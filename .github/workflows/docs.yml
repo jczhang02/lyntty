@@ -7,9 +7,14 @@ on:
       - "docs/**"
       - "AGENTS.md"
       - "CONTEXT-MAP.md"
-      - "astro.config.mjs"
-      - "src/content.config.ts"
-      - "scripts/prepare-starlight-pages.mjs"
+      - "app/**"
+      - "lib/**"
+      - "mdx-components.tsx"
+      - "next.config.mjs"
+      - "source.config.ts"
+      - "tsconfig.json"
+      - "scripts/prepare-fumadocs-pages.mjs"
+      - "scripts/write-fumadocs-agent-files.mjs"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/docs.yml"
@@ -37,17 +42,17 @@ jobs:
       - name: Install docs toolchain
         run: npm ci
 
-      - name: Check Starlight docs
+      - name: Check Fumadocs site
         run: npm run docs:check
 
-      - name: Build Starlight site
+      - name: Build Fumadocs site
         run: npm run docs:build
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: out
 
   deploy:
     needs: build

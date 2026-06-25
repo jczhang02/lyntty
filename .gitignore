@@ -6,9 +6,16 @@
 # JavaScript docs tooling
 node_modules/
 dist/
+out/
+.next/
 .astro/
+.source/
+tsconfig.tsbuildinfo
 
-# Generated Starlight pages; source docs stay in Markdown.
+# Generated Fumadocs pages; source docs stay in Markdown.
+content/docs/
+
+# Retired Starlight generated pages.
 src/content/docs/
 
 # Retired Tangly mirrors.
