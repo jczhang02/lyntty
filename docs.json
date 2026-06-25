@@ -1,8 +1,8 @@
 {
-  "$schema": "./node_modules/tangly/schema/docs.json",
+  "$schema": "https://tangly.dev/schema/docs.json",
   "name": "Lyntty Docs",
   "description": "Product, architecture, agent, and recovery documentation for Lyntty.",
-  "theme": "tang",
+  "theme": "readable",
   "colors": {
     "primary": "#2563eb"
   },
@@ -10,7 +10,7 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Start",
+        "tab": "English",
         "groups": [
           {
             "group": "Overview",
@@ -18,36 +18,36 @@
               "docs/README",
               "CONTEXT-MAP"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Product",
-        "groups": [
+          },
           {
-            "group": "PRD",
+            "group": "Product",
             "pages": [
               "docs/prds/lyntty-product",
-              "docs/prds/lyntty-product.zh"
+              "docs/recovered/previous-lyntty-decisions"
             ]
           },
           {
-            "group": "Recovered decisions",
+            "group": "Domain",
             "pages": [
-              "docs/recovered/previous-lyntty-decisions",
-              "docs/recovered/previous-lyntty-decisions.zh"
+              "docs/contexts/product/CONTEXT"
             ]
           }
         ]
       },
       {
-        "tab": "Domain",
+        "tab": "中文",
         "groups": [
           {
-            "group": "Contexts",
+            "group": "产品",
             "pages": [
-              "docs/contexts/product/CONTEXT",
-              "docs/contexts/product/CONTEXT.zh"
+              "docs/prds/zh/lyntty-product",
+              "docs/recovered/zh/previous-lyntty-decisions"
+            ]
+          },
+          {
+            "group": "领域",
+            "pages": [
+              "docs/contexts/product/zh/CONTEXT"
             ]
           }
         ]
@@ -59,11 +59,16 @@
             "group": "Skill configuration",
             "pages": [
               "docs/agents/issue-tracker",
-              "docs/agents/issue-tracker.zh",
               "docs/agents/triage-labels",
-              "docs/agents/triage-labels.zh",
-              "docs/agents/domain",
-              "docs/agents/domain.zh"
+              "docs/agents/domain"
+            ]
+          },
+          {
+            "group": "技能配置（中文）",
+            "pages": [
+              "docs/agents/zh/issue-tracker",
+              "docs/agents/zh/triage-labels",
+              "docs/agents/zh/domain"
             ]
           },
           {
@@ -75,7 +80,16 @@
           }
         ]
       }
-    ]
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/jczhang02/lyntty",
+          "icon": "github"
+        }
+      ]
+    }
   },
   "search": {
     "prompt": "Search Lyntty docs..."
@@ -86,8 +100,6 @@
     "readingProgress": true
   },
   "footer": {
-    "lastUpdated": true,
-    "repo": "https://github.com/jczhang02/lyntty",
-    "editUrl": "https://github.com/jczhang02/lyntty/edit/main/{path}"
+    "lastUpdated": false
   }
 }

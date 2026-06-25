@@ -9,6 +9,8 @@ node_modules/
 dist/
 
 # Generated Tangly mirrors; source docs stay in Markdown.
+.tangly/
+tangly-site/
 AGENTS.mdx
 CONTEXT-MAP.mdx
 docs/**/*.mdx
