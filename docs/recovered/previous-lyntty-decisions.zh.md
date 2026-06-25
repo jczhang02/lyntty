@@ -48,15 +48,15 @@ Brand personality：calm cockpit。
 - flashy dashboard；
 - 带 avatars/personas/unsupported claims 的 multi-agent theater。
 
-## Grill 决策：Home Hierarchy
+## Home Hierarchy 决策
 
-旧 grill prep 推荐的 primary model：
+旧 grill prep 曾推荐 node-first 和 attention-first inbox。当前产品方向改为 session-first 日常导航：
 
-1. Paired nodes / Node Management。
-2. Attention-first Global Inbox。
-3. Session Remote。
-4. Review Evidence。
-5. Settings / pairing recovery。
+1. Sessions Home。
+2. Session Remote。
+3. Review Evidence。
+4. Node Management / pairing。
+5. Settings / recovery。
 
 已拒绝模型：
 
@@ -66,9 +66,9 @@ Brand personality：calm cockpit。
 
 原因：
 
-- Node/computer 是用户关心的 pairing object：ThinkPad、Mac Studio、lab desktop。
-- Session/runtime 是当前 protocol truth。
-- Attention state 决定手机交互是否有用。
+- Session/runtime 是当前 protocol truth，也是用户每天要恢复或监督的对象。
+- Node/computer 仍然重要，但主要用于 pairing、trust、diagnostics 和选择新工作运行位置。
+- Attention state 应放在 session rows 上，不做成独立产品对象。
 - Task labels 以后可由 session name/goal 派生。
 - Chat/composer 是 session action，不是整个产品。
 - Connection details 属于 onboarding/settings/recovery。
@@ -105,16 +105,17 @@ Layout constraint：
 - Header/context 与 add/recovery actions 保持可触达。
 - Paired-node collection 使用 bounded internal scroll。
 
-## Global Inbox 决策
+## Sessions Home 决策
 
-Global Inbox 回答：我现在需要做什么吗？
+Sessions Home 回答：现在有哪些工作可以恢复、解锁或检查？
 
 优先级：
 
 1. needs-attention sessions；
 2. running sessions；
-3. node list/status；
-4. new session 和 node-management actions。
+3. recent sessions；
+4. completed/error sessions；
+5. node filter、new session、node-management actions。
 
 Needs-attention 示例：
 
@@ -168,8 +169,8 @@ Review 展示：
 Pi-compatible composer：
 
 - runtime idle：发送 normal prompt；
-- runtime running：默认发送 `steer`；
-- 显式 follow-up action/button/long-press，用于 queued next-turn input；
+- runtime running：默认排队 follow-up；
+- `steer` 是显式 interrupt action；
 - 支持 runtime 能力范围内的 abort/interrupt；
 - event feed 显示 command source。
 
@@ -199,12 +200,12 @@ Slash command strategy：
 - Nodes 使用 CLI/config 生成的 node tokens。
 - Production 需要 TLS。
 - Events 离开 node 前做 basic redaction：常见 API keys、secret env values、private key blocks、auth headers。
-- v0 不做 E2E encryption。
+- 完整 E2E encryption 不属于当前产品范围。
 - Phone 是 trusted self-host surface，不是 zero-trust boundary。
 
 ## Notifications 决策
 
-Android v0 使用 FCM。
+Android 使用 FCM。
 
 Triggers：
 
@@ -216,11 +217,11 @@ Triggers：
 - node disconnects/reconnects；
 - queued session starts or blocks。
 
-v0 不做 Telegram/ntfy/Discord。Web Push 不是 v0 product target。
+Telegram、ntfy、Discord、Web Push 不属于当前产品范围。
 
 ## Diff / Artifact / Preview 决策
 
-Android v0 应展示：
+Android 应展示：
 
 - changed files；
 - git diff summary 和 per-file diff；
@@ -260,7 +261,7 @@ Backend/node：
 - pi extension 用于 native session control。
 - pi SDK `AgentSessionRuntime` 用于 headless sessions。
 
-Android v0 product client：
+Android product client：
 
 - Kotlin + Jetpack Compose + Material 3。
 - Lean multi-module app。
@@ -270,18 +271,18 @@ Android v0 product client：
 - WebView preview。
 - Maestro E2E。
 
-v0.3 dogfood exception：
+恢复的 dogfood exception：
 
 - 在 `apps/client/` 增加 bounded Expo + HeroUI Native Android dogfood client。
 - 保留 Kotlin `apps/android/`；不要删除或 rewrite。
 - 抽取 UI-free shared TypeScript behavior 到 `packages/client-core/`。
-- Web/PWA 不是 v0.3 acceptance。
+- Web/PWA 不是该 dogfood gate 的 acceptance。
 
 ## ADR 0001 摘要
 
-v0.3 accepted decision：
+恢复的 ADR decision：
 
-- `apps/client/` 是 v0.3 dogfood control client，不是 product web/PWA client。
+- `apps/client/` 是 bounded dogfood control client，不是 product web/PWA client。
 - `packages/client-core/` 不得依赖 React Native、Expo SecureStore、HeroUI Native。
 - Expo app 负责 SecureStore、platform URLs、React Native WebSocket behavior。
 - Canonical history 留在 node 的 Pi JSONL。
@@ -296,11 +297,11 @@ v0.3 accepted decision：
 
 旧删除 repo 已有大量实现与 docs：
 
-- v0.1 real-alpha 作为 unreleased technical gate 完成。
-- v0.2 dogfood-local 完成。
-- v0.3 HeroUI Native dogfood gate 于 2026-06-09 通过 emulator/public-preview/native-smoke scope。
+- real-alpha gate 作为 private technical gate 完成。
+- dogfood-local gate 完成。
+- HeroUI Native dogfood gate 于 2026-06-09 通过 emulator/public-preview/native-smoke scope。
 - Physical phone 未运行，因为没有连接实体 Android device。
-- 旧 git state：branch `main` 比旧 `origin/main` ahead 16 commits，且有大量 uncommitted v0.3 files。
+- 旧 git state：branch `main` 比旧 `origin/main` ahead 16 commits，且有大量 uncommitted dogfood files。
 
 重要旧 evidence：
 
@@ -310,13 +311,12 @@ v0.3 accepted decision：
 - Native `/lyntty` real-task smoke 编辑 fixture 并运行 Bun test。
 - Public tunnel preview smoke passed，要求 auth/binding，debug route blocked。
 
-## 当前 PRD 冲突记录
+## 当前产品对齐
 
-当前 fresh PRD 曾写成 `web/PWA + Android APK`、更 broad multi-agent。旧决策更窄：
+产品 PRD 已采用这些恢复决策里的窄方向：
 
-- v0 是 Android-first，不是 product PWA/web。
-- debug web 只是 developer tooling。
-- pi-first runtime 是 primary；Codex/OpenCode adapters 是 future extension points。
-- product 应避免 multi-agent theater。
-
-后续已选择：用旧决策修正 issue #1 和 PRD，收窄 v0 scope。
+- Android-first product surface，不做 product PWA/web。
+- Debug web 只是 developer tooling。
+- `pi` runtime 是 primary；Codex/OpenCode adapters 是 future extension points。
+- Sessions Home 是日常入口；Node Management 是二级管理界面。
+- Product 应避免 multi-agent theater。
