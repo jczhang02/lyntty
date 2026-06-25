@@ -3,3 +3,12 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# JavaScript docs tooling
+node_modules/
+dist/
+
+# Generated Tangly mirrors; source docs stay in Markdown.
+AGENTS.mdx
+CONTEXT-MAP.mdx
+docs/**/*.mdx

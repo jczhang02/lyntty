@@ -1,0 +1,93 @@
+{
+  "$schema": "./node_modules/tangly/schema/docs.json",
+  "name": "Lyntty Docs",
+  "description": "Product, architecture, agent, and recovery documentation for Lyntty.",
+  "theme": "tang",
+  "colors": {
+    "primary": "#2563eb"
+  },
+  "siteUrl": "https://jczhang02.github.io",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Start",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "docs/README",
+              "CONTEXT-MAP"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Product",
+        "groups": [
+          {
+            "group": "PRD",
+            "pages": [
+              "docs/prds/lyntty-product",
+              "docs/prds/lyntty-product.zh"
+            ]
+          },
+          {
+            "group": "Recovered decisions",
+            "pages": [
+              "docs/recovered/previous-lyntty-decisions",
+              "docs/recovered/previous-lyntty-decisions.zh"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Domain",
+        "groups": [
+          {
+            "group": "Contexts",
+            "pages": [
+              "docs/contexts/product/CONTEXT",
+              "docs/contexts/product/CONTEXT.zh"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Agents",
+        "groups": [
+          {
+            "group": "Skill configuration",
+            "pages": [
+              "docs/agents/issue-tracker",
+              "docs/agents/issue-tracker.zh",
+              "docs/agents/triage-labels",
+              "docs/agents/triage-labels.zh",
+              "docs/agents/domain",
+              "docs/agents/domain.zh"
+            ]
+          },
+          {
+            "group": "Editing rules",
+            "pages": [
+              "AGENTS",
+              "docs/AGENTS"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "search": {
+    "prompt": "Search Lyntty docs..."
+  },
+  "appearance": {
+    "default": "system",
+    "readingTime": true,
+    "readingProgress": true
+  },
+  "footer": {
+    "lastUpdated": true,
+    "repo": "https://github.com/jczhang02/lyntty",
+    "editUrl": "https://github.com/jczhang02/lyntty/edit/main/{path}"
+  }
+}

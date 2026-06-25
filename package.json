@@ -1,0 +1,14 @@
+{
+  "name": "lyntty-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "docs:prepare": "node scripts/prepare-tangly-pages.mjs",
+    "docs:check": "npm run docs:prepare && tangly check --strict",
+    "docs:build": "npm run docs:prepare && tangly build --adapter static",
+    "docs:preview": "tangly preview"
+  },
+  "devDependencies": {
+    "tangly": "0.2.2"
+  }
+}
