@@ -3,12 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "docs:prepare": "node scripts/prepare-tangly-pages.mjs",
-    "docs:check": "npm run docs:prepare && tangly check --strict",
-    "docs:build": "npm run docs:prepare && tangly build --adapter static",
-    "docs:preview": "tangly preview"
+    "docs:prepare": "node scripts/prepare-starlight-pages.mjs",
+    "docs:check": "npm run docs:prepare && astro check",
+    "docs:build": "npm run docs:prepare && astro build && node scripts/write-starlight-agent-files.mjs",
+    "docs:preview": "astro preview"
   },
   "devDependencies": {
-    "tangly": "0.2.2"
+    "@astrojs/check": "0.9.4",
+    "@astrojs/starlight": "0.40.0",
+    "astro": "6.4.8",
+    "typescript": "5.9.3"
   }
 }

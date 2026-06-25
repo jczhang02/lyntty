@@ -1,4 +1,3 @@
-
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
@@ -7,8 +6,12 @@
 # JavaScript docs tooling
 node_modules/
 dist/
+.astro/
 
-# Generated Tangly mirrors; source docs stay in Markdown.
+# Generated Starlight pages; source docs stay in Markdown.
+src/content/docs/
+
+# Retired Tangly mirrors.
 .tangly/
 tangly-site/
 AGENTS.mdx

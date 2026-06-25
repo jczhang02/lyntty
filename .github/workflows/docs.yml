@@ -7,8 +7,11 @@ on:
       - "docs/**"
       - "AGENTS.md"
       - "CONTEXT-MAP.md"
-      - "docs.json"
+      - "astro.config.mjs"
+      - "src/content.config.ts"
+      - "scripts/prepare-starlight-pages.mjs"
       - "package.json"
+      - "package-lock.json"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -34,13 +37,11 @@ jobs:
       - name: Install docs toolchain
         run: npm ci
 
-      - name: Check Tangly docs
+      - name: Check Starlight docs
         run: npm run docs:check
 
-      - name: Build Tangly site
-        run: npm run docs:build -- --base /lyntty/
-        env:
-          TANGLY_SITE_URL: https://jczhang02.github.io
+      - name: Build Starlight site
+        run: npm run docs:build
 
       - uses: actions/configure-pages@v5
 
