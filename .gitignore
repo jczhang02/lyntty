@@ -14,6 +14,7 @@ tsconfig.tsbuildinfo
 
 # Generated Fumadocs pages; source docs stay in Markdown.
 content/docs/
+docs/.site/content/docs/
 
 # Retired Starlight generated pages.
 src/content/docs/

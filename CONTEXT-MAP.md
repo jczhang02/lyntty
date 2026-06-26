@@ -6,7 +6,7 @@ This repo uses a multi-context domain-doc layout.
 
 | Context | Purpose | Domain doc | Source docs |
 | ------- | ------- | ---------- | ----------- |
-| Product | Android-first remote control product model for local `pi` sessions | `docs/contexts/product/CONTEXT.md` | `docs/prds/lyntty-product.md`, `docs/recovered/previous-lyntty-decisions.md` |
+| Product | Android-first remote control product model for local `pi` sessions | `docs/contexts/product/CONTEXT.md` | `docs/prds/lyntty-product.md`, `docs/roadmap.md`, `docs/recovered/previous-lyntty-decisions.md` |
 
 ## ADRs
 

@@ -16,5 +16,7 @@ Current bilingual docs:
 - `contexts/product/CONTEXT.zh.md`
 - `prds/lyntty-product.md`
 - `prds/lyntty-product.zh.md`
+- `roadmap.md`
+- `roadmap.zh.md`
 - `recovered/previous-lyntty-decisions.md`
 - `recovered/previous-lyntty-decisions.zh.md`

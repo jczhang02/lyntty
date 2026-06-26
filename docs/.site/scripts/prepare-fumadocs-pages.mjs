@@ -1,7 +1,8 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 const CONTENT_ROOT = "content/docs";
+const REPO_ROOT = "../..";
 
 const sourcePages = [
   {
@@ -28,6 +29,18 @@ const sourcePages = [
     target: "prds/lyntty-product.zh.mdx",
     title: "Lyntty 产品 PRD",
     description: "Lyntty 的产品需求和产品框架。",
+  },
+  {
+    source: "docs/roadmap.md",
+    target: "roadmap.mdx",
+    title: "Lyntty Roadmap",
+    description: "Implementation roadmap for Lyntty.",
+  },
+  {
+    source: "docs/roadmap.zh.md",
+    target: "roadmap.zh.mdx",
+    title: "Lyntty Roadmap",
+    description: "Lyntty 的实现路线图。",
   },
   {
     source: "docs/recovered/previous-lyntty-decisions.md",
@@ -108,7 +121,7 @@ const generatedPages = [
     target: "index.zh.mdx",
     title: "Lyntty 文档",
     description: "Lyntty 中文文档入口。",
-    body: `# Lyntty 文档\n\n这里是 Lyntty 文档的中文入口。\n\n## 中文文档\n\n- [产品 PRD](prds/lyntty-product)\n- [历史决策](recovered/previous-lyntty-decisions)\n- [产品上下文](contexts/product)\n- [Issue 跟踪](agents/issue-tracker)\n- [分诊标签](agents/triage-labels)\n- [领域文档](agents/domain)\n`,
+    body: `# Lyntty 文档\n\n这里是 Lyntty 文档的中文入口。\n\n## 中文文档\n\n- [产品 PRD](prds/lyntty-product)\n- [路线图](roadmap)\n- [历史决策](recovered/previous-lyntty-decisions)\n- [产品上下文](contexts/product)\n- [Issue 跟踪](agents/issue-tracker)\n- [分诊标签](agents/triage-labels)\n- [领域文档](agents/domain)\n`,
   },
 ];
 
@@ -119,6 +132,7 @@ const rootMeta = {
     "context-map",
     "---Product---",
     "prds/lyntty-product",
+    "roadmap",
     "recovered/previous-lyntty-decisions",
     "---Domain---",
     "contexts/product",
@@ -138,6 +152,7 @@ const zhMeta = {
     "context-map",
     "---产品---",
     "prds/lyntty-product",
+    "roadmap",
     "recovered/previous-lyntty-decisions",
     "---领域---",
     "contexts/product",
@@ -174,7 +189,7 @@ function writePage(target, content) {
 rmSync(CONTENT_ROOT, { force: true, recursive: true });
 
 for (const page of sourcePages) {
-  let body = readFileSync(page.source, "utf8");
+  let body = readFileSync(join(REPO_ROOT, page.source), "utf8");
   for (const [oldText, newText] of page.replacements ?? []) {
     body = body.replaceAll(oldText, newText);
   }

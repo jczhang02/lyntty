@@ -1,130 +1,158 @@
-# PRD: Lyntty Product
+# Lyntty: Android control layer for the `pi` coding agent
 
-Product frame: Android-first remote control for local `pi` sessions
-Triage label: ready-for-agent
+Product frame: Lyntty is the Android control layer for the `pi` coding agent, similar to what Claude Code Remote is for Claude Code.
+
+Runtime path: the Android app connects through `relay` to the local computer/node running `lynttyd`; that node's `active runtime` advances the `pi` session. Repositories, tools, MCP servers, credentials, and canonical `pi` session JSONL stay on the node. Android does not hold the workspace or execute code.
 
 ## Problem Statement
 
-JC wants to keep supervising real `pi` coding sessions from an Android phone while away from the desk. Today, terminal-first agent work requires the computer to be nearby for prompts, steering, approvals, aborts, diffs, tests, and recovery. Generic SSH, remote desktop, terminal mirrors, chat wrappers, and task-board products either expose too much machine surface area or hide the session/runtime truth that matters during agent work.
+When the user leaves the computer, they still need to control the local computer/node `pi` session from Android: add requirements, check progress, confirm sensitive actions, stop wrong runs, inspect changes and run results, and recover context after app sleep, network loss, or node reconnect.
 
-Lyntty should make native and headless `pi` sessions controllable from Android without turning the phone into a tiny IDE. The phone should answer: which paired node needs attention, what is the session doing, what evidence exists, and what is the safest next control action.
+Today those actions usually pull the user back to the desk or force a fallback to SSH, remote desktop, a terminal mirror, or another chat wrapper. SSH and remote desktop expose too much machine surface area; terminal mirrors are unreadable on a phone; ordinary chat wrappers cannot show the real session/runtime state, activation lock, changed files, test/check results, errors, artifacts/previews, or `history_gap`.
 
 ## Solution
 
-Build Lyntty as a single-user, self-hosted, Android-first remote-control surface for `pi` agent sessions.
+Lyntty is a single-user, self-hosted, Android-first control layer for the `pi` coding agent. It is not remote desktop, a phone IDE, terminal mirror, task board, or PR manager. The phone only controls work: send requests, read replies, confirm actions, ask follow-ups, interrupt, or stop a task. Real operations happen on the node.
 
-The phone is a calm cockpit: entry, supervision, approval, interruption, evidence review, and follow-up control. Real work stays on the paired node. Local files, repositories, tools, MCP servers, credentials, and canonical `pi` session JSONL remain on the computer or server running `lynttyd`.
+Core use path:
 
-Primary surfaces:
+1. `Sessions Home`: daily entry for needs attention, running, recent, failed, and completed sessions.
+2. `Session Remote`: main control page, shaped like a phone chat. The user sends requests to `pi`, reads replies, confirms actions, asks follow-ups, interrupts or stops tasks, and sees changes, run results, errors, previews, and next steps.
+   - `Review Evidence`: review mode inside `Session Remote`, not a standalone page and not PR review. It appears when a session finishes, fails, waits for confirmation, or the user opens it. It collects changed files, diff summary, test/check results, command summary, errors, event timeline, artifacts/previews, recovery state, and next actions. The user can ask a follow-up, ask `pi` to add tests or fix issues, open the workspace on the computer, or export evidence. Current scope does not include merge, push, or PR approval.
+3. `Node Management`: manage paired computers, pairing, trust, heartbeat, roots, and diagnostics.
+4. `Settings / Recovery`: manage `relay` URL, owner/device binding, revocation, diagnostics, and recovery entry points.
 
-1. Sessions Home — daily entry for recent, running, waiting, failed, and completed sessions.
-2. Session Remote — main cockpit for one active session/runtime.
-3. Review Evidence — diffs, tests, commands, logs, events, artifacts, previews, and recovery context.
-4. Node Management / Pairing — manage paired computers and explicit QR/code pairing.
-5. Settings / Recovery — relay URL, owner/device binding, revocation, diagnostics.
-
-The build should prove one robust vertical slice: pair Android with a local node, continue or create a `pi` session, stream structured events, send prompt/follow-up/steer/abort, show evidence, reconnect, and preserve one active runtime per session.
+Current work should first prove one minimum viable path: pair Android with a local node, continue or create a `pi` session, show live progress, send new requests, add follow-up context, redirect active work, stop a run, show changes and run results, reconnect, and preserve one active runtime per session.
 
 ## User Stories
 
-1. As JC, I want to pair my Android phone with my development computer by QR or short code, so that setup is fast and explicit.
-2. As JC, I want paired nodes named like ThinkPad or Mac Studio, so that I know which computer I am controlling.
-3. As JC, I want Node Management to show node health, last heartbeat, root/workspace, and trust state, so that computer status is clear.
-4. As JC, I want Add Node and recovery actions always reachable, so that a long node list does not hide setup controls.
-5. As JC, I want relay URL and owner token hidden after setup, so that daily UI does not feel like a debug form.
-6. As JC, I want Sessions Home sorted by useful state, so that waiting, failed, running, and recent sessions are easy to find.
-7. As JC, I want waiting-input sessions to outrank idle recent sessions, so that I unblock agents quickly.
-8. As JC, I want running sessions visible near the top, so that I can check progress without hunting.
-9. As JC, I want offline, stale, revoked, blocked, and history-gap states spelled out, so that recovery path is obvious.
-10. As JC, I want to open a native `pi` session from Android after `/lyntty` is enabled, so that phone input reaches the same runtime as desktop input.
-11. As JC, I want to create a new headless `pi` session from Android, so that I can start bounded work away from my desk.
-12. As JC, I want to resume a recent `pi` session from Android, so that I do not re-explain context.
-13. As JC, I want native TUI, Android, and debug tooling to control the same active runtime, so that surfaces stay in sync.
-14. As JC, I want Lyntty to prevent two active runtimes from advancing one session, so that work is not duplicated or corrupted.
-15. As JC, I want explicit takeover/release language, so that runtime switches are deliberate.
-16. As JC, I want busy runtime takeover to require stop/wait/interrupt choice, so that I do not accidentally kill useful work.
-17. As JC, I want the Session Remote header to show repo, node, runtime state, model, and connection state, so that I understand context at a glance.
-18. As JC, I want a Now strip with current action, elapsed time, and last event, so that I know what the agent is doing.
-19. As JC, I want token-by-token or event-by-event structured updates, so that long work feels alive.
-20. As JC, I want tool calls rendered as cards, so that commands, reads, writes, edits, and results are readable on a phone.
-21. As JC, I want low-level streaming updates collapsed by default, so that the event feed remains usable.
-22. As JC, I want filters for events, commands, logs, diffs, tests, and errors, so that evidence inspection is quick.
-23. As JC, I want raw logs available only on drill-down, so that debug detail does not dominate the daily UI.
-24. As JC, I want the composer above the keyboard, so that next instructions are easy to send one-handed.
-25. As JC, I want idle runtime input to send a normal prompt, so that Android behaves like native pi.
-26. As JC, I want running runtime input to default to queued follow-up, so that I can add next-turn context without interrupting current work.
-27. As JC, I want steer to be explicit, so that I redirect active work only when I mean to interrupt it.
-28. As JC, I want abort/interrupt controls behind confirmation, so that I can stop bad runs without accidental taps.
-29. As JC, I want common slash commands exposed through a command palette, so that mobile actions do not require memorizing commands.
-30. As JC, I want local-only slash commands marked clearly, so that I know when laptop-side action is required.
-31. As JC, I want native pi confirmations that cannot be answered remotely to show “needs computer-side confirmation”, so that Lyntty does not fake unsupported approvals.
-32. As JC, I want remote-safe approvals or extension UI requests surfaced as cards near the composer, so that I can answer them quickly.
-33. As JC, I want changed files summarized after a run, so that I can review impact from phone.
-34. As JC, I want per-file diffs readable on Android, so that I can decide follow-up versus laptop review.
-35. As JC, I want test results shown as summary plus expandable detail, so that pass/fail evidence is clear.
-36. As JC, I want command output summarized with detail available, so that I can inspect failures without terminal mirroring.
-37. As JC, I want a Review Evidence mode, so that finished work can be judged separately from live progress.
-38. As JC, I want review actions like send follow-up, accept locally, open on laptop, or export evidence, so that mobile review leads to action.
-39. As JC, I want no merge/push action in current product scope, so that Lyntty does not pretend to be a PR manager.
-40. As JC, I want Android notifications when a session finishes, waits, fails, needs local confirmation, or node disconnects, so that I can leave the app.
-41. As JC, I want reconnect to backfill by sequence number, so that app sleep or network loss does not drop context.
-42. As JC, I want duplicate events ignored after reconnect, so that the feed does not show repeated actions.
-43. As JC, I want `history_gap` shown when continuity cannot be proven, so that missing context is explicit.
-44. As JC, I want owner-token login once and stored device token afterward, so that daily launch opens directly to sessions.
-45. As JC, I want device revocation, so that a lost phone can be removed.
-46. As JC, I want basic secret redaction before events leave the node, so that obvious tokens do not appear on relay/phone.
-47. As JC, I want project/cwd roots and recent session cwd values, so that session creation targets real workspaces.
-48. As JC, I want Android-created git sessions to use a temporary worktree by default, so that experiments do not dirty the main checkout unexpectedly.
-49. As JC, I want dirty worktrees never auto-deleted, so that agent changes are not lost.
-50. As JC, I want node capacity and queue state visible, so that blocked starts are understandable.
-51. As JC, I want static HTML artifact preview when safe, so that small generated demos can be inspected on phone.
-52. As JC, I want live dev-server preview through a constrained proxy, so that simple app output can be checked without remote desktop.
-53. As JC, I want Android WebView previews jailed and tokenized, so that preview does not become arbitrary filesystem access.
-54. As JC, I want debug web console only as development tooling, so that product scope stays Android-first.
-55. As JC, I want future adapter seams for Codex/OpenCode, so that Lyntty can grow without compromising the pi-first product line.
-56. As JC, I want human-readable labels instead of raw IDs, so that phone supervision stays calm.
-57. As JC, I want reduced-motion and large touch targets, so that the Android UI is usable one-handed.
-58. As JC, I want dark/light support eventually, but state clarity first, so that design serves control not decoration.
-59. As JC, I want stable test IDs, so that mobile E2E can validate real flows.
-60. As JC, I want final acceptance evidence recorded in repo docs, so that agent work remains inspectable across sessions.
+### 1. Pair Android with a node
+
+The user opens the app for the first time and pairs the Android device with a node running `lynttyd` by QR or short code.
+
+Acceptance:
+
+- `Node Management` shows node name, health, last heartbeat, roots/workspace, and trust state.
+- Add Node and recovery actions always stay reachable.
+- relay URL and owner token are hidden after setup; daily UI does not look like a debug form.
+- owner token is used only for first login; later launches use a revocable device token.
+
+### 2. Continue or create a `pi` session from phone
+
+The user finds waiting, running, failed, and recent sessions in `Sessions Home`, then continues an existing session or creates a headless `pi` session.
+
+Acceptance:
+
+- waiting sessions outrank ordinary recent sessions; running sessions stay near the top.
+- native `/lyntty` session, Android-created headless session, and recent session resume all use the same session/runtime model.
+- Android-created git sessions default to temporary worktree; dirty worktrees are never auto-deleted.
+- Current product scope does not provide merge, push, or PR approval.
+
+### 3. Supervise an active session
+
+The user enters `Session Remote` and sees repo, node, runtime state, model, connection state, current action, elapsed time, and last event.
+
+Acceptance:
+
+- Android app, native pi TUI, and debug tooling (development only) observe the same active runtime.
+- A session can have only one active runtime; runtime switch uses explicit takeover/release.
+- busy runtime takeover requires stop/wait/interrupt choice.
+- token-by-token or event-by-event updates are visible; low-level events are collapsed by default and can be filtered by progress, commands, logs, changes, checks, and errors.
+
+### 4. Send input, add context, interrupt, and stop
+
+The user sends a new request from the phone; during a run they can queue next-turn context, explicitly redirect active work, or stop the task.
+
+Acceptance:
+
+- input box stays above the keyboard and works one-handed.
+- idle input sends a new request; running input defaults to queued next-turn context.
+- redirecting active work and stopping a task are explicit actions and require confirmation.
+- common slash commands are exposed through a command palette; local-only slash commands are clearly marked.
+
+### 5. Handle confirmations and constrained actions
+
+The user answers confirmations that can be handled from phone; native `pi` confirmations that cannot be answered remotely clearly send the user back to the computer.
+
+Acceptance:
+
+- Lyntty does not invent an extra confirmation/risk gate.
+- It only surfaces confirmation requests already supported by pi/runtime.
+- Unsupported remote confirmations show “needs computer-side confirmation”.
+- phone-answerable confirmations or extension UI requests appear near the input box.
+
+### 6. Review what `pi` did
+
+The user opens `Review Evidence` to inspect changed files, diff summary, test/check results, command summary, errors, event timeline, artifacts/previews, recovery state, and next actions for the session.
+
+Acceptance:
+
+- command output is summarized first, with details expandable.
+- per-file changes are readable on Android.
+- test/check results show summary plus expandable detail.
+- next actions include ask follow-up, ask `pi` to add tests or fix issues, open workspace on computer, and export evidence; they do not include merge, push, or PR approval.
+
+### 7. Reconnect and recover
+
+After app sleep, network loss, or node reconnect, the user returns to the app and recovers session context.
+
+Acceptance:
+
+- reconnect backfills by sequence number.
+- duplicate events are ignored.
+- if continuity cannot be proven, `history_gap` is shown.
+- offline, stale, revoked, and blocked states have clear recovery paths.
+
+### 8. Preview safely and receive notifications
+
+The user receives session state notifications and previews small results inside safety boundaries.
+
+Acceptance:
+
+- Android notifications are sent when a session finishes, waits, fails, needs local confirmation, or node disconnects.
+- basic secret redaction happens before events leave the node.
+- static HTML artifact and constrained live dev-server preview are jailed, read-only, tokenized, WebView-safe, and have no native bridge.
+- debug web console is development tooling only, not a product web client.
 
 ## Implementation Decisions
 
 - Lyntty is Android-first. A product PWA/web client is not part of the current product direction; debug web remains development tooling only.
-- Lyntty is pi-first. Native pi extension and pi SDK runtime are first-class; Codex/OpenCode/other adapters are future seams.
+- Lyntty is pi-first. Native pi extension and pi SDK runtime are first-class; current scope supports only `pi` runtime.
 - The product model is node/session/runtime/evidence, not task/backlog/project-board.
-- Session is the primary domain object. A session maps to durable pi conversation/history identity, usually pi JSONL.
-- Node is a paired computer or server running `lynttyd`.
-- Surface is any control entry: native pi TUI, Android app, or debug web console.
-- Active runtime is the process currently advancing a session. One session can have only one active runtime.
-- Use relay lease + runtime heartbeat + stale state + explicit takeover to enforce activation lock.
+- Session is the main domain object. A session maps to durable pi conversation/history identity, usually `pi` JSONL.
+- node is a paired computer or server running `lynttyd`.
+- Product surfaces are Android app and native pi TUI integration. `debug web console` is a development surface for protocol debugging and E2E assistance, not a product web client.
+- active runtime is the process currently advancing a session. One session can have only one active runtime.
+- Use `relay` lease, runtime heartbeat, stale state, and explicit takeover to enforce activation lock.
 - Multiple authenticated surfaces can control the same active runtime.
-- Native pi extension connects only to local `lynttyd`; only `lynttyd` connects to relay.
-- Relay and `lynttyd` are logically separate deployables. Local development may start both together.
-- Relay routes events and commands, authenticates owner/device/node tokens, stores metadata/cache/queue, and does not become canonical history.
-- Pi session JSONL remains canonical history.
+- Native pi extension connects only to local `lynttyd`; only `lynttyd` connects to `relay`.
+- `relay` and `lynttyd` are logically separate deployables. Local development may start both together.
+- `relay` routes events and commands, authenticates owner/device/node tokens, stores metadata/cache/queue, and does not become canonical history.
+- `pi` session JSONL remains canonical history.
 - `lynttyd` owns node-local event cache, per-session sequence allocation, root scanning, path completion, SDK runtime start/resume, activation lock participation, capacity, worktree management, and preview proxying.
-- Android uses Sessions Home, Session Remote, Review Evidence, Node Management/Pairing, and Settings/Recovery as primary navigation concepts.
-- Sessions Home is the daily entry. It shows sessions by useful state: needs attention, running, recent, completed/error.
-- Node Management is for paired computers, pairing, trust, heartbeat, roots, and diagnostics. It must not become the daily session inbox.
-- Session Remote uses a structured event feed, not a terminal mirror.
-- Composer follows pi semantics: idle sends a prompt; running defaults to queued follow-up; steer is explicit; abort is confirmed.
+- Android main navigation only includes `Sessions Home`, `Session Remote`, `Node Management`, and `Settings / Recovery`. `Review Evidence` is a mode/panel inside `Session Remote`, not a standalone main navigation item.
+- `Sessions Home` is the daily entry. It shows sessions by useful state: needs attention, running, recent, completed/error.
+- `Node Management` is for paired computers, pairing, trust, heartbeat, roots, and diagnostics. It must not become the daily session inbox.
+- `Session Remote` uses a structured event feed, not a terminal mirror; it can look like chat, but must expose runtime state and evidence anchors.
+- input box follows pi semantics: idle sends a new request; running defaults to queued next-turn context; redirecting active work is explicit; stop is confirmed.
 - Slash command support probes runtime capability; local-only commands are marked, unknown commands may be sent raw as fallback.
-- Lyntty does not invent an extra approval/risk gate. It surfaces pi/runtime approvals where supported and reports computer-side confirmations where not supported.
-- Full event stream is preserved with collapse/filter/search/pin behavior for mobile usability.
+- Lyntty does not invent extra confirmation/risk gates. It surfaces pi/runtime confirmation requests where supported and reports computer-side confirmations where not supported.
+- The full event stream is preserved with collapse/filter/search/pin behavior for mobile usability.
 - Events carry `eventId`, `sessionId`, `runtimeId`, `nodeId`, `seq`, timestamp, type, source, redacted payload, and optional local-only payload reference.
-- Reconnect uses last seen sequence; relay/node may redeliver; clients dedupe by sequence/event identity.
+- Reconnect uses last seen sequence; `relay`/node may redeliver; clients dedupe by sequence/event identity.
 - If recovery cannot prove continuity, emit visible `history_gap` before continuing.
 - Auth flow is owner token once, then persistent revocable device token in encrypted Android storage.
 - Basic redaction happens before events leave node. This is self-host trusted-surface security, not zero-trust E2E.
 - Notifications use FCM for Android. Telegram, ntfy, Discord, and Web Push are not part of current product scope.
-- Diff, artifact, static HTML preview, minimal live dev-server preview, and worktree cleanup state are required evidence surfaces.
+- `Review Evidence` must at least include changed files, diff summary, test/check results, command summary, errors, event timeline, artifacts/previews, recovery state, and next actions.
+- File changes, artifact, static HTML preview, minimal live dev-server preview, and worktree cleanup state are required evidence surfaces.
 - Static/live previews must be jailed, read-only, tokenized, and WebView-safe with no native bridge.
 - New Android-created git sessions default to worktree-if-git; dirty worktrees are never auto-deleted.
 - Node capacity defaults to 3 and full capacity creates visible queue state.
 - Preferred backend stack: Bun, Hono, WebSocket, SQLite WAL, JSONL, static/prepared SQL.
-- Preferred Android stack: Kotlin + Jetpack Compose + Material 3, lean multi-module architecture, OkHttp, Kotlinx Serialization, Room/DataStore where needed, FCM, WebView preview, Maestro E2E.
-- Recovered dogfood exception: a bounded Expo + HeroUI Native Android client may exist under `apps/client/`, but it must preserve the Kotlin app and keep UI-free behavior in `packages/client-core/`.
+- Preferred Android stack: React Native + Expo + TypeScript, HeroUI Native, Expo Router, TanStack Query, Expo SecureStore, Expo SQLite/AsyncStorage, Expo Notifications/FCM, WebView preview, Maestro E2E.
+- `apps/client/` is the main Android app workspace, built with Expo/React Native + HeroUI Native.
+- `packages/client-core/` stores UI-free behavior: session reducer, event grouping, reconnect/dedupe, Review Evidence summary, recovery state mapping, and command state machine. React Native UI consumes these states and does not implement protocol semantics directly.
 
 ## Testing Decisions
 
@@ -132,11 +160,11 @@ The build should prove one robust vertical slice: pair Android with a local node
 - The core acceptance test should drive Android -> relay -> `lynttyd` -> pi runtime -> event/evidence replay.
 - Tests should prove one active runtime per session through activation lock, lease heartbeat, stale state, and explicit takeover behavior.
 - Native pi continuation should be tested by enabling `/lyntty`, routing Android input to the same native runtime, and verifying both native and Android surfaces observe the same events.
-- Headless session path should be tested through pi SDK start/resume, prompt, steer, follow-up, abort, and persisted pi JSONL history.
-- Reconnect tests should cover REST backfill, WebSocket live stream, dedupe, history gap, command idempotency, and node reconnect.
+- Headless session path should be tested through pi SDK start/resume, sending new requests, redirecting active work, adding follow-up context, stopping runs, and persisted pi JSONL history.
+- Reconnect tests should cover REST backfill, WebSocket live stream, dedupe, `history_gap`, command idempotency, and node reconnect.
 - Event reducer tests should map raw events into session state, evidence summaries, collapsed feed groups, and detail drilldowns.
-- Android UI tests should use stable test IDs for Sessions Home, Node Management, Session Remote, composer, next steps, events/logs/commands/diff/test details, recovery states, and settings.
-- Maestro emulator flows should prove login/pairing, stored-device restore, continue latest, new session, send prompt, steer, abort, and evidence anchors.
+- Android UI tests should use stable test IDs for Sessions Home, Node Management, Session Remote, input box, next steps, events/logs/commands/change/test details, recovery states, and settings.
+- Maestro emulator flows should prove login/pairing, stored-device restore, continue latest, new session, send new request, redirect active work, stop run, and evidence anchors.
 - Physical Android should be supported and documented. If unavailable, final evidence must explicitly record emulator pass plus physical-phone not-run reason.
 - Security tests should cover owner token exchange, device token refresh, device binding, revocation, node token auth, unauthenticated rejection, expired token rejection, path traversal rejection, and redaction.
 - Preview tests should cover jail realpath checks, token expiry, no native bridge, WebView-safe settings, and no durable relay artifact storage.
@@ -160,16 +188,17 @@ The build should prove one robust vertical slice: pair Android with a local node
 - Arbitrary Android file editing.
 - Unrestricted dev-server tunneling.
 - Litter-style saved-app/widget runtime.
-- Extra Lyntty-invented approval gate beyond pi/runtime semantics.
-- Two active runtimes concurrently advancing the same session.
+- Extra Lyntty-invented confirmation gate beyond pi/runtime semantics.
+- Two active runtime processes concurrently advancing the same session.
 
 ## Further Notes
 
 - This PRD supersedes the earlier broad “web + APK multi-agent” framing. Recovered decisions from the deleted repo intentionally narrow the product to Android-first, pi-first remote control.
 - Reference products remain useful, but only selectively:
-  - Claude Code Remote Control: local execution, phone as control surface, reconnect, QR-style pairing.
+  - Claude Code Remote: local execution, phone as control surface, reconnect, QR-style pairing.
   - MindFS: structured tool/event cards and agent gateway ideas.
   - Litter: native mobile control and pairing patterns.
-- Lyntty should borrow remote-control and mobile supervision patterns, not become a terminal mirror, generic web client, or multi-agent theater.
+- Lyntty may borrow mobile supervision and remote-control patterns, but it does not become a terminal mirror, generic web client, or broad multi-agent product.
+- Future compatibility: protocol and `packages/client-core/` should not hard-code one runtime class, but current product supports only `pi`. Codex/OpenCode adapter seams stay future extension boundaries and do not enter current scope, UI, or acceptance.
 - Recovered source summary lives in `docs/recovered/previous-lyntty-decisions.md`.
-- Suggested initial engineering milestone: scaffold relay + `lynttyd` + pi extension stub + Android shell; prove pair/login, native `/lyntty` session registration, Android prompt/follow-up/steer, structured event feed, activation lock, reconnect, and evidence summary.
+- Suggested initial engineering milestone: scaffold `relay` + `lynttyd` + pi extension stub + Expo/React Native Android shell; prove pair/login, native `/lyntty` session registration, Android new request/follow-up context/redirect active work, structured event feed, activation lock, reconnect, and evidence summary.

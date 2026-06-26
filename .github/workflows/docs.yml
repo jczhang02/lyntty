@@ -7,16 +7,6 @@ on:
       - "docs/**"
       - "AGENTS.md"
       - "CONTEXT-MAP.md"
-      - "app/**"
-      - "lib/**"
-      - "mdx-components.tsx"
-      - "next.config.mjs"
-      - "source.config.ts"
-      - "tsconfig.json"
-      - "scripts/prepare-fumadocs-pages.mjs"
-      - "scripts/write-fumadocs-agent-files.mjs"
-      - "package.json"
-      - "package-lock.json"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -28,6 +18,10 @@ permissions:
 concurrency:
   group: pages
   cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: docs/.site
 
 jobs:
   build:
@@ -52,7 +46,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: out
+          path: docs/.site/out
 
   deploy:
     needs: build
