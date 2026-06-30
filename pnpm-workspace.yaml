@@ -1,0 +1,8 @@
+packages:
+  - "packages/lyntty-app"
+  - "packages/lyntty-agent"
+  - "packages/lyntty-cli"
+  - "packages/lyntty-relay"
+  - "packages/lyntty-wire"
+  - "packages/lyntty-app-logs"
+  - "packages/codium"

@@ -1,0 +1,887 @@
+--------- beginning of main
+07-01 01:31:54.553   575   642 D FileSystemUtils: Punching hole in file - start: 400543744 len:12288
+07-01 01:31:54.553   575   642 D FileSystemUtils: punchHolesInApk:: Size after punching holes st_blocks: 914992, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.553   575   642 D FileSystemUtils: Punching holes in file: /data/app/vmdl198612650.tmp/base.apk programHeaderOffset: 64 programHeaderNum: 9
+07-01 01:31:54.553   575   642 D FileSystemUtils: Total number of LOAD segments 3
+07-01 01:31:54.553   575   642 D FileSystemUtils: Size before punching holes st_blocks: 914992, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.553   575   642 D FileSystemUtils: Size after punching holes st_blocks: 914992, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.553   575   642 D FileSystemUtils: Extra field length: 14960,  Size before punching holes st_blocks: 914992, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.553   575   642 D FileSystemUtils: Extra field length: 14960 content near offset: 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07-01 01:31:54.553   575   642 D FileSystemUtils: Punching hole in file - start: 432918528 len:12288
+07-01 01:31:54.553   575   642 D FileSystemUtils: punchHolesInApk:: Size after punching holes st_blocks: 914968, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.553   575   642 D FileSystemUtils: Punching holes in file: /data/app/vmdl198612650.tmp/base.apk programHeaderOffset: 64 programHeaderNum: 9
+07-01 01:31:54.553   575   642 D FileSystemUtils: Total number of LOAD segments 3
+07-01 01:31:54.553   575   642 D FileSystemUtils: Size before punching holes st_blocks: 914968, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Size after punching holes st_blocks: 914968, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Extra field length: 16324,  Size before punching holes st_blocks: 914968, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Extra field length: 16324 content near offset: 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Punching hole in file - start: 406278144 len:12288
+07-01 01:31:54.554   575   642 D FileSystemUtils: punchHolesInApk:: Size after punching holes st_blocks: 914944, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Punching holes in file: /data/app/vmdl198612650.tmp/base.apk programHeaderOffset: 64 programHeaderNum: 9
+07-01 01:31:54.554   575   642 D FileSystemUtils: Total number of LOAD segments 3
+07-01 01:31:54.554   575   642 D FileSystemUtils: Size before punching holes st_blocks: 914944, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Size after punching holes st_blocks: 914944, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Extra field length: 11962,  Size before punching holes st_blocks: 914944, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Extra field length: 11962 content near offset: 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Punching hole in file - start: 401645568 len:8192
+07-01 01:31:54.554   575   642 D FileSystemUtils: punchHolesInApk:: Size after punching holes st_blocks: 914928, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Punching holes in file: /data/app/vmdl198612650.tmp/base.apk programHeaderOffset: 64 programHeaderNum: 9
+07-01 01:31:54.554   575   642 D FileSystemUtils: Total number of LOAD segments 3
+07-01 01:31:54.554   575   642 D FileSystemUtils: Size before punching holes st_blocks: 914928, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Size after punching holes st_blocks: 914928, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Extra field length: 7211,  Size before punching holes st_blocks: 914928, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Extra field length: 7211 content near offset: 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Punching hole in file - start: 369274880 len:4096
+07-01 01:31:54.554   575   642 D FileSystemUtils: punchHolesInApk:: Size after punching holes st_blocks: 914920, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Punching holes in file: /data/app/vmdl198612650.tmp/base.apk programHeaderOffset: 64 programHeaderNum: 9
+07-01 01:31:54.554   575   642 D FileSystemUtils: Total number of LOAD segments 3
+07-01 01:31:54.554   575   642 D FileSystemUtils: Size before punching holes st_blocks: 914920, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Size after punching holes st_blocks: 914920, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Extra field length: 4894,  Size before punching holes st_blocks: 914920, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Extra field length: 4894 content near offset: 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+07-01 01:31:54.554   575   642 D FileSystemUtils: Punching hole in file - start: 390246400 len:4096
+07-01 01:31:54.554   575   642 D FileSystemUtils: punchHolesInApk:: Size after punching holes st_blocks: 914912, st_blksize: 4096, st_size: 468776000
+07-01 01:31:54.564  3151  4277 D TrafficStats: tagSocket(6) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:54.564  3151  4302 D TrafficStats: tagSocket(104) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:54.565  3151  4271 D TrafficStats: tagSocket(126) with statsTag=0xffffffff, statsUid=-1
+--------- beginning of system
+07-01 01:31:54.577   575   635 I PackageManager: Integrity check passed for file:///data/app/vmdl198612650.tmp
+07-01 01:31:54.591   575   609 I ActivityManager: Force stopping dev.jczhang.lyntty.dev appid=10210 user=-1: installPackageLI
+07-01 01:31:54.594   575   635 I PackageManager: Update package dev.jczhang.lyntty.dev code path from /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ== to /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==; Retain data and using new
+07-01 01:31:54.596   575   609 I ActivityManager: Killing 3151:dev.jczhang.lyntty.dev/u0a210 (adj 0): stop dev.jczhang.lyntty.dev due to installPackageLI
+07-01 01:31:54.601   575   726 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.601   575   600 D DisplayManagerService: Drop pending events for gone uid 10210
+07-01 01:31:54.601   575   726 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+07-01 01:31:54.601   575   635 I AppsFilter: interaction: PackageSetting{61381e8 com.android.microdroid.empty_payload/10196} -> PackageSetting{e07213e dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:54.602   575   635 I AppsFilter: interaction: PackageSetting{2e1b940 dev.lyntty/10209} -> PackageSetting{e07213e dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:54.602   575   726 D InetDiagMessage: Destroyed 3 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+07-01 01:31:54.602   575   726 D InetDiagMessage: Destroyed live tcp sockets for uids={10210} in 1ms
+07-01 01:31:54.602   575   726 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+07-01 01:31:54.602   575   635 I AppsFilter: interaction: PackageSetting{61381e8 com.android.microdroid.empty_payload/10196} -> PackageSetting{7ab68d0 dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:54.602   575   635 I AppsFilter: interaction: PackageSetting{2e1b940 dev.lyntty/10209} -> PackageSetting{7ab68d0 dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:54.602   575   726 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+07-01 01:31:54.602   575   726 D InetDiagMessage: Destroyed live tcp sockets for uids={20210} in 0ms
+07-01 01:31:54.606   575   609 W ActivityTaskManager: Force removing ActivityRecord{63a4119 u0 dev.jczhang.lyntty.dev/.MainActivity t76 f}}: app died, no saved state
+--------- beginning of kernel
+07-01 01:31:54.631     0     0 I servicemanager: Caller(pid=575,uid=1000,sid=u:r:system_server:s0) Since 'artd' could not be found trying to start it as a lazy AIDL service. (if it's not configured to be a lazy service, it may be stuck starting or still starting).
+07-01 01:31:54.610   810   851 V WindowManagerShell: Transition requested (#14): android.os.BinderProxy@ca9c755 TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=76 displayId=0 isRunning=false baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=null topActivity=null origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=0 lastActiveTime=6299679 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@fc3f56a} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=null launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 14 }
+07-01 01:31:54.635     0     0 I init    : starting service 'artd'...
+07-01 01:31:54.616   379   461 I netd    : tetherGetStats() -> {[]} <2.52ms>
+07-01 01:31:54.660     0     0 W binder_debug: 458 callbacks suppressed
+07-01 01:31:54.660     0     0 I binder  : undelivered transaction 778388, process died.
+07-01 01:31:54.636   575   726 D ConnectivityService: releasing NetworkRequest [ REQUEST id=137, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10210 RequestorUid: 10210 RequestorPkg: dev.jczhang.lyntty.dev UnderlyingNetworks: Null] ] (release request)
+07-01 01:31:54.637   575  2146 I ImeTracker: dev.jczhang.lyntty.dev:8f0b1f5c: onRequestHide at ORIGIN_SERVER reason HIDE_REMOVE_CLIENT fromUser false
+07-01 01:31:54.638   575  2146 I ImeTracker: dev.jczhang.lyntty.dev:8f0b1f5c: onCancelled at PHASE_SERVER_SHOULD_HIDE
+07-01 01:31:54.639   444   444 I adbd    : Remote process closed the socket (on MSG_PEEK)
+07-01 01:31:54.641   380   380 I Zygote  : Process 3151 exited due to signal 9 (Killed)
+07-01 01:31:54.649   575   611 I libprocessgroup: Removed cgroup /sys/fs/cgroup/uid_10210/pid_3151
+07-01 01:31:54.674     0     0 I init    : ... started service 'artd' has pid 4461
+07-01 01:31:54.674     0     0 I init    : Control message: Processed ctl.interface_start for 'aidl/artd' from pid: 169 (/system/bin/servicemanager)
+07-01 01:31:54.710  4461  4461 I artd    : Starting artd
+07-01 01:31:54.710  4461  4461 I AidlLazyServiceRegistrar: Registering service artd
+07-01 01:31:54.711  4461  4461 I AidlLazyServiceRegistrar: Process has 1 (of 1 available) client(s) in use after notification artd has clients: 1
+07-01 01:31:54.735     0     0 I servicemanager: Notifying artd they do (previously: don't) have clients when service is guaranteed to be in use
+07-01 01:31:54.735     0     0 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+07-01 01:31:54.791     0     0 I logd    : start watching /data/system/packages.list ...
+07-01 01:31:54.769   575   635 D PackageManager: Instant App installer not found with android.intent.action.INSTALL_INSTANT_APP_PACKAGE
+07-01 01:31:54.769   575   635 D PackageManager: Clear ephemeral installer activity
+07-01 01:31:54.771   575   609 W system_server: Long monitor contention with owner PackageManager (635) at void com.android.server.pm.RemovePackageHelper.clearPackageStateForUserLIF(com.android.server.pm.PackageSetting, int, int)(RemovePackageHelper.java:269) waiters=0 in void com.android.server.pm.PackageManagerService.notifyComponentUsed(com.android.server.pm.Computer, java.lang.String, int, java.lang.String, java.lang.String) for 156ms
+07-01 01:31:54.793     0     0 I logd    : ReadPackageList, total packages: 218
+07-01 01:31:54.780   810   851 W Looper  : Slow dispatch took 171ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda1@531fa5b m=0
+07-01 01:31:54.781   810   851 W Looper  : Slow delivery took 167ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.PinnedStackListenerForwarder$PinnedTaskListenerImpl$$ExternalSyntheticLambda1@df182f8 m=0
+07-01 01:31:54.782   440   440 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+07-01 01:31:54.782   575  2151 I WindowManager: WIN DEATH: Window{70e51dd u0 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity}
+07-01 01:31:54.782   575  2151 W InputManager-JNI: Input channel object '70e51dd dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity (client)' was disposed without first being removed with the input manager!
+07-01 01:31:54.783   575  2151 I WindowManager: WIN DEATH: Window{3d29f24 u0 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity}
+07-01 01:31:54.783   575  2151 W InputManager-JNI: Input channel object '3d29f24 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity (client)' was disposed without first being removed with the input manager!
+07-01 01:31:54.785   575  1447 I AppWidgetServiceImpl: startListening() 0
+07-01 01:31:54.785   575  1448 V ActivityManager: Got obituary of 3151:dev.jczhang.lyntty.dev
+07-01 01:31:54.785   810   851 W Looper  : Drained
+07-01 01:31:54.787   575   602 W ActivityManager: setHasOverlayUi called on unknown pid: 3151
+07-01 01:31:54.794   810   851 D WindowManagerShell: setLauncherKeepClearAreaHeight: visible=false, height=459
+07-01 01:31:54.794   810   851 D WindowManagerShell: setLauncherKeepClearAreaHeight: visible=true, height=459
+07-01 01:31:54.797  1267  1267 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+07-01 01:31:54.807   575   635 I AppsFilter: interaction: PackageSetting{9408c84 com.android.microdroid.empty_payload/10196} -> PackageSetting{ee8b902 dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:54.807   575   635 I AppsFilter: interaction: PackageSetting{76520a2 dev.lyntty/10209} -> PackageSetting{ee8b902 dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:54.809   575   602 V WindowManager: Unknown focus tokens, dropping reportFocusChanged
+07-01 01:31:54.814  1267  1267 I SsCardPagerAdapter: [rmv] Rendering flag - enabled: false
+07-01 01:31:54.814  1267  1267 I SsCardPagerAdapter: Use UI template for the feature: 1
+07-01 01:31:54.832   575   603 W ActivityTaskManager: Unable to send transaction to client proc dev.jczhang.lyntty.dev: no app thread
+07-01 01:31:54.847   575   635 I ActivityManager: Force stopping dev.jczhang.lyntty.dev appid=10210 user=0: pkg removed
+07-01 01:31:54.847   575   635 I WindowManager:   Force removing ActivityRecord{63a4119 u0 dev.jczhang.lyntty.dev/.MainActivity t76 f} isExiting}
+07-01 01:31:54.847   575   635 W WindowManager: removeAppToken: Attempted to remove non-existing token: Token{8f985de ActivityRecord{63a4119 u0 dev.jczhang.lyntty.dev/.MainActivity t76 f} isExiting}}
+07-01 01:31:54.849   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.850   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.850   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.850   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.850   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.850   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.850   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.850   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.850   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.851   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.851   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.851   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.851   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.851   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.851   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.857   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.874   575   751 I AppWidgetServiceImpl: Received broadcast: android.intent.action.PACKAGE_REMOVED on user 0
+07-01 01:31:54.881   575   575 D ActivityManager: sync unfroze 951 com.android.settings for 10
+07-01 01:31:54.882   575   575 D ActivityManager: sync unfroze 2641 com.google.android.settings.intelligence for 10
+07-01 01:31:54.884  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 01:31:54.884  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 01:31:54.884  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 01:31:54.884  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 01:31:54.884  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 01:31:54.884   575   575 D ActivityManager: sync unfroze 1561 com.android.keychain for 10
+07-01 01:31:54.892   575   732 E AppOps  : attributionTag VCN not declared in manifest of android
+07-01 01:31:54.897   948   948 E SmsApplication: com.google.android.apps.messaging lost android:read_cell_broadcasts:  (fixing)
+07-01 01:31:54.897   575  1447 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 10134, code = READ_CELL_BROADCASTS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:54.898   575   770 D ShortcutService: received package broadcast intent: Intent { act=android.intent.action.PACKAGE_REMOVED dat=package: flg=0x4000010 (has extras) }
+07-01 01:31:54.908   575   732 E AppOps  : attributionTag VCN not declared in manifest of android
+07-01 01:31:54.909   575   751 I AppWidgetServiceImpl: Received broadcast: android.intent.action.PACKAGE_ADDED on user 0
+07-01 01:31:54.914   575   780 I SdkSandboxManager: No SDKs used. Skipping SDK data reconcilation for CallingInfo{mUid=10210, mPackageName='dev.jczhang.lyntty.dev, mAppProcessToken='null'}
+07-01 01:31:54.916   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.918   948   948 E CellBroadcastUtils: getDefaultCellBroadcastReceiverPackageName: no package found
+07-01 01:31:54.919   575  1447 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = READ_SMS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:54.919   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.919   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.919   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.919   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.919  3513  3513 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.920  1267  1267 D BaseDepthController: setSurface:
+07-01 01:31:54.920  1267  1267 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+07-01 01:31:54.920  1267  1267 D BaseDepthController: 	mSurface: Surface(name=com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity)/@0x81ac37b
+07-01 01:31:54.920   951   951 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.921   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.921   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.921   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.921   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.921   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.921   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.921   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.921   575   635 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:54.922   914   914 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.925  1339  1339 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.925  2641  2641 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.926   575  1980 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = RECEIVE_SMS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:54.927   575   635 D PackageInstallerSession: Marking session 198612650 as applied
+07-01 01:31:54.927   575  1980 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = RECEIVE_WAP_PUSH, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:54.928   575  1980 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = SEND_SMS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:54.928   575  1448 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = READ_CELL_BROADCASTS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:54.928  1275  1275 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.932  1021  1021 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.935  1362  1362 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.935  1394  1394 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.935   810   810 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.935  1381  1381 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.937  1423  1423 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.937   878   878 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.938   575   609 D ActivityManager: sync unfroze 1125 com.google.android.permissioncontroller for 3
+07-01 01:31:54.939   575   609 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10210, packageName = null, attributionTag = null, token = android.os.Binder@95e334d, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+07-01 01:31:54.948   575   575 W binder:575_1: type=1400 audit(0.0:78): avc:  denied  { getopt } for  scontext=u:r:system_server:s0 tcontext=u:r:shell:s0 tclass=unix_stream_socket permissive=0
+07-01 01:31:54.948   575   575 W binder:575_1: type=1400 audit(0.0:79): avc:  denied  { getopt } for  scontext=u:r:system_server:s0 tcontext=u:r:shell:s0 tclass=unix_stream_socket permissive=0
+07-01 01:31:54.948   575   575 W binder:575_1: type=1400 audit(0.0:80): avc:  denied  { getopt } for  scontext=u:r:system_server:s0 tcontext=u:r:shell:s0 tclass=unix_stream_socket permissive=0
+07-01 01:31:54.940  1125  1125 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.942   575   732 E AppOps  : attributionTag VCN not declared in manifest of android
+07-01 01:31:54.942  1561  1561 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.942   575   780 I SdkSandboxManager: No SDKs used. Skipping SDK data reconcilation for CallingInfo{mUid=10210, mPackageName='dev.jczhang.lyntty.dev, mAppProcessToken='null'}
+07-01 01:31:54.946   575   770 D ShortcutService: received package broadcast intent: Intent { act=android.intent.action.PACKAGE_ADDED dat=package: flg=0x4000010 (has extras) }
+07-01 01:31:54.946   575   770 D ShortcutService: replacing package: dev.jczhang.lyntty.dev userId0
+07-01 01:31:54.946   575   770 D ShortcutService: handlePackageUpdateFinished: dev.jczhang.lyntty.dev user=0
+07-01 01:31:54.948   575   575 I Telecom : CarModeTracker: Package dev.jczhang.lyntty.dev is not tracked.: SSH.oR@AGE🔒
+07-01 01:31:54.951   575   575 I Telecom : InCallController: updateCarModeForConnections: car mode apps: : SSH.oR@AGE🔒
+07-01 01:31:54.953   575   575 I Telecom : InCallController: update carmode current:UserHandle{0} parent:null: SSH.oR@AGE🔒
+07-01 01:31:54.954   575   770 D ShortcutService: rescanPackageIfNeeded 0@dev.jczhang.lyntty.dev, forceRescan=true , isNewApp=true
+07-01 01:31:54.954   970   970 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:54.964   575   699 W PackageConfigPersister: App-specific configuration not found for packageName: dev.jczhang.lyntty.dev and userId: 0
+07-01 01:31:54.968   380   380 D Zygote  : Forked child process 4476
+07-01 01:31:54.979   575   610 I ActivityManager: Start proc 4476:dev.jczhang.lyntty.dev/u0a210 for broadcast {dev.jczhang.lyntty.dev/expo.modules.notifications.service.NotificationsService}
+07-01 01:31:54.986  1125  1125 I SafetyLabelChangedBroadcastReceiver: received broadcast packageName: dev.jczhang.lyntty.dev, current user: UserHandle{0}, packageChangeEvent: UPDATE, intent user: UserHandle{0}
+07-01 01:31:54.999   948   948 D CarrierSvcBindHelper: onPackageUpdateFinished: dev.jczhang.lyntty.dev
+07-01 01:31:55.000   575   770 D ShortcutService: Package dev.jczhang.lyntty.dev has 0 manifest shortcut(s), and 0 share target(s)
+07-01 01:31:55.007  1362  1367 I ogle.android.as: Background concurrent mark compact GC freed 1244KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 5201KB/10MB, paused 311us,1.698ms total 147.308ms
+07-01 01:31:55.007  1362  1367 W ogle.android.as: Reducing the number of considered missed Gc histogram windows from 227 to 100
+07-01 01:31:55.012  4476  4476 I hang.lyntty.dev: Late-enabling -Xcheck:jni
+07-01 01:31:55.013   948   948 D CarrierSvcBindHelper: No carrier app for: 0
+07-01 01:31:55.014   948   948 D CarrierSvcBindHelper: onPackageModified: dev.jczhang.lyntty.dev
+07-01 01:31:55.014   948   948 D CarrierSvcBindHelper: No carrier app for: 0
+07-01 01:31:55.016   948   948 E SmsApplication: com.google.android.apps.messaging lost android:read_cell_broadcasts:  (fixing)
+07-01 01:31:55.016   575   594 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 10134, code = READ_CELL_BROADCASTS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.023   575  2151 I ActivityManager: Force stopping dev.jczhang.lyntty.dev appid=10210 user=0: from pid 4479
+07-01 01:31:55.023   575  2151 I WindowManager:   Force removing ActivityRecord{63a4119 u0 dev.jczhang.lyntty.dev/.MainActivity t76 f} isExiting}
+07-01 01:31:55.023   575  2151 W WindowManager: removeAppToken: Attempted to remove non-existing token: Token{8f985de ActivityRecord{63a4119 u0 dev.jczhang.lyntty.dev/.MainActivity t76 f} isExiting}}
+07-01 01:31:55.029   575   575 V BackupManagerConstants: getFullBackupIntervalMilliseconds(...) returns 86400000
+07-01 01:31:55.029   575   575 V BackupManagerConstants: getFullBackupRequiredNetworkType(...) returns 2
+07-01 01:31:55.029   575   575 V BackupManagerConstants: getFullBackupRequireCharging(...) returns true
+07-01 01:31:55.047     0     0 I binder  : 575:2151 ioctl 400c620e 7960a8acccf4 returned -22
+07-01 01:31:55.041   948   948 E CellBroadcastUtils: getDefaultCellBroadcastReceiverPackageName: no package found
+07-01 01:31:55.041   575  1447 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = READ_SMS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.041   575  2151 E ActivityManager: Unable to freeze binder for 4476: java.lang.RuntimeException: Unable to freeze/unfreeze binder
+07-01 01:31:55.045   575  1980 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = RECEIVE_SMS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.045   575  2151 I ActivityManager: Killing 4476:dev.jczhang.lyntty.dev/u0a210 (adj -10000): stop dev.jczhang.lyntty.dev due to from pid 4479
+07-01 01:31:55.045   575  1447 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = RECEIVE_WAP_PUSH, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.049   575  1980 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = SEND_SMS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.050   380   380 I Zygote  : Process 4476 exited due to signal 9 (Killed)
+07-01 01:31:55.050   575   600 D DisplayManagerService: Drop pending events for gone uid 10210
+07-01 01:31:55.050   575   611 I libprocessgroup: Removed cgroup /sys/fs/cgroup/uid_10210/pid_4476
+07-01 01:31:55.053   575  1447 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = READ_CELL_BROADCASTS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.053   575  2151 I AppsFilter: interaction: PackageSetting{9408c84 com.android.microdroid.empty_payload/10196} -> PackageSetting{100dc3 dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:55.053   575  2151 I AppsFilter: interaction: PackageSetting{76520a2 dev.lyntty/10209} -> PackageSetting{100dc3 dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:55.058  1125  3177 I PermissionControllerServiceImpl: Updating user sensitive for uid 10210
+07-01 01:31:55.073  1267  1267 I TopTaskTracker: onTaskMovedToFront: (moved taskInfo to front) taskId=75, baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity }
+07-01 01:31:55.079   575   590 W system_server: Suspending all threads took: 10.064ms
+07-01 01:31:55.085   575   751 I AppWidgetServiceImpl: Received broadcast: android.intent.action.PACKAGE_RESTARTED on user 0
+07-01 01:31:55.085   575   751 I AppWidgetServiceImpl: Updating package stopped masked state for uid 10210 package dev.jczhang.lyntty.dev isStopped true
+07-01 01:31:55.095   575   575 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:55.103  1267  1267 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:55.104  1267  1267 D StatsLog: LAUNCHER_ALLAPPS_COUNT
+07-01 01:31:55.104   575   575 W AlarmManager: Package dev.jczhang.lyntty.dev, uid 10210 lost permission to set exact alarms!
+07-01 01:31:55.166  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 01:31:55.169  1362  1491 I AiAiEcho: EchoTargets:
+07-01 01:31:55.169  1362  1491 I AiAiEcho: Filtered by AiAi flag check:
+07-01 01:31:55.169  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 01:31:55.169  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 01:31:55.170  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 01:31:55.171  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 01:31:55.171  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 01:31:55.172  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 01:31:55.172  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 01:31:55.172  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 01:31:55.172  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 01:31:55.194   810  1098 V WindowManagerShell: onTransitionReady(transaction=2469606195700)
+07-01 01:31:55.194   810   851 V WindowManagerShell: onTransitionReady (#14) android.os.BinderProxy@ca9c755: {id=14 t=CLOSE f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@3048c0d} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x98c83d1 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@aa9c7c2} m=CLOSE f=NONE leash=Surface(name=Task=76)/@0x5a3fe36 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{c33bb85 token=android.os.Binder@320b8fc})/@0x20be137 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0}]}
+07-01 01:31:55.198   810   851 V WindowManagerShell: Playing animation for (#14) android.os.BinderProxy@ca9c755@0
+07-01 01:31:55.202   810   851 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultMixedHandler@c50ed
+07-01 01:31:55.202   810   851 V WindowManagerShell:  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@191d9b3
+07-01 01:31:55.203   810   851 V WindowManagerShell:  try handler com.android.wm.shell.pip.PipTransition@ee06b70
+07-01 01:31:55.203   810   851 V WindowManagerShell:  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@eea0ee9
+07-01 01:31:55.203   810   851 V WindowManagerShell:  try handler com.android.wm.shell.recents.RecentsTransitionHandler@b69876e
+07-01 01:31:55.203   810   851 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+07-01 01:31:55.204   810   851 V WindowManagerShell:  try handler com.android.wm.shell.splitscreen.StageCoordinator@465e0f
+07-01 01:31:55.204   810   851 V WindowManagerShell:  try handler com.android.wm.shell.transition.RemoteTransitionHandler@d38ce9c
+07-01 01:31:55.204   810   851 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=14 t=CLOSE f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@3048c0d} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0x98c83d1 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@aa9c7c2} m=CLOSE f=NONE leash=Surface(name=Task=76)/@0x5a3fe36 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{c33bb85 token=android.os.Binder@320b8fc})/@0x20be137 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0}]}
+07-01 01:31:55.204   440   504 D PermissionCache: checking android.permission.READ_FRAME_BUFFER for uid=1000 => granted (5116 us)
+07-01 01:31:55.205   810   851 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[OPEN,TO_FRONT] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@d2aa729, appThread = android.app.IApplicationThread$Stub$Proxy@ccddaae, debugName = OverlaySwipeBack }}
+07-01 01:31:55.205   810   851 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@cdb504f, appThread = android.app.IApplicationThread$Stub$Proxy@7f373dc, debugName = LauncherToDream }}
+07-01 01:31:55.205   810   851 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@81d8ce5, appThread = android.app.IApplicationThread$Stub$Proxy@3a0f3ba, debugName = QuickstepLaunchHome }}
+07-01 01:31:55.205   810   851 D RemoteTransitionHandler: Found filterPair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@81d8ce5, appThread = android.app.IApplicationThread$Stub$Proxy@3a0f3ba, debugName = QuickstepLaunchHome }}
+07-01 01:31:55.205   810   851 V WindowManagerShell:  Delegate animation for (#14) to RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@81d8ce5, appThread = android.app.IApplicationThread$Stub$Proxy@3a0f3ba, debugName = QuickstepLaunchHome }
+07-01 01:31:55.209   948   948 E SmsApplication: com.google.android.apps.messaging lost android:read_cell_broadcasts:  (fixing)
+07-01 01:31:55.221  1267  1267 D StateManager: createAtomicAnimation - fromState: Background, toState: Normal, partial trace:
+07-01 01:31:55.221  1267  1267 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.prepareToAnimate(go/retraceme 31f9979659277bb965985aff1272c33e3c3c9e755b77166d20a2465454178f2c:22)
+07-01 01:31:55.221  1267  1267 D StateManager: 	at com.android.quickstep.util.WorkspaceRevealAnim.<init>(go/retraceme 31f9979659277bb965985aff1272c33e3c3c9e755b77166d20a2465454178f2c:11)
+07-01 01:31:55.221  1267  1267 D StateManager: 	at com.android.launcher3.QuickstepTransitionManager.createWallpaperOpenAnimations(go/retraceme 31f9979659277bb965985aff1272c33e3c3c9e755b77166d20a2465454178f2c:735)
+07-01 01:31:55.249   575  1393 W AppSearchIcing: icing-search-engine.cc:321: Error: 5, Message: Document (com.google.android.googlequicksearchbox$OneSearchZeroStateGoogleSuggestions/default, zp) not found.
+07-01 01:31:55.256   575  1448 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 10134, code = READ_CELL_BROADCASTS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.264   948   948 E CellBroadcastUtils: getDefaultCellBroadcastReceiverPackageName: no package found
+07-01 01:31:55.266   575  1448 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = READ_SMS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.273   575  1448 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = RECEIVE_SMS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.274   575  1448 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = RECEIVE_WAP_PUSH, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.274   575  1448 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = SEND_SMS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.285   575   594 W AppOpService: Ignored setUidMode call for runtime permission app op: uid = 1001, code = READ_CELL_BROADCASTS, mode = allow, callingUid = 1001, oldMode = allow
+07-01 01:31:55.315   948  1146 D ImsResolver: maybeAddedImsService, packageName: dev.jczhang.lyntty.dev
+07-01 01:31:55.343     0     0 W healthd : battery l=100 v=5000 t=25.0 h=2 st=2 c=900000 fc=3000000 cc=10 chg=a
+07-01 01:31:55.326   575   590 I system_server: Background concurrent mark compact GC freed 17MB AllocSpace bytes, 92(1892KB) LOS objects, 46% free, 28MB/52MB, paused 12.855ms,3.358ms total 467.547ms
+07-01 01:31:55.332   948   948 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:55.335   575   592 W system_server: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk' with 1 weak references
+07-01 01:31:55.337   575   592 W system_server: ApkAssets: Deleting an ApkAssets object '<empty> and /product/priv-app/PrebuiltGmsCore/PrebuiltGmsCore.apk' with 1 weak references
+07-01 01:31:55.339   575   592 W system_server: ApkAssets: Deleting an ApkAssets object '<empty> and /system/priv-app/InputDevices/InputDevices.apk' with 1 weak references
+07-01 01:31:55.339   575   592 W system_server: ApkAssets: Deleting an ApkAssets object '<empty> and /product/app/LatinIMEGooglePrebuilt/LatinIMEGooglePrebuilt.apk' with 1 weak references
+07-01 01:31:55.339   948   948 D CarrierSvcBindHelper: onHandleForceStop: [dev.jczhang.lyntty.dev]
+07-01 01:31:55.339   948   948 D CarrierSvcBindHelper: No carrier app for: 0
+07-01 01:31:55.346   810   851 V WindowManagerShell:  animated by com.android.wm.shell.transition.RemoteTransitionHandler@d38ce9c
+07-01 01:31:55.346   810   851 W Looper  : Slow dispatch took 152ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@26db910 m=0
+07-01 01:31:55.347   575   602 W system_server: Long monitor contention with owner android.anim (603) at void com.android.server.wm.WindowSurfacePlacer$Traverser.run()(WindowSurfacePlacer.java:58) waiters=4 in void com.android.server.wm.WindowManagerService.reportFocusChanged(android.os.IBinder, android.os.IBinder) for 107ms
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: AppSearch 0-state cache not available, fallback to AGA
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: java.util.concurrent.CompletionException: java.util.NoSuchElementException: No value present
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:308)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at java.util.concurrent.CompletableFuture.completeThrowable(CompletableFuture.java:323)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at java.util.concurrent.CompletableFuture$UniAccept.tryFire(CompletableFuture.java:684)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:486)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at java.util.concurrent.CompletableFuture.completeExceptionally(CompletableFuture.java:2138)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at com.google.android.apps.nexuslauncher.allapps.E0.onResult(go/retraceme 31f9979659277bb965985aff1272c33e3c3c9e755b77166d20a2465454178f2c:67)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at android.app.appsearch.SearchSessionUtil$1.lambda$onResult$0(go/retraceme 64eee9e9f568ff45978879ad2ff83146f2618ee8a88278736fbdf5fae931976e:144)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at android.app.appsearch.SearchSessionUtil$1.$r8$lambda$CEk3q8sDAQVhU3rQwVueB8FAj_M(go/retraceme 64eee9e9f568ff45978879ad2ff83146f2618ee8a88278736fbdf5fae931976e:1)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at android.app.appsearch.SearchSessionUtil$1$$ExternalSyntheticLambda0.run(go/retraceme 64eee9e9f568ff45978879ad2ff83146f2618ee8a88278736fbdf5fae931976e:22)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at android.os.Handler.handleCallback(Handler.java:959)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at android.os.Handler.dispatchMessage(Handler.java:100)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at android.os.Looper.loopOnce(Looper.java:232)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at android.os.Looper.loop(Looper.java:317)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at android.os.HandlerThread.run(HandlerThread.java:85)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: Caused by: java.util.NoSuchElementException: No value present
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at java.util.Optional.get(Optional.java:143)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	at com.google.android.apps.nexuslauncher.allapps.E0.onResult(go/retraceme 31f9979659277bb965985aff1272c33e3c3c9e755b77166d20a2465454178f2c:28)
+07-01 01:31:55.347  1267  1814 D OneSearchSuggestProvider: 	... 8 more
+07-01 01:31:55.349   575  2147 W system_server: Long monitor contention with owner android.anim (603) at void com.android.server.wm.WindowSurfacePlacer$Traverser.run()(WindowSurfacePlacer.java:58) waiters=1 in int com.android.server.wm.ActivityStarter.execute() for 192ms
+07-01 01:31:55.353   575  2147 W ActivityTaskManager: callingPackage for (uid=2000, pid=4484) has no WPC
+07-01 01:31:55.355  1267  1814 D OneSearchSuggestProvider: Created the binder channel successfully for end point service =com.google.android.apps.search.googleapp.search.suggest.plugins.onesearch.server.OneSearchSuggestService , mChannel=i1{delegate=f{logId=5, target=directaddress:///AndroidComponentAddress%5BIntent%20%7B%20act=grpc.io.action.BIND%20cmp=com.google.android.googlequicksearchbox/com.google.android.apps.search.googleapp.search.suggest.plugins.onesearch.server.OneSearchSuggestService%20%7D%5D}} , mOneSearchConnection=l2.Z@d63912f
+07-01 01:31:55.362   575  2147 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE
+07-01 01:31:55.362   575  2147 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE
+07-01 01:31:55.362   575  2147 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE
+07-01 01:31:55.368   575   599 V WindowManager: Sent Transition (#14) createdAt=07-01 01:31:54.607 via request=TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=76 displayId=0 isRunning=false baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=null topActivity=null origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=0 lastActiveTime=6299679 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{df262c7 Task{6146883 #76 type=standard A=10210:dev.jczhang.lyntty.dev}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=null launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 14 }
+07-01 01:31:55.368   575   599 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+07-01 01:31:55.368   575   599 V WindowManager:     info={id=14 t=CLOSE f=0x0 trk=0 r=[0@Point(0, 0)] c=[
+07-01 01:31:55.368   575   599 V WindowManager:         {WCT{RemoteToken{ba0501d Task{34db544 #1 type=home}}} m=TO_FRONT f=SHOW_WALLPAPER|MOVE_TO_TOP leash=Surface(name=Task=1)/@0xd01169a sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},
+07-01 01:31:55.368   575   599 V WindowManager:         {WCT{RemoteToken{df262c7 Task{6146883 #76 type=standard A=10210:dev.jczhang.lyntty.dev}}} m=CLOSE f=NONE leash=Surface(name=Task=76)/@0x21926e1 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},
+07-01 01:31:55.368   575   599 V WindowManager:         {null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{c33bb85 token=android.os.Binder@320b8fc})/@0x16dab6e sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0}
+07-01 01:31:55.368   575   599 V WindowManager:     ]}
+07-01 01:31:55.373   575  2147 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10210, packageName = null, attributionTag = null, token = android.os.Binder@95e334d, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+07-01 01:31:55.374   575  2147 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_RESIZEABLE_ACTIVITY_OVERRIDES
+07-01 01:31:55.374   575  2147 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE
+07-01 01:31:55.393   575  2151 D ActivityManager: sync unfroze 4135 com.google.android.googlequicksearchbox:search for 6
+07-01 01:31:55.393   575  2147 I ActivityTaskManager: Add Task{6146883 #76 type=standard A=10210:dev.jczhang.lyntty.dev} to hidden list because adding Task{2eb3b5c #77 type=standard A=10210:dev.jczhang.lyntty.dev}
+07-01 01:31:55.394   575  2147 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity} with LAUNCH_SINGLE_TASK from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+07-01 01:31:55.426  3513  3547 I Bugle   : BroadcastReceiverAsyncWorkTracker: Acknowledging broadcast of buoi@bb195a6
+07-01 01:31:55.429   575  2151 D ActivityManager: sync unfroze 1296 com.google.android.apps.wellbeing for 7
+07-01 01:31:55.430  1267  1271 I s.nexuslauncher: Background concurrent mark compact GC freed 4403KB AllocSpace bytes, 4(296KB) LOS objects, 49% free, 7548KB/14MB, paused 291us,2.597ms total 308.840ms
+07-01 01:31:55.430  1267  1271 W s.nexuslauncher: Reducing the number of considered missed Gc histogram windows from 706 to 100
+07-01 01:31:55.431   575   602 W ProcessStats: Tracking association SourceState{1dc3f51 com.google.android.apps.nexuslauncher/10179 BTop #3855} whose proc state 2 is better than process ProcessState{13296d4 com.google.android.googlequicksearchbox:search/10144 pkg=com.google.android.googlequicksearchbox} proc state 14 (1 skipped)
+07-01 01:31:55.433   575  1446 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:55.436   948   956 I m.android.phone: Background concurrent mark compact GC freed 3560KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 3305KB/6611KB, paused 7.533ms,1.301ms total 94.669ms
+07-01 01:31:55.439   810   851 W Looper  : Slow delivery took 44ms wmshell.main h=android.os.Handler c=null m=2
+07-01 01:31:55.439   575   938 D CompatChangeReporter: Compat change id reported: 261072174; UID 10144; state: ENABLED
+07-01 01:31:55.439   575   938 D CompatChangeReporter: Compat change id reported: 261072174; UID 10143; state: ENABLED
+07-01 01:31:55.443  4135  4135 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:55.444  1381  1381 I GsaVoiceInteractionSrv: (REDACTED) O received %s
+07-01 01:31:55.447  1021  1032 I .gms.persistent: Background concurrent mark compact GC freed 3833KB AllocSpace bytes, 3(56KB) LOS objects, 49% free, 15MB/30MB, paused 10.452ms,5.622ms total 590.569ms
+07-01 01:31:55.448   810   851 W Looper  : Drained
+07-01 01:31:55.451   575  2151 D ActivityManager: sync unfroze 4362 com.google.android.gms for 6
+07-01 01:31:55.453   575   602 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10210, packageName = null, attributionTag = null, token = android.os.Binder@95e334d, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+07-01 01:31:55.457  1339  1339 W MediaProvider: WorkProfileOwnerApps cache is empty
+07-01 01:31:55.458  1339  1339 D PickerSyncLockManager: Trying to acquire lock com.android.providers.media.photopicker.sync.CloseableReentrantLock@a88f021[Unlocked]. Lock Name = CLOUD_PROVIDER_LOCK. Threads that may be waiting to acquire this lock = []
+07-01 01:31:55.458  1339  1339 D CloseableReentrantLock: Successfully acquired lock com.android.providers.media.photopicker.sync.CloseableReentrantLock@a88f021[Locked by thread main]. Lock Name = CLOUD_PROVIDER_LOCK. Threads that may be waiting to acquire this lock = []
+07-01 01:31:55.458  1339  1339 D CloseableReentrantLock: Successfully released lock com.android.providers.media.photopicker.sync.CloseableReentrantLock@a88f021[Unlocked]. Lock Name = CLOUD_PROVIDER_LOCK. Threads that may be waiting to acquire this lock = []
+07-01 01:31:55.460  4362  4362 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:55.461   380   380 D Zygote  : Forked child process 4495
+07-01 01:31:55.462   575   610 I ActivityManager: Start proc 4495:dev.jczhang.lyntty.dev/u0a210 for next-top-activity {dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity}
+07-01 01:31:55.468  4135  4135 I A       : (REDACTED) Created gRPC endpoint for service %s
+07-01 01:31:55.477   810   851 V WindowManagerShell: Transition requested (#15): android.os.BinderProxy@f4fc02f TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=77 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} topActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=1 lastActiveTime=7085513 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@4dd563c} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{ec2fc5 dev.jczhang.lyntty.dev.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=1080 topActivityLetterboxHeight=1920 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 15 }
+07-01 01:31:55.479  4495  4495 I hang.lyntty.dev: Late-enabling -Xcheck:jni
+07-01 01:31:55.493  1381  1381 I GsaVoiceInteractionSrv: (REDACTED) O received %s
+07-01 01:31:55.497   810   810 D ControlsListingControllerImpl: ServiceConfig reloaded, count: 0
+07-01 01:31:55.504   810   810 D ControlsListingControllerImpl: ServiceConfig reloaded, count: 0
+07-01 01:31:55.525   810   810 D ControlsListingControllerImpl: ServiceConfig reloaded, count: 0
+07-01 01:31:55.526  1381  1381 I GsaVoiceInteractionSrv: (REDACTED) O received %s
+07-01 01:31:55.550  4495  4495 I hang.lyntty.dev: Using CollectorTypeCMC GC.
+07-01 01:31:55.554  4495  4495 W hang.lyntty.dev: Unexpected CPU variant for x86: x86_64.
+07-01 01:31:55.554  4495  4495 W hang.lyntty.dev: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, goldmont-without-sha-xsaves, tremont, kabylake, default
+07-01 01:31:55.561   444   469 I adbd    : jdwp connection from 4495
+07-01 01:31:55.562  1267  1489 D EGL_emulation: app_time_stats: avg=251077.14ms min=7.17ms max=7029740.50ms count=28
+07-01 01:31:55.563  4495  4495 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+07-01 01:31:55.575  4135  4176 W SearchServiceCore: Abort, client detached.
+07-01 01:31:55.575  4135  4176 W SearchServiceCore: Abort, client detached.
+07-01 01:31:55.595  1296  1296 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:55.603  1267  1267 W SplitSelectStateCtor: Missing session instanceIds
+07-01 01:31:55.604  1267  1267 D StatsLog: LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED
+07-01 01:31:55.609   575   938 I AppsFilter: interaction: PackageSetting{9408c84 com.android.microdroid.empty_payload/10196} -> PackageSetting{3b2d3d9 dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:55.609   575   938 I AppsFilter: interaction: PackageSetting{76520a2 dev.lyntty/10209} -> PackageSetting{3b2d3d9 dev.jczhang.lyntty.dev/10210} BLOCKED
+07-01 01:31:55.615   810   851 D WindowManagerShell: setLauncherKeepClearAreaHeight: visible=false, height=459
+07-01 01:31:55.629  1267  1267 I TopTaskTracker: onTaskMovedToFront: (moved taskInfo to front) taskId=77, baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity }
+07-01 01:31:55.638   575   751 I AppWidgetServiceImpl: Received broadcast: android.intent.action.PACKAGE_UNSTOPPED on user 0
+07-01 01:31:55.638   575   751 I AppWidgetServiceImpl: Updating package stopped masked state for uid 10210 package dev.jczhang.lyntty.dev isStopped false
+07-01 01:31:55.640   575   691 I ImeTracker: com.google.android.apps.nexuslauncher:4c40b79d: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+07-01 01:31:55.640   575   691 I ImeTracker: com.google.android.apps.nexuslauncher:4c40b79d: onCancelled at PHASE_SERVER_SHOULD_HIDE
+07-01 01:31:55.643  4135  4138 I earchbox:search: Compiler allocated 4538KB to compile java.lang.Object com.google.android.apps.gsa.binaries.velvet.app.ahh.a()
+07-01 01:31:55.646  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():3157
+07-01 01:31:55.654   810   887 D SplashScreenView: Build android.window.SplashScreenView{19030d4 V.E...... ......ID 0,0-0,0}
+07-01 01:31:55.654   810   887 D SplashScreenView: Icon: view: android.widget.ImageView{13d927d V.ED..... ......I. 0,0-0,0 #1020504 android:id/splashscreen_icon_view} drawable: com.android.wm.shell.startingsurface.SplashscreenIconDrawableFactory$ImmobileIconDrawable@387a572 size: 504
+07-01 01:31:55.654   810   887 D SplashScreenView: Branding: view: android.view.View{d565dc3 G.ED..... ......I. 0,0-0,0 #1020503 android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+07-01 01:31:55.657   575   603 W ActivityTaskManager: Unable to send transaction to client proc dev.jczhang.lyntty.dev: no app thread
+07-01 01:31:55.661   575   938 D CoreBackPreview: Window{4ba9666 u0 Splash Screen dev.jczhang.lyntty.dev}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@4a48e4e, mPriority=0, mIsAnimationCallback=false}
+07-01 01:31:55.676  1267  1273 W System  : A resource failed to call release.
+07-01 01:31:55.690  1021  4516 I Fitness : FitCleanupIntentOperation received Intent android.intent.action.PACKAGE_REMOVED [CONTEXT service_id=17 ]
+07-01 01:31:55.694   810   851 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#14) android.os.BinderProxy@ca9c755@0
+07-01 01:31:55.695  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 0, locked = false
+07-01 01:31:55.696  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1986 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+07-01 01:31:55.698   575   599 V WindowManager: Finish Transition (#14): created at 07-01 01:31:54.607 collect-started=0.226ms request-sent=0.921ms started=170.642ms ready=548.418ms sent=580.267ms finished=1091.426ms
+07-01 01:31:55.701  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 1, locked = false
+07-01 01:31:55.703   575  1446 E IPCThreadState: Binder transaction failure. id: 780847, BR_*: 29189, error: -22 (Invalid argument)
+07-01 01:31:55.703   575  1446 W ActivityManager: pid 575 system sent binder code 7 with flags 1 to frozen apps and got error -32
+07-01 01:31:55.725     0     0 I binder  : 1446:575 cannot find target node
+07-01 01:31:55.726     0     0 I binder  : 575:1446 transaction async to 0:0 failed 780847/29189/-22, size 64-0 line 3344
+07-01 01:31:55.706  1021  4516 I ProximityAuth: [RecentAppsMediator] Package added: (user=UserHandle{0}) dev.jczhang.lyntty.dev
+07-01 01:31:55.713   575  1446 W WindowManager: Exception thrown during dispatchAppVisibility Window{70e51dd u0 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity EXITING}
+07-01 01:31:55.713   575  1446 W WindowManager: android.os.DeadObjectException
+07-01 01:31:55.713   575  1446 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:586)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:553)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3253)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1289)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:403)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:7166)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5881)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5823)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1286)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:937)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:494)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:289)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:204)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1505)
+07-01 01:31:55.713   575  1446 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1444)
+07-01 01:31:55.713   575  1446 W Process : Unable to open /proc/3151/status
+07-01 01:31:55.714   575  1446 E IPCThreadState: Binder transaction failure. id: 780857, BR_*: 29189, error: -22 (Invalid argument)
+07-01 01:31:55.714   575  1446 W ActivityManager: pid 575 system sent binder code 7 with flags 1 to frozen apps and got error -32
+07-01 01:31:55.714   575  1446 D ActivityManager: Too many transaction errors, throttling freezer binder callback.
+07-01 01:31:55.714   575  1446 W WindowManager: Exception thrown during dispatchAppVisibility Window{3d29f24 u0 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity EXITING}
+07-01 01:31:55.714   575  1446 W WindowManager: android.os.DeadObjectException
+07-01 01:31:55.714   575  1446 W WindowManager: 	at android.os.BinderProxy.transactNative(Native Method)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at android.os.BinderProxy.transact(BinderProxy.java:586)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at android.view.IWindow$Stub$Proxy.dispatchAppVisibility(IWindow.java:553)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.WindowState.sendAppVisibilityToClients(WindowState.java:3253)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.WindowContainer.sendAppVisibilityToClients(WindowContainer.java:1289)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.WindowToken.setClientVisible(WindowToken.java:403)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.ActivityRecord.setClientVisible(ActivityRecord.java:7166)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.ActivityRecord.postApplyAnimation(ActivityRecord.java:5881)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.ActivityRecord.commitVisibility(ActivityRecord.java:5823)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.Transition.finishTransition(Transition.java:1286)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.TransitionController.finishTransition(TransitionController.java:937)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.finishTransition(WindowOrganizerController.java:494)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at android.window.IWindowOrganizerController$Stub.onTransact(IWindowOrganizerController.java:289)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at com.android.server.wm.WindowOrganizerController.onTransact(WindowOrganizerController.java:204)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at android.os.Binder.execTransactInternal(Binder.java:1505)
+07-01 01:31:55.714   575  1446 W WindowManager: 	at android.os.Binder.execTransact(Binder.java:1444)
+07-01 01:31:55.714   575  1446 W Process : Unable to open /proc/3151/status
+07-01 01:31:55.737     0     0 I binder  : 1446:575 cannot find target node
+07-01 01:31:55.737     0     0 I binder  : 575:1446 transaction async to 0:0 failed 780857/29189/-22, size 64-0 line 3344
+07-01 01:31:55.727  1275  1275 I AndroidIME: InputBundleManager.loadActiveInputBundleId():450 loadActiveInputBundleId: und-Latn-x-password, password
+07-01 01:31:55.730  1267  1273 W s.nexuslauncher: ApkAssets: Deleting an ApkAssets object '<empty> and /system_ext/priv-app/SystemUIGoogle/SystemUIGoogle.apk' with 1 weak references
+07-01 01:31:55.730   575   655 W PackageConfigPersister: App-specific configuration not found for packageName: com.google.android.apps.nexuslauncher and userId: 0
+07-01 01:31:55.736  1267  1273 W s.nexuslauncher: ApkAssets: Deleting an ApkAssets object '/vendor/overlay/SystemUIGoogle__sdk_gphone64_x86_64__auto_generated_rro_vendor.apk' with 1 weak references
+07-01 01:31:55.737  1267  1273 W s.nexuslauncher: ApkAssets: Deleting an ApkAssets object '/product/overlay/SystemUIGoogle__sdk_gphone64_x86_64__auto_generated_rro_product.apk' with 1 weak references
+07-01 01:31:55.745  1267  1273 W s.nexuslauncher: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk' with 1 weak references
+07-01 01:31:55.759  1381  1385 I hbox:interactor: Compiler allocated 5774KB to compile java.lang.Object com.google.android.apps.gsa.binaries.velvet.app.arq.r()
+07-01 01:31:55.769  1267  1267 W FrameTracker: Missed App frame:UNKNOWN: 88, 339760, 405300815, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME_FALLBACK>
+07-01 01:31:55.769  1267  1267 W FrameTracker: Missed SF frame:UNKNOWN: 88, 339760, 405300815, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME_FALLBACK>
+07-01 01:31:55.769  1267  1267 W FrameTracker: Missed App frame:UNKNOWN: 88, 339816, 142166975, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME_FALLBACK>
+07-01 01:31:55.769  1267  1267 W FrameTracker: Missed SF frame:UNKNOWN: 88, 339816, 142166975, CUJ=J<LAUNCHER_APP_CLOSE_TO_HOME_FALLBACK>
+07-01 01:31:55.772   810   851 V WindowManagerShell: Track 0 became idle
+07-01 01:31:55.772   810   851 W Looper  : Slow dispatch took 78ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.RemoteTransitionHandler$1$$ExternalSyntheticLambda0@c2270ca m=0
+07-01 01:31:55.772   810   851 W Looper  : Slow delivery took 47ms wmshell.main h=android.os.Handler c=com.android.wm.shell.pip.PinnedStackListenerForwarder$PinnedTaskListenerImpl$$ExternalSyntheticLambda1@f43c23b m=0
+07-01 01:31:55.778   810   851 W Looper  : Drained
+07-01 01:31:55.780   575  2146 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:55.796   810  2138 V WindowManagerShell: onTransitionReady(transaction=2469606195725)
+07-01 01:31:55.799   810   851 V WindowManagerShell: onTransitionReady (#15) android.os.BinderProxy@f4fc02f: {id=15 t=OPEN f=0x0 trk=1 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@f8b7704} m=OPEN f=NONE leash=Surface(name=Task=77)/@0x9a9dd58 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@dbd14ed} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x8d43eb1 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1}]}
+07-01 01:31:55.800   810   851 V WindowManagerShell: Playing animation for (#15) android.os.BinderProxy@f4fc02f@1
+07-01 01:31:55.800   810   851 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultMixedHandler@c50ed
+07-01 01:31:55.800   810   851 V WindowManagerShell:  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@191d9b3
+07-01 01:31:55.800   810   851 V WindowManagerShell:  try handler com.android.wm.shell.pip.PipTransition@ee06b70
+07-01 01:31:55.800   810   851 V WindowManagerShell:  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@eea0ee9
+07-01 01:31:55.800   810   851 V WindowManagerShell:  try handler com.android.wm.shell.recents.RecentsTransitionHandler@b69876e
+07-01 01:31:55.800   810   851 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+07-01 01:31:55.800   810   851 V WindowManagerShell:  try handler com.android.wm.shell.splitscreen.StageCoordinator@465e0f
+07-01 01:31:55.800   810   851 V WindowManagerShell:  try handler com.android.wm.shell.transition.RemoteTransitionHandler@d38ce9c
+07-01 01:31:55.800   810   851 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=15 t=OPEN f=0x0 trk=1 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@f8b7704} m=OPEN f=NONE leash=Surface(name=Task=77)/@0x9a9dd58 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@dbd14ed} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x8d43eb1 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1}]}
+07-01 01:31:55.802   379   461 I netd    : tetherGetStats() -> {[]} <1.11ms>
+07-01 01:31:55.803   810   851 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=undefined independent=true modes=[OPEN,TO_FRONT] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=undefined independent=true modes=[CLOSE,TO_BACK] flags=IN_TASK_WITH_EMBEDDED_ACTIVITY mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@d2aa729, appThread = android.app.IApplicationThread$Stub$Proxy@ccddaae, debugName = OverlaySwipeBack }}
+07-01 01:31:55.803   810   851 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x0 checks=[{atype=dream independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null},{atype=home independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@cdb504f, appThread = android.app.IApplicationThread$Stub$Proxy@7f373dc, debugName = LauncherToDream }}
+07-01 01:31:55.803   810   851 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity} launchCookie=null},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null launchCookie=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@81d8ce5, appThread = android.app.IApplicationThread$Stub$Proxy@3a0f3ba, debugName = QuickstepLaunchHome }}
+07-01 01:31:55.803   810   851 V WindowManagerShell:  Delegate animation for (#15) to null
+07-01 01:31:55.803   810   851 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultTransitionHandler@e165534
+07-01 01:31:55.803   810   851 V WindowManagerShell: start default transition animation, info = {id=15 t=OPEN f=0x0 trk=1 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@f8b7704} m=OPEN f=NONE leash=Surface(name=Task=77)/@0x9a9dd58 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},{WCT{android.window.IWindowContainerToken$Stub$Proxy@dbd14ed} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0x8d43eb1 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1}]}
+07-01 01:31:55.807   575   599 V WindowManager: Sent Transition (#15) createdAt=07-01 01:31:55.374 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=77 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} topActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=1 lastActiveTime=7085513 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{6bc8a57 Task{2eb3b5c #77 type=standard A=10210:dev.jczhang.lyntty.dev}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{6b79944 dev.jczhang.lyntty.dev.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=1080 topActivityLetterboxHeight=1920 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 15 }
+07-01 01:31:55.812  4135  4176 W SearchServiceCore: Abort, client detached.
+07-01 01:31:55.812   575   594 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:55.812   575   655 W ActivityManager: Slow operation: 55ms so far, now at attachApplicationLocked: immediately before bindApplication
+07-01 01:31:55.814   810   851 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@e312e9 animAttr=0x13 type=OPEN isEntrance=false
+07-01 01:31:55.814   575   655 W ActivityManager: Slow operation: 57ms so far, now at attachApplicationLocked: immediately after bindApplication
+07-01 01:31:55.814   575   655 W ActivityManager: Slow operation: 57ms so far, now at attachApplicationLocked: after updateLruProcessLocked
+07-01 01:31:55.815   810   851 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@b50f4a5 animAttr=0x12 type=OPEN isEntrance=true
+07-01 01:31:55.820   575   599 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+07-01 01:31:55.820   575   599 V WindowManager:     info={id=15 t=OPEN f=0x0 trk=1 r=[0@Point(0, 0)] c=[
+07-01 01:31:55.820   575   599 V WindowManager:         {WCT{RemoteToken{6bc8a57 Task{2eb3b5c #77 type=standard A=10210:dev.jczhang.lyntty.dev}}} m=OPEN f=NONE leash=Surface(name=Task=77)/@0x7112e5f sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},
+07-01 01:31:55.820   575   599 V WindowManager:         {WCT{RemoteToken{ba0501d Task{34db544 #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xd01169a sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1}
+07-01 01:31:55.820   575   599 V WindowManager:     ]}
+07-01 01:31:55.831   810   851 V WindowManagerShell:  animated by com.android.wm.shell.transition.DefaultTransitionHandler@e165534
+07-01 01:31:55.831   810   851 W Looper  : Slow dispatch took 32ms wmshell.main h=android.os.Handler c=com.android.wm.shell.transition.Transitions$TransitionPlayerImpl$$ExternalSyntheticLambda0@f7b4c88 m=0
+07-01 01:31:55.834   575   594 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:55.839   810   851 W Looper  : Slow delivery took 32ms wmshell.main h=android.os.Handler c=android.window.TaskOrganizer$1$$ExternalSyntheticLambda7@2013621 m=0
+07-01 01:31:55.840   810   916 D EGL_emulation: app_time_stats: avg=55790.41ms min=55790.41ms max=55790.41ms count=1
+07-01 01:31:55.843   575   655 W ActivityManager: Slow operation: 86ms so far, now at attachApplicationLocked: after updateOomAdjLocked
+07-01 01:31:55.851   810   851 W Looper  : Drained
+07-01 01:31:55.907  4362  4365 W gle.android.gms: Missing inline cache for int fkid.a(java.lang.Object)
+07-01 01:31:55.917  1267  1267 I TopTaskTracker: onTaskRemoved: taskId=76
+07-01 01:31:55.922  1267  1267 I TopTaskTracker: onTaskRemoved: taskId=76
+07-01 01:31:55.923  1267  1273 W s.nexuslauncher: ApkAssets: Deleting an ApkAssets object '<empty> and /product/app/CalendarGooglePrebuilt/CalendarGooglePrebuilt.apk' with 1 weak references
+07-01 01:31:55.935   810   871 W Looper  : Slow dispatch took 37ms wmshell.anim h=android.view.Choreographer$FrameHandler c=android.view.Choreographer$FrameDisplayEventReceiver@3bca934 m=0
+07-01 01:31:55.943  1296  1301 W .apps.wellbeing: Suspending all threads took: 21.018ms
+07-01 01:31:55.950  4362  4525 I Icing   : Using regular flags by method 2
+07-01 01:31:55.963   796   796 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS
+07-01 01:31:55.971  4495  4495 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+07-01 01:31:55.971  4495  4495 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+07-01 01:31:55.972   575  2149 W ActivityTaskManager: takeTaskSnapshot: taskId=72 not found or not visible
+07-01 01:31:55.989  4495  4495 W ziparchive: Unable to open '/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.dm': No such file or directory
+07-01 01:31:55.989  4495  4495 W ziparchive: Unable to open '/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.dm': No such file or directory
+07-01 01:31:56.032   575   936 D FileUtils: Rounded bytes from 2592718848 to 4000000000
+07-01 01:31:56.045   575   938 D CompatChangeReporter: Compat change id reported: 161145287; UID 10143; state: ENABLED
+07-01 01:31:56.063  4362  4423 I Icing   : Storage manager: low false usage 1.82MB avail 3.94GB capacity 5.80GB
+07-01 01:31:56.075  1296  1301 I .apps.wellbeing: Background concurrent mark compact GC freed 648KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 4471KB/8943KB, paused 21.656ms,1.943ms total 396.750ms
+07-01 01:31:56.080  1296  1301 W .apps.wellbeing: Reducing the number of considered missed Gc histogram windows from 703 to 100
+07-01 01:31:56.116  4362  4423 D nativeloader: Load /product/priv-app/PrebuiltGmsCore/PrebuiltGmsCore.apk!/lib/x86_64/libAppDataSearch.so using ns product-clns-9 from class loader (caller=/product/priv-app/PrebuiltGmsCore/PrebuiltGmsCore.apk!classes4.dex): ok
+07-01 01:31:56.121  4362  4525 I Auth    : [SupervisedAccountIntentOperation] onHandleIntent(): android.intent.action.PACKAGE_ADDED
+07-01 01:31:56.127  4362  4423 W native  : W0000 00:00:1782840716.127333    4423 model-utils.cc:17] No CRC32, most likely an old model; skip CRC32 check
+07-01 01:31:56.131  4362  4423 I native  : I0000 00:00:1782840716.131453    4423 permission-checker.cc:81] Creating PermissionChecker based on ACL with config_version 1 having 9 permissions defined.
+07-01 01:31:56.133   810   851 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#15) android.os.BinderProxy@f4fc02f@1
+07-01 01:31:56.137  4362  4423 W native  : W0000 00:00:1782840716.131724    4423 words-map.cc:34] INVALID_ARGUMENT: Empty URI
+07-01 01:31:56.137  4362  4423 W native  : W0000 00:00:1782840716.137191    4423 words-map.cc:38] WordsMap was not properly initialized
+07-01 01:31:56.142  4362  4362 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+07-01 01:31:56.142  4362  4362 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.common.BIND_SHARED_PREFS pkg=com.google.android.gms }
+07-01 01:31:56.155   575   599 V WindowManager: Finish Transition (#15): created at 07-01 01:31:55.374 collect-started=0.02ms request-sent=19.811ms started=103.649ms ready=401.781ms sent=413.87ms finished=773.83ms
+07-01 01:31:56.156   810   851 V WindowManagerShell: Track 1 became idle
+07-01 01:31:56.156   810   851 V WindowManagerShell: All active transition animations finished
+07-01 01:31:56.158  1267  1267 D VRI[NexusLauncherActivity]: visibilityChanged oldVisibility=true newVisibility=false
+07-01 01:31:56.160  4362  4522 V Backup  : [PhotosPackagedAddedIO] Flag is disabled.
+07-01 01:31:56.165  1267  1267 D NexusLauncherModelDelegate: notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=7}
+07-01 01:31:56.165   440   440 E BpTransactionCompletedListener: Failed to transact (-32)
+07-01 01:31:56.165   440   440 E BpTransactionCompletedListener: Failed to transact (-32)
+07-01 01:31:56.169  4362  4395 W GoogleCertificates: GoogleCertificates has been initialized already
+07-01 01:31:56.170  4362  4395 I DynamiteModule: Considering local module com.google.android.gms.googlecertificates:7 and remote module com.google.android.gms.googlecertificates:7
+07-01 01:31:56.170  4362  4395 I DynamiteModule: Selected local version of com.google.android.gms.googlecertificates
+07-01 01:31:56.179   575  2146 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:56.181   575  2146 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:56.185   575  2149 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:56.196  4135  4156 I DynamiteModule: Considering local module com.google.android.gms.cronet_dynamite:0 and remote module com.google.android.gms.cronet_dynamite:3111
+07-01 01:31:56.196  4135  4156 I DynamiteModule: Selected remote version of com.google.android.gms.cronet_dynamite, version >= 3111
+07-01 01:31:56.196  4135  4156 V DynamiteModule: Dynamite loader version >= 2, using loadModule2NoCrashUtils
+07-01 01:31:56.224   575  4540 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+07-01 01:31:56.229   575  4540 I EGL_emulation: Opening libGLESv2_emulation.so
+07-01 01:31:56.242   575   608 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+07-01 01:31:56.243   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:56.253   575   608 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+07-01 01:31:56.253   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:56.255  1362  1362 I AiAiEcho: AppFetcherImpl onPackageChanged dev.jczhang.lyntty.dev.
+07-01 01:31:56.257  1267  1344 D PackageUpdatedTask: Package updated: mOp=UPDATE packages=[dev.jczhang.lyntty.dev]
+07-01 01:31:56.260  1362  4544 I AiAiEcho: AppIndexer Package:[dev.jczhang.lyntty.dev] UserProfile:[0] Enabled:[true].
+07-01 01:31:56.260  1362  4544 I AiAiEcho: AppFetcherImplV2 updateApps package:[dev.jczhang.lyntty.dev], userId:[0], reason:[package is updated.].
+07-01 01:31:56.271  4362  4525 W SQLiteLog: (28) double-quoted string literal: "dev.jczhang.lyntty.dev"
+07-01 01:31:56.278   575   655 D CompatChangeReporter: Compat change id reported: 311208629; UID 10143; state: ENABLED
+07-01 01:31:56.288  4362  4389 I Icing   : IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=AppsCorpus serviceId=36
+07-01 01:31:56.294  4135  4156 W ziparchive: Unable to open '/data/user_de/0/com.google.android.gms/app_chimera/m/00000001/CronetDynamite.uncompressed.dm': No such file or directory
+07-01 01:31:56.294  4135  4156 W ziparchive: Unable to open '/data/user_de/0/com.google.android.gms/app_chimera/m/00000001/CronetDynamite.uncompressed.dm': No such file or directory
+07-01 01:31:56.322   575  4540 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-01 01:31:56.325  4362  4368 W gle.android.gms: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk' with 1 weak references
+07-01 01:31:56.331  1267  1267 D StatsLog: LAUNCHER_ALLAPPS_COUNT
+07-01 01:31:56.337  4362  4402 I GmscoreIpa: Using regular flags by method 2 [CONTEXT service_id=255 ]
+07-01 01:31:56.341   575   601 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-01 01:31:56.355  4362  4423 I Icing   : updateResources: need to parse bfgz{com.google.android.gms}
+07-01 01:31:56.384  1267  1267 D SearchTargetUtil: query= size=15
+07-01 01:31:56.384  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=ncaa college baseball tournament,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=ncaa college baseball tournament searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 2d59fd11-e617-4e9d-9089-8aef4033dae7
+07-01 01:31:56.384  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=keanu reeves carl rinsch,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=keanu reeves carl rinsch searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 5f24b400-6d05-4a37-91f5-f49313105ac5
+07-01 01:31:56.384  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=apple iphone 18 pro,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=apple iphone 18 pro searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: e76130eb-d17a-450b-8196-0a98bc63f979
+07-01 01:31:56.384  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=la mayoral election,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=la mayoral election searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 4695a4be-057b-4a74-9e0f-4e803dcba5e1
+07-01 01:31:56.385  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=jeep grand cherokee airbag recall,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=jeep grand cherokee airbag recall searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 7c5b1540-1cce-458b-a632-cded3121941a
+07-01 01:31:56.385  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=a different world netflix sequel,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=a different world netflix sequel searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: d8034c21-15ef-4193-b944-7d2aba9319b0
+07-01 01:31:56.385  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=daniel ingham tt crash,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=daniel ingham tt crash searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 7d2d5214-7d5d-441d-ad65-930c61232230
+07-01 01:31:56.385  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=copperhead srt hyper muscle car,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=copperhead srt hyper muscle car searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 52c55853-d52d-4785-a580-1752b94e5498
+07-01 01:31:56.385  1267  1267 D SearchTargetUtil: layoutType=extra_tall_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{bitmap_url=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHwAAAB8CAMAAACcwCSMAAAAaVBMVEXeKRD/3gD/4gDfMA//4ADdIBD1rAbeJRD/3AD/5ADgNQ//5wDdGhD7yAP+2ADjSg7rewvvjAn4ugXiQg78zQPpagzmYw35vwXzoAf2tAb90wD0pAbmXQ3wkgniPA7rgwvocgzkUg7ymgjYqHdCAAADMklEQVRoge2Y2WKrIBCGBcERRXGL+5r3f8iD5qQxrZK0arzhu0ljmvnDwGwYhkajWQPMc2QBDIPWFzhDO05bTkXZ0TPE2yIKROT2Z4gb9GLbJfFTfpzfFZZ5zghCVuoctXazXVfnIUOIMJSFx2hD3awuiwY+JshO8j4+xvH8GjkrlmlfepaHI5PTgzadJ/6wYhouFwEpKcyjzhsIzDq+9iEF4HlxWKTxBuNsTXz6AfH1KHEwIozw2qbfuEcD7O19mpYE4VC19HsegFjA7O0e4iFGCEfvGARhxRQor/dSB7OQ4iRZO+9P/+tknoA6C/Y6AiBk9pRLf6tu0YJ5hespEuIbgjN4wCZx6+np8tcotzDB9rb66pgPaDatnPhi9tBxlr7W9h6ZdmiTeFhYD9ANPH9WLZwAaMOEjV4i0Sa3D4XL8B10V//CLS9LPZsZi7pDBLtutiXegXfll+h3iF3RZb+C3HQb1Xzogr9rS3idMbKojctAkUR4KWsMrPy4t6FOjhfUCc4GVfHk1mWPGAfeJz9cT1BjKI1DulNyo0P0zfWsDF41iruldWo2/lydFO0HO2Tg0ZPn4ZPdObTJfOWs/qQ47ey5OLaURX1vqievk+SNPnG3Ui68W1GRTK/+65HMEXvFWn+rpn4TeLe/qleWYajU3d7b8MnrOOk5F1PIk+zVWCLnxm0F9SEuMxq5BfcY8mMrl6osU8p57oYyD22/qKApk2UkvKVy4KmHEbsqzrvTd52shklzrYLFZuM3yJ6IJfVXaabCYrhUiJuX0pWbQ5gbbT51EHuomk/dY5V3VU0sNXKZF4gdbh8aaZAE36zQOquUc5McbgjZ1rz+p09/CNFWuZsyMTAfoT3a9iXnqUsLDVDO09I651YubCjw4bpXlvsd8RgbYJ50H3mCJh3eGSP3x5HnEtrslBtIqK898Iooc/5h4qZlZxYqP9pgPdRbj2Hih/HWKeVPTPM7wV7Vf14bzGgcq+wy32tW+Y225fo+9mp+4J33GjQsmrQj2R6F7Pc4Y/NUnCQ+AqI6T9wwxOaebQMnrluj0Wg0Go1Go9FoNBqNRqPRaDQajUaj0Wg0B/MPoCYmfFJHJdwAAAAASUVORK5CYII=,suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=true,is_personal=false,suggest_raw_text=china,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=China searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: eb499189-f926-463c-a78a-f6a1b350a6de
+07-01 01:31:56.385  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=highly contagious vomiting bug,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=highly contagious vomiting bug searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 8901198a-246e-441b-8ac4-3efef9915b43
+07-01 01:31:56.385  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=starflite aviation license revoked,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=starflite aviation license revoked searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: ab60c94f-69ae-4c62-9c92-2d78a6167f81
+07-01 01:31:56.385  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=one piece chapter 1184,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=one piece chapter 1184 searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 609f5cda-f00e-413d-be6b-b6fa4296ab7a
+07-01 01:31:56.386  1267  1267 D SearchTargetUtil: layoutType=extra_tall_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{bitmap_url=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHwAAAA4CAMAAAAICWz2AAAAjVBMVEX///8AAADv7++5ubkVFRX4+PihoaG0tLT7+/v09PR8fHzf39/V1dXQ0NBpaWnq6uooKChNTU2/v79ubm5dXV0fHx+ZmZl1dXVERERYWFiRkZE3NzeCgoILCwvIyMjAytCrq6vR2+KNlJigqK1pbnIvLy96f4M7PT+DiYyrtLlcYWSVnaG0vcJyd3tOUlVFQ8wLAAAGH0lEQVRYhe2ZaXOjOBCG1ZwGYS5z39hh8DiZ/P+fty2J00eMJ9mq/bBvpcwl6ZG6Wy1BCHlV1E51dnTBInuQiQRhn3gB3okaXa52Lzf4tZxII8QGQ1xlAAk7KpBzuKppUJo2ITowmYQUoBNVpt+kGlqQ4cEC2JNDOcC7gw0qh0NlIRwFLvvVoEJ75Aze7SSIierZmv56HyQ/cvBQAeQqh3sT3AHN58jSzkO6hvtEDTkcGqNEE/geYB/IPpOdreRdwMyHdiRmYgJl8AD8eID7QCkUDB7s4XAfHia5w+DoIkZNxvY2yIeMSiGzdxJTiBjcT/pAEfCYtaQweEpyeACvIAoFnFk98Qgt0HNb1KDvJFbUAV1CBMIrdEAo4KGn+ylrE5/sb+A7DlckG5QFPNnhiPyNcBwRHAiR+YnDRk5SECO3mCl8wPBXcHalpT/DMTTKnM2EopQsHvYLuLwR7qSppkPKLBzrMVZiMW1Br/KHvoRR4ajrKuJyL+taYTG4QwIGl4qX4YQaxEC44eLYKGRE0qVtFUdhcZo1RO1wmqBf+pfMbmYeWtdJN3b2cScsH/uAUy8p4o1w9FdeyOrzglul+pGnwMap7tzLz1edoRZqerZHDQlQctS7/X7Rc0I7lfpadkigWd41eB4frwp2McxjzPBKYheRTO93YqNUgzZZ4MKgctl3M6zrCU7hvfZGuAyT3KDQKuNvyJmdw1rx/JTCqf01wdPP9gR34KLPm9M6avC3BLeah26Hp9Nk9gqOp/4hHPpp7F+7QaVN7AmEpAx1u8TO/GYNdyAMZ58H4C58LuB6FcVeV/JzexxPf9Do/Q7snMbMZ+sKuGmJ0tYavker9xNceWvP13CxilPrwC4K8YSfu/FNB4x9kUx28me4NtFWcB/qNpzgcGb+vwfn2x5ckiRRaVRe+LMRG1uBhcyncB0+Pyezq5B/dl/CXe51exWGduPMJhW3ym3wPkwY7sAvIkiY1Ybl/jH8MBOEcNOFi6VQf5Bpsgmuw+/2AiASpgR/2ESDhmyBJ9SPRwcnbMoyrwQaZTHJ72dP4Gp54TheDtusa/R/R1Zw5xGcndEm4JPFEtuisdueZ/qi02v4KtozDDdmdT6DKBx5rFdruJ3pliMxn9yBE7ZyskKEQ/Th3pyNJrjkUD3jW8pcTBEHfrXHqY7ntphn2dZjBecKvdh7AOd7fIWES/gsAU/joJvaGhbkg1LX+LDnFxXO+LeFj+9kOIRI9+HhCu7ss1RfwpdKRw+8c5yYWeFn+zHG6CO4J5zK/ZsPtpUitEk5wQ0rCpQp3m7gbjKs3l7PcQlliuCjZZY1ruF+pZm2x9sGU6RXKlwRRFTEjqPbAq7p9mzeeAXvgjjyqSNNbf9u39yuc5USpYhpppFr+BC1Dl/pPREsU4rr7PElKrwxUzrDzZk6yH1r23ohFvfhssB6nkezz4eL0ReZ8Qy+HBKXBr+OqDNSj1x/ANZbwzvwcByAZrtrzJzvgswKnsGDwXB1+z4PYlXiKzg2S6NgJLIXMd6Z3qxYCfsZvBL1jm09B6S1KvEQbo33pGpYQrGiGqfRuMQ+hZPA89IyrFluzz2mpFgXeAhPIIn9MYtp7L67rvkMvmN/LMVhjPfqjuuqyEM4T3ZjT8VXjBfhMe81W0rCB9vSF+FSZY/LAk+B9mM4CZHuXpjRH33uUB1Lj4rRvAt4cAcup+EwWagsdjQ8cYrda3PddA+FBR+n6yh7KL56iR0/j9UwEPllgPPfyqjMcZse8FrSoWjorWVx5+F+otGrmycPZEhVVBhjXa4cZxbPdqWA54tU8+WYDpdP+P0GsVX58lb+qP3MULoFfFJn3q6uQo6dekkOaX0R6SV/5U1ESF5ska/hrtncfT8dRDFcL2/ntj2f35Nh8/iyjGUHchES6GntK7BQBF5dJ6e2vtzJPtsl6fHkYA/cwt/2NmuBcsIMcx7W/L/Xzsp6vgORtn+g9PHlpK4/cCfz3Q+rKPraJ2Kp7I7JsS7LS7n1I8fPiSff/AQZhl74g99stqiBJHIySNj7wT6Ln5b/SakaczSFb0fbNxRs/IL7r6iCn/5Hxisqnhf5X/9p/QNd4WYOpvdkDgAAAABJRU5ErkJggg==,suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=true,is_personal=false,suggest_raw_text=spurs nba,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=spurs nba searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: e35e6b6d-2a48-401f-aa57-aaa0c38055a7
+07-01 01:31:56.386  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=blue moon full moon,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=blue moon full moon searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: c22ad173-1e9d-4a86-baf3-4027f7a84b6b
+07-01 01:31:56.386  1267  1267 D SearchTargetUtil: layoutType=short_icon_row resultType=131072 packageName=com.google.android.googlequicksearchbox extras=Bundle{suggestion_type=33,suggest_truncate_start=false,is_answer=false,is_entity=false,is_personal=false,suggest_raw_text=laos cave rescue,input_query=android.app.search.Query@6fd78a6,group_id=web7085220,response_id=75c25e5f-aa19-4952-985a-e72e6bdc8472,support_query_builder=false,} searchAction=laos cave rescue searchActionExtras=Bundle{learn_more_url=https://support.google.com/websearch/answer/106230?hl=106230,suggestion_action_text=Report this,should_start_for_result=true,allow_pinning=true,skip_logging_in_target_handler=true,suggestion_action_rpc=2,}ParentID: null targetID: 71409d3e-f84b-4664-9085-6f05803af599
+07-01 01:31:56.406  4362  4362 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+07-01 01:31:56.406  4362  4362 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+07-01 01:31:56.422  4362  4423 I Icing   : Internal init done: storage state 0
+07-01 01:31:56.425  4362  4389 I Icing   : IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=AppsCorpus serviceId=32
+07-01 01:31:56.425  4362  4389 I Icing   : IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=ContactsIndexer serviceId=33
+07-01 01:31:56.436  4362  4389 I Icing   : IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=null serviceId=30
+07-01 01:31:56.451  4362  4423 I Icing   : Post-init done
+07-01 01:31:56.464   575   655 D ActivityManager: sync unfroze 1204 android.process.acore for 7
+07-01 01:31:56.469  4362  4389 I Icing   : IndexChimeraService.getServiceInterface callingPackage=com.google.android.gms componentName=null serviceId=36
+07-01 01:31:56.473  1204  1204 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+07-01 01:31:56.489  4362  4423 I Icing   : Usage reports ok 1, Failed Usage reports 0, indexed 0, rejected 0
+07-01 01:31:56.504  4362  4423 I Icing   : Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+07-01 01:31:56.505  4135  4550 I cr_CronetLibraryLoader: HTTP flags log line: Using live production flag values from Google
+07-01 01:31:56.513  4362  4423 I Icing   : Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+07-01 01:31:56.525  4135  4156 D nativeloader: Load /product/priv-app/Velvet/Velvet.apk!/lib/x86_64/libcronet.127.0.6493.0.so using ns product-clns-7 from class loader (caller=/product/priv-app/Velvet/Velvet.apk!classes11.dex): ok
+07-01 01:31:56.531  4135  4156 I cr_CronetLibraryLoader: Cronet version: 127.0.6493.0, arch: x86_64
+07-01 01:31:56.535  4135  4158 W earchbox:search: Long monitor contention with owner BG Thread #0 (4156) at java.lang.Object e.c.d.b()(PG:46) waiters=0 in java.lang.Object e.c.d.b() for 647ms
+07-01 01:31:56.556   575  1448 D ConnectivityService: requestNetwork for uid/pid:10144/4135 activeRequest: null callbackRequest: 140 [NetworkRequest [ REQUEST id=141, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10144 RequestorUid: 10144 RequestorPkg: com.google.android.googlequicksearchbox UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647 isUidTracked: false
+07-01 01:31:56.557   575   713 D WifiNetworkFactory: got request NetworkRequest [ REQUEST id=141, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10144 RequestorUid: 10144 RequestorPkg: com.google.android.googlequicksearchbox UnderlyingNetworks: Null] ]
+07-01 01:31:56.557   575   713 D UntrustedWifiNetworkFactory: got request NetworkRequest [ REQUEST id=141, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10144 RequestorUid: 10144 RequestorPkg: com.google.android.googlequicksearchbox UnderlyingNetworks: Null] ]
+07-01 01:31:56.557   575   713 D OemPaidWifiNetworkFactory: got request NetworkRequest [ REQUEST id=141, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10144 RequestorUid: 10144 RequestorPkg: com.google.android.googlequicksearchbox UnderlyingNetworks: Null] ]
+07-01 01:31:56.557   575   726 D ConnectivityService: NetReassign [141 : null → 101] [c 0] [a 1] [i 0]
+07-01 01:31:56.557   575   713 D MultiInternetWifiNetworkFactory: got request NetworkRequest [ REQUEST id=141, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10144 RequestorUid: 10144 RequestorPkg: com.google.android.googlequicksearchbox UnderlyingNetworks: Null] ]
+07-01 01:31:56.562   575   726 D ConnectivityService: NetReassign [no changes] [c 0] [a 0] [i 0]
+07-01 01:31:56.572  4362  4423 I Icing   : Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+07-01 01:31:56.584  4362  4423 I Icing   : Usage reports ok 0, Failed Usage reports 0, indexed 0, rejected 0
+07-01 01:31:56.586  1362  1839 I AiAiTextClassifier: [VisualCortexAdapter]: provideRegistration: Registered Prominent Screen Entities for updates.
+07-01 01:31:56.592  4135  4555 W chromium: [0701/013156.590153:WARNING:url_request_context_config.cc(716)] Unrecognized Cronet experimental option "enable_telemetry" with params "true
+07-01 01:31:56.592  4135  4555 W chromium:
+07-01 01:31:56.602  4362  4423 I Icing   : Indexing com.google.android.gms-apps from com.google.android.gms
+07-01 01:31:56.615  4362  4423 I Icing   : Indexing done com.google.android.gms-apps
+07-01 01:31:56.638  1362  1839 I AiAiTextClassifier: [VisualCortexAdapter]: provideRegistration: Registered Prominent Screen Entities for updates.
+07-01 01:31:56.648  1362  1839 I AiAiTextClassifier: [VisualCortexAdapter]: provideRegistration: Registered Prominent Screen Entities for updates.
+07-01 01:31:56.653  1362  1839 I AiAiTextClassifier: [VisualCortexAdapter]: provideRegistration: Registered Prominent Screen Entities for updates.
+07-01 01:31:56.655  1362  1839 I AiAiTextClassifier: [VisualCortexAdapter]: provideRegistration: Registered Prominent Screen Entities for updates.
+07-01 01:31:56.656  1362  1839 I AiAiTextClassifier: [VisualCortexAdapter]: provideRegistration: Registered Prominent Screen Entities for updates.
+07-01 01:31:56.657  1362  1839 I AiAiTextClassifier: [VisualCortexAdapter]: provideRegistration: Registered Prominent Screen Entities for updates.
+07-01 01:31:56.657  1362  1839 I AiAiTextClassifier: [VisualCortexAdapter]: provideRegistration: Registered Prominent Screen Entities for updates.
+07-01 01:31:56.659  1362  1839 I AiAiTextClassifier: [VisualCortexAdapter]: provideRegistration: Registered Prominent Screen Entities for updates.
+07-01 01:31:57.046  4495  4495 D nativeloader: Configuring clns-7 for other apk /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/lib/x86_64:/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/dev.jczhang.lyntty.dev
+07-01 01:31:57.058  4495  4495 V GraphicsEnvironment: Currently set values for:
+07-01 01:31:57.058  4495  4495 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+07-01 01:31:57.058  4495  4495 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+07-01 01:31:57.058  4495  4495 V GraphicsEnvironment: Global.Settings values are invalid: number of packages: 0, number of values: 0
+07-01 01:31:57.058  4495  4495 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+07-01 01:31:57.082  4495  4495 I FirebaseApp: Device unlocked: initializing all Firebase APIs for app [DEFAULT]
+07-01 01:31:57.092  4495  4495 I FirebaseInitProvider: FirebaseApp initialization successful
+07-01 01:31:57.115  4495  4495 W SoLoader: Initializing SoLoader: 0
+07-01 01:31:57.116  4495  4495 W SoLoader: Recording new base apk path: /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk
+07-01 01:31:57.116  4495  4495 W SoLoader: Previously recorded 0 base apk paths.
+07-01 01:31:57.117  4495  4495 I SoLoader: Preparing SO source: DirectorySoSource[root = /vendor/lib64 flags = 2]
+07-01 01:31:57.117  4495  4495 I SoLoader: Preparing SO source: DirectorySoSource[root = /system/lib64 flags = 2]
+07-01 01:31:57.117  4495  4495 I SoLoader: Preparing SO source: DirectApkSoSource[root = [/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64]]
+07-01 01:31:57.178  4495  4495 I SoLoader: Preparing SO source: ApplicationSoSource[DirectorySoSource[root = /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/lib/x86_64 flags = 0]]
+07-01 01:31:57.178  4495  4495 I SoLoader: init finish: 4 SO sources prepared
+07-01 01:31:57.178  4495  4495 W SoLoader: SoLoader initialized: 8
+07-01 01:31:57.257  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libc++_shared.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.266  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libjsi.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.271  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libfbjni.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.276  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libreactnative.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Entering merged library JNI_OnLoad.
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x796148ffc730
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7961491f9190
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x79614920a910
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7961492abd20
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7961494b62e0
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x7961494f6770
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x7961495065d0
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x7961495434c0
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7961496a4c00
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7961496bcde0
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x7961496cbd70
+07-01 01:31:57.276  4495  4495 D jni_lib_merge: About to register 11 actual methods.
+07-01 01:31:57.292  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libreact_codegen_rnscreens.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Entering merged library JNI_OnLoad.
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x796148ffc730
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7961491f9190
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x79614920a910
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7961492abd20
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7961494b62e0
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x7961494f6770
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x7961495065d0
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x7961495434c0
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7961496a4c00
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7961496bcde0
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x7961496cbd70
+07-01 01:31:57.292  4495  4495 D jni_lib_merge: About to register 11 actual methods.
+07-01 01:31:57.298  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libreact_codegen_RNCSlider.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.304  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libreact_codegen_rnsvg.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Entering merged library JNI_OnLoad.
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x796148ffc730
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7961491f9190
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x79614920a910
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7961492abd20
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7961494b62e0
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x7961494f6770
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x7961495065d0
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x7961495434c0
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7961496a4c00
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7961496bcde0
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x7961496cbd70
+07-01 01:31:57.304  4495  4495 D jni_lib_merge: About to register 11 actual methods.
+07-01 01:31:57.310  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libreact_codegen_RNKC.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Entering merged library JNI_OnLoad.
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x796148ffc730
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7961491f9190
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x79614920a910
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7961492abd20
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7961494b62e0
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x7961494f6770
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x7961495065d0
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x7961495434c0
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7961496a4c00
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7961496bcde0
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x7961496cbd70
+07-01 01:31:57.310  4495  4495 D jni_lib_merge: About to register 11 actual methods.
+07-01 01:31:57.315  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libreact_codegen_safeareacontext.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.321  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libreact_codegen_RNEnrichedTextInputViewSpec.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.329  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libreact-native-mmkv.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.337  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libreact_codegen_rnpicker.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Entering merged library JNI_OnLoad.
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x796148ffc730
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7961491f9190
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x79614920a910
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7961492abd20
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7961494b62e0
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x7961494f6770
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x7961495065d0
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x7961495434c0
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7961496a4c00
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7961496bcde0
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x7961496cbd70
+07-01 01:31:57.337  4495  4495 D jni_lib_merge: About to register 11 actual methods.
+07-01 01:31:57.341  4495  4495 D nativeloader: Load /data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!/lib/x86_64/libappmodules.so using ns clns-7 from class loader (caller=/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.apk!classes8.dex): ok
+07-01 01:31:57.366  4495  4495 W org.webrtc.Logging: HardwareVideoEncoderFactory: No shared EglBase.Context.  Encoders will not use texture mode.
+07-01 01:31:57.377  4495  4495 I org.webrtc.Logging: WebRtcAudioManagerExternal: Running emulator, overriding sample rate to 8 kHz.
+07-01 01:31:57.377  4495  4495 I org.webrtc.Logging: WebRtcAudioManagerExternal: Running emulator, overriding sample rate to 8 kHz.
+07-01 01:31:57.378  4495  4495 E org.webrtc.Logging: JavaAudioDeviceModule: HW AEC not supported
+07-01 01:31:57.378  4495  4495 E org.webrtc.Logging: JavaAudioDeviceModule: HW NS not supported
+07-01 01:31:57.378  4495  4495 I org.webrtc.Logging: JavaAudioDeviceModule: createAudioDeviceModule
+07-01 01:31:57.378  4495  4495 I org.webrtc.Logging: JavaAudioDeviceModule: HW NS will not be used.
+07-01 01:31:57.378  4495  4495 I org.webrtc.Logging: JavaAudioDeviceModule: HW AEC will not be used.
+07-01 01:31:57.380  4495  4495 I org.webrtc.Logging: WebRtcAudioEffectsExternal: ctor@[name=main, id=2]
+07-01 01:31:57.381  4495  4495 I org.webrtc.Logging: WebRtcAudioRecordExternal: ctor@[name=main, id=2]
+07-01 01:31:57.382  4495  4495 I org.webrtc.Logging: WebRtcAudioTrackExternal: ctor@[name=main, id=2]
+07-01 01:31:57.489  4495  4576 D TrafficStats: tagSocket(94) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:57.560  4495  4576 W unknown:ReconnectingWebSocket: Couldn't connect to "ws://10.0.2.2:8081/message?device=sdk_gphone64_x86_64%20-%2015%20-%20API%2035&app=dev.jczhang.lyntty.dev&clientid=BridgelessDevSupportManager", will silently retry
+07-01 01:31:57.579   575   655 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS
+07-01 01:31:57.586   575   655 I BroadcastQueue: BOOT_COMPLETED_BROADCAST_COMPLETION_LATENCY_REPORTED action:android.intent.action.BOOT_COMPLETED dispatchLatency:10 completeLatency:1743 dispatchRealLatency:10 completeRealLatency:1743 receiversSize:1 userId:0 userType:android.os.usertype.full.SYSTEM
+07-01 01:31:57.587  1021  1021 W GCM     : Invalid request, no callback for what: 4
+07-01 01:31:57.605  4495  4495 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+07-01 01:31:57.627  4495  4495 W hang.lyntty.dev: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (unsupported, reflection, allowed)
+07-01 01:31:57.637  4495  4495 W hang.lyntty.dev: Accessing hidden field Ljava/lang/reflect/Field;->accessFlags:I (unsupported, reflection, allowed)
+07-01 01:31:57.639   575   938 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE
+07-01 01:31:57.639   575   938 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE
+07-01 01:31:57.639   575   938 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE
+07-01 01:31:57.639   575   938 V GrammaticalInflectionUtils: AttributionSource: AttributionSource { uid = 10210, packageName = null, attributionTag = null, token = android.os.Binder@95e334d, deviceId = 0, next = null } does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+07-01 01:31:57.639   575   938 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_RESIZEABLE_ACTIVITY_OVERRIDES
+07-01 01:31:57.639   575   938 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE
+07-01 01:31:57.641   810   851 V WindowManagerShell: Transition requested (#16): android.os.BinderProxy@51a135d TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=77 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=ComponentInfo{dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} topActivity=ComponentInfo{dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=1 lastActiveTime=7087759 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@4eec4d2} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{60df9a3 expo.modules.devlauncher.launcher.DevLauncherActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=1080 topActivityLetterboxHeight=1920 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 16 }
+07-01 01:31:57.642   575   938 I ActivityTaskManager: START u0 {flg=0x10018000 cmp=dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} with LAUNCH_SINGLE_TASK from uid 10210 (BAL_ALLOW_VISIBLE_WINDOW) result code=0
+07-01 01:31:57.648   440   440 I BpBinder: onLastStrongRef automatically unlinking death recipients:
+07-01 01:31:57.654  4495  4495 W HWUI    : Unknown dataspace 0
+07-01 01:31:57.663   575   655 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS
+07-01 01:31:57.666   575   599 V WindowManager: Sent Transition (#16) createdAt=07-01 01:31:57.639 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=77 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=ComponentInfo{dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} topActivity=ComponentInfo{dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=1 lastActiveTime=7087759 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{6bc8a57 Task{2eb3b5c #77 type=standard A=10210:dev.jczhang.lyntty.dev}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{228dd6d expo.modules.devlauncher.launcher.DevLauncherActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=1080 topActivityLetterboxHeight=1920 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 16 }
+07-01 01:31:57.666   575   599 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+07-01 01:31:57.666   575   599 V WindowManager:     info={id=16 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[
+07-01 01:31:57.666   575   599 V WindowManager:         {null m=OPEN f=STARTING_WINDOW_TRANSFER|FILLS_TASK|IS_BEHIND_STARTING_WINDOW|NO_ANIMATION leash=Surface(name=ActivityRecord{4287a43 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity)/@0xfb1bb97 sb=Rect(0, 0 - 0, 0) eb=Rect(0, 0 - 1080, 1920) d=-1->0 r=-1->0:-1 bc=ff000000 component=dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity},
+07-01 01:31:57.666   575   599 V WindowManager:         {null m=CLOSE f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{3f85cf u0 dev.jczhang.lyntty.dev/.MainActivity)/@0x6e94616 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 bc=ff000000 component=dev.jczhang.lyntty.dev/.MainActivity}
+07-01 01:31:57.666   575   599 V WindowManager:     ]}
+07-01 01:31:57.666   810  1098 V WindowManagerShell: onTransitionReady(transaction=2469606195746)
+07-01 01:31:57.666   810   851 V WindowManagerShell: onTransitionReady (#16) android.os.BinderProxy@51a135d: {id=16 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{null m=OPEN f=STARTING_WINDOW_TRANSFER|FILLS_TASK|IS_BEHIND_STARTING_WINDOW|NO_ANIMATION leash=Surface(name=ActivityRecord{4287a43 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity)/@0xd1524a0 sb=Rect(0, 0 - 0, 0) eb=Rect(0, 0 - 1080, 1920) d=-1->0 r=-1->0:-1 bc=ff000000 component=dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity},{null m=CLOSE f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{3f85cf u0 dev.jczhang.lyntty.dev/.MainActivity)/@0x6e98859 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 bc=ff000000 component=dev.jczhang.lyntty.dev/.MainActivity}]}
+07-01 01:31:57.667   810   851 V WindowManagerShell: Non-visible anim so abort: (#16) android.os.BinderProxy@51a135d@0
+07-01 01:31:57.667   810   851 V WindowManagerShell: Transition animation finished (aborted=true), notifying core (#16) android.os.BinderProxy@51a135d@0
+07-01 01:31:57.668   575   599 V WindowManager: Finish Transition (#16): created at 07-01 01:31:57.639 collect-started=0.017ms request-sent=1.783ms started=2.786ms ready=24.185ms sent=25.569ms finished=28.319ms
+07-01 01:31:57.668   810   851 V WindowManagerShell: Track 0 became idle
+07-01 01:31:57.668   810   851 V WindowManagerShell: All active transition animations finished
+07-01 01:31:57.669   575   938 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:57.670   575   655 D CoreBackPreview: Window{700cfd8 u0 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@e2bada2, mPriority=0, mIsAnimationCallback=false}
+07-01 01:31:57.670   575   938 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:57.671   575   655 W UserManagerService: Requested status bar icon for non-badged user 0
+07-01 01:31:57.688  4495  4495 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false
+07-01 01:31:57.766   575   655 W ActivityTaskManager: takeTaskSnapshot: taskId=72 not found or not visible
+07-01 01:31:57.805  4495  4495 W hang.lyntty.dev: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (unsupported, reflection, allowed)
+07-01 01:31:57.816  4495  4499 I hang.lyntty.dev: Compiler allocated 5174KB to compile void android.view.ViewRootImpl.performTraversals()
+07-01 01:31:57.913   575   655 D CoreBackPreview: Window{ebdc1f0 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@a48fbdd, mPriority=0, mIsAnimationCallback=false}
+07-01 01:31:57.914  1394  1979 I BugleRcsEngine: handleMessage processing message:[NOTIFY_UPTIME_IGNORE_STATE_CHANGED] with [non-null]:RcsEngineImpl reference [CONTEXT log_prefix="RcsEngineImpl[DUAL_REG]:[d2c735fe-6f32]>Handler" thread_id=63 ]
+07-01 01:31:57.914   575   726 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:57.915   575   726 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:31:57.915  1394  1688 I BugleRcsEngine: Connected state: [1], networkType: [WIFI] [CONTEXT thread_id=57 ]
+07-01 01:31:57.917   575   655 D CompatChangeReporter: Compat change id reported: 297989574; UID 10134; state: ENABLED
+07-01 01:31:57.919  1021  1802 I ChimeraSrvcProxy: NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl
+07-01 01:31:57.919  1021  1802 W .gms.persistent: Large reply transaction of 1056768 bytes, interface descriptor , code 1
+07-01 01:31:57.920  1394  1979 I BugleRcsEngine: No RCS Configuration was found in Bugle for simID: redacted-pii:sim_id[chars:20,last3:897] [CONTEXT log_prefix="ProvisioningEngineDataRetriever" thread_id=63 ]
+07-01 01:31:57.986  4495  4584 D TrafficStats: tagSocket(107) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:57.989  4495  4586 D TrafficStats: tagSocket(108) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:57.989  4495  4585 D TrafficStats: tagSocket(109) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:57.990  4495  4587 D TrafficStats: tagSocket(110) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:57.990  4495  4588 D TrafficStats: tagSocket(111) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:58.060  4495  4588 D TrafficStats: tagSocket(107) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:58.061  4495  4587 D TrafficStats: tagSocket(109) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:58.061  4495  4589 D TrafficStats: tagSocket(111) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:58.156  4495  4579 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+07-01 01:31:58.156  4495  4579 I EGL_emulation: Opening libGLESv2_emulation.so
+07-01 01:31:58.161  4495  4579 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-01 01:31:58.195     0     0 I servicemanager: Caller(pid=4495,uid=10210,sid=u:r:untrusted_app:s0:c210,c256,c512,c768) Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest. No alternative instances declared in VINTF.
+07-01 01:31:58.173   170   170 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+07-01 01:31:58.173  4495  4579 I Gralloc4: mapper 4.x is not supported
+07-01 01:31:58.358   575   599 D CompatChangeReporter: Compat change id reported: 296060945; UID 10143; state: ENABLED
+07-01 01:31:58.693   575   599 W ziparchive: Unable to open '/data/app/~~V8IJuHIwHW1LeGnZ74ANkA==/dev.jczhang.lyntty.dev-Y2gr5KRLLLn8ur2d-td4wg==/base.dm': No such file or directory
+07-01 01:31:58.695   575   599 I ActivityTaskManager: Displayed dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity for user 0: +3s536ms
+07-01 01:31:58.709  4495  4530 I HWUI    : Davey! duration=992ms; Flags=1, FrameTimelineVsyncId=341017, IntendedVsync=7087817224311, Vsync=7087817224311, InputEventId=0, HandleInputStart=7087817474519, AnimationStart=7087817475276, PerformTraversalsStart=7087817475686, DrawStart=7088327898292, FrameDeadline=7087833890977, FrameInterval=7087817469060, FrameStartTime=16666666, SyncQueued=7088342717108, SyncStart=7088342851047, IssueDrawCommandsStart=7088343304755, SwapBuffers=7088702543862, FrameCompleted=7088809629530, DequeueBufferDuration=5198, QueueBufferDuration=373086, GpuCompleted=7088809346169, SwapBuffersCompleted=7088809629530, DisplayPresentTime=0, CommandSubmissionCompleted=7088702543862,
+07-01 01:31:58.710  4495  4495 I Choreographer: Skipped 59 frames!  The application may be doing too much work on its main thread.
+07-01 01:31:58.765  1021  1802 I FontLog : Received query Noto Color Emoji Compat, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+07-01 01:31:58.766  1021  1802 I FontLog : Query [emojicompat-emoji-font] resolved to {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+07-01 01:31:58.769  1021  1802 I FontLog : Fetch {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+07-01 01:31:58.773  1021  1802 I FontLog : Pulling font file for id = 13, cache size = 8 [CONTEXT service_id=132 ]
+07-01 01:31:58.776  1021  1802 I FontLog : Pulling font file for id = 13, cache size = 8 [CONTEXT service_id=132 ]
+07-01 01:31:58.802   575   691 I ImeTracker: dev.jczhang.lyntty.dev:92ea0480: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+07-01 01:31:58.805   575   691 I ImeTracker: dev.jczhang.lyntty.dev:92ea0480: onCancelled at PHASE_SERVER_SHOULD_HIDE
+07-01 01:31:58.814  4495  4533 I HWUI    : Davey! duration=1084ms; Flags=0, FrameTimelineVsyncId=341039, IntendedVsync=7087833890977, Vsync=7088817224271, InputEventId=0, HandleInputStart=7088829736127, AnimationStart=7088829737938, PerformTraversalsStart=7088847073563, DrawStart=7088856886250, FrameDeadline=7088833890937, FrameInterval=7088829502956, FrameStartTime=16666666, SyncQueued=7088858807570, SyncStart=7088858893309, IssueDrawCommandsStart=7088859012922, SwapBuffers=7088866663742, FrameCompleted=7088918452974, DequeueBufferDuration=3352, QueueBufferDuration=153778, GpuCompleted=7088918452974, SwapBuffersCompleted=7088913538583, DisplayPresentTime=0, CommandSubmissionCompleted=7088866663742,
+07-01 01:31:58.817  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.onFinishInput():3157
+07-01 01:31:58.824  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 0, locked = false
+07-01 01:31:58.824  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1986 onStartInput(EditorInfo{EditorInfo{packageName=dev.jczhang.lyntty.dev, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+07-01 01:31:58.824  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 1, locked = false
+07-01 01:31:58.829  1275  1275 I AndroidIME: InputBundleManager.loadActiveInputBundleId():450 loadActiveInputBundleId: und-Latn-x-password, password
+07-01 01:31:58.830   575  2147 W PackageConfigPersister: App-specific configuration not found for packageName: dev.jczhang.lyntty.dev and userId: 0
+07-01 01:31:58.880  1267  1267 D BaseDepthController: setSurface:
+07-01 01:31:58.880  1267  1267 D BaseDepthController: 	mWaitingOnSurfaceValidity: false
+07-01 01:31:58.880  1267  1267 D BaseDepthController: 	mSurface: null
+07-01 01:31:58.881  1267  1267 D BaseDepthController: mSurface is null and mCurrentBlur is: 0
+07-01 01:31:58.883  1267  1267 D StateManager: goToState - fromState: Normal, toState: Normal, partial trace:
+07-01 01:31:58.883  1267  1267 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 31f9979659277bb965985aff1272c33e3c3c9e755b77166d20a2465454178f2c:4)
+07-01 01:31:58.883  1267  1267 D StateManager: 	at com.android.launcher3.statemanager.StateManager.moveToRestState(go/retraceme 31f9979659277bb965985aff1272c33e3c3c9e755b77166d20a2465454178f2c:1)
+07-01 01:31:58.883  1267  1267 D StateManager: 	at com.android.launcher3.statemanager.StatefulActivity.onStop(go/retraceme 31f9979659277bb965985aff1272c33e3c3c9e755b77166d20a2465454178f2c:34)
+07-01 01:31:58.884  1267  1267 D StatsLog: LAUNCHER_ONSTOP
+07-01 01:31:58.885   575   655 I AppWidgetServiceImpl: setAppWidgetHidden() 0
+07-01 01:31:58.887  1267  1267 D StatsLog: LAUNCHER_GOOGLE_SEARCH_RESTORE_LIST_SIZE_AFTER_ACTIVITY_RESTART
+07-01 01:31:58.897  1267  1814 D OneSearchSuggestProvider: Shut down the binder channel
+07-01 01:31:58.905  1267  1288 I IPCThreadState: oneway function results for code 2 on binder at 0x79631d8c9650 will be dropped but finished with status UNKNOWN_TRANSACTION
+07-01 01:31:58.908  4495  4495 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@187cb8c
+07-01 01:31:58.908   575   655 D CoreBackPreview: Window{700cfd8 u0 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity}: Setting back callback null
+07-01 01:31:58.912   575   938 W InputManager-JNI: Input channel object '700cfd8 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity (client)' was disposed without first being removed with the input manager!
+07-01 01:31:58.923   379   461 I netd    : tetherGetStats() -> {[]} <2.17ms>
+07-01 01:31:59.086   810   886 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@c15d979
+07-01 01:31:59.087   575   655 D CoreBackPreview: Window{4ba9666 u0 Splash Screen dev.jczhang.lyntty.dev EXITING}: Setting back callback null
+07-01 01:31:59.087   575   938 W InputManager-JNI: Input channel object '4ba9666 Splash Screen dev.jczhang.lyntty.dev (client)' was disposed without first being removed with the input manager!
+07-01 01:31:59.258   810   916 D EGL_emulation: app_time_stats: avg=338.15ms min=7.51ms max=2606.71ms count=10
+07-01 01:31:59.563  4495  4576 D TrafficStats: tagSocket(125) with statsTag=0xffffffff, statsUid=-1
+07-01 01:31:59.808  4495  4579 D EGL_emulation: app_time_stats: avg=10.78ms min=4.39ms max=103.90ms count=58
+07-01 01:31:59.917   575  1436 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+07-01 01:32:00.003  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 01:32:00.003  1362  1491 I AiAiEcho: EchoTargets:
+07-01 01:32:00.003  1362  1491 I AiAiEcho: Filtered by AiAi flag check:
+07-01 01:32:00.003  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 01:32:00.003  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 01:32:00.004  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 01:32:00.004  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 01:32:00.004  1362  1491 I AiAiEcho: EchoTargets:
+07-01 01:32:00.004  1362  1491 I AiAiEcho: Filtered by AiAi flag check:
+07-01 01:32:00.004  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 01:32:00.004  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 01:32:00.004  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 01:32:00.005  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 01:32:00.005  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 01:32:00.006  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 01:32:00.006  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 01:32:00.006  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 01:32:00.006  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 01:32:00.006  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 01:32:00.018   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 01:32:00.822  4495  4579 D EGL_emulation: app_time_stats: avg=6.09ms min=4.06ms max=16.68ms count=61
+07-01 01:32:00.923   575   726 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:32:00.923   575   726 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:32:00.924  1021  1802 I ChimeraSrvcProxy: NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl
+07-01 01:32:00.924  1021  1802 W .gms.persistent: Large reply transaction of 1056768 bytes, interface descriptor , code 1
+07-01 01:32:00.924  1394  1979 I BugleRcsEngine: handleMessage processing message:[NOTIFY_UPTIME_IGNORE_STATE_CHANGED] with [non-null]:RcsEngineImpl reference [CONTEXT log_prefix="RcsEngineImpl[DUAL_REG]:[d2c735fe-6f32]>Handler" thread_id=63 ]
+07-01 01:32:00.924  1394  1688 I BugleRcsEngine: Connected state: [1], networkType: [WIFI] [CONTEXT thread_id=57 ]
+07-01 01:32:00.927  1394  1979 I BugleRcsEngine: No RCS Configuration was found in Bugle for simID: redacted-pii:sim_id[chars:20,last3:897] [CONTEXT log_prefix="ProvisioningEngineDataRetriever" thread_id=63 ]
+07-01 01:32:01.838  4495  4579 D EGL_emulation: app_time_stats: avg=5.94ms min=4.22ms max=14.69ms count=61
+07-01 01:32:02.059  4495  4576 D TrafficStats: tagSocket(125) with statsTag=0xffffffff, statsUid=-1
+07-01 01:32:02.523   379   461 I netd    : tetherGetStats() -> {[]} <1.34ms>
+07-01 01:32:02.839  4495  4579 D EGL_emulation: app_time_stats: avg=6.44ms min=4.42ms max=13.51ms count=60
+07-01 01:32:02.903  4495  4597 D ProfileInstaller: Installing profile for dev.jczhang.lyntty.dev
+07-01 01:32:03.557   878  2340 D ApfFilter: (wlan0): Adding RA fe80::2 -> ff02::1 1800s fec0::/64 86400s/14400s
+07-01 01:32:03.840  4495  4579 D EGL_emulation: app_time_stats: avg=6.13ms min=3.84ms max=9.99ms count=60
+07-01 01:32:03.901   796   796 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS
+07-01 01:32:03.925   575   726 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:32:03.925   575   726 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 01:32:03.926  1021  1802 I ChimeraSrvcProxy: NullBinder for android.net.action.RECOMMEND_NETWORKS triggering remote TransactionTooLargeException due to Service without Chimera impl
+07-01 01:32:03.926  1021  1802 W .gms.persistent: Large reply transaction of 1056768 bytes, interface descriptor , code 1
+07-01 01:32:03.926  1394  1979 I BugleRcsEngine: handleMessage processing message:[NOTIFY_UPTIME_IGNORE_STATE_CHANGED] with [non-null]:RcsEngineImpl reference [CONTEXT log_prefix="RcsEngineImpl[DUAL_REG]:[d2c735fe-6f32]>Handler" thread_id=63 ]
+07-01 01:32:03.927  1394  1688 I BugleRcsEngine: Connected state: [1], networkType: [WIFI] [CONTEXT thread_id=57 ]
+07-01 01:32:03.928  1394  1979 I BugleRcsEngine: No RCS Configuration was found in Bugle for simID: redacted-pii:sim_id[chars:20,last3:897] [CONTEXT log_prefix="ProvisioningEngineDataRetriever" thread_id=63 ]
+07-01 01:32:04.007  4605  4605 W BpBinder: Linking to death on android.gui.ISurfaceComposer but there are no threads (yet?) listening to incoming transactions. See ProcessState::startThreadPool and ProcessState::setThreadPoolMaxThreadCount. Generally you should setup the binder threadpool before other initialization steps.
+07-01 01:32:04.007  4605  4605 W ProcessState: Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+07-01 01:32:04.013   170   170 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+07-01 01:32:04.013  4605  4606 I Gralloc4: mapper 4.x is not supported
+07-01 01:32:04.036     0     0 I servicemanager: Caller(pid=4605,uid=2000,sid=u:r:shell:s0) Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest. No alternative instances declared in VINTF.

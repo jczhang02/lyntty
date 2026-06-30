@@ -1,0 +1,32 @@
+## adb devices
+List of devices attached
+emulator-5554	device
+
+## apk
+-rw-r--r-- 1 jc jc 448M Jul  1 01:35 packages/lyntty-app/android/app/build/outputs/apk/debug/app-debug.apk
+## clear logcat
+## install
+Performing Streamed Install
+Success
+## launch
+Starting: Intent { cmp=dev.jczhang.lyntty.dev/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity
+TotalTime: 2393
+WaitTime: 2397
+Complete
+## pid
+4668
+## resumed
+    topResumedActivity=ActivityRecord{c967f04 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity t78}
+  ResumedActivity: ActivityRecord{c967f04 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity t78}
+## screenshot
+docs/evidence/artifacts/r11-brand-icon-emulator-launch.png: PNG image data, 1080 x 1920, 8-bit/color RGBA, non-interlaced
+-rw-r--r-- 1 jc jc 121K Jul  1 01:36 docs/evidence/artifacts/r11-brand-icon-emulator-launch.png
+## logcat
+fatal_count=0
+android_runtime_lines=0
+## final devices
+List of devices attached
+emulator-5554	device

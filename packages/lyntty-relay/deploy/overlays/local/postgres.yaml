@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lyntty-postgres
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: lyntty-postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lyntty-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lyntty-postgres
+  template:
+    metadata:
+      labels:
+        app: lyntty-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: lyntty
+            - name: POSTGRES_PASSWORD
+              value: lyntty
+            - name: POSTGRES_DB
+              value: lyntty

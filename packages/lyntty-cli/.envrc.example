@@ -1,0 +1,17 @@
+# Lyntty CLI Development Environment
+#
+# This file is for direnv users who want automatic environment switching
+# when entering this directory.
+#
+# Setup:
+#   1. Install direnv: https://direnv.net/
+#   2. Copy this file: cp .envrc.example .envrc
+#   3. Run: direnv allow
+#
+# The .envrc file is gitignored, so each developer can customize it.
+
+export LYNTTY_HOME_DIR="$HOME/.lyntty-dev"
+export LYNTTY_VARIANT="dev"
+export LYNTTY_SERVER_URL="${LYNTTY_SERVER_URL:-https://api.cluster-fluster.com}"
+
+echo "🔧 DEV environment activated (data: $LYNTTY_HOME_DIR)"

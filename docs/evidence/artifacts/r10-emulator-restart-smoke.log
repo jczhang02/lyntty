@@ -1,0 +1,175 @@
+## restart avd lyntty-api35
+date=2026-06-30T23:33:43+08:00
+ANDROID_HOME=/opt/android-sdk
+emulator=/opt/android-sdk/emulator/emulator
+List of devices attached
+
+emulator_pid=2639539
+loop=6 devices=emulator-5554	device boot=
+loop=7 devices=emulator-5554	device boot=
+loop=8 devices=emulator-5554	device boot=
+loop=9 devices=emulator-5554	device boot=
+loop=10 devices=emulator-5554	device boot=1
+BOOT_OK
+List of devices attached
+emulator-5554	device
+
+## apk check/build
+APK_EXISTS
+-rw-r--r-- 1 jc jc 448M Jun 30 22:22 packages/lyntty-app/android/app/build/outputs/apk/debug/app-debug.apk
+## adb devices before install
+List of devices attached
+emulator-5554	device
+
+## clear logcat
+## install
+Performing Streamed Install
+Success
+## package path
+package:/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk
+## force stop
+## launch
+Starting: Intent { cmp=dev.jczhang.lyntty.dev/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity
+TotalTime: 2279
+WaitTime: 2281
+Complete
+## process pid
+3151
+## resumed activity
+    topResumedActivity=ActivityRecord{e585193 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity t76}
+  ResumedActivity: ActivityRecord{e585193 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity t76}
+## screenshot
+docs/evidence/artifacts/r10-emulator-restart-launch.png: PNG image data, 1080 x 1920, 8-bit/color RGBA, non-interlaced
+-rw-r--r-- 1 jc jc 104K Jun 30 23:34 docs/evidence/artifacts/r10-emulator-restart-launch.png
+## logcat sample
+06-30 23:34:44.933  1267  1267 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.934  1475  1475 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.935  2684  2684 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.935   575   780 I SdkSandboxManager: No SDKs used. Skipping SDK data reconcilation for CallingInfo{mUid=10210, mPackageName='dev.jczhang.lyntty.dev, mAppProcessToken='null'}
+06-30 23:34:44.935  1125  1125 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.935  2858  2858 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.935  1592  1592 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.936  1275  1275 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.936   951   951 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.936  1204  1204 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.937  1381  1381 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.937  2311  2311 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.937  2211  2211 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.937  1394  1394 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.937  1021  1021 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.937   575   770 D ShortcutService: replacing package: dev.jczhang.lyntty.dev userId0
+06-30 23:34:44.937   575   770 D ShortcutService: handlePackageUpdateFinished: dev.jczhang.lyntty.dev user=0
+06-30 23:34:44.937  1573  1573 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.937   575   770 D ShortcutService: rescanPackageIfNeeded 0@dev.jczhang.lyntty.dev, forceRescan=true , isNewApp=true
+06-30 23:34:44.937  1362  1362 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.938   575   770 D ShortcutService: Package dev.jczhang.lyntty.dev has 0 manifest shortcut(s), and 0 share target(s)
+06-30 23:34:44.938   575   575 I Telecom : CarModeTracker: Package dev.jczhang.lyntty.dev is not tracked.: SSH.oR@AFw🔒
+06-30 23:34:44.938  2179  2179 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.938  2641  2641 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.938   948   948 D CarrierSvcBindHelper: onPackageUpdateFinished: dev.jczhang.lyntty.dev
+06-30 23:34:44.939  1742  1742 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.939  1339  1339 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.940  1561  1561 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.940   948   948 D CarrierSvcBindHelper: onPackageModified: dev.jczhang.lyntty.dev
+06-30 23:34:44.941  2348  2348 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.941  1296  1296 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.941   878   878 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.941   970   970 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.941  1846  1846 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.941   914   914 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.944   810   810 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.944   575   780 I SdkSandboxManager: No SDKs used. Skipping SDK data reconcilation for CallingInfo{mUid=10210, mPackageName='dev.jczhang.lyntty.dev, mAppProcessToken='null'}
+06-30 23:34:44.947  1423  1423 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.956   575   699 W PackageConfigPersister: App-specific configuration not found for packageName: dev.jczhang.lyntty.dev and userId: 0
+06-30 23:34:44.956  1362  1362 I AiAiEcho: AppFetcherImpl onPackageChanged dev.jczhang.lyntty.dev.
+06-30 23:34:44.957  1362  3055 I AiAiEcho: AppIndexer Package:[dev.jczhang.lyntty.dev] UserProfile:[0] Enabled:[true].
+06-30 23:34:44.957  1362  3055 I AiAiEcho: AppFetcherImplV2 updateApps package:[dev.jczhang.lyntty.dev], userId:[0], reason:[package is updated.].
+06-30 23:34:44.958   575   610 I ActivityManager: Start proc 3122:dev.jczhang.lyntty.dev/u0a210 for broadcast {dev.jczhang.lyntty.dev/expo.modules.notifications.service.NotificationsService}
+06-30 23:34:44.959   575   575 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:44.963   575   575 W AlarmManager: Package dev.jczhang.lyntty.dev, uid 10210 lost permission to set exact alarms!
+06-30 23:34:44.964  1267  1344 D PackageUpdatedTask: Package updated: mOp=UPDATE packages=[dev.jczhang.lyntty.dev]
+06-30 23:34:44.977  1125  1125 I SafetyLabelChangedBroadcastReceiver: received broadcast packageName: dev.jczhang.lyntty.dev, current user: UserHandle{0}, packageChangeEvent: UPDATE, intent user: UserHandle{0}
+06-30 23:34:44.981   948  1146 D ImsResolver: maybeAddedImsService, packageName: dev.jczhang.lyntty.dev
+06-30 23:34:44.988   948   948 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:45.017  3122  3122 W ziparchive: Unable to open '/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.dm': No such file or directory
+06-30 23:34:45.017  3122  3122 W ziparchive: Unable to open '/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.dm': No such file or directory
+06-30 23:34:45.211   575   654 I ActivityManager: Force stopping dev.jczhang.lyntty.dev appid=10210 user=0: from pid 3143
+06-30 23:34:45.212   575   654 I ActivityManager: Killing 3122:dev.jczhang.lyntty.dev/u0a210 (adj 0): stop dev.jczhang.lyntty.dev due to from pid 3143
+06-30 23:34:45.213   575   654 I AppsFilter: interaction: PackageSetting{9408c84 com.android.microdroid.empty_payload/10196} -> PackageSetting{aa486ef dev.jczhang.lyntty.dev/10210} BLOCKED
+06-30 23:34:45.213   575   654 I AppsFilter: interaction: PackageSetting{76520a2 dev.lyntty/10209} -> PackageSetting{aa486ef dev.jczhang.lyntty.dev/10210} BLOCKED
+06-30 23:34:45.214   575   751 I AppWidgetServiceImpl: Updating package stopped masked state for uid 10210 package dev.jczhang.lyntty.dev isStopped true
+06-30 23:34:45.215   948   948 D CarrierSvcBindHelper: onHandleForceStop: [dev.jczhang.lyntty.dev]
+06-30 23:34:45.218   575   654 V ActivityManager: Got obituary of 3122:dev.jczhang.lyntty.dev
+06-30 23:34:45.245   575   654 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity} with LAUNCH_SINGLE_TASK from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+06-30 23:34:45.245   810   851 V WindowManagerShell: Transition requested (#7): android.os.BinderProxy@3cc1db6 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=76 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} topActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=1 lastActiveTime=55363 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@fba4ab7} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{59fc224 dev.jczhang.lyntty.dev.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=1080 topActivityLetterboxHeight=1920 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 7 }
+06-30 23:34:45.248   575  2147 I AppsFilter: interaction: PackageSetting{9408c84 com.android.microdroid.empty_payload/10196} -> PackageSetting{94f562c dev.jczhang.lyntty.dev/10210} BLOCKED
+06-30 23:34:45.248   575  2147 I AppsFilter: interaction: PackageSetting{76520a2 dev.lyntty/10209} -> PackageSetting{94f562c dev.jczhang.lyntty.dev/10210} BLOCKED
+06-30 23:34:45.253  1267  1267 I TopTaskTracker: onTaskMovedToFront: (moved taskInfo to front) taskId=76, baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity }
+06-30 23:34:45.257   575   751 I AppWidgetServiceImpl: Updating package stopped masked state for uid 10210 package dev.jczhang.lyntty.dev isStopped false
+06-30 23:34:45.258   575   610 I ActivityManager: Start proc 3151:dev.jczhang.lyntty.dev/u0a210 for next-top-activity {dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity}
+06-30 23:34:45.275   575  2147 D CoreBackPreview: Window{966a1ad u0 Splash Screen dev.jczhang.lyntty.dev}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@5b07873, mPriority=0, mIsAnimationCallback=false}
+06-30 23:34:45.325  2082  2082 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:45.335  3151  3151 W ziparchive: Unable to open '/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.dm': No such file or directory
+06-30 23:34:45.335  3151  3151 W ziparchive: Unable to open '/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.dm': No such file or directory
+06-30 23:34:45.347   575   599 V WindowManager: Sent Transition (#7) createdAt=06-30 23:34:45.239 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=76 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} topActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=1 lastActiveTime=55363 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{df262c7 Task{6146883 #76 type=standard A=10210:dev.jczhang.lyntty.dev}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{736e0f4 dev.jczhang.lyntty.dev.MainActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=1080 topActivityLetterboxHeight=1920 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 7 }
+06-30 23:34:45.347   575   599 V WindowManager:         {WCT{RemoteToken{df262c7 Task{6146883 #76 type=standard A=10210:dev.jczhang.lyntty.dev}}} m=OPEN f=NONE leash=Surface(name=Task=76)/@0x21926e1 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1},
+06-30 23:34:45.442  2698  2698 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:45.577  1021  3189 I ProximityAuth: [RecentAppsMediator] Package added: (user=UserHandle{0}) dev.jczhang.lyntty.dev
+06-30 23:34:45.626  1592  3185 W SQLiteLog: (28) double-quoted string literal: "dev.jczhang.lyntty.dev"
+06-30 23:34:45.795  2755  2755 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:45.857  1592  1607 W gle.android.gms: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk' with 1 weak references
+06-30 23:34:46.066  3151  3151 D nativeloader: Configuring clns-7 for other apk /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/lib/x86_64:/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/dev.jczhang.lyntty.dev
+06-30 23:34:46.154  3151  3151 W SoLoader: Recording new base apk path: /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk
+06-30 23:34:46.156  3151  3151 I SoLoader: Preparing SO source: DirectApkSoSource[root = [/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64]]
+06-30 23:34:46.234  3151  3151 I SoLoader: Preparing SO source: ApplicationSoSource[DirectorySoSource[root = /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/lib/x86_64 flags = 0]]
+06-30 23:34:46.263  1296  1303 W .apps.wellbeing: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk' with 1 weak references
+06-30 23:34:46.294  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libc++_shared.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.301  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libjsi.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.307  2613  2613 D ActivityThread: Package [dev.jczhang.lyntty.dev] reported as REPLACED, but missing application info. Assuming REMOVED.
+06-30 23:34:46.307  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libfbjni.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.314  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libreactnative.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.329  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libreact_codegen_rnscreens.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.335  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libreact_codegen_RNCSlider.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.341  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libreact_codegen_rnsvg.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.348  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libreact_codegen_RNKC.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.355  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libreact_codegen_safeareacontext.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.362  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libreact_codegen_RNEnrichedTextInputViewSpec.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.368  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libreact-native-mmkv.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.374  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libreact_codegen_rnpicker.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.377  3151  3151 D nativeloader: Load /data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!/lib/x86_64/libappmodules.so using ns clns-7 from class loader (caller=/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.apk!classes8.dex): ok
+06-30 23:34:46.609   810   851 V WindowManagerShell: Transition requested (#8): android.os.BinderProxy@5c47f33 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=76 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=ComponentInfo{dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} topActivity=ComponentInfo{dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=1 lastActiveTime=56726 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@7dde2f0} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{a3ef069 expo.modules.devlauncher.launcher.DevLauncherActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=1080 topActivityLetterboxHeight=1920 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 8 }
+06-30 23:34:46.610   575  2152 I ActivityTaskManager: START u0 {flg=0x10018000 cmp=dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} with LAUNCH_SINGLE_TASK from uid 10210 (BAL_ALLOW_VISIBLE_WINDOW) result code=0
+06-30 23:34:46.640   575   599 V WindowManager: Sent Transition (#8) createdAt=06-30 23:34:46.606 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=76 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=dev.jczhang.lyntty.dev/.MainActivity } baseActivity=ComponentInfo{dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} topActivity=ComponentInfo{dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity} origActivity=null realActivity=ComponentInfo{dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity} numActivities=1 lastActiveTime=56726 supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{df262c7 Task{6146883 #76 type=standard A=10210:dev.jczhang.lyntty.dev}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{85a443d expo.modules.devlauncher.launcher.DevLauncherActivity} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= falseisLetterboxEducationEnabled= true isLetterboxDoubleTapEnabled= false topActivityEligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=1080 topActivityLetterboxHeight=1920 isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false cameraCompatTaskInfo=CameraCompatTaskInfo { cameraCompatControlState=hidden freeformCameraCompatMode=inactive}}}, pipTask = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 8 }
+06-30 23:34:46.640   575   599 V WindowManager:         {null m=OPEN f=STARTING_WINDOW_TRANSFER|FILLS_TASK|IS_BEHIND_STARTING_WINDOW|NO_ANIMATION leash=Surface(name=ActivityRecord{e585193 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity)/@0x28f1e7 sb=Rect(0, 0 - 0, 0) eb=Rect(0, 0 - 1080, 1920) d=-1->0 r=-1->0:-1 bc=ff000000 component=dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity},
+06-30 23:34:46.640   575   599 V WindowManager:         {null m=CLOSE f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{f202332 u0 dev.jczhang.lyntty.dev/.MainActivity)/@0x49d23a6 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 bc=ff000000 component=dev.jczhang.lyntty.dev/.MainActivity}
+06-30 23:34:46.641   810   851 V WindowManagerShell: onTransitionReady (#8) android.os.BinderProxy@5c47f33: {id=8 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{null m=OPEN f=STARTING_WINDOW_TRANSFER|FILLS_TASK|IS_BEHIND_STARTING_WINDOW|NO_ANIMATION leash=Surface(name=ActivityRecord{e585193 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity)/@0x4428aee sb=Rect(0, 0 - 0, 0) eb=Rect(0, 0 - 1080, 1920) d=-1->0 r=-1->0:-1 bc=ff000000 component=dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity},{null m=CLOSE f=FILLS_TASK|IS_BEHIND_STARTING_WINDOW leash=Surface(name=ActivityRecord{f202332 u0 dev.jczhang.lyntty.dev/.MainActivity)/@0x8bddb8f sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 bc=ff000000 component=dev.jczhang.lyntty.dev/.MainActivity}]}
+06-30 23:34:46.647   575  2152 D CoreBackPreview: Window{d2c6ee8 u0 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@367d432, mPriority=0, mIsAnimationCallback=false}
+06-30 23:34:46.780  3151  3237 W unknown:ReconnectingWebSocket: Couldn't connect to "ws://10.0.2.2:8081/message?device=sdk_gphone64_x86_64%20-%2015%20-%20API%2035&app=dev.jczhang.lyntty.dev&clientid=BridgelessDevSupportManager", will silently retry
+06-30 23:34:46.894   575  2152 D CoreBackPreview: Window{abc3300 u0 dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@ffc22d7, mPriority=0, mIsAnimationCallback=false}
+06-30 23:34:47.516   575   599 W ziparchive: Unable to open '/data/app/~~oPgE9aH_s-k_H1LbRGX3Rw==/dev.jczhang.lyntty.dev-vHJDzH7DJ_pZS_RRNwg1yQ==/base.dm': No such file or directory
+06-30 23:34:47.522   575   599 I ActivityTaskManager: Displayed dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity for user 0: +2s279ms
+06-30 23:34:47.720   575  2146 D CoreBackPreview: Window{d2c6ee8 u0 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity}: Setting back callback null
+06-30 23:34:47.725   575  2146 W InputManager-JNI: Input channel object 'd2c6ee8 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity (client)' was disposed without first being removed with the input manager!
+06-30 23:34:47.734   575   691 I ImeTracker: dev.jczhang.lyntty.dev:1d83e3ee: onRequestHide at ORIGIN_SERVER reason HIDE_UNSPECIFIED_WINDOW fromUser false
+06-30 23:34:47.735   575   691 I ImeTracker: dev.jczhang.lyntty.dev:1d83e3ee: onCancelled at PHASE_SERVER_SHOULD_HIDE
+06-30 23:34:47.763  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1986 onStartInput(EditorInfo{EditorInfo{packageName=dev.jczhang.lyntty.dev, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+06-30 23:34:47.765   575  2146 W PackageConfigPersister: App-specific configuration not found for packageName: dev.jczhang.lyntty.dev and userId: 0
+06-30 23:34:47.906   575  2146 D CoreBackPreview: Window{966a1ad u0 Splash Screen dev.jczhang.lyntty.dev EXITING}: Setting back callback null
+06-30 23:34:47.906   575  2147 W InputManager-JNI: Input channel object '966a1ad Splash Screen dev.jczhang.lyntty.dev (client)' was disposed without first being removed with the input manager!
+06-30 23:34:52.386  3151  3267 D ProfileInstaller: Installing profile for dev.jczhang.lyntty.dev
+## devices after launch (keep alive)
+List of devices attached
+emulator-5554	device
+
+## final alive check
+List of devices attached
+emulator-5554	device
+
+pid=3151
+fatal_count=0
+android_runtime_lines=0
+2642518 /bin/bash -c {   echo '## final alive check'   adb devices   echo 'pid='$(adb shell pidof dev.jczhang.lyntty.dev || true)   echo 'fatal_count='$(grep -c 'FATAL EXCEPTION' docs/evidence/artifacts/r10-emulator-restart-logcat.txt || true)   echo 'android_runtime_lines='$(grep -c 'AndroidRuntime' docs/evidence/artifacts/r10-emulator-restart-logcat.txt || true)   pgrep -fa '/opt/android-sdk/emulator/emulator' | head -5 || true } | tee -a /tmp/lyntty-avd-restart-smoke.log
+2642519 /bin/bash -c {   echo '## final alive check'   adb devices   echo 'pid='$(adb shell pidof dev.jczhang.lyntty.dev || true)   echo 'fatal_count='$(grep -c 'FATAL EXCEPTION' docs/evidence/artifacts/r10-emulator-restart-logcat.txt || true)   echo 'android_runtime_lines='$(grep -c 'AndroidRuntime' docs/evidence/artifacts/r10-emulator-restart-logcat.txt || true)   pgrep -fa '/opt/android-sdk/emulator/emulator' | head -5 || true } | tee -a /tmp/lyntty-avd-restart-smoke.log
