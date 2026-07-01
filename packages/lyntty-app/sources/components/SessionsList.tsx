@@ -18,8 +18,9 @@ import { layout } from './layout';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
 import { useSessionActionAlert } from '@/hooks/useSessionQuickActions';
-import { useSettingMutable } from '@/sync/storage';
+import { storage, useSettingMutable } from '@/sync/storage';
 import { machineSpawnNewSession } from '@/sync/ops';
+import { sync } from '@/sync/sync';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 
@@ -336,6 +337,36 @@ const STATUS_CONFIG: Record<SessionState, { color: string; dotColor: string; isP
     permission_required: { color: '#FF9500', dotColor: '#FF9500', isPulsing: true, isConnected: true },
 };
 
+function applyOptimisticPiSession(source: SessionRowData, sessionId: string) {
+    const now = Date.now();
+    storage.getState().applySessions([{
+        id: sessionId,
+        seq: 0,
+        createdAt: now,
+        updatedAt: now,
+        active: true,
+        activeAt: now,
+        metadata: {
+            path: source.path ?? source.subtitle ?? '',
+            host: source.machineId ?? 'node',
+            flavor: 'pi',
+            machineId: source.machineId ?? undefined,
+            piSessionId: source.piSessionId ?? undefined,
+            piDiscoveryState: 'active_runtime',
+            piMessageCount: source.piMessageCount ?? undefined,
+            piFirstMessage: source.piFirstMessage ?? undefined,
+            piRecoveryReason: source.piRecoveryReason ?? undefined,
+            piHasHistoryGap: source.piHasHistoryGap,
+            name: source.name,
+        },
+        metadataVersion: 0,
+        agentState: null,
+        agentStateVersion: 0,
+        thinking: false,
+        thinkingAt: 0,
+    }]);
+}
+
 const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }: {
     session: SessionRowData;
     selected?: boolean;
@@ -388,7 +419,9 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                 approvedNewDirectoryCreation: true,
             });
             if (result.type === 'success') {
+                applyOptimisticPiSession(session, result.sessionId);
                 navigateToSession(result.sessionId);
+                void sync.refreshSessions();
             } else if (result.type === 'error') {
                 Modal.alert(t('common.error'), result.errorMessage);
             }

@@ -97,7 +97,9 @@ export interface SessionRowData {
     piSessionId: string | null;
     piDiscoveryState: string | null;
     piMessageCount: number | null;
+    piFirstMessage: string | null;
     piRecoveryReason: string | null;
+    piHasHistoryGap: boolean;
     piSynthetic: boolean;
 }
 
@@ -135,7 +137,9 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         piSessionId: session.metadata?.piSessionId ?? null,
         piDiscoveryState: session.metadata?.piDiscoveryState ?? null,
         piMessageCount: session.metadata?.piMessageCount ?? null,
+        piFirstMessage: session.metadata?.piFirstMessage ?? null,
         piRecoveryReason: session.metadata?.piRecoveryReason ?? null,
+        piHasHistoryGap: session.metadata?.piHasHistoryGap === true,
         piSynthetic: session.metadata?.piSynthetic === true,
     };
 }

@@ -1,0 +1,77 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+Starting project at /home/jc/dev/lyntty/packages/lyntty-app
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android packages/lyntty-app/index.ts ▓▓▓▓▓▓░░░░░░░░░░ 43.2% (594/977)
+Android packages/lyntty-app/index.ts ▓▓▓▓▓▓▓▓░░░░░░░░ 52.9% (1799/2705)
+Android packages/lyntty-app/index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 92.3% (3331/3468)
+ WARN  Attempted to import the module "/home/jc/dev/lyntty/node_modules/@noble/hashes/crypto.js" which is not listed in the "exports" of "/home/jc/dev/lyntty/node_modules/@noble/hashes" under the requested subpath "./crypto.js". Falling back to file-based resolution. Consider updating the call site or asking the package maintainer(s) to expose this API.
+Android Bundled 13376ms packages/lyntty-app/index.ts (3658 modules)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "1eed1b385edf40ba1cc4e70ba474bc127133753f",
+  "buildCommitTimestamp": "2026-07-01T17:37:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 127ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "1eed1b385edf40ba1cc4e70ba474bc127133753f",
+  "buildCommitTimestamp": "2026-07-01T17:37:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+ WARN  Failed to list Pi sessions for machine 1c3ae438-a016-48e7-a4fc-ffd6b45db197: Error: operation has timed out
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 157ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "1eed1b385edf40ba1cc4e70ba474bc127133753f",
+  "buildCommitTimestamp": "2026-07-01T17:37:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 133ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "1eed1b385edf40ba1cc4e70ba474bc127133753f",
+  "buildCommitTimestamp": "2026-07-01T17:37:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)

@@ -22,6 +22,7 @@ import { connectionState } from '@/utils/serverConnectionErrors';
 import { logger } from '@/ui/logger';
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
 import { bindPiSessionExtensions, getPiPluginFeatureSummary, listPiRemoteSlashCommands } from './runPiFeatures';
+import { mapPiSessionHistoryToEnvelopes } from './runPiHistory';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 
 export interface RunPiOptions {
@@ -208,6 +209,17 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   });
 
   session.sendSessionEvent({ type: 'ready' });
+
+  if (requestedPiSessionId) {
+    const historyEnvelopes = mapPiSessionHistoryToEnvelopes(piRuntime.session.sessionManager.getEntries());
+    for (const envelope of historyEnvelopes) {
+      session.sendSessionProtocolMessage(envelope);
+    }
+    sendPiEnvelopes(piSessionProtocol.serviceMessage(
+      `Imported ${historyEnvelopes.length} historical Pi session events from ${piRuntime.session.sessionId}.`,
+    ));
+  }
+
   sendPiEnvelopes(piSessionProtocol.serviceMessage(
     `Pi SDK runtime connected: ${piRuntime.session.sessionId}. Remote slash commands: ${summarizePiRuntimeList(initialFeatureSummary.slashCommands)}. Active tools: ${summarizePiRuntimeList(initialFeatureSummary.activeTools)}.`,
   ));
