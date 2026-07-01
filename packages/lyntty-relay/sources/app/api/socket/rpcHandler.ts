@@ -77,6 +77,84 @@ function baseMethodName(prefixedMethod: string): string {
     return lastColon >= 0 ? prefixedMethod.substring(lastColon + 1) : prefixedMethod;
 }
 
+const ALLOWED_MACHINE_RPC_METHODS = new Set([
+    'spawn-lyntty-session',
+    'resume-lyntty-session',
+    'list-pi-sessions',
+    'stop-session',
+    'stop-daemon',
+    'claude-fork-session',
+    'claude-duplicate-session',
+    'claude-list-rewind-points',
+    'codex-fork-thread',
+    'codex-duplicate-thread',
+    'codex-list-rewind-points',
+]);
+
+const MACHINE_DENIED_COMMON_RPC_METHODS = new Set([
+    'bash',
+    'readFile',
+    'writeFile',
+    'listDirectory',
+    'getDirectoryTree',
+    'ripgrep',
+]);
+
+const UUID_SCOPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function splitRpcMethod(method: string): { scopeId: string; base: string } | null {
+    const separator = method.lastIndexOf(':');
+    if (separator <= 0 || separator >= method.length - 1) {
+        return null;
+    }
+    return {
+        scopeId: method.slice(0, separator),
+        base: method.slice(separator + 1),
+    };
+}
+
+export function canRegisterRpcMethod(socketData: any, method: string): boolean {
+    const parts = splitRpcMethod(method);
+    if (!parts) {
+        return false;
+    }
+
+    if (socketData.clientType === 'machine-scoped') {
+        return parts.scopeId === socketData.machineId && ALLOWED_MACHINE_RPC_METHODS.has(parts.base);
+    }
+
+    if (socketData.clientType === 'session-scoped') {
+        return parts.scopeId === socketData.sessionId;
+    }
+
+    return false;
+}
+
+export function canCallRpcMethod(socketData: any, method: string): boolean {
+    const parts = splitRpcMethod(method);
+    if (!parts) {
+        return false;
+    }
+
+    if (socketData.clientType === 'machine-scoped') {
+        return false;
+    }
+
+    if (socketData.clientType === 'session-scoped') {
+        return parts.scopeId === socketData.sessionId;
+    }
+
+    if (ALLOWED_MACHINE_RPC_METHODS.has(parts.base)) {
+        return true;
+    }
+
+    if (MACHINE_DENIED_COMMON_RPC_METHODS.has(parts.base) && UUID_SCOPE_RE.test(parts.scopeId)) {
+        return false;
+    }
+
+    return parts.base.length > 0;
+}
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 type RoomSockets = RemoteSocket<DefaultEventsMap, any>[];
@@ -134,6 +212,10 @@ export function rpcHandler(userId: string, socket: Socket, io: Server) {
                 socket.emit('rpc-error', { type: 'register', error: 'Invalid method name' });
                 return;
             }
+            if (!canRegisterRpcMethod(socket.data, method)) {
+                socket.emit('rpc-error', { type: 'register', error: 'RPC method not allowed for this socket scope' });
+                return;
+            }
             socket.join(rpcRoom(userId, method));
             socket.emit('rpc-registered', { method });
         } catch (error) {
@@ -147,6 +229,10 @@ export function rpcHandler(userId: string, socket: Socket, io: Server) {
             const { method } = data ?? {};
             if (!method || typeof method !== 'string') {
                 socket.emit('rpc-error', { type: 'unregister', error: 'Invalid method name' });
+                return;
+            }
+            if (!canRegisterRpcMethod(socket.data, method)) {
+                socket.emit('rpc-error', { type: 'unregister', error: 'RPC method not allowed for this socket scope' });
                 return;
             }
             socket.leave(rpcRoom(userId, method));
@@ -172,6 +258,11 @@ export function rpcHandler(userId: string, socket: Socket, io: Server) {
             if (!method || typeof method !== 'string') {
                 finish('invalid_params');
                 callback?.({ ok: false, error: 'Invalid parameters: method is required' });
+                return;
+            }
+            if (!canCallRpcMethod(socket.data, method)) {
+                finish('forbidden');
+                callback?.({ ok: false, error: 'RPC method not allowed for this socket scope' });
                 return;
             }
 

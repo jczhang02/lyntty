@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiMachineClient } from './apiMachine';
 import type { Machine } from './types';
+import { registerCommonHandlers } from '@/modules/common/registerCommonHandlers';
+import { logger } from '@/ui/logger';
 
 const {
     mockIo,
@@ -39,6 +41,7 @@ vi.mock('@/api/rpc/RpcHandlerManager', () => ({
         handleRequest = vi.fn(async () => '');
         registerHandler = vi.fn();
         unregisterHandler = vi.fn();
+        hasHandler = vi.fn(() => false);
     }
 }));
 
@@ -122,6 +125,39 @@ describe('ApiMachineClient socket reconnection', () => {
     afterEach(() => {
         vi.useRealTimers();
         vi.restoreAllMocks();
+    });
+
+    it('does not register session shell/file handlers on machine RPC', () => {
+        new ApiMachineClient('fake-token', makeMachine());
+
+        expect(registerCommonHandlers).not.toHaveBeenCalled();
+    });
+
+    it('redacts sensitive spawn RPC parameters from logs', async () => {
+        const client = new ApiMachineClient('fake-token', makeMachine());
+        const spawnSession = vi.fn(async () => ({ type: 'success' as const, sessionId: 'session-1' }));
+        client.setRPCHandlers({
+            spawnSession,
+            stopSession: vi.fn(() => true),
+            requestShutdown: vi.fn(),
+        });
+
+        const handler = (client as any).rpcHandlerManager.registerHandler.mock.calls
+            .find(([method]: [string]) => method === 'spawn-lyntty-session')?.[1];
+        expect(handler).toBeTypeOf('function');
+
+        await handler({
+            directory: '/repo',
+            agent: 'pi',
+            token: 'test-token-value',
+            environmentVariables: { PROVIDER_KEY: 'provider-key-value' },
+        });
+
+        const logs = JSON.stringify(vi.mocked(logger.debug).mock.calls);
+        expect(logs).toContain('hasToken');
+        expect(logs).toContain('hasEnvironmentVariables');
+        expect(logs).not.toContain('test-token-value');
+        expect(logs).not.toContain('provider-key-value');
     });
 
     it('retries after initial socket connection error', async () => {

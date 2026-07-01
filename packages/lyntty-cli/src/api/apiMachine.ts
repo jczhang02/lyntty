@@ -7,7 +7,7 @@ import { io, Socket } from 'socket.io-client';
 import { logger } from '@/ui/logger';
 import { configuration } from '@/configuration';
 import { MachineMetadata, DaemonState, Machine, Update, UpdateMachineBody } from './types';
-import { registerCommonHandlers, SpawnSessionOptions, SpawnSessionResult } from '../modules/common/registerCommonHandlers';
+import type { SpawnSessionOptions, SpawnSessionResult } from '../modules/common/registerCommonHandlers';
 import { encodeBase64, decodeBase64, encrypt, decrypt } from './encryption';
 import { backoff } from '@/utils/time';
 import { RpcHandlerManager } from './rpc/RpcHandlerManager';
@@ -135,7 +135,9 @@ export class ApiMachineClient {
             logger: (msg, data) => logger.debug(msg, data)
         });
 
-        registerCommonHandlers(this.rpcHandlerManager, process.cwd());
+        // Machine RPC is account/node control only. Session shell/file handlers
+        // are registered by ApiSessionClient with session-scoped encryption.
+        // Never expose bash/readFile/writeFile/listDirectory at machine scope.
     }
 
     setRPCHandlers({
@@ -150,7 +152,20 @@ export class ApiMachineClient {
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-lyntty-session', async (params: any) => {
             const { directory, sessionId, machineId, approvedNewDirectoryCreation, agent, takeoverChoice, environmentVariables, token, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId } = params || {};
-            logger.debug(`[API MACHINE] Spawning session with params: ${JSON.stringify(params)}`);
+            logger.debug('[API MACHINE] Spawning session', {
+                hasDirectory: typeof directory === 'string' && directory.length > 0,
+                hasSessionId: typeof sessionId === 'string' && sessionId.length > 0,
+                hasMachineId: typeof machineId === 'string' && machineId.length > 0,
+                agent,
+                takeoverChoice,
+                approvedNewDirectoryCreation: !!approvedNewDirectoryCreation,
+                hasEnvironmentVariables: !!environmentVariables,
+                hasToken: typeof token === 'string' && token.length > 0,
+                hasResumeClaudeSessionId: typeof resumeClaudeSessionId === 'string' && resumeClaudeSessionId.length > 0,
+                hasResumeCodexThreadId: typeof resumeCodexThreadId === 'string' && resumeCodexThreadId.length > 0,
+                hasParentSessionId: typeof parentSessionId === 'string' && parentSessionId.length > 0,
+                hasForkedFromMessageId: typeof forkedFromMessageId === 'string' && forkedFromMessageId.length > 0,
+            });
 
             if (!directory) {
                 throw new Error('Directory is required');
