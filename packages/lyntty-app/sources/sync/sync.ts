@@ -51,8 +51,7 @@ import { systemPrompt } from './prompt/systemPrompt';
 import { fetchArtifact, fetchArtifacts, createArtifact, updateArtifact } from './apiArtifacts';
 import { DecryptedArtifact, Artifact, ArtifactCreateRequest, ArtifactUpdateRequest } from './artifactTypes';
 import { ArtifactEncryption } from './encryption/artifactEncryption';
-import { getFriendsList, getUserProfile } from './apiFriends';
-import { fetchFeed } from './apiFeed';
+import { getUserProfile } from './apiFriends';
 import { FeedItem } from './feedTypes';
 import { UserProfile } from './friendTypes';
 import { resolveMessageModeMeta } from './messageMeta';
@@ -191,9 +190,6 @@ class Sync {
                 this.nativeUpdateSync.invalidate();
                 log.log('📱 App became active: Invalidating artifacts sync');
                 this.artifactsSync.invalidate();
-                this.friendsSync.invalidate();
-                this.friendRequestsSync.invalidate();
-                this.feedSync.invalidate();
             } else {
                 log.log(`📱 App state changed to: ${nextAppState}`);
                 this.maybeStartBackgroundSendWatchdog();
@@ -265,10 +261,7 @@ class Sync {
         this.machinesSync.invalidate();
         this.pushTokenSync.invalidate();
         this.nativeUpdateSync.invalidate();
-        this.friendsSync.invalidate();
-        this.friendRequestsSync.invalidate();
         this.artifactsSync.invalidate();
-        this.feedSync.invalidate();
         log.log('🔄 #init: All syncs invalidated, including artifacts');
 
         // Mark UI ready as soon as sessions load. Machines sync may hang
@@ -1424,107 +1417,17 @@ class Sync {
     }
 
     private fetchFriends = async () => {
-        if (!this.credentials) return;
-
-        try {
-            log.log('👥 Fetching friends list...');
-            const friendsList = await getFriendsList(this.credentials);
-            storage.getState().applyFriends(friendsList);
-            log.log(`👥 fetchFriends completed - processed ${friendsList.length} friends`);
-        } catch (error) {
-            console.error('Failed to fetch friends:', error);
-            // Silently handle error - UI will show appropriate state
-        }
+        // Lyntty product scope has no social/friends surface. Keep the method
+        // as an inert compatibility seam so legacy invalidations cannot spam
+        // removed relay endpoints during mobile E2E.
     }
 
     private fetchFriendRequests = async () => {
-        // Friend requests are now included in the friends list with status='pending'
-        // This method is kept for backward compatibility but does nothing
-        log.log('👥 fetchFriendRequests called - now handled by fetchFriends');
+        // Lyntty product scope has no friend requests.
     }
 
     private fetchFeed = async () => {
-        if (!this.credentials) return;
-
-        try {
-            log.log('📰 Fetching feed...');
-            const state = storage.getState();
-            const existingItems = state.feedItems;
-            const head = state.feedHead;
-
-            // Load feed items - if we have a head, load newer items
-            let allItems: FeedItem[] = [];
-            let hasMore = true;
-            let cursor = head ? { after: head } : undefined;
-            let loadedCount = 0;
-            const maxItems = 500;
-
-            // Keep loading until we reach known items or hit max limit
-            while (hasMore && loadedCount < maxItems) {
-                const response = await fetchFeed(this.credentials, {
-                    limit: 100,
-                    ...cursor
-                });
-
-                // Check if we reached known items
-                const foundKnown = response.items.some(item =>
-                    existingItems.some(existing => existing.id === item.id)
-                );
-
-                allItems.push(...response.items);
-                loadedCount += response.items.length;
-                hasMore = response.hasMore && !foundKnown;
-
-                // Update cursor for next page
-                if (response.items.length > 0) {
-                    const lastItem = response.items[response.items.length - 1];
-                    cursor = { after: lastItem.cursor };
-                }
-            }
-
-            // If this is initial load (no head), also load older items
-            if (!head && allItems.length < 100) {
-                const response = await fetchFeed(this.credentials, {
-                    limit: 100
-                });
-                allItems.push(...response.items);
-            }
-
-            // Collect user IDs from friend-related feed items
-            const userIds = new Set<string>();
-            allItems.forEach(item => {
-                if (item.body && (item.body.kind === 'friend_request' || item.body.kind === 'friend_accepted')) {
-                    userIds.add(item.body.uid);
-                }
-            });
-
-            // Fetch missing users
-            if (userIds.size > 0) {
-                await this.assumeUsers(Array.from(userIds));
-            }
-
-            // Filter out items where user is not found (404)
-            const users = storage.getState().users;
-            const compatibleItems = allItems.filter(item => {
-                // Keep text items
-                if (item.body.kind === 'text') return true;
-
-                // For friend-related items, check if user exists and is not null (404)
-                if (item.body.kind === 'friend_request' || item.body.kind === 'friend_accepted') {
-                    const userProfile = users[item.body.uid];
-                    // Keep item only if user exists and is not null
-                    return userProfile !== null && userProfile !== undefined;
-                }
-
-                return true;
-            });
-
-            // Apply only compatible items to storage
-            storage.getState().applyFeedItems(compatibleItems);
-            log.log(`📰 fetchFeed completed - loaded ${compatibleItems.length} compatible items (${allItems.length - compatibleItems.length} filtered)`);
-        } catch (error) {
-            console.error('Failed to fetch feed:', error);
-        }
+        // Lyntty product scope has no social feed.
     }
 
     private syncSettings = async () => {

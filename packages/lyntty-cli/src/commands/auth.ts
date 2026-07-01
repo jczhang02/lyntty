@@ -7,6 +7,7 @@ import { createInterface } from 'node:readline';
 import { stopDaemon, checkIfDaemonRunningAndCleanupStaleState } from '@/daemon/controlClient';
 import { logger } from '@/ui/logger';
 import os from 'node:os';
+import type { AuthMethod } from '@/ui/ink/AuthSelector';
 
 export async function handleAuthCommand(args: string[]): Promise<void> {
   const subcommand = args[0];
@@ -38,13 +39,15 @@ function showAuthHelp(): void {
 ${chalk.bold('lyntty auth')} - Authentication management
 
 ${chalk.bold('Usage:')}
-  lyntty auth login [--force]    Authenticate with Lyntty
+  lyntty auth login [--force] [--method mobile|web]
+                                  Authenticate with Lyntty
   lyntty auth logout             Remove authentication and machine data
   lyntty auth status             Show authentication status
   lyntty auth help               Show this help message
 
 ${chalk.bold('Options:')}
-  --force    Clear credentials, machine ID, and stop daemon before re-auth
+  --force                 Clear credentials, machine ID, and stop daemon before re-auth
+  --method mobile|web     Select auth flow without interactive prompt
 
 ${chalk.gray('PS: Your master secret never leaves your mobile/web device. Each CLI machine')}
 ${chalk.gray('receives only a derived key for per-machine encryption, so backup codes')}
@@ -54,6 +57,7 @@ ${chalk.gray('cannot be displayed from the CLI.')}
 
 async function handleAuthLogin(args: string[]): Promise<void> {
   const forceAuth = args.includes('--force') || args.includes('-f');
+  const method = parseAuthMethod(args);
 
   if (forceAuth) {
     // As per user's request: "--force-auth will clear credentials, clear machine ID, stop daemon"
@@ -105,13 +109,30 @@ async function handleAuthLogin(args: string[]): Promise<void> {
   // Perform authentication and machine setup
   // "Finally we'll run the auth and setup machine if needed"
   try {
-    const result = await authAndSetupMachineIfNeeded();
+    const result = await authAndSetupMachineIfNeeded({ authMethod: method });
     console.log(chalk.green('\n✓ Authentication successful'));
     console.log(chalk.gray(`  Machine ID: ${result.machineId}`));
   } catch (error) {
     console.error(chalk.red('Authentication failed:'), error instanceof Error ? error.message : 'Unknown error');
     process.exit(1);
   }
+}
+
+function parseAuthMethod(args: string[]): AuthMethod | undefined {
+  const methodFlagIndex = args.findIndex(arg => arg === '--method' || arg === '-m');
+  const rawMethod = methodFlagIndex >= 0 ? args[methodFlagIndex + 1] : undefined;
+
+  if (!rawMethod) {
+    if (args.includes('--mobile')) return 'mobile';
+    if (args.includes('--web')) return 'web';
+    return undefined;
+  }
+
+  if (rawMethod === 'mobile' || rawMethod === 'web') {
+    return rawMethod;
+  }
+
+  throw new Error(`Invalid auth method: ${rawMethod}. Expected "mobile" or "web".`);
 }
 
 async function handleAuthLogout(): Promise<void> {

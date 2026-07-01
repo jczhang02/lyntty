@@ -1,0 +1,5 @@
+12589 /bin/bash -c cd packages/lyntty-app && EXPO_PUBLIC_LYNTTY_SERVER_URL=http://192.168.100.21:3005 nohup pnpm expo start --host lan --dev-client --clear > ../../docs/evidence/artifacts/r15-human-e2e/expo.log 2>&1 & echo $! > ../../docs/evidence/artifacts/r15-human-e2e/expo.pid sleep 12 sed -n '1,120p' docs/evidence/artifacts/r15-human-e2e/expo.log
+12590 node /usr/bin/pnpm expo start --host lan --dev-client --clear
+12648 node /home/jc/.local/share/pnpm/store/v11/links/@/pnpm/10.11.0/1e6e59530eac63971fa6e718207f324eae9304c1c67e76485f52ed94445142d3/bin/../node_modules/pnpm/bin/pnpm.cjs expo start --host lan --dev-client --clear
+12665 node /home/jc/dev/lyntty/node_modules/.bin/expo start --host lan --dev-client --clear
+13974 /bin/bash -c pgrep -af "expo start|metro|@expo/cli" | tee docs/evidence/artifacts/r15-human-e2e/expo-ps.txt

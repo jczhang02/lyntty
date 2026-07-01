@@ -31,6 +31,13 @@ export interface RunPiOptions {
 
 const LOCAL_ONLY_SLASH_COMMANDS = ['/model', '/settings', '/session', '/theme', '/help'];
 
+function summarizePiRuntimeList(items: string[], visibleCount = 8): string {
+  if (items.length === 0) return 'none';
+  const visible = items.slice(0, visibleCount).join(', ');
+  const remaining = items.length - visibleCount;
+  return remaining > 0 ? `${visible}, +${remaining} more` : visible;
+}
+
 async function createPiRuntime(cwd: string): Promise<AgentSessionRuntime> {
   const createRuntime = async ({
     cwd: runtimeCwd,
@@ -172,7 +179,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
 
   session.sendSessionEvent({ type: 'ready' });
   sendPiEnvelopes(piSessionProtocol.serviceMessage(
-    `Pi SDK runtime connected: ${piRuntime.session.sessionId}. Remote slash commands: ${initialFeatureSummary.slashCommands.join(', ')}. Active tools: ${initialFeatureSummary.activeTools.join(', ')}`,
+    `Pi SDK runtime connected: ${piRuntime.session.sessionId}. Remote slash commands: ${summarizePiRuntimeList(initialFeatureSummary.slashCommands)}. Active tools: ${summarizePiRuntimeList(initialFeatureSummary.activeTools)}.`,
   ));
 
   const commandLedger = new PiCommandLedger();

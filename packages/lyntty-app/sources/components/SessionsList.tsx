@@ -13,7 +13,6 @@ import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
 import { StyleSheet } from 'react-native-unistyles';
 import { useIsTablet } from '@/utils/responsive';
-import { requestReview } from '@/utils/requestReview';
 import { UpdateBanner } from './UpdateBanner';
 import { layout } from './layout';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
@@ -215,13 +214,6 @@ export function SessionsList() {
         if (!pathname.startsWith('/session/')) return undefined;
         return pathname.split('/')[2];
     }, [isTablet, pathname]);
-
-    // Request review
-    React.useEffect(() => {
-        if (data && data.length > 0) {
-            requestReview();
-        }
-    }, [data && data.length > 0]);
 
     // Early return if no data yet
     if (!data) {

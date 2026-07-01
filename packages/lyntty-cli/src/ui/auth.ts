@@ -14,11 +14,11 @@ import React from 'react';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger';
 
-export async function doAuth(): Promise<Credentials | null> {
+export async function doAuth(preferredMethod?: AuthMethod): Promise<Credentials | null> {
     console.clear();
 
     // Show authentication method selector
-    const authMethod = await selectAuthenticationMethod();
+    const authMethod = preferredMethod ?? await selectAuthenticationMethod();
     if (!authMethod) {
         console.log('\nAuthentication cancelled.\n');
         process.exit(0);
@@ -250,7 +250,7 @@ export function decryptWithEphemeralKey(encryptedBundle: Uint8Array, recipientSe
  * Ensure authentication and machine setup
  * This replaces the onboarding flow and ensures everything is ready
  */
-export async function authAndSetupMachineIfNeeded(): Promise<{
+export async function authAndSetupMachineIfNeeded(options?: { authMethod?: AuthMethod }): Promise<{
     credentials: Credentials;
     machineId: string;
 }> {
@@ -262,7 +262,7 @@ export async function authAndSetupMachineIfNeeded(): Promise<{
 
     if (!credentials) {
         logger.debug('[AUTH] No credentials found, starting authentication flow...');
-        const authResult = await doAuth();
+        const authResult = await doAuth(options?.authMethod);
         if (!authResult) {
             throw new Error('Authentication failed or was cancelled');
         }

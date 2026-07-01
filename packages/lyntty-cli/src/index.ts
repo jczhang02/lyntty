@@ -733,58 +733,28 @@ ${chalk.bold('To clean up runaway processes:')} Use ${chalk.cyan('lyntty doctor 
     // Show help
     if (showHelp) {
       console.log(`
-${chalk.bold('lyntty')} - Claude Code On the Go
+${chalk.bold('lyntty')} - Mobile control for local pi sessions
 
 ${chalk.bold('Usage:')}
-  lyntty [options]         Start Claude with mobile control
-  lyntty auth              Manage authentication
+  lyntty [options]         Start a local pi session with mobile control
+  lyntty auth              Manage phone/computer pairing
   lyntty resume            Resume a previous Lyntty session by Lyntty session ID
-  lyntty codex             Start Codex mode
-  lyntty gemini            Start Gemini mode (ACP)
-  lyntty acp               Start a generic ACP-compatible agent
-  lyntty connect           Connect AI vendor API keys
-  lyntty sandbox           Configure and manage OS-level sandboxing
-  lyntty notify            Send push notification
-  lyntty daemon            Manage background service that allows
-                            to spawn new sessions away from your computer
+  lyntty server            Start a local Lyntty relay for development/self-hosting
+  lyntty daemon            Manage lynttyd background service
   lyntty doctor            System diagnostics & troubleshooting
 
 ${chalk.bold('Examples:')}
-  lyntty                    Start session
+  lyntty                    Start a pi session
+  lyntty auth login --method mobile
+                            Pair this computer from the mobile app
+  lyntty server --host 0.0.0.0 --port 3005
+                            Start a LAN relay for phone testing
   lyntty resume cmmij8      Resume a previous session by Lyntty session ID
-  lyntty --yolo             Start with bypassing permissions
-                            lyntty sugar for --dangerously-skip-permissions
-  lyntty --chrome           Enable Chrome browser access for this session
-  lyntty --no-chrome        Disable Chrome even if default is on
   lyntty --no-sandbox       Disable Lyntty sandbox for this session
-  lyntty --js-runtime bun   Use bun instead of node to spawn Claude Code
-  lyntty --claude-env ANTHROPIC_BASE_URL=http://127.0.0.1:3456
-                           Use a custom API endpoint (e.g., claude-code-router)
-  lyntty acp gemini         Start Gemini via generic ACP runner
-  lyntty acp -- opencode --acp
-                           Start a custom ACP command
-  lyntty acp opencode --verbose
-                           Print raw ACP backend/envelope events
-  lyntty auth login --force Authenticate
   lyntty doctor             Run diagnostics
 
-${chalk.bold('Lyntty supports ALL Claude options!')}
-  Use any claude flag with lyntty as you would with claude. Our favorite:
-
-  lyntty --resume
-
-${chalk.gray('─'.repeat(60))}
-${chalk.bold.cyan('Claude Code Options (from `claude --help`):')}
+${chalk.gray('Legacy Claude/Codex/Gemini/ACP/OpenClaw runtimes are not supported by Lyntty.')}
 `)
-
-      // Run claude --help and display its output
-      // Use execFileSync directly with claude CLI for runtime-agnostic compatibility
-      try {
-        const claudeHelp = execFileSync(claudeCliPath, ['--help'], { encoding: 'utf8', windowsHide: true })
-        console.log(claudeHelp)
-      } catch (e) {
-        console.log(chalk.yellow('Could not retrieve claude help. Make sure claude is installed.'))
-      }
 
       process.exit(0)
     }
@@ -792,7 +762,6 @@ ${chalk.bold.cyan('Claude Code Options (from `claude --help`):')}
     // Show version
     if (showVersion) {
       console.log(`lyntty version: ${packageJson.version}`)
-      // Don't exit - continue to pass --version to Claude Code
     }
 
     // Normal flow - auth and machine setup

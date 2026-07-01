@@ -1,0 +1,176 @@
+07-01 15:10:52.413 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:52.433 W/ReactNativeJS( 8710): [Error: Failed to get friends list: 404]
+07-01 15:10:52.896 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:53.164 W/ReactNativeJS( 8710): [Error: Failed to get friends list: 404]
+07-01 15:10:53.347 W/ReactNativeJS( 8710): [Error: Failed to get friends list: 404]
+07-01 15:10:53.462 I/GoogleInputMethodService( 1275): GoogleInputMethodService.onStartInput():1986 onStartInput(EditorInfo{EditorInfo{packageName=dev.jczhang.lyntty.dev, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+07-01 15:10:53.463 W/PackageConfigPersister(  575): App-specific configuration not found for packageName: dev.jczhang.lyntty.dev and userId: 0
+07-01 15:10:53.464 W/unknown:BridgelessReact( 8710): ReactHost{0}.raiseSoftException(getOrCreateReloadTask()): BridgelessDevSupportManager.handleReloadJS()
+07-01 15:10:53.464 E/unknown:ReactHost( 8710): Unhandled SoftException
+07-01 15:10:53.464 E/unknown:ReactHost( 8710): com.facebook.react.bridge.ReactNoCrashSoftException: raiseSoftException(getOrCreateReloadTask()): BridgelessDevSupportManager.handleReloadJS()
+07-01 15:10:53.464 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException(ReactHostImpl.kt:861)
+07-01 15:10:53.464 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException$default(ReactHostImpl.kt:852)
+07-01 15:10:53.501 V/SplashScreenExceptionList(  575): SplashScreen checking exception for package com.android.settings (target sdk:35) -> false
+07-01 15:10:53.508 W/unknown:BridgelessReact( 8710): ReactHost{0}.raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.510 E/unknown:ReactHost( 8710): Unhandled SoftException
+07-01 15:10:53.510 E/unknown:ReactHost( 8710): com.facebook.react.bridge.ReactNoCrashSoftException: raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.510 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException(ReactHostImpl.kt:861)
+07-01 15:10:53.510 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException$default(ReactHostImpl.kt:852)
+07-01 15:10:53.510 W/unknown:BridgelessReact( 8710): ReactHost{0}.raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.511 E/unknown:ReactHost( 8710): Unhandled SoftException
+07-01 15:10:53.511 E/unknown:ReactHost( 8710): com.facebook.react.bridge.ReactNoCrashSoftException: raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.511 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException(ReactHostImpl.kt:861)
+07-01 15:10:53.511 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException$default(ReactHostImpl.kt:852)
+07-01 15:10:53.514 W/unknown:BridgelessReact( 8710): ReactHost{0}.raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.514 E/unknown:ReactHost( 8710): Unhandled SoftException
+07-01 15:10:53.514 E/unknown:ReactHost( 8710): com.facebook.react.bridge.ReactNoCrashSoftException: raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.514 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException(ReactHostImpl.kt:861)
+07-01 15:10:53.514 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException$default(ReactHostImpl.kt:852)
+07-01 15:10:53.514 W/unknown:BridgelessReact( 8710): ReactHost{0}.raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.515 E/unknown:ReactHost( 8710): Unhandled SoftException
+07-01 15:10:53.515 E/unknown:ReactHost( 8710): com.facebook.react.bridge.ReactNoCrashSoftException: raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.515 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException(ReactHostImpl.kt:861)
+07-01 15:10:53.515 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException$default(ReactHostImpl.kt:852)
+07-01 15:10:53.515 W/unknown:BridgelessReact( 8710): ReactHost{0}.raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.516 E/unknown:ReactHost( 8710): Unhandled SoftException
+07-01 15:10:53.516 E/unknown:ReactHost( 8710): com.facebook.react.bridge.ReactNoCrashSoftException: raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.516 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException(ReactHostImpl.kt:861)
+07-01 15:10:53.516 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException$default(ReactHostImpl.kt:852)
+07-01 15:10:53.516 W/unknown:BridgelessReact( 8710): ReactHost{0}.raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.516 E/unknown:ReactHost( 8710): Unhandled SoftException
+07-01 15:10:53.516 E/unknown:ReactHost( 8710): com.facebook.react.bridge.ReactNoCrashSoftException: raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.516 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException(ReactHostImpl.kt:861)
+07-01 15:10:53.516 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException$default(ReactHostImpl.kt:852)
+07-01 15:10:53.521 E/unknown:ReactNative( 8710): Tried to remove non-existent frame callback
+07-01 15:10:53.521 W/unknown:BridgelessReact( 8710): ReactHost{0}.raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.522 E/unknown:ReactHost( 8710): Unhandled SoftException
+07-01 15:10:53.522 E/unknown:ReactHost( 8710): com.facebook.react.bridge.ReactNoCrashSoftException: raiseSoftException(callWithExistingReactInstance(callFunctionOnModule("RCTDeviceEventEmitter", "emit"))): Execute: reactInstance is null. Dropping work.
+07-01 15:10:53.522 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException(ReactHostImpl.kt:861)
+07-01 15:10:53.522 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException$default(ReactHostImpl.kt:852)
+07-01 15:10:53.522 E/unknown:ReactNative( 8710): Tried to remove non-existent frame callback
+07-01 15:10:53.537 I/InputDispatcher(  575): Waiting because 443e9d2 dev.jczhang.lyntty.dev/dev.jczhang.lyntty.dev.MainActivity is paused
+07-01 15:10:53.538 I/ReactNative( 8710): [GESTURE HANDLER] Tearing down gesture handler registered for root view com.facebook.react.runtime.ReactSurfaceView{709fc14 V.E...... ........ 0,0-1080,1920 #1}
+07-01 15:10:53.541 V/WindowManager(  575):     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+07-01 15:10:53.541 V/WindowManager(  575):         {WCT{RemoteToken{f7232fd Task{d41f171 #79 type=standard A=10210:dev.jczhang.lyntty.dev}}} m=TO_BACK f=NONE leash=Surface(name=Task=79)/@0x3b89bc1 sb=Rect(0, 0 - 1080, 1920) eb=Rect(0, 0 - 1080, 1920) d=0 taskParent=-1}
+07-01 15:10:53.553 W/com.reactnativekeyboardcontroller.modules.statusbar.StatusBarManagerCompatModuleImpl( 8710): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+07-01 15:10:53.618 I/hang.lyntty.dev( 8710): Explicit concurrent mark compact GC freed 17MB AllocSpace bytes, 2(104KB) LOS objects, 48% free, 25MB/49MB, paused 321us,2.760ms total 69.495ms
+07-01 15:10:53.618 I/ImeTracker( 8710): dev.jczhang.lyntty.dev:59537680: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT_CLOSE_CURRENT_SESSION fromUser false
+07-01 15:10:53.622 I/ImeTracker(  575): dev.jczhang.lyntty.dev:59537680: onCancelled at PHASE_SERVER_SHOULD_HIDE
+07-01 15:10:53.623 W/unknown:BridgelessReact( 8710): ReactHost{0}.raiseSoftException(onWindowFocusChange(hasFocus = "false")): Tried to access onWindowFocusChange while context is not ready
+07-01 15:10:53.624 E/unknown:ReactHost( 8710): Unhandled SoftException
+07-01 15:10:53.624 E/unknown:ReactHost( 8710): com.facebook.react.bridge.ReactNoCrashSoftException: raiseSoftException(onWindowFocusChange(hasFocus = "false")): Tried to access onWindowFocusChange while context is not ready
+07-01 15:10:53.624 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException(ReactHostImpl.kt:861)
+07-01 15:10:53.624 E/unknown:ReactHost( 8710): 	at com.facebook.react.runtime.ReactHostImpl.raiseSoftException$default(ReactHostImpl.kt:852)
+07-01 15:10:53.631 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.631 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.631 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.634 E/unknown:ReactNative( 8710): Tried to remove non-existent frame callback
+07-01 15:10:53.638 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.639 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.640 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.641 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.642 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.646 W/System.err( 8710): java.lang.NoSuchFieldException: No field mIsFinished in class Lcom/facebook/react/bridge/queue/MessageQueueThreadImpl; (declaration of 'com.facebook.react.bridge.queue.MessageQueueThreadImpl' appears in /data/app/~~7e8YCbzeSOcOKH3Wd59c3w==/dev.jczhang.lyntty.dev-gD1pypx7sNdReY121Up_ww==/base.apk!classes8.dex)
+07-01 15:10:53.652 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.652 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.652 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.652 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.652 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.653 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.653 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.654 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.654 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.654 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.654 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.655 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.656 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.656 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.656 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.657 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.659 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.661 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.664 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.665 V/WindowManager(  575):     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+07-01 15:10:53.665 W/unknown:ReactNative( 8710): Tried to enqueue runnable on already finished thread: 'v_native... dropping Runnable.
+07-01 15:10:53.733 W/HWUI    (  951): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-01 15:10:54.202 W/ndroid.settings(  951): ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~7e8YCbzeSOcOKH3Wd59c3w==/dev.jczhang.lyntty.dev-gD1pypx7sNdReY121Up_ww==/base.apk' with 1 weak references
+07-01 15:10:54.274 I/hang.lyntty.dev( 8710): Background concurrent mark compact GC freed 14MB AllocSpace bytes, 4(80KB) LOS objects, 38% free, 38MB/62MB, paused 9.130ms,6.032ms total 230.287ms
+07-01 15:10:54.282 D/com.oney.WebRTCModule.WebRTCModule( 8710): Using video encoder factory: com.livekit.reactnative.video.CustomVideoEncoderFactory
+07-01 15:10:54.282 D/com.oney.WebRTCModule.WebRTCModule( 8710): Using video decoder factory: com.livekit.reactnative.video.CustomVideoDecoderFactory
+07-01 15:10:54.415 W/FrameTracker(  810): Missed SF frame:PREDICTION_ERROR, 23876017, 9086129, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-01 15:10:54.415 W/FrameTracker(  810): Missed SF frame:PREDICTION_ERROR, 23876044, 8470109, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-01 15:10:54.415 W/FrameTracker(  810): Missed SF frame:PREDICTION_ERROR, 23876082, 13839306, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-01 15:10:54.415 W/FrameTracker(  810): Missed SF frame:PREDICTION_ERROR, 23876111, 15397423, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-01 15:10:54.415 W/FrameTracker(  810): Missed SF frame:PREDICTION_ERROR, 23876134, 11628369, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-01 15:10:54.415 W/FrameTracker(  810): Missed SF frame:PREDICTION_ERROR, 23876157, 12573441, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-01 15:10:54.415 W/FrameTracker(  810): Missed SF frame:PREDICTION_ERROR, 23876180, 12340323, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-01 15:10:54.878 I/RNMMKV  ( 8710): Initializing MMKV at /data/user/0/dev.jczhang.lyntty.dev/files/mmkv...
+07-01 15:10:55.020 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativekeyboardcontroller.OverKeyboardViewManager
+07-01 15:10:55.021 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativekeyboardcontroller.views.overlay.OverKeyboardHostShadowNode
+07-01 15:10:55.021 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativekeyboardcontroller.KeyboardToolbarGroupViewManager
+07-01 15:10:55.026 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativecommunity.picker.ReactDialogPickerManager
+07-01 15:10:55.026 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativecommunity.picker.ReactPickerShadowNode
+07-01 15:10:55.027 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativekeyboardcontroller.KeyboardBackgroundViewManager
+07-01 15:10:55.031 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class java.com.reactnativekeyboardcontroller.ClippingScrollViewDecoratorViewManager
+07-01 15:10:55.031 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.shopify.reactnative.skia.SkiaPictureViewManager
+07-01 15:10:55.032 E/unknown:UIManagerModuleConstantsHelper( 8710): Direct event name for 'CameraView' doesn't correspond to the naming convention, expected 'topEventName'->'onEventName', got 'topCameraError'->'onError'
+07-01 15:10:55.034 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativecommunity.picker.ReactDropdownPickerManager
+07-01 15:10:55.042 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.shopify.reactnative.skia.WebGPUViewManager
+07-01 15:10:55.043 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativecommunity.slider.ReactSliderManager
+07-01 15:10:55.044 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativekeyboardcontroller.KeyboardGestureAreaViewManager
+07-01 15:10:55.048 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativecommunity.webview.RNCWebViewManager
+07-01 15:10:55.049 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class com.reactnativekeyboardcontroller.KeyboardControllerViewManager
+07-01 15:10:55.050 W/unknown:ViewManagerPropertyUpdater( 8710): Could not find generated setter for class org.reactnative.maskedview.RNCMaskedViewManager
+07-01 15:10:55.496 I/ReactNativeJS( 8710): Running "main" with {"rootTag":1,"initialProps":{},"fabric":true}
+07-01 15:10:55.886 I/ReactNativeJS( 8710): calling Libsodium.install
+07-01 15:10:55.894 I/ReactNativeJS( 8710): '[loadAppConfig] Loaded from ExponentConstants:', [ 'elevenLabsAgentId', 'consoleLoggingDefault' ]
+07-01 15:10:55.894 I/ReactNativeJS( 8710): '[loadAppConfig] Loaded from Constants.expoConfig:', [ 'elevenLabsAgentId',
+07-01 15:10:55.894 I/ReactNativeJS( 8710):   'consoleLoggingDefault',
+07-01 15:10:55.894 I/ReactNativeJS( 8710):   'buildCommitSha',
+07-01 15:10:55.894 I/ReactNativeJS( 8710):   'buildCommitTimestamp' ]
+07-01 15:10:55.894 I/ReactNativeJS( 8710): '[loadAppConfig] Final merged config:', '{\n  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",\n  "consoleLoggingDefault": true,\n  "buildCommitSha": "141b62aa8d8adc9d8637a8530d7afa938ed26b82",\n  "buildCommitTimestamp": "2026-07-01T14:41:20+08:00"\n}'
+07-01 15:10:55.895 I/ReactNativeJS( 8710): '[ConsoleLogging] Initialized', '(output enabled)'
+07-01 15:10:56.446 W/ReactNativeJS( 8710): [Error: Failed to get friends list: 404]
+07-01 15:10:56.449 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:56.818 W/com.reactnativekeyboardcontroller.modules.statusbar.StatusBarManagerCompatModuleImpl( 8710): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+07-01 15:10:56.819 W/com.reactnativekeyboardcontroller.modules.statusbar.StatusBarManagerCompatModuleImpl( 8710): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+07-01 15:10:56.831 I/ReactNative( 8710): [GESTURE HANDLER] Initialize gesture handler for root view com.facebook.react.runtime.ReactSurfaceView{709fc14 V.E...... ......ID 0,0-1080,1920 #1}
+07-01 15:10:56.831 I/ReactNative( 8710): [GESTURE HANDLER] Gesture handler is already enabled for a parent view
+07-01 15:10:56.979 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:57.012 E/TaskPersister(  575): File error accessing recents directory (directory doesn't exist?).
+07-01 15:10:57.014 W/ReactNativeJS( 8710): [Error: Failed to get friends list: 404]
+07-01 15:10:57.180 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:57.213 W/ReactNativeJS( 8710): [Error: Failed to get friends list: 404]
+07-01 15:10:57.946 W/ReactNativeJS( 8710): [Error: Failed to get friends list: 404]
+07-01 15:10:58.030 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:58.280 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:58.580 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:58.813 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:58.863 W/ReactNativeJS( 8710): [Error: Failed to get friends list: 404]
+07-01 15:10:58.880 W/ReactNativeJS( 8710): [Error: Failed to fetch feed: 404]
+07-01 15:10:59.108 E/unknown:ReconnectingWebSocket( 8710): Error occurred, shutting down websocket connection: Websocket exception
+07-01 15:10:59.108 E/unknown:ReconnectingWebSocket( 8710): java.net.SocketException: Software caused connection abort
+07-01 15:10:59.108 W/unknown:ReconnectingWebSocket( 8710): Couldn't connect to "ws://10.0.2.2:8081/message?device=sdk_gphone64_x86_64%20-%2015%20-%20API%2035&app=dev.jczhang.lyntty.dev&clientid=BridgelessDevSupportManager", will silently retry
+07-01 15:10:59.108 E/unknown:ReconnectingWebSocket( 8710): Error occurred, shutting down websocket connection: Websocket exception
+07-01 15:10:59.108 E/unknown:ReconnectingWebSocket( 8710): java.net.SocketException: Software caused connection abort
+07-01 15:10:59.110 E/unknown:ReconnectingWebSocket( 8710): Error occurred, shutting down websocket connection: Websocket exception
+07-01 15:10:59.110 E/unknown:ReconnectingWebSocket( 8710): java.net.SocketException: Software caused connection abort
+07-01 15:10:59.630 W/ReactNativeJS( 8710): Cannot connect to Expo CLI.
+07-01 15:10:59.630 W/ReactNativeJS( 8710): 
+07-01 15:10:59.630 W/ReactNativeJS( 8710): Try the following to fix the issue:
+07-01 15:10:59.630 W/ReactNativeJS( 8710): - Ensure that Expo dev server is running and available on the same network
+07-01 15:10:59.630 W/ReactNativeJS( 8710): - Ensure that your device/emulator is connected to your machine and has USB debugging enabled - run 'adb devices' to see a list of connected devices
+07-01 15:10:59.630 W/ReactNativeJS( 8710): - If you're on a physical device connected to the same machine, run 'adb reverse tcp:8081 tcp:8081' to forward requests from your device
+07-01 15:10:59.630 W/ReactNativeJS( 8710): 
+07-01 15:10:59.630 W/ReactNativeJS( 8710): URL: 10.0.2.2:8081
+07-01 15:10:59.630 W/ReactNativeJS( 8710): 
+07-01 15:10:59.630 W/ReactNativeJS( 8710): Error: undefined
