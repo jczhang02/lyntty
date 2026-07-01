@@ -1,0 +1,441 @@
+--------- beginning of main
+07-01 15:45:51.998 10938 11049 I CameraPresencePrvdr: Starting CameraPresenceProvider monitoring.
+07-01 15:45:51.998 10938 11049 I CameraPresenceSrc: First observer added. Starting monitoring.
+07-01 15:45:51.998 10938 11049 I Camera2PresenceSrc: Starting system availability monitoring.
+07-01 15:45:51.998 10938 11049 D CameraValidator: Verifying camera lens facing on emu64xa, lensFacingInteger: null
+07-01 15:45:51.998 10938 11049 W CameraValidator: Camera LENS_FACING_FRONT verification failed
+07-01 15:45:51.998 10938 11049 W CameraValidator: java.lang.IllegalArgumentException: No available camera can be found. Cams:1 Id:1  Lens:1 PhyId:null  Filters:1 Id:Identifier{value=java.lang.Object@5c91300} LensFilter:0
+07-01 15:45:51.998 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraSelector.select(CameraSelector.java:109)
+07-01 15:45:51.998 10938 11049 W CameraValidator: 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:118)
+07-01 15:45:51.998 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraX.lambda$initAndRetryRecursively$2$androidx-camera-core-CameraX(CameraX.java:466)
+07-01 15:45:51.998 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraX$$ExternalSyntheticLambda2.run(D8$$SyntheticClass:0)
+07-01 15:45:51.998 10938 11049 W CameraValidator: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-01 15:45:51.998 10938 11049 W CameraValidator: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-01 15:45:51.998 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraExecutor$1.lambda$newThread$0(CameraExecutor.java:68)
+07-01 15:45:51.998 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraExecutor$1$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+07-01 15:45:51.998 10938 11049 W CameraValidator: 	at java.lang.Thread.run(Thread.java:1012)
+07-01 15:45:51.998 10938 11049 E CameraValidator: Camera LensFacing verification failed, existing cameras: [Camera@8879cf6[id=1]]
+07-01 15:45:51.998 10938 11049 I CameraPresencePrvdr: Shutting down CameraPresenceProvider monitoring.
+07-01 15:45:51.998 10938 11049 I CameraPresenceSrc: Last observer removed. Stopping monitoring.
+07-01 15:45:51.998 10938 11049 I Camera2PresenceSrc: Stopping system availability monitoring.
+07-01 15:45:51.998 10938 11049 W CameraX : Retry init. Start time 58318045 current time 58322117
+07-01 15:45:51.998 10938 11049 W CameraX : androidx.camera.core.impl.CameraValidator$CameraIdListIncorrectException: Expected camera missing from device.
+07-01 15:45:51.998 10938 11049 W CameraX : 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:137)
+07-01 15:45:51.998 10938 11049 W CameraX : 	at androidx.camera.core.CameraX.lambda$initAndRetryRecursively$2$androidx-camera-core-CameraX(CameraX.java:466)
+07-01 15:45:51.998 10938 11049 W CameraX : 	at androidx.camera.core.CameraX$$ExternalSyntheticLambda2.run(D8$$SyntheticClass:0)
+07-01 15:45:51.998 10938 11049 W CameraX : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-01 15:45:51.998 10938 11049 W CameraX : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-01 15:45:51.998 10938 11049 W CameraX : 	at androidx.camera.core.CameraExecutor$1.lambda$newThread$0(CameraExecutor.java:68)
+07-01 15:45:51.998 10938 11049 W CameraX : 	at androidx.camera.core.CameraExecutor$1$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+07-01 15:45:51.998 10938 11049 W CameraX : 	at java.lang.Thread.run(Thread.java:1012)
+07-01 15:45:51.998 10938 11049 W CameraX : Caused by: java.lang.IllegalArgumentException: No available camera can be found. Cams:1 Id:1  Lens:1 PhyId:null  Filters:1 Id:Identifier{value=java.lang.Object@5c91300} LensFilter:0
+07-01 15:45:51.998 10938 11049 W CameraX : 	at androidx.camera.core.CameraSelector.select(CameraSelector.java:109)
+07-01 15:45:51.998 10938 11049 W CameraX : 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:118)
+07-01 15:45:51.998 10938 11049 W CameraX : 	... 7 more
+07-01 15:45:51.999 10938 11049 D Camera2CameraImpl: {Camera@65d6f1f[id=1]} Transitioning camera internal state: INITIALIZED --> RELEASING
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: Recalculating open cameras:
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: Camera                                       State                 
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: Camera@65d6f1f[id=1]                         RELEASING             
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: Open count: 1 (Max allowed: 1)
+07-01 15:45:51.999 10938 11049 D CameraStateMachine: New public camera state CameraState{type=CLOSING, error=null} from RELEASING and null
+07-01 15:45:51.999 10938 11049 D CameraStateMachine: Publishing new public camera state CameraState{type=CLOSING, error=null}
+07-01 15:45:51.999 10938 11049 D Camera2CameraImpl: {Camera@65d6f1f[id=1]} Transitioning camera internal state: RELEASING --> RELEASED
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: Recalculating open cameras:
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: Camera                                       State                 
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:51.999 10938 11049 D CameraStateRegistry: Open count: 0 (Max allowed: 1)
+07-01 15:45:51.999 10938 11049 D CameraStateMachine: New public camera state CameraState{type=CLOSED, error=null} from RELEASED and null
+07-01 15:45:51.999 10938 11049 D CameraStateMachine: Publishing new public camera state CameraState{type=CLOSED, error=null}
+07-01 15:45:51.999 10938 11049 D Camera2PresenceSrc: System onCameraAvailable: 1
+07-01 15:45:51.999 10938 11049 D Camera2PresenceSrc: [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=1}
+07-01 15:45:51.999 10938 11049 D Camera2PresenceSrc: [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=1}
+07-01 15:45:52.296 10938 11034 W ReactNativeJS: [Error: Failed to register push token: 401]
+07-01 15:45:52.502 10938 11049 D Camera2CameraCoordinator: Updated concurrent camera map: {}
+07-01 15:45:52.502 10938 11049 D Camera2CameraFactory: Updated available camera list: [] -> [1]
+07-01 15:45:52.505 10938 11049 D CameraRepository: Added camera: 1
+07-01 15:45:52.505 10938 11049 D CameraQuirks: camera2 CameraQuirks = 
+07-01 15:45:52.506 10938 11049 I Camera2CameraInfo: Device Level: INFO_SUPPORTED_HARDWARE_LEVEL_3
+07-01 15:45:52.507 10938 11049 I CameraPresencePrvdr: Starting CameraPresenceProvider monitoring.
+07-01 15:45:52.507 10938 11049 I CameraPresenceSrc: First observer added. Starting monitoring.
+07-01 15:45:52.507 10938 11049 I Camera2PresenceSrc: Starting system availability monitoring.
+07-01 15:45:52.508 10938 11049 D CameraValidator: Verifying camera lens facing on emu64xa, lensFacingInteger: null
+07-01 15:45:52.509 10938 11049 W CameraValidator: Camera LENS_FACING_FRONT verification failed
+07-01 15:45:52.509 10938 11049 W CameraValidator: java.lang.IllegalArgumentException: No available camera can be found. Cams:1 Id:1  Lens:1 PhyId:null  Filters:1 Id:Identifier{value=java.lang.Object@5c91300} LensFilter:0
+07-01 15:45:52.509 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraSelector.select(CameraSelector.java:109)
+07-01 15:45:52.509 10938 11049 W CameraValidator: 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:118)
+07-01 15:45:52.509 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraX.lambda$initAndRetryRecursively$2$androidx-camera-core-CameraX(CameraX.java:466)
+07-01 15:45:52.509 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraX$$ExternalSyntheticLambda2.run(D8$$SyntheticClass:0)
+07-01 15:45:52.509 10938 11049 W CameraValidator: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-01 15:45:52.509 10938 11049 W CameraValidator: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-01 15:45:52.509 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraExecutor$1.lambda$newThread$0(CameraExecutor.java:68)
+07-01 15:45:52.509 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraExecutor$1$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+07-01 15:45:52.509 10938 11049 W CameraValidator: 	at java.lang.Thread.run(Thread.java:1012)
+07-01 15:45:52.509 10938 11049 E CameraValidator: Camera LensFacing verification failed, existing cameras: [Camera@28ea032[id=1]]
+07-01 15:45:52.509 10938 11049 I CameraPresencePrvdr: Shutting down CameraPresenceProvider monitoring.
+07-01 15:45:52.509 10938 11049 I CameraPresenceSrc: Last observer removed. Stopping monitoring.
+07-01 15:45:52.509 10938 11049 I Camera2PresenceSrc: Stopping system availability monitoring.
+07-01 15:45:52.509 10938 11049 W CameraX : Retry init. Start time 58318045 current time 58322628
+07-01 15:45:52.509 10938 11049 W CameraX : androidx.camera.core.impl.CameraValidator$CameraIdListIncorrectException: Expected camera missing from device.
+07-01 15:45:52.509 10938 11049 W CameraX : 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:137)
+07-01 15:45:52.509 10938 11049 W CameraX : 	at androidx.camera.core.CameraX.lambda$initAndRetryRecursively$2$androidx-camera-core-CameraX(CameraX.java:466)
+07-01 15:45:52.509 10938 11049 W CameraX : 	at androidx.camera.core.CameraX$$ExternalSyntheticLambda2.run(D8$$SyntheticClass:0)
+07-01 15:45:52.509 10938 11049 W CameraX : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-01 15:45:52.509 10938 11049 W CameraX : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-01 15:45:52.509 10938 11049 W CameraX : 	at androidx.camera.core.CameraExecutor$1.lambda$newThread$0(CameraExecutor.java:68)
+07-01 15:45:52.509 10938 11049 W CameraX : 	at androidx.camera.core.CameraExecutor$1$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+07-01 15:45:52.509 10938 11049 W CameraX : 	at java.lang.Thread.run(Thread.java:1012)
+07-01 15:45:52.509 10938 11049 W CameraX : Caused by: java.lang.IllegalArgumentException: No available camera can be found. Cams:1 Id:1  Lens:1 PhyId:null  Filters:1 Id:Identifier{value=java.lang.Object@5c91300} LensFilter:0
+07-01 15:45:52.509 10938 11049 W CameraX : 	at androidx.camera.core.CameraSelector.select(CameraSelector.java:109)
+07-01 15:45:52.509 10938 11049 W CameraX : 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:118)
+07-01 15:45:52.509 10938 11049 W CameraX : 	... 7 more
+07-01 15:45:52.510 10938 11049 D Camera2CameraImpl: {Camera@8879cf6[id=1]} Transitioning camera internal state: INITIALIZED --> RELEASING
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: Recalculating open cameras:
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: Camera                                       State                 
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: Camera@8879cf6[id=1]                         RELEASING             
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: Open count: 1 (Max allowed: 1)
+07-01 15:45:52.510 10938 11049 D CameraStateMachine: New public camera state CameraState{type=CLOSING, error=null} from RELEASING and null
+07-01 15:45:52.510 10938 11049 D CameraStateMachine: Publishing new public camera state CameraState{type=CLOSING, error=null}
+07-01 15:45:52.510 10938 11049 D Camera2CameraImpl: {Camera@8879cf6[id=1]} Transitioning camera internal state: RELEASING --> RELEASED
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: Recalculating open cameras:
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: Camera                                       State                 
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:52.510 10938 11049 D CameraStateRegistry: Open count: 0 (Max allowed: 1)
+07-01 15:45:52.510 10938 11049 D CameraStateMachine: New public camera state CameraState{type=CLOSED, error=null} from RELEASED and null
+07-01 15:45:52.510 10938 11049 D CameraStateMachine: Publishing new public camera state CameraState{type=CLOSED, error=null}
+07-01 15:45:52.511 10938 11049 D Camera2PresenceSrc: System onCameraAvailable: 1
+07-01 15:45:52.511 10938 11049 D Camera2PresenceSrc: [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=1}
+07-01 15:45:52.511 10938 11049 D Camera2PresenceSrc: [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=1}
+07-01 15:45:52.552 10938 10975 D EGL_emulation: app_time_stats: avg=8.48ms min=2.53ms max=49.31ms count=59
+07-01 15:45:53.012 10938 11049 D Camera2CameraCoordinator: Updated concurrent camera map: {}
+07-01 15:45:53.012 10938 11049 D Camera2CameraFactory: Updated available camera list: [] -> [1]
+07-01 15:45:53.013 10938 11049 D CameraRepository: Added camera: 1
+07-01 15:45:53.013 10938 11049 D CameraQuirks: camera2 CameraQuirks = 
+07-01 15:45:53.013 10938 11049 I Camera2CameraInfo: Device Level: INFO_SUPPORTED_HARDWARE_LEVEL_3
+07-01 15:45:53.014 10938 11049 I CameraPresencePrvdr: Starting CameraPresenceProvider monitoring.
+07-01 15:45:53.014 10938 11049 I CameraPresenceSrc: First observer added. Starting monitoring.
+07-01 15:45:53.014 10938 11049 I Camera2PresenceSrc: Starting system availability monitoring.
+07-01 15:45:53.014 10938 11049 D CameraValidator: Verifying camera lens facing on emu64xa, lensFacingInteger: null
+07-01 15:45:53.014 10938 11049 W CameraValidator: Camera LENS_FACING_FRONT verification failed
+07-01 15:45:53.014 10938 11049 W CameraValidator: java.lang.IllegalArgumentException: No available camera can be found. Cams:1 Id:1  Lens:1 PhyId:null  Filters:1 Id:Identifier{value=java.lang.Object@5c91300} LensFilter:0
+07-01 15:45:53.014 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraSelector.select(CameraSelector.java:109)
+07-01 15:45:53.014 10938 11049 W CameraValidator: 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:118)
+07-01 15:45:53.014 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraX.lambda$initAndRetryRecursively$2$androidx-camera-core-CameraX(CameraX.java:466)
+07-01 15:45:53.014 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraX$$ExternalSyntheticLambda2.run(D8$$SyntheticClass:0)
+07-01 15:45:53.014 10938 11049 W CameraValidator: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-01 15:45:53.014 10938 11049 W CameraValidator: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-01 15:45:53.014 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraExecutor$1.lambda$newThread$0(CameraExecutor.java:68)
+07-01 15:45:53.014 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraExecutor$1$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+07-01 15:45:53.014 10938 11049 W CameraValidator: 	at java.lang.Thread.run(Thread.java:1012)
+07-01 15:45:53.014 10938 11049 E CameraValidator: Camera LensFacing verification failed, existing cameras: [Camera@d4b79e2[id=1]]
+07-01 15:45:53.014 10938 11049 I CameraPresencePrvdr: Shutting down CameraPresenceProvider monitoring.
+07-01 15:45:53.014 10938 11049 I CameraPresenceSrc: Last observer removed. Stopping monitoring.
+07-01 15:45:53.014 10938 11049 I Camera2PresenceSrc: Stopping system availability monitoring.
+07-01 15:45:53.015 10938 11049 W CameraX : Retry init. Start time 58318045 current time 58323134
+07-01 15:45:53.015 10938 11049 W CameraX : androidx.camera.core.impl.CameraValidator$CameraIdListIncorrectException: Expected camera missing from device.
+07-01 15:45:53.015 10938 11049 W CameraX : 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:137)
+07-01 15:45:53.015 10938 11049 W CameraX : 	at androidx.camera.core.CameraX.lambda$initAndRetryRecursively$2$androidx-camera-core-CameraX(CameraX.java:466)
+07-01 15:45:53.015 10938 11049 W CameraX : 	at androidx.camera.core.CameraX$$ExternalSyntheticLambda2.run(D8$$SyntheticClass:0)
+07-01 15:45:53.015 10938 11049 W CameraX : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-01 15:45:53.015 10938 11049 W CameraX : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-01 15:45:53.015 10938 11049 W CameraX : 	at androidx.camera.core.CameraExecutor$1.lambda$newThread$0(CameraExecutor.java:68)
+07-01 15:45:53.015 10938 11049 W CameraX : 	at androidx.camera.core.CameraExecutor$1$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+07-01 15:45:53.015 10938 11049 W CameraX : 	at java.lang.Thread.run(Thread.java:1012)
+07-01 15:45:53.015 10938 11049 W CameraX : Caused by: java.lang.IllegalArgumentException: No available camera can be found. Cams:1 Id:1  Lens:1 PhyId:null  Filters:1 Id:Identifier{value=java.lang.Object@5c91300} LensFilter:0
+07-01 15:45:53.015 10938 11049 W CameraX : 	at androidx.camera.core.CameraSelector.select(CameraSelector.java:109)
+07-01 15:45:53.015 10938 11049 W CameraX : 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:118)
+07-01 15:45:53.015 10938 11049 W CameraX : 	... 7 more
+07-01 15:45:53.015 10938 11049 D Camera2CameraImpl: {Camera@28ea032[id=1]} Transitioning camera internal state: INITIALIZED --> RELEASING
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: Recalculating open cameras:
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: Camera                                       State                 
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: Camera@28ea032[id=1]                         RELEASING             
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: Open count: 1 (Max allowed: 1)
+07-01 15:45:53.015 10938 11049 D CameraStateMachine: New public camera state CameraState{type=CLOSING, error=null} from RELEASING and null
+07-01 15:45:53.015 10938 11049 D CameraStateMachine: Publishing new public camera state CameraState{type=CLOSING, error=null}
+07-01 15:45:53.015 10938 11049 D Camera2CameraImpl: {Camera@28ea032[id=1]} Transitioning camera internal state: RELEASING --> RELEASED
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: Recalculating open cameras:
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: Camera                                       State                 
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:53.015 10938 11049 D CameraStateRegistry: Open count: 0 (Max allowed: 1)
+07-01 15:45:53.015 10938 11049 D CameraStateMachine: New public camera state CameraState{type=CLOSED, error=null} from RELEASED and null
+07-01 15:45:53.015 10938 11049 D CameraStateMachine: Publishing new public camera state CameraState{type=CLOSED, error=null}
+07-01 15:45:53.015 10938 11049 D Camera2PresenceSrc: System onCameraAvailable: 1
+07-01 15:45:53.015 10938 11049 D Camera2PresenceSrc: [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=1}
+07-01 15:45:53.015 10938 11049 D Camera2PresenceSrc: [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=1}
+07-01 15:45:53.517 10938 11049 D Camera2CameraCoordinator: Updated concurrent camera map: {}
+07-01 15:45:53.517 10938 11049 D Camera2CameraFactory: Updated available camera list: [] -> [1]
+07-01 15:45:53.519 10938 11049 D CameraRepository: Added camera: 1
+07-01 15:45:53.519 10938 11049 D CameraQuirks: camera2 CameraQuirks = 
+07-01 15:45:53.520 10938 11049 I Camera2CameraInfo: Device Level: INFO_SUPPORTED_HARDWARE_LEVEL_3
+07-01 15:45:53.521 10938 11049 I CameraPresencePrvdr: Starting CameraPresenceProvider monitoring.
+07-01 15:45:53.521 10938 11049 I CameraPresenceSrc: First observer added. Starting monitoring.
+07-01 15:45:53.521 10938 11049 I Camera2PresenceSrc: Starting system availability monitoring.
+07-01 15:45:53.521 10938 11049 D CameraValidator: Verifying camera lens facing on emu64xa, lensFacingInteger: null
+07-01 15:45:53.522 10938 11049 W CameraValidator: Camera LENS_FACING_FRONT verification failed
+07-01 15:45:53.522 10938 11049 W CameraValidator: java.lang.IllegalArgumentException: No available camera can be found. Cams:1 Id:1  Lens:1 PhyId:null  Filters:1 Id:Identifier{value=java.lang.Object@5c91300} LensFilter:0
+07-01 15:45:53.522 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraSelector.select(CameraSelector.java:109)
+07-01 15:45:53.522 10938 11049 W CameraValidator: 	at androidx.camera.core.impl.CameraValidator.validateCameras(CameraValidator.java:118)
+07-01 15:45:53.522 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraX.lambda$initAndRetryRecursively$2$androidx-camera-core-CameraX(CameraX.java:466)
+07-01 15:45:53.522 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraX$$ExternalSyntheticLambda2.run(D8$$SyntheticClass:0)
+07-01 15:45:53.522 10938 11049 W CameraValidator: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-01 15:45:53.522 10938 11049 W CameraValidator: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-01 15:45:53.522 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraExecutor$1.lambda$newThread$0(CameraExecutor.java:68)
+07-01 15:45:53.522 10938 11049 W CameraValidator: 	at androidx.camera.core.CameraExecutor$1$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+07-01 15:45:53.522 10938 11049 W CameraValidator: 	at java.lang.Thread.run(Thread.java:1012)
+07-01 15:45:53.522 10938 11049 E CameraValidator: Camera LensFacing verification failed, existing cameras: [Camera@18a1f92[id=1]]
+07-01 15:45:53.522 10938 11049 E CameraX : The device might underreport the amount of the cameras. Finish the initialize task since we are already reaching the maximum number of retries.
+07-01 15:45:53.522 10938 11049 I CameraPresencePrvdr: Shutting down CameraPresenceProvider monitoring.
+07-01 15:45:53.522 10938 11049 I CameraPresenceSrc: Last observer removed. Stopping monitoring.
+07-01 15:45:53.522 10938 11049 I Camera2PresenceSrc: Stopping system availability monitoring.
+07-01 15:45:53.522 10938 11049 D Camera2CameraImpl: {Camera@d4b79e2[id=1]} Transitioning camera internal state: INITIALIZED --> RELEASING
+07-01 15:45:53.522 10938 11049 D CameraStateRegistry: Recalculating open cameras:
+07-01 15:45:53.522 10938 11049 D CameraStateRegistry: Camera                                       State                 
+07-01 15:45:53.522 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:53.522 10938 11049 D CameraStateRegistry: Camera@d4b79e2[id=1]                         RELEASING             
+07-01 15:45:53.522 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:53.522 10938 11049 D CameraStateRegistry: Open count: 1 (Max allowed: 1)
+07-01 15:45:53.522 10938 11049 D CameraStateMachine: New public camera state CameraState{type=CLOSING, error=null} from RELEASING and null
+07-01 15:45:53.522 10938 11049 D CameraStateMachine: Publishing new public camera state CameraState{type=CLOSING, error=null}
+07-01 15:45:53.523 10938 11049 D Camera2CameraImpl: {Camera@d4b79e2[id=1]} Transitioning camera internal state: RELEASING --> RELEASED
+07-01 15:45:53.523 10938 11049 D CameraStateRegistry: Recalculating open cameras:
+07-01 15:45:53.523 10938 11049 D CameraStateRegistry: Camera                                       State                 
+07-01 15:45:53.523 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:53.523 10938 11049 D CameraStateRegistry: -------------------------------------------------------------------
+07-01 15:45:53.523 10938 11049 D CameraStateRegistry: Open count: 0 (Max allowed: 1)
+07-01 15:45:53.523 10938 11049 D CameraStateMachine: New public camera state CameraState{type=CLOSED, error=null} from RELEASED and null
+07-01 15:45:53.523 10938 11049 D CameraStateMachine: Publishing new public camera state CameraState{type=CLOSED, error=null}
+07-01 15:45:53.523 10938 11049 D Camera2PresenceSrc: System onCameraAvailable: 1
+07-01 15:45:53.523 10938 11049 D Camera2PresenceSrc: [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=1}
+07-01 15:45:53.523 10938 11049 D Camera2PresenceSrc: [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=1}
+07-01 15:45:53.523 10938 11090 I CameraDevices: Initializing ExtensionsManager...
+07-01 15:45:53.528 10938 11090 D ExtenderVersion: No versioning extender found. Falling back to default.
+07-01 15:45:53.528 10938 11090 I CameraDevices: Successfully initialized!
+07-01 15:45:53.568 10938 10975 D EGL_emulation: app_time_stats: avg=4.00ms min=2.32ms max=8.36ms count=61
+07-01 15:45:54.568 10938 10975 D EGL_emulation: app_time_stats: avg=3.87ms min=2.76ms max=5.31ms count=60
+--------- beginning of kernel
+07-01 15:45:55.313     0     0 W healthd : battery l=100 v=5000 t=25.0 h=2 st=2 c=900000 fc=3000000 cc=10 chg=a
+07-01 15:45:55.568 10938 10975 D EGL_emulation: app_time_stats: avg=4.08ms min=3.28ms max=5.45ms count=60
+07-01 15:45:56.002  1021 11091 E WorkSourceUtil: Could not find package: com.google.android.gms.westworld
+--------- beginning of system
+07-01 15:45:56.511   575   931 W AppOps  : Noting op not finished: uid 10143 pkg com.google.android.gms code 113 startTime of in progress event=1782833645854
+07-01 15:45:56.513   575  1983 W AppOps  : Noting op not finished: uid 10143 pkg com.google.android.gms code 113 startTime of in progress event=1782833645854
+07-01 15:45:56.514   575  1983 W AppOps  : Noting op not finished: uid 10143 pkg com.google.android.gms code 79 startTime of in progress event=1782833651905
+07-01 15:45:56.516  1021  1697 I ActivityScheduler: nextTriggerTime: 58564735, in 238100ms, detectorType: 39, FULL_TYPE alarmWindowMillis: 80000
+07-01 15:45:56.568 10938 10975 D EGL_emulation: app_time_stats: avg=4.13ms min=1.69ms max=8.26ms count=60
+07-01 15:45:57.585 10938 10975 D EGL_emulation: app_time_stats: avg=11.83ms min=2.20ms max=64.39ms count=57
+07-01 15:45:58.586 10938 10975 D EGL_emulation: app_time_stats: avg=16.67ms min=12.25ms max=21.72ms count=60
+07-01 15:45:59.602 10938 10975 D EGL_emulation: app_time_stats: avg=16.63ms min=14.81ms max=19.09ms count=61
+07-01 15:46:00.001  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:00.001  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:00.001  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:00.001  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:00.001  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:00.001  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:00.002  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:00.002  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:00.002  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:00.002  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:00.002  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:00.002  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:00.002  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 15:46:00.002  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 15:46:00.002  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 15:46:00.002  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:00.002  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:00.002  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:00.002  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 15:46:00.015   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 15:46:00.017   810   916 D EGL_emulation: app_time_stats: avg=943.16ms min=12.86ms max=9282.39ms count=10
+07-01 15:46:00.501   194 11069 I keystore2: system/security/keystore2/watchdog/src/lib.rs:319 - Watchdog thread idle -> terminating. Have a great day.
+07-01 15:46:00.602 10938 10975 D EGL_emulation: app_time_stats: avg=16.64ms min=11.33ms max=20.62ms count=60
+07-01 15:46:01.620 10938 10975 D EGL_emulation: app_time_stats: avg=16.63ms min=12.37ms max=23.46ms count=61
+07-01 15:46:02.635 10938 10975 D EGL_emulation: app_time_stats: avg=16.63ms min=14.52ms max=19.72ms count=61
+07-01 15:46:03.652 10938 10975 D EGL_emulation: app_time_stats: avg=8.87ms min=2.37ms max=27.84ms count=61
+07-01 15:46:04.652 10938 10975 D EGL_emulation: app_time_stats: avg=3.98ms min=2.20ms max=5.45ms count=60
+07-01 15:46:05.430 11097 11097 W BpBinder: Linking to death on android.gui.ISurfaceComposer but there are no threads (yet?) listening to incoming transactions. See ProcessState::startThreadPool and ProcessState::setThreadPoolMaxThreadCount. Generally you should setup the binder threadpool before other initialization steps.
+07-01 15:46:05.430 11097 11097 W ProcessState: Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+07-01 15:46:05.438   170   170 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+07-01 15:46:05.438 11097 11098 I Gralloc4: mapper 4.x is not supported
+07-01 15:46:05.459     0     0 I servicemanager: Caller(pid=11097,uid=2000,sid=u:r:shell:s0) Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest. No alternative instances declared in VINTF.
+07-01 15:46:05.668 11099 11099 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-01 15:46:05.669 10938 10975 D EGL_emulation: app_time_stats: avg=3.97ms min=2.30ms max=8.39ms count=60
+07-01 15:46:05.673 11099 11099 I AndroidRuntime: Using default boot image
+07-01 15:46:05.673 11099 11099 I AndroidRuntime: Leaving lock profiling enabled
+07-01 15:46:05.676 11099 11099 I app_process: Core platform API reporting enabled, enforcing=false
+07-01 15:46:05.676 11099 11099 I app_process: Using CollectorTypeCMC GC.
+07-01 15:46:05.756 11099 11099 D nativeloader: InitDefaultPublicLibraries for_preload=1: libandroid.so:libaaudio.so:libamidi.so:libbinder_ndk.so:libc.so:libcamera2ndk.so:libdl.so:libEGL.so:libGLESv1_CM.so:libGLESv2.so:libGLESv3.so:libicu.so:libicui18n.so:libicuuc.so:libjnigraphics.so:liblog.so:libmediandk.so:libm.so:libnativehelper.so:libnativewindow.so:libOpenMAXAL.so:libOpenSLES.so:libRS.so:libstdc++.so:libsync.so:libvulkan.so:libwebviewchromium_plat_support.so:libz.so
+07-01 15:46:05.764 11099 11099 D nativeloader: Load libicu_jni.so using APEX ns com_android_art for caller /apex/com.android.art/javalib/core-oj.jar: ok
+07-01 15:46:05.764 11099 11099 D app_process: u_setTimeZoneFilesDirectory("/apex/com.android.tzdata/etc/tz/versioned/8/icu") succeeded. 
+07-01 15:46:05.765 11099 11099 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt75l.dat
+07-01 15:46:05.765 11099 11099 D nativeloader: Load libjavacore.so using APEX ns com_android_art for caller /apex/com.android.art/javalib/core-oj.jar: ok
+07-01 15:46:05.766 11099 11099 D nativeloader: Load libopenjdk.so using APEX ns com_android_art for caller /apex/com.android.art/javalib/core-oj.jar: ok
+07-01 15:46:05.768 11099 11099 W app_process: Unexpected CPU variant for x86: x86_64.
+07-01 15:46:05.768 11099 11099 W app_process: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, goldmont-without-sha-xsaves, tremont, kabylake, default
+07-01 15:46:05.769 11099 11099 W app_process: ClassLoaderContext shared library size mismatch. Expected=2, found=0 (PCL[]{PCL[/system/framework/android.test.base.jar*724373495]#PCL[/system/framework/android.test.mock.jar*1452759902]} | PCL[])
+07-01 15:46:05.770 11099 11099 W app_process: ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[]{PCL[/system/framework/android.test.runner.jar*2496447986]#PCL[/system/framework/android.test.base.jar*724373495]} | PCL[/system/framework/android.test.runner.jar*2496447986])
+07-01 15:46:05.792 11099 11099 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+07-01 15:46:05.792 11099 11099 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+07-01 15:46:05.795 11099 11099 D UiAutomationConnection: Created on user UserHandle{0}
+07-01 15:46:05.795 11099 11099 I UiAutomation: Initialized for user 0 on display 0
+07-01 15:46:05.795 11099 11099 W UiAutomation: Created with deprecatead constructor, assumes DEFAULT_DISPLAY
+07-01 15:46:05.797   575  1983 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+07-01 15:46:05.797   575  1983 I UiAutomationManager: Registering UiTestAutomationService (id=com.android.server.accessibility/UiAutomation, flags=0x0) when called by user 0
+07-01 15:46:05.799   575  1983 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+07-01 15:46:05.800   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.801   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.801  1362  2428 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+07-01 15:46:05.801   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.801   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.802 11099 11111 V UiAutomation: Init UiAutomation@ab45c94[id=31, displayId=0, flags=0]
+07-01 15:46:05.802  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:05.802   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.802  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:05.802  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:05.802  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.802  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.802   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.802   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.802   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.802   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.802   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.802   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.802  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:05.802   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.802  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:05.802  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:05.802  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:05.802  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.802  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.802  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:05.802  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:05.802  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:05.802  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:05.802  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.802  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.802  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:05.804   575   931 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+07-01 15:46:05.804  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface media_data_manager with targets# 0 (types=[])
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805  1362  2048 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.805   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.806   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.806   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.806   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:05.806  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 15:46:05.806   575   575 D BatterySaverPolicy: accessibility changed to true, updating policy.
+07-01 15:46:05.807  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 15:46:05.807  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:05.808   810   810 D SsMediaDataProvider: Forwarding Smartspace updates []
+07-01 15:46:05.808   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 15:46:05.808  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:05.808  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:05.808  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.808  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.808  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:05.808  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:05.808  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:05.808  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:05.808  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.808  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.808  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:05.809  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:05.809  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:05.809  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:05.809  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.809  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:05.809  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:05.809  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface media_data_manager with targets# 0 (types=[])
+07-01 15:46:05.809  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 15:46:05.809   810   810 D SsMediaDataProvider: Forwarding Smartspace updates []
+07-01 15:46:05.809  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 15:46:05.809   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 15:46:05.809  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 15:46:05.809  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:05.809  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:05.810  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:05.810  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 15:46:05.810  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 15:46:05.810  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:05.810  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:05.810  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:05.810  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 15:46:06.070  1381  1800 I BistoHotwordHelper: (REDACTED) getHotwordActive::active query: %s, watch: %s, devices connected: %s
+07-01 15:46:06.685 10938 10975 D EGL_emulation: app_time_stats: avg=3.94ms min=2.22ms max=5.39ms count=61
+07-01 15:46:06.817 11099 11099 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@1ad1d; boundsInParent: Rect(0, 0 - 1080, 1920); boundsInScreen: Rect(0, 0 - 1080, 1920); boundsInWindow: Rect(0, 0 - 1080, 1920); packageName: dev.jczhang.lyntty.dev; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+07-01 15:46:06.820 11099 11099 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@1a95c; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 0 - 1080, 0); boundsInWindow: Rect(0, 0 - 1080, 0); packageName: dev.jczhang.lyntty.dev; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+07-01 15:46:06.820 11099 11099 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@1a59b; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 0 - 1080, 0); boundsInWindow: Rect(0, 0 - 1080, 0); packageName: dev.jczhang.lyntty.dev; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+07-01 15:46:06.836 11099 11099 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@107f1; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 1920 - 1080, 1920); boundsInWindow: Rect(0, 1920 - 1080, 1920); packageName: dev.jczhang.lyntty.dev; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+07-01 15:46:06.837 11099 11099 W AccessibilityNodeInfoDumper: Fetch time: 25ms
+07-01 15:46:06.838   575   655 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+07-01 15:46:06.838   575   655 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838  1362  2048 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:46:06.838   575   575 D BatterySaverPolicy: accessibility changed to false, updating policy.
+07-01 15:46:06.839  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:06.839  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:06.839  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:06.839  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:06.839  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:06.839  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:06.839 11099 11099 D AndroidRuntime: Shutting down VM
+07-01 15:46:06.839  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:06.839  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:06.839  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:06.839  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:06.839  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:06.839  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:06.839  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:46:06.839  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:46:06.839  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:46:06.839  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:06.839  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:46:06.839  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:46:06.839  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface media_data_manager with targets# 0 (types=[])
+07-01 15:46:06.840  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 15:46:06.840  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 15:46:06.840  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 15:46:06.840  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:06.840  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:06.840  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:46:06.840  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 15:46:06.841   810   810 D SsMediaDataProvider: Forwarding Smartspace updates []
+07-01 15:46:06.841   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 15:46:07.133   810   916 D EGL_emulation: app_time_stats: avg=7116.02ms min=7116.02ms max=7116.02ms count=1

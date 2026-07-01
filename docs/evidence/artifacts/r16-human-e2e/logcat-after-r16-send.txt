@@ -1,0 +1,500 @@
+--------- beginning of main
+07-01 15:58:25.749  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:58:25.749  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:58:25.749  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:58:25.749  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:58:25.749  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:58:25.749  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:58:25.750   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:58:25.750   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:58:25.750   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:58:25.750   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:58:25.750  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:58:25.750  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:58:25.750  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:58:25.750  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:58:25.750  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:58:25.750  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:58:25.750  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:58:25.750  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:58:25.750  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:58:25.750  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:58:25.750  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:58:25.750  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:58:25.750  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface media_data_manager with targets# 0 (types=[])
+07-01 15:58:25.750  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 15:58:25.750 12204 12204 D AndroidRuntime: Shutting down VM
+07-01 15:58:25.751  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 15:58:25.751   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:58:25.751   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:58:25.751   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:58:25.751   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+--------- beginning of system
+07-01 15:58:25.751   575   575 D BatterySaverPolicy: accessibility changed to false, updating policy.
+07-01 15:58:25.751   810   810 D SsMediaDataProvider: Forwarding Smartspace updates []
+07-01 15:58:25.752   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 15:58:25.753  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 15:58:25.753  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:58:25.753  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:58:25.753  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:58:25.753  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 15:58:26.336 11171 11207 D EGL_emulation: app_time_stats: avg=500.03ms min=498.62ms max=501.32ms count=3
+07-01 15:58:27.833 11171 11207 D EGL_emulation: app_time_stats: avg=499.27ms min=498.28ms max=500.47ms count=3
+07-01 15:58:28.834 11171 11207 D EGL_emulation: app_time_stats: avg=500.03ms min=499.99ms max=500.08ms count=2
+07-01 15:58:29.835 11171 11207 D EGL_emulation: app_time_stats: avg=500.75ms min=500.63ms max=500.88ms count=2
+07-01 15:58:31.334 11171 11207 D EGL_emulation: app_time_stats: avg=499.70ms min=498.34ms max=500.49ms count=3
+07-01 15:58:32.338 11171 11207 D EGL_emulation: app_time_stats: avg=501.61ms min=500.67ms max=502.55ms count=2
+07-01 15:58:32.406 11171 11171 E FrameTracker: force finish cuj, time out: J<IME_INSETS_SHOW_ANIMATION::0@1@dev.jczhang.lyntty.dev>
+07-01 15:58:33.593   575  1790 W BatteryExternalStatsWorker: error reading Bluetooth stats: 11
+07-01 15:58:33.594   575  1790 D TelephonyManager: requestModemActivityInfo: Sending result to app: ModemActivityInfo{ mTimestamp=59083713 mSleepTimeMs=0 mIdleTimeMs=59083154 mActivityStatsTechSpecificInfo=[{mRat=UNKNOWN,mFrequencyRange=UNKNOWN,mTxTimeMs[]=[0, 0, 0, 0, 0],mRxTimeMs=0}]}
+07-01 15:58:33.610   379   461 I netd    : tetherGetStats() -> {[]} <1.03ms>
+07-01 15:58:33.835 11171 11207 D EGL_emulation: app_time_stats: avg=498.94ms min=497.24ms max=500.21ms count=3
+07-01 15:58:34.835 11171 11207 D EGL_emulation: app_time_stats: avg=500.14ms min=499.56ms max=500.72ms count=2
+07-01 15:58:36.335 11171 11207 D EGL_emulation: app_time_stats: avg=499.89ms min=499.29ms max=500.82ms count=3
+07-01 15:58:36.907  8435  8435 D BoundBrokerSvc: onUnbind: Intent { act=com.google.firebase.dynamiclinks.service.START pkg=com.google.android.gms }
+07-01 15:58:37.134   810   916 D EGL_emulation: app_time_stats: avg=37116.66ms min=37116.66ms max=37116.66ms count=1
+07-01 15:58:37.835 11171 11207 D EGL_emulation: app_time_stats: avg=499.73ms min=499.17ms max=500.12ms count=3
+07-01 15:58:37.979   888  1063 I bluetooth: system/gd/hci/le_address_manager.cc:659 OnCommandComplete: Received command complete with op_code LE_SET_RANDOM_ADDRESS(0x2005)
+07-01 15:58:37.979   888  1063 I bluetooth: system/gd/hci/le_address_manager.cc:680 OnCommandComplete: update random address : xx:xx:xx:xx:9a:51
+07-01 15:58:37.979   888  1063 I bluetooth: system/gd/hci/le_address_manager.cc:347 resume_registered_clients: Resuming registered clients
+07-01 15:58:39.333 11171 11207 D EGL_emulation: app_time_stats: avg=499.53ms min=496.23ms max=503.03ms count=3
+07-01 15:58:40.334 11171 11207 D EGL_emulation: app_time_stats: avg=500.22ms min=499.54ms max=500.89ms count=2
+07-01 15:58:41.335 11171 11207 D EGL_emulation: app_time_stats: avg=500.45ms min=499.28ms max=501.61ms count=2
+07-01 15:58:42.299   428  1143 D audioserver: logFgsApiBegin: FGS Logger Transaction failed, -129
+07-01 15:58:42.300   575  2147 W AS.PlaybackActivityMon: No piid assigned for invalid/internal port id 15
+07-01 15:58:42.335 11171 11207 D EGL_emulation: app_time_stats: avg=500.18ms min=499.25ms max=501.11ms count=2
+07-01 15:58:42.349   428   553 D AudioFlinger: mixer(0x7be3607318e0) throttle end: throttle time(33)
+07-01 15:58:42.405  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1986 onStartInput(EditorInfo{EditorInfo{packageName=dev.jczhang.lyntty.dev, inputType=2c001, inputTypeString=Normal, enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=40000006, privateImeOptions=null, actionName=DONE, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=3000, label=null, fieldId=288, fieldName=null, extras=Bundle[mParcelledData.dataSize=404], hintText=non-empty, hintLocales=[]}}, true)
+07-01 15:58:42.406  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 1, locked = false
+07-01 15:58:42.406  1275  1275 W SessionManager: SessionManager.beginSession():53 Try to begin an already begun session [INPUT_SESSION], end it first
+07-01 15:58:42.406  1275  1275 W SessionManager: SessionManager.endSession():96 Child session [INPUT_VIEW_SESSION] is not ended while ending session [{IME_SESSION=1782892701765, TRAINING_CACHE_SESSION=1782892701766, INPUT_SESSION=1782892701758, INPUT_VIEW_SESSION=1782892701762}], ending it now.
+07-01 15:58:42.406  1275  1275 W SessionManager: SessionManager.endSession():96 Child session [IME_SESSION] is not ended while ending session [{IME_SESSION=1782892701765, TRAINING_CACHE_SESSION=1782892701766, INPUT_SESSION=1782892701758, INPUT_VIEW_SESSION=1782892701762}], ending it now.
+07-01 15:58:42.407  1275  1275 I AndroidIME: InputBundleManager.loadActiveInputBundleId():450 loadActiveInputBundleId: en-US, ime_english_united_states
+07-01 15:58:42.409   575  1790 W PackageConfigPersister: App-specific configuration not found for packageName: dev.jczhang.lyntty.dev and userId: 0
+07-01 15:58:42.409  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.onStartInputView():2098 onStartInputView(EditorInfo{EditorInfo{packageName=dev.jczhang.lyntty.dev, inputType=2c001, inputTypeString=Normal, enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=40000006, privateImeOptions=null, actionName=DONE, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=3000, label=null, fieldId=288, fieldName=null, extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=11, androidx.core.view.inputmethod.EditorInfoCompat.STYLUS_HANDWRITING_ENABLED=true, android.support.text.emoji.emojiCompat_replaceAll=false}], hintText=non-empty, hintLocales=[]}}, true)
+07-01 15:58:42.410  1275  1275 I InputBundle: InputBundle.consumeEvent():884 Skip consuming an event as keyboard status is 0
+07-01 15:58:42.410  1275  1275 I VoiceInputHandler: VoiceInputHandler.onDeactivateIme():115 unregistering TalkbackStateListener
+07-01 15:58:42.410  1275  1275 I VoiceInputManagerWrapper: VoiceInputManagerWrapper.shutdown():124 shutdown()
+07-01 15:58:42.411  1275  1275 I AndroidIME: AbstractIme.onDeactivate():202 LatinIme.onDeactivate()
+07-01 15:58:42.411  1275  1275 W SessionManager: SessionManager.endSession():88 Try to end a not begun session [IME_SESSION].
+07-01 15:58:42.411  1275  1494 W ModuleManager: ModuleManager.loadModule():473 Module mgc is not available
+07-01 15:58:42.412  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.updateDeviceLockedStatus():2248 repeatCheckTimes = 1, locked = false
+07-01 15:58:42.420  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.getOemKeyboardHeightRatio():206 systemKeyboardHeightRatio:1.000000.
+07-01 15:58:42.421  1275  1275 I AndroidIME: AbstractIme.onActivate():89 LatinIme.onActivate() : EditorInfo = EditorInfo{packageName=dev.jczhang.lyntty.dev, inputType=2c001, inputTypeString=Normal, enableLearning=true, autoCorrection=true, autoComplete=true, imeOptions=40000006, privateImeOptions=null, actionName=DONE, actionLabel=null, initialSelStart=0, initialSelEnd=0, initialCapsMode=3000, label=null, fieldId=288, fieldName=null, extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=11, androidx.core.view.inputmethod.EditorInfoCompat.STYLUS_HANDWRITING_ENABLED=true, android.support.text.emoji.emojiCompat_replaceAll=false}], hintText=non-empty, hintLocales=[]}, IncognitoMode = false, DeviceLocked = false
+07-01 15:58:42.421  1275  1275 I Delight5Facilitator: Delight5Facilitator.initializeForIme():747 initializeForIme() : Locale = [en_US], layout = qwerty
+07-01 15:58:42.422  1275  1275 I VoiceInputHandler: VoiceInputHandler.onActivateIme():99 registering TalkbackStateListener
+07-01 15:58:42.422  1275  1275 I VoiceInputManagerWrapper: VoiceInputManagerWrapper.cancelShutdown():102 cancelShutdown()
+07-01 15:58:42.422  1275  1275 I VoiceInputManagerWrapper: VoiceInputManagerWrapper.syncLanguagePacks():114 syncLanguagePacks()
+07-01 15:58:42.422  1275  9188 I SpeechFactory: SpeechRecognitionFactory.maybeScheduleAutoPackDownloadForFallback():200 maybeScheduleAutoPackDownloadForFallback()
+07-01 15:58:42.422  1275  9188 I FallbackOnDeviceRecognitionProvider: FallbackOnDeviceRecognitionProvider.maybeScheduleAutoPackDownload():197 maybeScheduleAutoPackDownload() for language tag en-US
+07-01 15:58:42.423  1275  1275 I LatinIme: LatinIme.updateEnableInlineSuggestionsOnDecoderSideFlags():1174 inline flag updated to:false
+07-01 15:58:42.425  1275  1275 I InputBundle: InputBundle.consumeEvent():884 Skip consuming an event as keyboard status is 0
+07-01 15:58:42.426  1275  1275 I KeyboardWrapper: KeyboardWrapper.activateKeyboard():575 activateKeyboard(): type=prime, status=0, imeDef=ktt{stringId=ime_english_united_states, language=en-US, languageTag=en-US, processedConditions={enable_number_row=false, device=phone}, className=com.google.android.apps.inputmethod.libs.latin5.LatinIme, label=0, keyEventInterpreter=null, inlineComposing=true, autoCapital=true, announceAutoSelectedCandidate=true, statusIcon=0, primeKeyboardType=SOFT, indicatorIcon=0, indicatorLabel=US, displayAppCompletions=true, extraValues=ktl{}, processors=kvl@aa6f31, unacceptableMetaKeys=4098, languageSpecificSettings=0, asciiCapable=true, alwaysShowSuggestions=false, useAsciiPasswordKeyboard=false, secondaryIme=null, keyboardGroupDef=kut@438dd3f, phenotypeFlagId=0, localizationLanguageTag=null, supportsInlineSuggestion=true, supportsAccessPoints=true}
+07-01 15:58:42.426  1275  1275 I KeyboardManager: KeyboardManager.requestKeyboard():234 Creating keyboard prime, imeId=ime_english_united_states, cacheKey=theme_border_stylesheet_noshadow_gsans_pillkey_silkpopup_hover_light_phone_navredesign
+07-01 15:58:42.426  1275  1275 I KeyboardWrapper: KeyboardWrapper.onKeyboardReady():239 onKeyboardReady(): type=prime(prime), kb=com.google.android.apps.inputmethod.latin.keyboard.LatinPrimeKeyboard@424bb55
+07-01 15:58:42.426  1275  1275 I KeyboardWrapper: KeyboardWrapper.doActivateKeyboard():606 doActivateKeyboard(): prime
+07-01 15:58:42.428  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():45 leave 281 height for app when ime window height:1731, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1334
+07-01 15:58:42.431  1275  1275 W Keyboard: Keyboard.getKeyboardViewHelper():574 null helper is returned: keyboardDef=kuo{processedConditions={enable_more_candidates_view_for_multilingual=false, enable_secondary_symbols=false, variant=qwerty, language=en-US, device=phone, expressions=normal, keyboard_mode=normal, show_secondary_digits=true, enable_preemptive_decode=true, rtl_layout=false}, globalConditions={global_theme_key=theme_border_stylesheet_noshadow_gsans_pillkey_silkpopup_hover_light_phone_navredesign, global_locale=en_US, global_density_dpi=420, global_orientation=1}, className=.latin.keyboard.LatinPrimeKeyboard, resourceIds=[#0x7f170663, #0x7f1708e0], initialStates=0, keyboardViewDefs=[kvb{direction=null, id=#0x7f0b014d, isScalable=true, layoutId=#0x7f0e039d, type=BODY, touchable=true, defaultShow=true}, kvb{direction=null, id=#0x7f0b014d, isScalable=false, layoutId=#0x7f0e01aa, type=FLOATING_CANDIDATES, touchable=false, defaultShow=false}, kvb{direction=LOCALE, id=#0x7f0b014d, isScalable=false, layoutId=#0x7f0e0591, type=HEADER, touchable=true, defaultShow=true}], persistentStates=0, persistentStatesPrefKey=null, popupBubbleLayoutId=#0x7f0e068d, recentKeyLayoutId=0, recentKeyPopupLayoutId=0, recentKeyType=null, rememberRecentKey=NONE, sessionStates=17592186044419}, type=WIDGET, helpersCreated=[kib@44d2903, kib@2ab9080, kib@c13b6b9, null], context.getResources().getConfiguration(): {1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h731dp 420dpi nrml long port finger qwerty/v/v -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.8 fontWeightAdjustment=0}
+07-01 15:58:42.431  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():45 leave 281 height for app when ime window height:1731, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1334
+07-01 15:58:42.433  1275  1275 I GoogleInputMethodService: GoogleInputMethodService.startInputIfInputViewStarted():3728 startInputIfInputViewStarted(): default prime
+07-01 15:58:42.433  1275  1275 I KeyboardModeManager: KeyboardModeManager.setInputViewKeyboardViewHolderProvider():625 setInputView() : supportsOneHandedMode=true supportsSplitMode=true
+07-01 15:58:42.433  1275  1275 I NormalModeController: NormalModeController.getKeyboardBodyViewHolderPaddingBottom():104 currentPrimeKeyboardType:SOFT systemPaddingBottom:-1
+07-01 15:58:42.433  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():45 leave 281 height for app when ime window height:1731, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1334
+07-01 15:58:42.433  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():45 leave 281 height for app when ime window height:1731, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1334
+07-01 15:58:42.433  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():45 leave 281 height for app when ime window height:1731, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1334
+07-01 15:58:42.433  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():45 leave 281 height for app when ime window height:1731, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1334
+07-01 15:58:42.433  1275  1275 I NormalModeController: NormalModeController.getKeyboardBodyViewHolderPaddingBottom():104 currentPrimeKeyboardType:SOFT systemPaddingBottom:-1
+07-01 15:58:42.434  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():45 leave 281 height for app when ime window height:1731, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1334
+07-01 15:58:42.434  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():45 leave 281 height for app when ime window height:1731, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1334
+07-01 15:58:42.434  1275  1275 I KeyboardModeManager: KeyboardModeManager.setInputViewKeyboardViewHolderProvider():613 setInputView() : supportsOneHandedMode=true, supportSplitMode=true
+07-01 15:58:42.444  1275  1275 I CrowdsourceExtension: CrowdsourceExtension.checkIfDefaultBrowserIsAllowed():110 Failed to get default browser. The default browser may be deactived.
+07-01 15:58:42.445  1275  1275 I AccessoryInputModeManager: AccessoryInputModeManager.onModeStarted():308 Accessory input mode started: null
+07-01 15:58:42.445  1275  1275 W SupplementaryKeyboardsWrapper: SupplementaryKeyboardsWrapper.deactivateKeyboard():159 keyboard accessory_candidates_consumer is not activated before!
+07-01 15:58:42.447  1275  1275 I VoiceImeExtension: VoiceImeExtension.shouldStartVoiceInputAutomaticallyInCurrentInputBox():415 No private IME option set to start voice input.
+07-01 15:58:42.447  1275  1275 I ShortcutsDataManager: AbstractContentDataManager.startImportContentTask():240 startImportContentTask()
+07-01 15:58:42.449  1275  1275 I KeyboardHeightUtil: KeyboardHeightUtil.calculateMaxKeyboardBodyHeight():45 leave 281 height for app when ime window height:1731, header height:116 and isFullscreenMode:false, so the max keyboard body height is:1334
+07-01 15:58:42.449  1275  1275 I WindowMetricsNotification: WindowMetricsNotification.notifyWithWindow():113 
+07-01 15:58:42.449  1275  1275 I WindowMetricsNotification: WindowMetricsNotification.notify():106 WindowMetricsNotification{bounds=Rect(0, 63 - 1080, 1920), insets=Rect(0, 0 - 0, 126), densityDpi=420, smallestScreenWidthDp=411, displayWidth=1080, displayHeight=1920, xdpi=420.0, ydpi=420.0}; DisplayMetrics{density=2.625, width=1080, height=1920, scaledDensity=2.625, xdpi=420.0, ydpi=420.0}
+07-01 15:58:42.458  1275  1275 I GoogleInputMethodService: GoogleInputMethodService$1.onKeyboardViewShown():494 onKeyboardViewShown: keyboardType=prime, keyboardViewType=HEADER keyboardView=com.google.android.libraries.inputmethod.widgets.SoftKeyboardView{c5d1d91 V.E...... ........ 0,0-1080,116}
+07-01 15:58:42.458  1275  1275 I GoogleInputMethodService: GoogleInputMethodService$1.onKeyboardViewShown():494 onKeyboardViewShown: keyboardType=prime, keyboardViewType=BODY keyboardView=com.google.android.libraries.inputmethod.widgets.SoftKeyboardView{298403e V.E...... ........ 0,0-1080,630}
+07-01 15:58:42.458  1275  1275 I NewLanguagePromptExtension: NewLanguagePromptExtension$1.onKeyboardViewShown():104 Not show new language banner: no change in enabled input method entries
+07-01 15:58:42.459  1275  1275 I WindowMetricsNotification: WindowMetricsNotification.notifyWithWindow():113 
+07-01 15:58:42.459  1275  1275 I WindowMetricsNotification: WindowMetricsNotification.notify():106 WindowMetricsNotification{bounds=Rect(0, 63 - 1080, 1920), insets=Rect(0, 0 - 0, 126), densityDpi=420, smallestScreenWidthDp=411, displayWidth=1080, displayHeight=1920, xdpi=420.0, ydpi=420.0}; DisplayMetrics{density=2.625, width=1080, height=1920, scaledDensity=2.625, xdpi=420.0, ydpi=420.0}
+07-01 15:58:42.459  1275  1275 I WindowMetricsNotification: WindowMetricsNotification.notifyWithWindow():113 
+07-01 15:58:42.459  1275  1275 I WindowMetricsNotification: WindowMetricsNotification.notify():106 WindowMetricsNotification{bounds=Rect(0, 63 - 1080, 1920), insets=Rect(0, 0 - 0, 126), densityDpi=420, smallestScreenWidthDp=411, displayWidth=1080, displayHeight=1920, xdpi=420.0, ydpi=420.0}; DisplayMetrics{density=2.625, width=1080, height=1920, scaledDensity=2.625, xdpi=420.0, ydpi=420.0}
+07-01 15:58:42.459  1275  1275 I NormalModeController: NormalModeController.getKeyboardBodyViewHolderPaddingBottom():104 currentPrimeKeyboardType:SOFT systemPaddingBottom:-1
+07-01 15:58:42.460   428   553 D audioserver: logFgsApiEnd: FGS Logger Transaction failed, -129
+07-01 15:58:42.460  8435  8435 D BoundBrokerSvc: onBind: Intent { act=com.google.firebase.dynamiclinks.service.START pkg=com.google.android.gms }
+07-01 15:58:42.460  8435  8435 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.firebase.dynamiclinks.service.START pkg=com.google.android.gms }
+07-01 15:58:42.463  1275  1275 I WindowMetricsNotification: WindowMetricsNotification.notifyWithWindow():113 
+07-01 15:58:42.464  1275  1618 I Delight5Decoder: Delight5DecoderWrapper.setKeyboardLayout():511 setKeyboardLayout()
+07-01 15:58:42.465  1275  1275 I WindowMetricsNotification: WindowMetricsNotification.notify():106 WindowMetricsNotification{bounds=Rect(0, 63 - 1080, 1920), insets=Rect(0, 0 - 0, 126), densityDpi=420, smallestScreenWidthDp=411, displayWidth=1080, displayHeight=1920, xdpi=420.0, ydpi=420.0}; DisplayMetrics{density=2.625, width=1080, height=1920, scaledDensity=2.625, xdpi=420.0, ydpi=420.0}
+07-01 15:58:42.466  1275  1651 I ShortcutsDataManager: AbstractContentDataManager$ImportContentTask.doInBackground():255 doInBackground()
+07-01 15:58:42.466  1275  1651 I PersonalDictionaryDataHandler: PersonalDictionaryDataHandler.beginProcess():114 LanguageTags = [en-US]
+07-01 15:58:42.468  1275  1704 D EGL_emulation: app_time_stats: avg=1085.27ms min=4.51ms max=19180.40ms count=18
+07-01 15:58:42.473   575  1790 D ActivityManager: sync unfroze 1204 android.process.acore for 7
+07-01 15:58:42.490  1275  1651 I ShortcutsDataManager: AbstractContentDataManager.importRecords():345 importRecords() : Success : Count = 0
+07-01 15:58:42.493  1275  1651 I ShortcutsDataManager: AbstractContentDataManager.importContentData():295 importContentData() : Ending import process
+07-01 15:58:42.493  1275  1618 I Delight5Decoder: Delight5DecoderWrapper.unloadLanguageModel():943 unloadLanguageModel() : 4, version [n/a]
+07-01 15:58:42.499   379   461 I netd    : tetherGetStats() -> {[]} <0.26ms>
+07-01 15:58:42.504  1275  1651 I PersonalLanguageModelUpdater: PersonalLanguageModelUpdater$UpdateOperation.performInternal():165 run() : Added 0 words and 0 shortcuts
+07-01 15:58:42.504  1275  1651 I DynamicLanguageModelOperation: DynamicLanguageModelOperation.perform():43 perform() : 4 : dxm : Completed
+07-01 15:58:42.504  1275  1275 I ShortcutsDataManager: AbstractContentDataManager$ImportContentTask.onPostExecute():266 onPostExecute() : Result = [2,0]
+07-01 15:58:42.504  1275  1275 I ShortcutsDataManager: ShortcutsDataManager.onImportFinished():82 onImportFinished() : Result = 2 : Count = 0
+07-01 15:58:42.504  1275  1618 I Delight5Decoder: Delight5DecoderWrapper.loadLanguageModel():730 loadLanguageModel() : 4, version [n/a]
+07-01 15:58:42.505  1275  1618 I Delight5Decoder: Delight5DecoderWrapper.loadLanguageModel():771 Loaded dynamic LM 4.en
+07-01 15:58:43.339 11171 11207 D EGL_emulation: app_time_stats: avg=13.03ms min=5.26ms max=72.05ms count=56
+07-01 15:58:44.355 11171 11207 D EGL_emulation: app_time_stats: avg=7.75ms min=5.72ms max=12.69ms count=61
+07-01 15:58:45.338   383  9009 D android.hardware.audio@7.1-impl.ranchu: threadLoop: entering standby, frames: 2981120
+07-01 15:58:45.359 11171 11207 D EGL_emulation: app_time_stats: avg=12.68ms min=4.91ms max=53.81ms count=57
+07-01 15:58:46.371 11171 11207 D EGL_emulation: app_time_stats: avg=14.30ms min=6.12ms max=25.81ms count=60
+07-01 15:58:47.373 11171 11207 D EGL_emulation: app_time_stats: avg=16.80ms min=5.39ms max=62.53ms count=54
+07-01 15:58:47.550   948   948 D TelephonyManager: requestModemActivityInfo: Sending result to app: ModemActivityInfo{ mTimestamp=59097669 mSleepTimeMs=0 mIdleTimeMs=59097109 mActivityStatsTechSpecificInfo=[{mRat=UNKNOWN,mFrequencyRange=UNKNOWN,mTxTimeMs[]=[0, 0, 0, 0, 0],mRxTimeMs=0}]}
+07-01 15:58:48.434 11171 11207 D EGL_emulation: app_time_stats: avg=52.19ms min=8.52ms max=395.36ms count=20
+07-01 15:58:48.513   379   461 I netd    : tetherGetStats() -> {[]} <0.62ms>
+07-01 15:58:49.436 11171 11207 D EGL_emulation: app_time_stats: avg=500.90ms min=500.53ms max=501.27ms count=2
+07-01 15:58:50.439 11171 11207 D EGL_emulation: app_time_stats: avg=501.65ms min=500.31ms max=503.00ms count=2
+07-01 15:58:51.933 11171 11207 D EGL_emulation: app_time_stats: avg=497.95ms min=494.96ms max=501.90ms count=3
+07-01 15:58:52.934 11171 11207 D EGL_emulation: app_time_stats: avg=500.20ms min=499.18ms max=501.21ms count=2
+07-01 15:58:53.934 11171 11207 D EGL_emulation: app_time_stats: avg=499.99ms min=499.46ms max=500.52ms count=2
+--------- beginning of kernel
+07-01 15:58:55.314     0     0 W healthd : battery l=100 v=5000 t=25.0 h=2 st=2 c=900000 fc=3000000 cc=10 chg=a
+07-01 15:58:55.434 11171 11207 D EGL_emulation: app_time_stats: avg=499.91ms min=499.75ms max=500.00ms count=3
+07-01 15:58:56.436 11171 11207 D EGL_emulation: app_time_stats: avg=500.92ms min=499.94ms max=501.91ms count=2
+07-01 15:58:57.437 11171 11207 D EGL_emulation: app_time_stats: avg=500.51ms min=498.70ms max=502.33ms count=2
+07-01 15:58:57.533  8435  8435 D BoundBrokerSvc: onUnbind: Intent { act=com.google.firebase.dynamiclinks.service.START pkg=com.google.android.gms }
+07-01 15:58:57.615   194 12228 I keystore2: system/security/keystore2/watchdog/src/lib.rs:319 - Watchdog thread idle -> terminating. Have a great day.
+07-01 15:58:58.933 11171 11207 D EGL_emulation: app_time_stats: avg=498.74ms min=496.40ms max=500.72ms count=3
+07-01 15:58:59.934 11171 11207 D EGL_emulation: app_time_stats: avg=500.40ms min=499.43ms max=501.37ms count=2
+07-01 15:59:00.001  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:00.001  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:00.001  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:00.001  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:00.001  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:00.001  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:00.001  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:00.001  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:00.001  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:00.001  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:00.002  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:00.002  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:00.002  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 15:59:00.002  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 15:59:00.002  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 15:59:00.002  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:00.002  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:00.002  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:00.002  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 15:59:00.015   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 15:59:00.016   810   916 D EGL_emulation: app_time_stats: avg=22882.17ms min=22882.17ms max=22882.17ms count=1
+07-01 15:59:00.935 11171 11207 D EGL_emulation: app_time_stats: avg=500.56ms min=499.37ms max=501.75ms count=2
+07-01 15:59:02.434 11171 11207 D EGL_emulation: app_time_stats: avg=499.70ms min=498.79ms max=500.86ms count=3
+07-01 15:59:03.434 11171 11207 D EGL_emulation: app_time_stats: avg=500.05ms min=499.17ms max=500.93ms count=2
+07-01 15:59:04.435 11171 11207 D EGL_emulation: app_time_stats: avg=500.12ms min=499.13ms max=501.11ms count=2
+07-01 15:59:05.934 11171 11207 D EGL_emulation: app_time_stats: avg=499.68ms min=499.01ms max=500.11ms count=3
+07-01 15:59:06.071  1381  1578 I BistoHotwordHelper: (REDACTED) getHotwordActive::active query: %s, watch: %s, devices connected: %s
+07-01 15:59:06.935 11171 11207 D EGL_emulation: app_time_stats: avg=500.27ms min=500.20ms max=500.33ms count=2
+07-01 15:59:07.130   810   916 D EGL_emulation: app_time_stats: avg=7113.90ms min=7113.90ms max=7113.90ms count=1
+07-01 15:59:07.582   575   672 D ActivityManager: freezing 8435 com.google.android.gms
+07-01 15:59:07.935 11171 11207 D EGL_emulation: app_time_stats: avg=500.21ms min=499.29ms max=501.13ms count=2
+07-01 15:59:08.284  1021  1697 I ActivityScheduler: nextTriggerTime: 59202042, in 83639ms, detectorType: 39, FULL_TYPE alarmWindowMillis: 80000
+07-01 15:59:08.285  1021  1697 W SystemServiceRegistry: No service published for: wifirtt
+07-01 15:59:09.069   575  2148 D WifiNl80211Manager: Scan result ready event
+07-01 15:59:09.069   575  2148 D WifiNative: Scan result ready event
+07-01 15:59:09.069   489   489 I wificond: Unexpected empty scan result!
+07-01 15:59:09.071   575   713 I HalDevMgr: bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+07-01 15:59:09.074  1021 11968 W GLSUser : [DeviceKeyStore] Cannot load key: Device key file not found.
+07-01 15:59:09.097   575  1790 D ActivityManager: sync unfroze 2684 com.google.android.gms.unstable for 6
+07-01 15:59:09.106   575  1790 W ProcessStats: Tracking association SourceState{644a8e9 com.google.android.gms.persistent/10143 BFgs #14145} whose proc state 4 is better than process ProcessState{b188641 com.google.android.gms.unstable/10143 pkg=com.google.android.gms} proc state 14 (5 skipped)
+07-01 15:59:09.124   379 12240 I resolv  : GetAddrInfoHandler::run: {100 786532 100 983140 10143 0}
+07-01 15:59:09.125  2684  3441 D TrafficStats: tagSocket(121) with statsTag=0x1809, statsUid=-1
+07-01 15:59:09.128   575  1790 D FileUtils: Rounded bytes from 2592718848 to 4000000000
+07-01 15:59:09.130  2684  3441 W libc    : Access denied finding property "persist.adb.tls_server.enable"
+07-01 15:59:09.130  2684  3441 W libc    : Access denied finding property "service.adb.tls.port"
+07-01 15:59:09.128  2684  2684 W binder:2684_8: type=1400 audit(0.0:293): avc:  denied  { read } for  name="u:object_r:system_adbd_prop:s0" dev="tmpfs" ino=318 scontext=u:r:gmscore_app:s0:c512,c768 tcontext=u:object_r:system_adbd_prop:s0 tclass=file permissive=0 app=com.google.android.gms
+07-01 15:59:09.128  2684  2684 W binder:2684_8: type=1400 audit(0.0:294): avc:  denied  { read } for  name="u:object_r:adbd_prop:s0" dev="tmpfs" ino=63 scontext=u:r:gmscore_app:s0:c512,c768 tcontext=u:object_r:adbd_prop:s0 tclass=file permissive=0 app=com.google.android.gms
+07-01 15:59:09.135  1021 11968 W GmsUrlRequestImpl: Content-Type header is overwritten.
+07-01 15:59:09.223   810   810 D ZenModeController: Added callback class com.android.systemui.qs.tiles.DndTile$3
+07-01 15:59:09.225   810   890 D ControlsListingControllerImpl: Subscribing callback, service count: 0
+07-01 15:59:09.226   810   810 D ZenModeController: Removed callback class com.android.systemui.qs.tiles.DndTile$3
+07-01 15:59:09.227   810   890 D ControlsListingControllerImpl: Unsubscribing callback
+07-01 15:59:09.228   810   890 I QuickAccessWalletTile: QAW service is unavailable, recreating the wallet client.
+07-01 15:59:09.386  1021 11968 W GLSUser : [AppCertManager] Exception while requesting key: 
+07-01 15:59:09.386  1021 11968 W GLSUser : java.util.concurrent.ExecutionException: bpcw: Parse Proto Exception with response code 400
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at etvr.s(:com.google.android.gms@242335041@24.23.35 (190800-646585959):21)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at etvr.get(:com.google.android.gms@242335041@24.23.35 (190800-646585959):10)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at yfw.b(:com.google.android.gms@242335041@24.23.35 (190800-646585959):477)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at yfu.a(:com.google.android.gms@242335041@24.23.35 (190800-646585959):70)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at yfq.a(:com.google.android.gms@242335041@24.23.35 (190800-646585959):3)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at yfs.a(:com.google.android.gms@242335041@24.23.35 (190800-646585959):58)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at yfs.b(:com.google.android.gms@242335041@24.23.35 (190800-646585959):21)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at anaw.m(:com.google.android.gms@242335041@24.23.35 (190800-646585959):13)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at anbi.g(:com.google.android.gms@242335041@24.23.35 (190800-646585959):11)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at efkz.b(:com.google.android.gms@242335041@24.23.35 (190800-646585959):39)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at efkr.a(:com.google.android.gms@242335041@24.23.35 (190800-646585959):274)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at ehaz.call(:com.google.android.gms@242335041@24.23.35 (190800-646585959):1026)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at angs.c(:com.google.android.gms@242335041@24.23.35 (190800-646585959):50)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at angs.run(:com.google.android.gms@242335041@24.23.35 (190800-646585959):76)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at anmg.run(:com.google.android.gms@242335041@24.23.35 (190800-646585959):8)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at java.lang.Thread.run(Thread.java:1012)
+07-01 15:59:09.386  1021 11968 W GLSUser : Caused by: bpcw: Parse Proto Exception with response code 400
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at bpdw.b(:com.google.android.gms@242335041@24.23.35 (190800-646585959):80)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at bpgb.e(:com.google.android.gms@242335041@24.23.35 (190800-646585959):17)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at bpgp.onSucceeded(:com.google.android.gms@242335041@24.23.35 (190800-646585959):7)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at m.mw.onSucceeded(:com.google.android.gms.dynamite_cronetdynamite@242335041@24.23.35 (190800-0):3)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at m.lt.run(:com.google.android.gms.dynamite_cronetdynamite@242335041@24.23.35 (190800-0):25)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	... 6 more
+07-01 15:59:09.386  1021 11968 W GLSUser : Caused by: fkhe: Protocol message contained an invalid tag (zero).
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at fkea.k(:com.google.android.gms@242335041@24.23.35 (190800-646585959):39)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at fkid.c(:com.google.android.gms@242335041@24.23.35 (190800-646585959):309)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at fkid.i(:com.google.android.gms@242335041@24.23.35 (190800-646585959):8)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at fkgi.fe(:com.google.android.gms@242335041@24.23.35 (190800-646585959):25)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at fkgc.g(:com.google.android.gms@242335041@24.23.35 (190800-646585959):3)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at fkdw.e(:com.google.android.gms@242335041@24.23.35 (190800-646585959):1)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at fkdw.d(:com.google.android.gms@242335041@24.23.35 (190800-646585959):3)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at fkdw.p(:com.google.android.gms@242335041@24.23.35 (190800-646585959):1)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at bpdw.g(:com.google.android.gms@242335041@24.23.35 (190800-646585959):68)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	at bpdw.b(:com.google.android.gms@242335041@24.23.35 (190800-646585959):11)
+07-01 15:59:09.386  1021 11968 W GLSUser : 	... 10 more
+07-01 15:59:09.386  1021 11968 W GLSUser : [DeviceKeyStore] Cannot load key: Device key file not found.
+07-01 15:59:09.387  1021 12238 D TrafficStats: tagSocket(126) with statsTag=0x34000609, statsUid=10138
+07-01 15:59:09.391  1021 12238 W Conscrypt: Could not set socket write timeout: java.net.SocketException: Socket closed
+07-01 15:59:09.391  1021 12238 W Conscrypt: 	at com.google.android.gms.org.conscrypt.Platform.setSocketWriteTimeout(:com.google.android.gms@242335041@24.23.35 (190800-646585959):204)
+07-01 15:59:09.391  1021 12238 W Conscrypt: 	at com.google.android.gms.org.conscrypt.ConscryptFileDescriptorSocket.setSoWriteTimeout(:com.google.android.gms@242335041@24.23.35 (190800-646585959):4)
+07-01 15:59:09.435 11171 11207 D EGL_emulation: app_time_stats: avg=499.77ms min=498.19ms max=500.98ms count=3
+07-01 15:59:10.126  1021 12238 W Conscrypt: Could not set socket write timeout: java.net.SocketException: Socket closed
+07-01 15:59:10.126  1021 12238 W Conscrypt: 	at com.google.android.gms.org.conscrypt.Platform.setSocketWriteTimeout(:com.google.android.gms@242335041@24.23.35 (190800-646585959):204)
+07-01 15:59:10.126  1021 12238 W Conscrypt: 	at com.google.android.gms.org.conscrypt.ConscryptFileDescriptorSocket.setSoWriteTimeout(:com.google.android.gms@242335041@24.23.35 (190800-646585959):4)
+07-01 15:59:10.435 11171 11207 D EGL_emulation: app_time_stats: avg=500.04ms min=498.41ms max=501.68ms count=2
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: Voilatile gRPC failure INVALID_ARGUMENT: Application credential header not valid. Please fix the client to pass a valid application credential header. [CONTEXT service_id=6 ]
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: gbzz: INVALID_ARGUMENT: Application credential header not valid. Please fix the client to pass a valid application credential header.
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at gbzy.h(:com.google.android.gms@242335041@24.23.35 (190800-646585959):3)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at anbi.u(:com.google.android.gms@242335041@24.23.35 (190800-646585959):29)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at anbi.g(:com.google.android.gms@242335041@24.23.35 (190800-646585959):97)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at efkz.b(:com.google.android.gms@242335041@24.23.35 (190800-646585959):39)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at efkr.a(:com.google.android.gms@242335041@24.23.35 (190800-646585959):274)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at ehaz.call(:com.google.android.gms@242335041@24.23.35 (190800-646585959):1026)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at angs.c(:com.google.android.gms@242335041@24.23.35 (190800-646585959):50)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at angs.run(:com.google.android.gms@242335041@24.23.35 (190800-646585959):76)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at anmg.run(:com.google.android.gms@242335041@24.23.35 (190800-646585959):8)
+07-01 15:59:10.628  1021 11968 W GlsClientGrpc: 	at java.lang.Thread.run(Thread.java:1012)
+07-01 15:59:10.630  1021  1697 W AlarmManager: alarm window unlikely to be respected [CONTEXT service_id=231 ]
+07-01 15:59:10.630  1021  1697 W AlarmManager: java.lang.IllegalArgumentException: alarm "NetworkLocationLocator" has short window length
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at boaw.b(:com.google.android.gms@242335041@24.23.35 (190800-646585959):52)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at ehbk.f(:com.google.android.gms@242335041@24.23.35 (190800-646585959):119)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at egxu.q(:com.google.android.gms@242335041@24.23.35 (190800-646585959):107)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at egxu.e(:com.google.android.gms@242335041@24.23.35 (190800-646585959):27)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at egxq.apply(:com.google.android.gms@242335041@24.23.35 (190800-646585959):19)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at etvw.d(:com.google.android.gms@242335041@24.23.35 (190800-646585959):3)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at etvx.run(:com.google.android.gms@242335041@24.23.35 (190800-646585959):42)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at android.os.Handler.handleCallback(Handler.java:959)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at android.os.Handler.dispatchMessage(Handler.java:100)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at bphk.nR(:com.google.android.gms@242335041@24.23.35 (190800-646585959):1)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at bphk.dispatchMessage(:com.google.android.gms@242335041@24.23.35 (190800-646585959):138)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at android.os.Looper.loopOnce(Looper.java:232)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at android.os.Looper.loop(Looper.java:317)
+07-01 15:59:10.630  1021  1697 W AlarmManager: 	at android.os.HandlerThread.run(HandlerThread.java:85)
+07-01 15:59:10.631  1021  1697 I ActivityScheduler: nextTriggerTime: 59202042, in 81292ms, detectorType: 39, FULL_TYPE alarmWindowMillis: 80000
+07-01 15:59:11.436 11171 11207 D EGL_emulation: app_time_stats: avg=500.47ms min=499.85ms max=501.10ms count=2
+07-01 15:59:12.933 11171 11207 D EGL_emulation: app_time_stats: avg=499.12ms min=498.89ms max=499.27ms count=3
+07-01 15:59:14.435 11171 11207 D EGL_emulation: app_time_stats: avg=500.67ms min=497.14ms max=502.48ms count=3
+07-01 15:59:15.436 11171 11207 D EGL_emulation: app_time_stats: avg=500.31ms min=500.24ms max=500.37ms count=2
+07-01 15:59:16.934 11171 11207 D EGL_emulation: app_time_stats: avg=499.08ms min=497.10ms max=500.75ms count=3
+07-01 15:59:17.934 11171 11207 D EGL_emulation: app_time_stats: avg=500.01ms min=498.02ms max=502.00ms count=2
+07-01 15:59:18.936 11171 11207 D EGL_emulation: app_time_stats: avg=501.12ms min=500.80ms max=501.43ms count=2
+07-01 15:59:20.435 11171 11207 D EGL_emulation: app_time_stats: avg=499.58ms min=498.63ms max=500.27ms count=3
+07-01 15:59:21.934 11171 11207 D EGL_emulation: app_time_stats: avg=499.82ms min=499.09ms max=500.39ms count=3
+07-01 15:59:23.437 11171 11207 D EGL_emulation: app_time_stats: avg=500.73ms min=499.13ms max=502.70ms count=3
+07-01 15:59:24.186   575   672 D ActivityManager: freezing 2684 com.google.android.gms.unstable
+07-01 15:59:24.933 11171 11207 D EGL_emulation: app_time_stats: avg=498.73ms min=497.79ms max=499.76ms count=3
+07-01 15:59:26.435 11171 11207 D EGL_emulation: app_time_stats: avg=500.60ms min=498.80ms max=501.94ms count=3
+07-01 15:59:27.435 11171 11207 D EGL_emulation: app_time_stats: avg=500.21ms min=498.15ms max=502.27ms count=2
+07-01 15:59:28.935 11171 11207 D EGL_emulation: app_time_stats: avg=499.75ms min=499.29ms max=500.55ms count=3
+07-01 15:59:30.435 11171 11207 D EGL_emulation: app_time_stats: avg=500.06ms min=499.39ms max=501.30ms count=3
+07-01 15:59:31.934 11171 11207 D EGL_emulation: app_time_stats: avg=499.46ms min=499.15ms max=500.07ms count=3
+07-01 15:59:32.934 11171 11207 D EGL_emulation: app_time_stats: avg=500.03ms min=499.63ms max=500.43ms count=2
+07-01 15:59:34.434 11171 11207 D EGL_emulation: app_time_stats: avg=500.17ms min=497.31ms max=502.45ms count=3
+07-01 15:59:35.934 11171 11207 D EGL_emulation: app_time_stats: avg=499.78ms min=498.58ms max=500.42ms count=3
+07-01 15:59:36.937 11171 11207 D EGL_emulation: app_time_stats: avg=501.31ms min=499.66ms max=502.96ms count=2
+07-01 15:59:38.434 11171 11207 D EGL_emulation: app_time_stats: avg=499.09ms min=498.05ms max=500.77ms count=3
+07-01 15:59:39.434 11171 11207 D EGL_emulation: app_time_stats: avg=499.99ms min=499.97ms max=500.01ms count=2
+07-01 15:59:40.435 11171 11207 D EGL_emulation: app_time_stats: avg=500.66ms min=500.12ms max=501.19ms count=2
+07-01 15:59:41.933 11171 11207 D EGL_emulation: app_time_stats: avg=499.25ms min=498.71ms max=500.25ms count=3
+07-01 15:59:42.476   575  1790 W BatteryExternalStatsWorker: error reading Bluetooth stats: 11
+07-01 15:59:42.477   575  2147 D TelephonyManager: requestModemActivityInfo: Sending result to app: ModemActivityInfo{ mTimestamp=59152596 mSleepTimeMs=0 mIdleTimeMs=59152035 mActivityStatsTechSpecificInfo=[{mRat=UNKNOWN,mFrequencyRange=UNKNOWN,mTxTimeMs[]=[0, 0, 0, 0, 0],mRxTimeMs=0}]}
+07-01 15:59:42.493   379   461 I netd    : tetherGetStats() -> {[]} <0.27ms>
+07-01 15:59:42.934 11171 11207 D EGL_emulation: app_time_stats: avg=500.55ms min=499.55ms max=501.56ms count=2
+07-01 15:59:43.936 11171 11207 D EGL_emulation: app_time_stats: avg=500.65ms min=499.65ms max=501.65ms count=2
+07-01 15:59:45.434 11171 11207 D EGL_emulation: app_time_stats: avg=499.26ms min=497.57ms max=500.40ms count=3
+07-01 15:59:46.434 11171 11207 D EGL_emulation: app_time_stats: avg=500.13ms min=499.52ms max=500.74ms count=2
+07-01 15:59:47.934 11171 11207 D EGL_emulation: app_time_stats: avg=500.03ms min=498.88ms max=500.98ms count=3
+07-01 15:59:49.434 11171 11207 D EGL_emulation: app_time_stats: avg=499.71ms min=499.10ms max=500.16ms count=3
+07-01 15:59:50.933 11171 11207 D EGL_emulation: app_time_stats: avg=499.84ms min=498.32ms max=501.51ms count=3
+07-01 15:59:51.933 11171 11207 D EGL_emulation: app_time_stats: avg=500.12ms min=499.68ms max=500.56ms count=2
+07-01 15:59:52.376 12245 12245 W BpBinder: Linking to death on android.gui.ISurfaceComposer but there are no threads (yet?) listening to incoming transactions. See ProcessState::startThreadPool and ProcessState::setThreadPoolMaxThreadCount. Generally you should setup the binder threadpool before other initialization steps.
+07-01 15:59:52.376 12245 12245 W ProcessState: Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+07-01 15:59:52.383   170   170 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+07-01 15:59:52.383 12245 12246 I Gralloc4: mapper 4.x is not supported
+07-01 15:59:52.406     0     0 I servicemanager: Caller(pid=12245,uid=2000,sid=u:r:shell:s0) Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest. No alternative instances declared in VINTF.
+07-01 15:59:52.610 12247 12247 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-01 15:59:52.615 12247 12247 I AndroidRuntime: Using default boot image
+07-01 15:59:52.615 12247 12247 I AndroidRuntime: Leaving lock profiling enabled
+07-01 15:59:52.618 12247 12247 I app_process: Core platform API reporting enabled, enforcing=false
+07-01 15:59:52.619 12247 12247 I app_process: Using CollectorTypeCMC GC.
+07-01 15:59:52.692 12247 12247 D nativeloader: InitDefaultPublicLibraries for_preload=1: libandroid.so:libaaudio.so:libamidi.so:libbinder_ndk.so:libc.so:libcamera2ndk.so:libdl.so:libEGL.so:libGLESv1_CM.so:libGLESv2.so:libGLESv3.so:libicu.so:libicui18n.so:libicuuc.so:libjnigraphics.so:liblog.so:libmediandk.so:libm.so:libnativehelper.so:libnativewindow.so:libOpenMAXAL.so:libOpenSLES.so:libRS.so:libstdc++.so:libsync.so:libvulkan.so:libwebviewchromium_plat_support.so:libz.so
+07-01 15:59:52.701 12247 12247 D nativeloader: Load libicu_jni.so using APEX ns com_android_art for caller /apex/com.android.art/javalib/core-oj.jar: ok
+07-01 15:59:52.701 12247 12247 D app_process: u_setTimeZoneFilesDirectory("/apex/com.android.tzdata/etc/tz/versioned/8/icu") succeeded. 
+07-01 15:59:52.701 12247 12247 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt75l.dat
+07-01 15:59:52.702 12247 12247 D nativeloader: Load libjavacore.so using APEX ns com_android_art for caller /apex/com.android.art/javalib/core-oj.jar: ok
+07-01 15:59:52.702 12247 12247 D nativeloader: Load libopenjdk.so using APEX ns com_android_art for caller /apex/com.android.art/javalib/core-oj.jar: ok
+07-01 15:59:52.704 12247 12247 W app_process: Unexpected CPU variant for x86: x86_64.
+07-01 15:59:52.704 12247 12247 W app_process: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, goldmont-without-sha-xsaves, tremont, kabylake, default
+07-01 15:59:52.705 12247 12247 W app_process: ClassLoaderContext shared library size mismatch. Expected=2, found=0 (PCL[]{PCL[/system/framework/android.test.base.jar*724373495]#PCL[/system/framework/android.test.mock.jar*1452759902]} | PCL[])
+07-01 15:59:52.706 12247 12247 W app_process: ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[]{PCL[/system/framework/android.test.runner.jar*2496447986]#PCL[/system/framework/android.test.base.jar*724373495]} | PCL[/system/framework/android.test.runner.jar*2496447986])
+07-01 15:59:52.724 12247 12247 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+07-01 15:59:52.724 12247 12247 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+07-01 15:59:52.726 12247 12247 D UiAutomationConnection: Created on user UserHandle{0}
+07-01 15:59:52.726 12247 12247 I UiAutomation: Initialized for user 0 on display 0
+07-01 15:59:52.726 12247 12247 W UiAutomation: Created with deprecatead constructor, assumes DEFAULT_DISPLAY
+07-01 15:59:52.727   575  2147 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+07-01 15:59:52.727   575  2147 I UiAutomationManager: Registering UiTestAutomationService (id=com.android.server.accessibility/UiAutomation, flags=0x0) when called by user 0
+07-01 15:59:52.729   575  2147 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+07-01 15:59:52.730  1362  2176 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+07-01 15:59:52.731   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.731  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:52.731  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:52.731  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:52.731  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.731   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.731   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.731  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.731  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:52.731   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.731  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:52.732  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:52.732  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:52.732  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.732 12247 12259 V UiAutomation: Init UiAutomation@d5186a7[id=57, displayId=0, flags=0]
+07-01 15:59:52.732  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.732  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:52.732  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:52.732   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.732   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.732  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:52.732  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:52.732  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.732  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.732   575  1790 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+07-01 15:59:52.732  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:52.732   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.732   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.732  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface media_data_manager with targets# 0 (types=[])
+07-01 15:59:52.732  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 15:59:52.733  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 15:59:52.733  1362  2176 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+07-01 15:59:52.733   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.733  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:52.733  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:52.733  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:52.733  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.733   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.733   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.733   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.733  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.733  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:52.733  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:52.733  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:52.733  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:52.733  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.734  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.734  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:52.734  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:52.734  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:52.734  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:52.734  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.734   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.734   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.734  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:52.734  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:52.734   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.734  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface media_data_manager with targets# 0 (types=[])
+07-01 15:59:52.734  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 15:59:52.734   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.734  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 15:59:52.735   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.735   810   810 D SsMediaDataProvider: Forwarding Smartspace updates []
+07-01 15:59:52.735   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.735   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.735   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:52.735   575   575 D BatterySaverPolicy: accessibility changed to true, updating policy.
+07-01 15:59:52.736  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 15:59:52.736   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 15:59:52.736   810   810 D SsMediaDataProvider: Forwarding Smartspace updates []
+07-01 15:59:52.736   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 15:59:52.736  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:52.736  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:52.737  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:52.737  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 15:59:52.737  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 15:59:52.737  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:52.737  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:52.737  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:52.737  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 15:59:52.934 11171 11207 D EGL_emulation: app_time_stats: avg=500.44ms min=491.72ms max=509.16ms count=2
+07-01 15:59:53.744 12247 12247 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9ca23; boundsInParent: Rect(0, 0 - 1080, 1920); boundsInScreen: Rect(0, 0 - 1080, 1920); boundsInWindow: Rect(0, 0 - 1080, 1920); packageName: dev.jczhang.lyntty.dev; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+07-01 15:59:53.744 12247 12247 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@aba63; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 0 - 1080, 0); boundsInWindow: Rect(0, 0 - 1080, 0); packageName: dev.jczhang.lyntty.dev; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+07-01 15:59:53.744 12247 12247 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@ab6a2; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 0 - 1080, 0); boundsInWindow: Rect(0, 0 - 1080, 0); packageName: dev.jczhang.lyntty.dev; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+07-01 15:59:53.760 12247 12247 I AccessibilityNodeInfoDumper: Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@924f7; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 1920 - 1080, 1920); boundsInWindow: Rect(0, 1920 - 1080, 1920); packageName: dev.jczhang.lyntty.dev; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; granularScrollingSupported: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+07-01 15:59:53.760 12247 12247 W AccessibilityNodeInfoDumper: Fetch time: 20ms
+07-01 15:59:53.761   575  1449 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+07-01 15:59:53.761   575  1449 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+07-01 15:59:53.761   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.761   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.761   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.761   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.762   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.762   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.762   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.762   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.762   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.762   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.762   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.762   575   575 W IPCThreadState: Sending oneway calls to frozen process.
+07-01 15:59:53.762   575   575 D BatterySaverPolicy: accessibility changed to false, updating policy.
+07-01 15:59:53.763  1362  2176 I AiAiEcho: Settings changed for uri: content://settings/secure/accessibility_enabled
+07-01 15:59:53.763  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:53.763  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:53.763  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:53.763  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:53.763  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:53.763  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:53.763 12247 12247 D AndroidRuntime: Shutting down VM
+07-01 15:59:53.763  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:53.763  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:53.763  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:53.763  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:53.763  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:53.763  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:53.763  1362  1491 I AiAiEcho: Predicting[0]:  [CONTEXT sampling_count=5 ]
+07-01 15:59:53.763  1362  1491 I AiAiEcho: EchoTargets: 
+07-01 15:59:53.763  1362  1491 I AiAiEcho: Filtered by AiAi flag check: 
+07-01 15:59:53.763  1362  1491 I AiAiEcho: [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:53.763  1362  1491 I AiAiEcho: Ranked targets strategy: SORT, count: 0, ranking metadata:  [CONTEXT ratelimit_period="10 SECONDS" ]
+07-01 15:59:53.763  1362  1491 I AiAiEcho: #remoteViewsTwiddler: feature disabled.
+07-01 15:59:53.763  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface media_data_manager with targets# 0 (types=[])
+07-01 15:59:53.763  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+07-01 15:59:53.763  1362  1491 I AiAiEcho: #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+07-01 15:59:53.764   810   810 D SsMediaDataProvider: Forwarding Smartspace updates []
+07-01 15:59:53.764   810   810 W PageIndicator: Total number of pages invalid: 0. Assuming 1 page.
+07-01 15:59:53.764  1267  1267 D SsBaseTemplateCard: No text view can be set up
+07-01 15:59:53.764  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:53.764  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:53.764  1267  1267 D SsBaseTemplateCard: Passed-in item info is null
+07-01 15:59:53.764  1267  1267 I SsBaseTemplateCard: Secondary card pane is null
+07-01 15:59:54.435 11171 11207 D EGL_emulation: app_time_stats: avg=500.13ms min=498.63ms max=501.23ms count=3

@@ -1,4 +1,5 @@
 import { backoff } from "@/utils/time";
+import { isAuthInvalidationError, requestAuthInvalidation } from "@/auth/authInvalidation";
 
 export class InvalidateSync {
     private _invalidated = false;
@@ -62,12 +63,21 @@ export class InvalidateSync {
 
 
     private _doSync = async () => {
-        await backoff(async () => {
-            if (this._stopped) {
+        try {
+            await backoff(async () => {
+                if (this._stopped) {
+                    return;
+                }
+                await this._command();
+            });
+        } catch (error) {
+            if (isAuthInvalidationError(error)) {
+                requestAuthInvalidation(error instanceof Error ? error.message : 'authentication failed');
+                this.stop();
                 return;
             }
-            await this._command();
-        });
+            throw error;
+        }
         if (this._stopped) {
             this._notifyPendings();
             return;
@@ -145,12 +155,21 @@ export class ValueSync<T> {
             const value = this._latestValue!;
             this._hasValue = false;
 
-            await backoff(async () => {
-                if (this._stopped) {
+            try {
+                await backoff(async () => {
+                    if (this._stopped) {
+                        return;
+                    }
+                    await this._command(value);
+                });
+            } catch (error) {
+                if (isAuthInvalidationError(error)) {
+                    requestAuthInvalidation(error instanceof Error ? error.message : 'authentication failed');
+                    this.stop();
                     return;
                 }
-                await this._command(value);
-            });
+                throw error;
+            }
 
             if (this._stopped) {
                 this._notifyPendings();

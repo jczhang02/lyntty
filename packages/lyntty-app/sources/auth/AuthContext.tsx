@@ -6,6 +6,7 @@ import { clearPersistence, loadRegisteredPushToken } from '@/sync/persistence';
 import { unregisterPushToken } from '@/sync/apiPush';
 import { Platform } from 'react-native';
 import { trackLogout } from '@/track';
+import { subscribeAuthInvalidation } from '@/auth/authInvalidation';
 
 interface AuthContextType {
     isAuthenticated: boolean;
@@ -20,10 +21,23 @@ export function AuthProvider({ children, initialCredentials }: { children: React
     const [isAuthenticated, setIsAuthenticated] = useState(!!initialCredentials);
     const [credentials, setCredentials] = useState<AuthCredentials | null>(initialCredentials);
 
+    const clearLocalAuth = async () => {
+        clearPersistence();
+        await TokenStorage.removeCredentials();
+        setCredentials(null);
+        setIsAuthenticated(false);
+    };
+
     // Update global auth state when local state changes
     useEffect(() => {
         setCurrentAuth(credentials ? { isAuthenticated, credentials, login, logout } : null);
     }, [isAuthenticated, credentials]);
+
+    useEffect(() => {
+        return subscribeAuthInvalidation(async () => {
+            await clearLocalAuth();
+        });
+    }, []);
 
     const login = async (token: string, secret: string) => {
         const newCredentials: AuthCredentials = { token, secret };
@@ -47,12 +61,7 @@ export function AuthProvider({ children, initialCredentials }: { children: React
                 console.log('Failed to unregister push token during logout:', error);
             }
         }
-        clearPersistence();
-        await TokenStorage.removeCredentials();
-
-        // Update React state to ensure UI consistency
-        setCredentials(null);
-        setIsAuthenticated(false);
+        await clearLocalAuth();
 
         if (Platform.OS === 'web') {
             window.location.reload();

@@ -1,0 +1,7 @@
+Starting: Intent { cmp=dev.jczhang.lyntty.dev/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: dev.jczhang.lyntty.dev/expo.modules.devlauncher.launcher.DevLauncherActivity
+TotalTime: 2075
+WaitTime: 2077
+Complete

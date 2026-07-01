@@ -27,3 +27,4 @@
 {"id":"int-58b5ecff","kind":"field_change","created_at":"2026-07-01T06:46:24.895392062Z","actor":"JC Zhang","issue_id":"lyntty-cjn","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}
 {"id":"int-948fc363","kind":"field_change","created_at":"2026-07-01T06:46:24.895470379Z","actor":"JC Zhang","issue_id":"lyntty-cjn","extra":{"field":"assignee","new_value":"JC Zhang","old_value":""}}
 {"id":"int-586d6b2b","kind":"field_change","created_at":"2026-07-01T07:28:53.445049526Z","actor":"JC Zhang","issue_id":"lyntty-cjn","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Human-style APK E2E completed; issues fixed; evidence recorded"}}
+{"id":"int-8db0bfc6","kind":"field_change","created_at":"2026-07-01T08:05:35.050783385Z","actor":"JC Zhang","issue_id":"lyntty-1io","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Continued APK E2E done; stale-token bug fixed; evidence recorded"}}

@@ -25,6 +25,12 @@ export function createBackoff(
             try {
                 return await callback();
             } catch (e) {
+                if (e instanceof Error && /(:\s*401\b|\b401\b|Invalid token|Unauthorized)/i.test(e.message)) {
+                    if (opts && opts.onError) {
+                        opts.onError(e, currentFailureCount);
+                    }
+                    throw e;
+                }
                 if (currentFailureCount < maxFailureCount) {
                     currentFailureCount++;
                 }
