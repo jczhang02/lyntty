@@ -7,6 +7,8 @@ import { allocateUserSeq } from "@/storage/seq";
 import { log } from "@/utils/log";
 import * as privacyKit from "privacy-kit";
 
+const MAX_ARTIFACT_BASE64_FIELD_LENGTH = 5_000_000;
+
 export function artifactsRoutes(app: Fastify) {
     // GET /v1/artifacts - List all artifacts for the account
     app.get('/v1/artifacts', {
@@ -127,9 +129,9 @@ export function artifactsRoutes(app: Fastify) {
         schema: {
             body: z.object({
                 id: z.string().uuid(),
-                header: z.string(),
-                body: z.string(),
-                dataEncryptionKey: z.string()
+                header: z.string().min(1).max(MAX_ARTIFACT_BASE64_FIELD_LENGTH),
+                body: z.string().min(1).max(MAX_ARTIFACT_BASE64_FIELD_LENGTH),
+                dataEncryptionKey: z.string().min(1).max(MAX_ARTIFACT_BASE64_FIELD_LENGTH)
             }),
             response: {
                 200: z.object({
@@ -144,7 +146,10 @@ export function artifactsRoutes(app: Fastify) {
                     updatedAt: z.number()
                 }),
                 409: z.object({
-                    error: z.literal('Artifact with this ID already exists for another account')
+                    error: z.union([
+                        z.literal('Artifact with this ID already exists for another account'),
+                        z.literal('Artifact with this ID already exists with different content')
+                    ])
                 }),
                 500: z.object({
                     error: z.literal('Failed to create artifact')
@@ -156,6 +161,9 @@ export function artifactsRoutes(app: Fastify) {
         const { id, header, body, dataEncryptionKey } = request.body;
 
         try {
+            const decodedHeader = privacyKit.decodeBase64(header);
+            const decodedBody = privacyKit.decodeBase64(body);
+            const decodedDataEncryptionKey = privacyKit.decodeBase64(dataEncryptionKey);
             // Check if artifact exists
             const existingArtifact = await db.artifact.findUnique({
                 where: { id }
@@ -169,7 +177,16 @@ export function artifactsRoutes(app: Fastify) {
                     });
                 }
 
-                // If exists for same account, return existing (idempotent)
+                const samePayload = Buffer.compare(existingArtifact.header, decodedHeader) === 0 &&
+                    Buffer.compare(existingArtifact.body, decodedBody) === 0 &&
+                    Buffer.compare(existingArtifact.dataEncryptionKey, decodedDataEncryptionKey) === 0;
+                if (!samePayload) {
+                    return reply.code(409).send({
+                        error: 'Artifact with this ID already exists with different content'
+                    });
+                }
+
+                // If exists for same account with identical content, return existing (idempotent)
                 log({ module: 'api', artifactId: id, userId }, 'Found existing artifact');
                 return reply.send({
                     id: existingArtifact.id,
@@ -190,11 +207,11 @@ export function artifactsRoutes(app: Fastify) {
                 data: {
                     id,
                     accountId: userId,
-                    header: privacyKit.decodeBase64(header),
+                    header: decodedHeader,
                     headerVersion: 1,
-                    body: privacyKit.decodeBase64(body),
+                    body: decodedBody,
                     bodyVersion: 1,
-                    dataEncryptionKey: privacyKit.decodeBase64(dataEncryptionKey),
+                    dataEncryptionKey: decodedDataEncryptionKey,
                     seq: 0
                 }
             });
@@ -233,9 +250,9 @@ export function artifactsRoutes(app: Fastify) {
                 id: z.string()
             }),
             body: z.object({
-                header: z.string().optional(),
+                header: z.string().min(1).max(MAX_ARTIFACT_BASE64_FIELD_LENGTH).optional(),
                 expectedHeaderVersion: z.number().int().min(0).optional(),
-                body: z.string().optional(),
+                body: z.string().min(1).max(MAX_ARTIFACT_BASE64_FIELD_LENGTH).optional(),
                 expectedBodyVersion: z.number().int().min(0).optional()
             }),
             response: {

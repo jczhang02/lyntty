@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canCallRpcMethod, canRegisterRpcMethod } from './rpcHandler';
+import { MAX_RPC_PARAMS_CHARS, MAX_RPC_RESPONSE_CHARS, canCallRpcMethod, canRegisterRpcMethod, isOversizedRpcString } from './rpcHandler';
 
 const machineId = '3f761d9e-5ef6-4b8a-8b13-a20bc0fed470';
 const sessionId = 'cmr21ruo5000rovv87u2os57a';
@@ -29,5 +29,12 @@ describe('RPC scope guards', () => {
     it('prevents machine sockets from issuing RPC calls', () => {
         expect(canCallRpcMethod({ clientType: 'machine-scoped', machineId }, `${sessionId}:bash`)).toBe(false);
         expect(canCallRpcMethod({ clientType: 'machine-scoped', machineId }, `${machineId}:list-pi-sessions`)).toBe(false);
+    });
+
+    it('detects oversized RPC string payloads', () => {
+        expect(isOversizedRpcString('x'.repeat(MAX_RPC_PARAMS_CHARS), MAX_RPC_PARAMS_CHARS)).toBe(false);
+        expect(isOversizedRpcString('x'.repeat(MAX_RPC_PARAMS_CHARS + 1), MAX_RPC_PARAMS_CHARS)).toBe(true);
+        expect(isOversizedRpcString('x'.repeat(MAX_RPC_RESPONSE_CHARS + 1), MAX_RPC_RESPONSE_CHARS)).toBe(true);
+        expect(isOversizedRpcString({ value: 'not-wire-format' }, MAX_RPC_PARAMS_CHARS)).toBe(false);
     });
 });

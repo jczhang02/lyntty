@@ -522,6 +522,26 @@ describe("v3SessionRoutes", () => {
         });
         expect(overLimitBatch.statusCode).toBe(400);
 
+        const oversizedContent = await app.inject({
+            method: "POST",
+            url: "/v3/sessions/session-1/messages",
+            headers: { "x-user-id": "owner-user" },
+            payload: {
+                messages: [{ localId: "l1", content: "x".repeat(1_000_001) }]
+            }
+        });
+        expect(oversizedContent.statusCode).toBe(400);
+
+        const oversizedLocalId = await app.inject({
+            method: "POST",
+            url: "/v3/sessions/session-1/messages",
+            headers: { "x-user-id": "owner-user" },
+            payload: {
+                messages: [{ localId: "l".repeat(241), content: "enc-1" }]
+            }
+        });
+        expect(oversizedLocalId.statusCode).toBe(400);
+
         const unauthorized = await app.inject({
             method: "POST",
             url: "/v3/sessions/session-1/messages",

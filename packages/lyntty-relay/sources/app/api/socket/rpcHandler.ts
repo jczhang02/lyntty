@@ -32,6 +32,8 @@ const RPC_PRESENCE_FETCH_TIMEOUT_MS = 500;
 // under load while still catching a daemon mid-reconnect.
 const RPC_RECONNECT_GRACE_MS = 15_000;
 const RPC_RECONNECT_POLL_MS = 200;
+export const MAX_RPC_PARAMS_CHARS = 1_000_000;
+export const MAX_RPC_RESPONSE_CHARS = 2_000_000;
 
 const rpcCallCounter = new Counter({
     name: 'rpc_calls_total',
@@ -62,6 +64,10 @@ const rpcFetchSocketsTimeouts = new Counter({
     labelNames: ['context'] as const,
     registers: [register]
 });
+
+export function isOversizedRpcString(value: unknown, maxChars: number): boolean {
+    return typeof value === 'string' && value.length > maxChars;
+}
 
 function rpcRoom(userId: string, method: string): string {
     return `${RPC_ROOM_PREFIX}${userId}:${method}`;
@@ -265,6 +271,11 @@ export function rpcHandler(userId: string, socket: Socket, io: Server) {
                 callback?.({ ok: false, error: 'RPC method not allowed for this socket scope' });
                 return;
             }
+            if (isOversizedRpcString(params, MAX_RPC_PARAMS_CHARS)) {
+                finish('request_too_large');
+                callback?.({ ok: false, error: 'RPC request too large' });
+                return;
+            }
 
             // 1. Find the daemon socket(s) cross-replica via the adapter.
             // If the room is empty OR fetchSockets fails (peer replica
@@ -330,6 +341,11 @@ export function rpcHandler(userId: string, socket: Socket, io: Server) {
 
             try {
                 const response = await Promise.race([ackPromise, presencePoll]);
+                if (isOversizedRpcString(response, MAX_RPC_RESPONSE_CHARS)) {
+                    finish('response_too_large');
+                    callback?.({ ok: false, error: 'RPC response too large' });
+                    return;
+                }
                 finish('success');
                 callback?.({ ok: true, result: response });
             } catch (error) {

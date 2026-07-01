@@ -24,10 +24,13 @@ const getMessagesQuerySchema = z.object({
     { message: "after_seq and before_seq are mutually exclusive" }
 );
 
+const MAX_ENCRYPTED_MESSAGE_CONTENT_LENGTH = 1_000_000;
+const MAX_MESSAGE_LOCAL_ID_LENGTH = 240;
+
 const sendMessagesBodySchema = z.object({
     messages: z.array(z.object({
-        content: z.string(),
-        localId: z.string().min(1)
+        content: z.string().min(1).max(MAX_ENCRYPTED_MESSAGE_CONTENT_LENGTH),
+        localId: z.string().min(1).max(MAX_MESSAGE_LOCAL_ID_LENGTH)
     })).min(1).max(100)
 });
 

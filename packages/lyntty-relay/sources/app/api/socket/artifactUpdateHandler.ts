@@ -7,6 +7,12 @@ import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
 import * as privacyKit from "privacy-kit";
 
+const MAX_ARTIFACT_BASE64_FIELD_LENGTH = 5_000_000;
+
+export function isOversizedArtifactField(value: string): boolean {
+    return value.length > MAX_ARTIFACT_BASE64_FIELD_LENGTH;
+}
+
 export function artifactUpdateHandler(userId: string, socket: Socket) {
     const labels = getMetricsLabelsFromSocket(socket);
     // Read artifact with full body
@@ -97,7 +103,7 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
             }
 
             // Validate header structure if provided
-            if (header && (typeof header.data !== 'string' || typeof header.expectedVersion !== 'number')) {
+            if (header && (typeof header.data !== 'string' || typeof header.expectedVersion !== 'number' || isOversizedArtifactField(header.data))) {
                 if (callback) {
                     callback({ result: 'error', message: 'Invalid header parameters' });
                 }
@@ -105,7 +111,7 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
             }
 
             // Validate body structure if provided
-            if (body && (typeof body.data !== 'string' || typeof body.expectedVersion !== 'number')) {
+            if (body && (typeof body.data !== 'string' || typeof body.expectedVersion !== 'number' || isOversizedArtifactField(body.data))) {
                 if (callback) {
                     callback({ result: 'error', message: 'Invalid body parameters' });
                 }
@@ -267,12 +273,17 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
             const { id, header, body, dataEncryptionKey } = data;
 
             // Validate input
-            if (!id || typeof header !== 'string' || typeof body !== 'string' || typeof dataEncryptionKey !== 'string') {
+            if (!id || typeof header !== 'string' || typeof body !== 'string' || typeof dataEncryptionKey !== 'string' ||
+                isOversizedArtifactField(header) || isOversizedArtifactField(body) || isOversizedArtifactField(dataEncryptionKey)) {
                 if (callback) {
                     callback({ result: 'error', message: 'Invalid parameters' });
                 }
                 return;
             }
+
+            const decodedHeader = privacyKit.decodeBase64(header);
+            const decodedBody = privacyKit.decodeBase64(body);
+            const decodedDataEncryptionKey = privacyKit.decodeBase64(dataEncryptionKey);
 
             // Check if artifact already exists
             const existingArtifact = await db.artifact.findUnique({
@@ -288,7 +299,15 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
                     return;
                 }
 
-                // If exists for same account, return existing (idempotent)
+                const samePayload = Buffer.compare(existingArtifact.header, decodedHeader) === 0 &&
+                    Buffer.compare(existingArtifact.body, decodedBody) === 0 &&
+                    Buffer.compare(existingArtifact.dataEncryptionKey, decodedDataEncryptionKey) === 0;
+                if (!samePayload) {
+                    callback({ result: 'error', message: 'Artifact with this ID already exists with different content' });
+                    return;
+                }
+
+                // If exists for same account with identical content, return existing (idempotent)
                 callback({
                     result: 'success',
                     artifact: {
@@ -310,11 +329,11 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
                 data: {
                     id,
                     accountId: userId,
-                    header: privacyKit.decodeBase64(header),
+                    header: decodedHeader,
                     headerVersion: 1,
-                    body: privacyKit.decodeBase64(body),
+                    body: decodedBody,
                     bodyVersion: 1,
-                    dataEncryptionKey: privacyKit.decodeBase64(dataEncryptionKey),
+                    dataEncryptionKey: decodedDataEncryptionKey,
                     seq: 0
                 }
             });
