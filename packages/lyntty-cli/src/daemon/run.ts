@@ -29,7 +29,7 @@ import { buildResumeLaunch } from '@/resume/handleResumeCommand';
 import { detectResumeSupport } from '@/resume/localLynttyAgentAuth';
 import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
 import { resolvePiActivationLock } from './activationLock';
-import { discoverLocalPiSessions, redactPiSessionForRelay, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
+import { discoverLocalPiSessions, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -41,6 +41,32 @@ function shellescape(s: string): string {
 // is visually distinct from the stable one in the machine list (they otherwise
 // share the same hostname and look identical).
 const hostSuffix = process.env.LYNTTY_VARIANT === 'dev' ? '-dev' : '';
+
+function expandHomeDirectory(directory: string, homeDir = os.homedir()): string {
+  if (directory === '~') {
+    return homeDir;
+  }
+  if (directory.startsWith('~/')) {
+    return join(homeDir, directory.slice(2));
+  }
+  return directory;
+}
+
+export function choosePiSpawnDirectory(
+  directory: string,
+  sessionId: string | undefined,
+  records: PiSessionRecoveryRecord[],
+  homeDir = os.homedir(),
+): string {
+  if (sessionId) {
+    const matched = records.find((record) => record.piSessionId === sessionId);
+    if (matched?.cwd) {
+      return matched.cwd;
+    }
+  }
+  return expandHomeDirectory(directory, homeDir);
+}
+
 export const initialMachineMetadata: MachineMetadata = {
   host: os.hostname() + hostSuffix,
   platform: os.platform(),
@@ -277,7 +303,18 @@ export async function startDaemon(): Promise<void> {
     const spawnSession = async (options: SpawnSessionOptions): Promise<SpawnSessionResult> => {
       logger.debugLargeJson('[DAEMON RUN] Spawning session', options);
 
-      const { directory, sessionId, machineId, approvedNewDirectoryCreation = true } = options;
+      let { directory, sessionId, machineId, approvedNewDirectoryCreation = true } = options;
+      if (sessionId) {
+        const records = await discoverLocalPiSessions({ scope: 'machine' });
+        const resolvedDirectory = choosePiSpawnDirectory(directory, sessionId, records);
+        if (resolvedDirectory !== directory) {
+          logger.debug(`[DAEMON RUN] Resolved Pi session spawn directory from ${directory} to ${resolvedDirectory}`);
+          directory = resolvedDirectory;
+        }
+      } else {
+        directory = expandHomeDirectory(directory);
+      }
+      const spawnOptions = { ...options, directory };
       let directoryCreated = false;
 
       try {
@@ -324,7 +361,7 @@ export async function startDaemon(): Promise<void> {
       }
 
       try {
-        const activationLock = resolvePiActivationLock(options, getCurrentChildren());
+        const activationLock = resolvePiActivationLock(spawnOptions, getCurrentChildren());
         if (activationLock.type === 'blocked') {
           logger.debug(`[DAEMON RUN] Pi activation lock blocked spawn: ${activationLock.errorMessage}`);
           return {

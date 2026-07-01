@@ -33,20 +33,20 @@ describe('resolveMessageModeMeta', () => {
             permissionMode: null,
             modelMode: null,
             effortLevel: null,
-            metadata: { flavor: 'claude' },
+            metadata: { flavor: 'pi' },
         } as any, {
             agentDefaultOverrides: {
-                claude: {
-                    permissionMode: 'bypassPermissions',
-                    modelMode: 'opus',
+                pi: {
+                    permissionMode: 'default',
+                    modelMode: 'default',
                     effortLevel: 'medium',
                 },
             },
         } as any);
 
         expect(meta).toEqual({
-            permissionMode: 'bypassPermissions',
-            model: 'opus',
+            permissionMode: 'default',
+            model: null,
             effort: 'medium',
         });
     });

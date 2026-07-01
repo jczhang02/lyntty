@@ -97,15 +97,25 @@ describe('mergePiDiscoveredSessions', () => {
         });
     });
 
-    it('updates relay sessions with canonical Pi title and history info', () => {
+    it('updates relay sessions with canonical Pi title and history info without replacing real path', () => {
         const sessions = mergePiDiscoveredSessions([
-            relaySession(),
+            relaySession({
+                metadata: {
+                    path: '/home/jc',
+                    host: 'thinkpad',
+                    machineId: 'machine-1',
+                    flavor: 'pi',
+                    piSessionId: 'pi-registered',
+                    name: 'Old title',
+                },
+            }),
         ], [{
             machine,
             sessions: [piRecord({
                 state: 'registered',
                 piSessionId: 'pi-registered',
                 relaySessionId: 'relay-1',
+                cwd: '~',
                 name: 'Renamed in Pi',
                 messageCount: 99,
                 needsRegistration: false,
@@ -115,6 +125,7 @@ describe('mergePiDiscoveredSessions', () => {
 
         expect(sessions).toHaveLength(1);
         expect(sessions[0].metadata).toMatchObject({
+            path: '/home/jc',
             name: 'Renamed in Pi',
             piSessionId: 'pi-registered',
             piDiscoveryState: 'registered',

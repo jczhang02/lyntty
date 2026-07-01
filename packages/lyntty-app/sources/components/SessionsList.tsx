@@ -337,6 +337,17 @@ const STATUS_CONFIG: Record<SessionState, { color: string; dotColor: string; isP
     permission_required: { color: '#FF9500', dotColor: '#FF9500', isPulsing: true, isConnected: true },
 };
 
+function resolveOptimisticPiPath(source: SessionRowData): string {
+    const path = source.path ?? source.subtitle ?? '';
+    if (path === '~' && source.homeDir) {
+        return source.homeDir;
+    }
+    if (path.startsWith('~/') && source.homeDir) {
+        return `${source.homeDir}/${path.slice(2)}`;
+    }
+    return path;
+}
+
 function applyOptimisticPiSession(source: SessionRowData, sessionId: string) {
     const now = Date.now();
     storage.getState().applySessions([{
@@ -347,7 +358,7 @@ function applyOptimisticPiSession(source: SessionRowData, sessionId: string) {
         active: true,
         activeAt: now,
         metadata: {
-            path: source.path ?? source.subtitle ?? '',
+            path: resolveOptimisticPiPath(source),
             host: source.machineId ?? 'node',
             flavor: 'pi',
             machineId: source.machineId ?? undefined,

@@ -12,9 +12,9 @@ describe('findActiveWord', () => {
 
         it('should detect : emoji at cursor', () => {
             const content = 'I feel :lyntty';
-            const selection = { start: 13, end: 13 };
+            const selection = { start: 14, end: 14 };
             const result = findActiveWord(content, selection);
-            expect(result).toEqual({ word: ':lyntty', activeWord: ':lyntty', offset: 7, length: 6, activeLength: 6, endOffset: 13 });
+            expect(result).toEqual({ word: ':lyntty', activeWord: ':lyntty', offset: 7, length: 7, activeLength: 7, endOffset: 14 });
         });
 
         it('should detect / command at cursor', () => {

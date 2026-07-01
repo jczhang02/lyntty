@@ -1,0 +1,122 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+Starting project at /home/jc/dev/lyntty/packages/lyntty-app
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android packages/lyntty-app/index.ts ▓▓▓▓▓▓▓▓░░░░░░░░ 53.7% ( 838/1181)
+Android packages/lyntty-app/index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84.4% (2664/2899)
+ WARN  Attempted to import the module "/home/jc/dev/lyntty/node_modules/@noble/hashes/crypto.js" which is not listed in the "exports" of "/home/jc/dev/lyntty/node_modules/@noble/hashes" under the requested subpath "./crypto.js". Falling back to file-based resolution. Consider updating the call site or asking the package maintainer(s) to expose this API.
+Android Bundled 10412ms packages/lyntty-app/index.ts (3658 modules)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "15332691680d9975be06d2955c9837b6371af0c7",
+  "buildCommitTimestamp": "2026-07-01T18:38:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 116ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "15332691680d9975be06d2955c9837b6371af0c7",
+  "buildCommitTimestamp": "2026-07-01T18:38:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+ WARN  [Error: Session encryption not ready for cmr21ruo5000rovv87u2os57a]
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 103ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "15332691680d9975be06d2955c9837b6371af0c7",
+  "buildCommitTimestamp": "2026-07-01T18:38:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 114ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "15332691680d9975be06d2955c9837b6371af0c7",
+  "buildCommitTimestamp": "2026-07-01T18:38:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+ WARN  [Error: Session encryption not ready for cmr226xaj000aov3k8c4jc8se]
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 84ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "15332691680d9975be06d2955c9837b6371af0c7",
+  "buildCommitTimestamp": "2026-07-01T18:38:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 90ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "15332691680d9975be06d2955c9837b6371af0c7",
+  "buildCommitTimestamp": "2026-07-01T18:38:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 115ms packages/lyntty-app/index.ts (1 module)
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 90ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "15332691680d9975be06d2955c9837b6371af0c7",
+  "buildCommitTimestamp": "2026-07-01T18:38:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+Android packages/lyntty-app/index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 94ms packages/lyntty-app/index.ts (1 module)
+ LOG  calling Libsodium.install
+ LOG  [loadAppConfig] Loaded from ExponentConstants: ["elevenLabsAgentId", "consoleLoggingDefault"]
+ LOG  [loadAppConfig] Loaded from Constants.expoConfig: ["elevenLabsAgentId", "consoleLoggingDefault", "buildCommitSha", "buildCommitTimestamp"]
+ LOG  [loadAppConfig] Final merged config: {
+  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",
+  "consoleLoggingDefault": true,
+  "buildCommitSha": "15332691680d9975be06d2955c9837b6371af0c7",
+  "buildCommitTimestamp": "2026-07-01T18:38:13+08:00"
+}
+ LOG  [ConsoleLogging] Initialized (output enabled)
+ WARN  [Error: Session encryption not ready for cmr22kl3l000aovvwfpay7jne]
+ WARN  The package /home/jc/dev/lyntty/packages/lyntty-wire contains an invalid package.json configuration. Consider raising this issue with the package maintainer(s).
+Reason: The resolution for "/home/jc/dev/lyntty/packages/lyntty-app/node_modules/lyntty-wire" defined in "exports" is /home/jc/dev/lyntty/packages/lyntty-wire/dist/index.mjs, however this file does not exist. Falling back to file-based resolution.
+ WARN  The package /home/jc/dev/lyntty/packages/lyntty-wire contains an invalid package.json configuration. Consider raising this issue with the package maintainer(s).
+Reason: The resolution for "/home/jc/dev/lyntty/packages/lyntty-app/node_modules/lyntty-wire" defined in "exports" is /home/jc/dev/lyntty/packages/lyntty-wire/dist/index.mjs, however this file does not exist. Falling back to file-based resolution.
+Unable to resolve "lyntty-wire" from "packages/lyntty-app/sources/sync/apiTypes.ts"
+ WARN  The package /home/jc/dev/lyntty/packages/lyntty-wire contains an invalid package.json configuration. Consider raising this issue with the package maintainer(s).
+Reason: The resolution for "/home/jc/dev/lyntty/packages/lyntty-app/node_modules/lyntty-wire" defined in "exports" is /home/jc/dev/lyntty/packages/lyntty-wire/dist/index.mjs, however this file does not exist. Falling back to file-based resolution.
+ WARN  The package /home/jc/dev/lyntty/packages/lyntty-wire contains an invalid package.json configuration. Consider raising this issue with the package maintainer(s).
+Reason: The resolution for "/home/jc/dev/lyntty/packages/lyntty-app/node_modules/lyntty-wire" defined in "exports" is /home/jc/dev/lyntty/packages/lyntty-wire/dist/index.mjs, however this file does not exist. Falling back to file-based resolution.
+Unable to resolve "lyntty-wire" from "packages/lyntty-app/sources/sync/apiTypes.ts"

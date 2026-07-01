@@ -21,7 +21,7 @@ describe('applySuggestion', () => {
 
             expect(result).toEqual({
                 text: 'I feel :lyntty: ',
-                cursorPosition: 15
+                cursorPosition: 16
             });
         });
 

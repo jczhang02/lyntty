@@ -45,12 +45,16 @@ export function enrichSessionWithPiDiscovery(
     record: PiMachineSessionRecord,
     machine: Machine,
 ): Omit<Session, 'presence'> & { presence?: Session['presence'] } {
+    const discoveredMetadata = buildPiMetadata(record, machine, false);
     return {
         ...session,
         updatedAt: Math.max(session.updatedAt, resolveTimestamp(record.modifiedAt, session.updatedAt)),
         metadata: {
-            ...(session.metadata ?? buildPiMetadata(record, machine, false)),
-            ...buildPiMetadata(record, machine, false),
+            ...(session.metadata ?? {}),
+            ...discoveredMetadata,
+            path: session.metadata?.path ?? discoveredMetadata.path,
+            homeDir: session.metadata?.homeDir ?? discoveredMetadata.homeDir,
+            lynttyHomeDir: session.metadata?.lynttyHomeDir ?? discoveredMetadata.lynttyHomeDir,
             summary: session.metadata?.summary,
         },
     };
