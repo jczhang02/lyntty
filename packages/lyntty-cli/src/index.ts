@@ -39,6 +39,11 @@ import { handleCodexCommand } from './commands/codexCommand'
 (async () => {
   const args = process.argv.slice(2)
 
+  if (args.length === 1 && (args[0] === '--version' || args[0] === '-v')) {
+    console.log(`lyntty version: ${packageJson.version}`)
+    return;
+  }
+
   // If --version is passed - do not log, its likely daemon inquiring about our version
   if (!args.includes('--version')) {
     logger.debug('Starting lyntty CLI with args: ', process.argv)

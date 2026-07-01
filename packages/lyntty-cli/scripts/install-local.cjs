@@ -45,8 +45,9 @@ function run(cmd, args, { allowFailure = false } = {}) {
 run('pnpm', ['run', 'build']);
 run('lyntty', ['daemon', 'stop'], { allowFailure: true });
 run('npm', ['link']);
-run('lyntty', ['daemon', 'start']);
+run('lyntty', ['daemon', 'start'], { allowFailure: true });
 run('lyntty', ['--version']);
 
 console.log(`\n✓ Installed from ${PACKAGE_DIR}`);
+console.log('  Note: if daemon did not start, run `lyntty` once and complete mobile auth.');
 console.log('  To undo: npm unlink -g lyntty && npm i -g lyntty@latest');
