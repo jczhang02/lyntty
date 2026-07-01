@@ -137,17 +137,28 @@ describe('discoverLocalPiSessions', () => {
     })).resolves.toMatchObject([{ state: 'active_runtime', piSessionId: 'pi-1' }]);
   });
 
-  it('paginates machine-wide Pi discovery by newest modified sessions first', async () => {
+  it('paginates machine-wide Pi discovery by opaque newest-first cursor', async () => {
+    const sessions = [
+      sessionInfo({ id: 'pi-old', cwd: '/repo/old', modified: new Date('2026-06-30T10:00:00Z') }),
+      sessionInfo({ id: 'pi-new', cwd: '/repo/new', modified: new Date('2026-06-30T14:00:00Z') }),
+      sessionInfo({ id: 'pi-mid', cwd: '/repo/mid', modified: new Date('2026-06-30T12:00:00Z') }),
+    ];
+
+    const first = await discoverLocalPiSessionsPage({
+      scope: 'machine',
+      limit: 1,
+      now,
+      listSessions: async () => sessions,
+    });
+    expect(first.records).toMatchObject([{ piSessionId: 'pi-new' }]);
+    expect(first.nextCursor).toBeTruthy();
+
     await expect(discoverLocalPiSessionsPage({
       scope: 'machine',
       limit: 2,
-      cursor: '1',
+      cursor: first.nextCursor,
       now,
-      listSessions: async () => [
-        sessionInfo({ id: 'pi-old', cwd: '/repo/old', modified: new Date('2026-06-30T10:00:00Z') }),
-        sessionInfo({ id: 'pi-new', cwd: '/repo/new', modified: new Date('2026-06-30T14:00:00Z') }),
-        sessionInfo({ id: 'pi-mid', cwd: '/repo/mid', modified: new Date('2026-06-30T12:00:00Z') }),
-      ],
+      listSessions: async () => sessions,
     })).resolves.toMatchObject({
       records: [
         { piSessionId: 'pi-mid' },
@@ -156,6 +167,38 @@ describe('discoverLocalPiSessions', () => {
       nextCursor: undefined,
       total: 3,
     });
+  });
+
+  it('keeps cursor stable when a newer Pi session appears before the next page', async () => {
+    const first = await discoverLocalPiSessionsPage({
+      scope: 'machine',
+      limit: 1,
+      now,
+      listSessions: async () => [
+        sessionInfo({ id: 'pi-new', cwd: '/repo/new', modified: new Date('2026-06-30T14:00:00Z') }),
+        sessionInfo({ id: 'pi-mid', cwd: '/repo/mid', modified: new Date('2026-06-30T12:00:00Z') }),
+        sessionInfo({ id: 'pi-old', cwd: '/repo/old', modified: new Date('2026-06-30T10:00:00Z') }),
+      ],
+    });
+    expect(first.records).toMatchObject([{ piSessionId: 'pi-new' }]);
+
+    const second = await discoverLocalPiSessionsPage({
+      scope: 'machine',
+      limit: 2,
+      cursor: first.nextCursor,
+      now,
+      listSessions: async () => [
+        sessionInfo({ id: 'pi-newer', cwd: '/repo/newer', modified: new Date('2026-06-30T15:00:00Z') }),
+        sessionInfo({ id: 'pi-new', cwd: '/repo/new', modified: new Date('2026-06-30T14:00:00Z') }),
+        sessionInfo({ id: 'pi-mid', cwd: '/repo/mid', modified: new Date('2026-06-30T12:00:00Z') }),
+        sessionInfo({ id: 'pi-old', cwd: '/repo/old', modified: new Date('2026-06-30T10:00:00Z') }),
+      ],
+    });
+
+    expect(second.records).toMatchObject([
+      { piSessionId: 'pi-mid' },
+      { piSessionId: 'pi-old' },
+    ]);
   });
 
   it('orders active runtime sessions before pagination slices', async () => {
@@ -171,7 +214,6 @@ describe('discoverLocalPiSessions', () => {
       ],
     })).resolves.toMatchObject({
       records: [{ state: 'active_runtime', piSessionId: 'pi-active' }],
-      nextCursor: '1',
       total: 2,
     });
   });

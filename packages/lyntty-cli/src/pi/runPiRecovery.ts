@@ -185,21 +185,54 @@ export function classifyPiSessionRecovery(input: {
 
 function compareSessionInfoByDiscoveryOrder(activePiIds: Set<string>): (a: SessionInfo, b: SessionInfo) => number {
   return (a, b) => {
-    const activeDelta = Number(activePiIds.has(b.id)) - Number(activePiIds.has(a.id));
-    if (activeDelta !== 0) {
-      return activeDelta;
-    }
-    const modifiedDelta = b.modified.getTime() - a.modified.getTime();
-    return modifiedDelta !== 0 ? modifiedDelta : a.id.localeCompare(b.id);
+    return compareSessionDiscoveryKeys(sessionDiscoveryKey(a, activePiIds), sessionDiscoveryKey(b, activePiIds));
   };
 }
 
-function resolvePageOffset(cursor: string | undefined): number {
-  if (!cursor) {
-    return 0;
+interface PiDiscoveryCursorV1 {
+  v: 1;
+  active: boolean;
+  modified: number;
+  id: string;
+}
+
+function sessionDiscoveryKey(session: SessionInfo, activePiIds: Set<string>): Omit<PiDiscoveryCursorV1, 'v'> {
+  return {
+    active: activePiIds.has(session.id),
+    modified: session.modified.getTime(),
+    id: session.id,
+  };
+}
+
+function compareSessionDiscoveryKeys(a: Omit<PiDiscoveryCursorV1, 'v'>, b: Omit<PiDiscoveryCursorV1, 'v'>): number {
+  const activeDelta = Number(b.active) - Number(a.active);
+  if (activeDelta !== 0) {
+    return activeDelta;
   }
-  const parsed = Number.parseInt(cursor, 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  const modifiedDelta = b.modified - a.modified;
+  return modifiedDelta !== 0 ? modifiedDelta : a.id.localeCompare(b.id);
+}
+
+function encodeDiscoveryCursor(session: SessionInfo, activePiIds: Set<string>): string {
+  return Buffer.from(JSON.stringify({
+    v: 1,
+    ...sessionDiscoveryKey(session, activePiIds),
+  } satisfies PiDiscoveryCursorV1), 'utf8').toString('base64url');
+}
+
+function decodeDiscoveryCursor(cursor: string | undefined): PiDiscoveryCursorV1 | undefined {
+  if (!cursor) {
+    return undefined;
+  }
+  try {
+    const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as Partial<PiDiscoveryCursorV1>;
+    if (decoded.v === 1 && typeof decoded.active === 'boolean' && typeof decoded.modified === 'number' && typeof decoded.id === 'string') {
+      return decoded as PiDiscoveryCursorV1;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 function resolvePageLimit(limit: number | undefined): number | undefined {
@@ -231,10 +264,14 @@ export async function discoverLocalPiSessionsPage(options: DiscoverPiSessionsOpt
   const activePiIds = new Set(options.activePiSessionIds ?? []);
   const sessions = (await listPiSessionsForScope(options)).sort(compareSessionInfoByDiscoveryOrder(activePiIds));
   const total = sessions.length;
-  const offset = resolvePageOffset(options.cursor);
+  const decodedCursor = decodeDiscoveryCursor(options.cursor);
   const limit = resolvePageLimit(options.limit);
-  const pageSessions = limit === undefined ? sessions.slice(offset) : sessions.slice(offset, offset + limit);
-  const nextOffset = offset + pageSessions.length;
+  const candidateSessions = decodedCursor
+    ? sessions.filter((session) => compareSessionDiscoveryKeys(sessionDiscoveryKey(session, activePiIds), decodedCursor) > 0)
+    : sessions;
+  const pageSessions = limit === undefined ? candidateSessions : candidateSessions.slice(0, limit);
+  const hasMore = limit !== undefined && candidateSessions.length > pageSessions.length;
+  const lastSession = pageSessions.at(-1);
 
   return {
     records: pageSessions.map((local) => classifyPiSessionRecovery({
@@ -244,7 +281,7 @@ export async function discoverLocalPiSessionsPage(options: DiscoverPiSessionsOpt
       staleAfterMs: options.staleAfterMs,
       now: options.now,
     })),
-    nextCursor: nextOffset < total ? String(nextOffset) : undefined,
+    nextCursor: hasMore && lastSession ? encodeDiscoveryCursor(lastSession, activePiIds) : undefined,
     total,
   };
 }
