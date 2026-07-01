@@ -19,6 +19,8 @@ import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
 import { useSessionActionAlert } from '@/hooks/useSessionQuickActions';
 import { useSettingMutable } from '@/sync/storage';
+import { machineSpawnNewSession } from '@/sync/ops';
+import { Modal } from '@/modal';
 import { t } from '@/text';
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -344,6 +346,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
     const styles = stylesheet;
     const navigateToSession = useNavigateToSession();
     const [actionsAnchor, setActionsAnchor] = React.useState<SessionActionsAnchor | null>(null);
+    const [isOpeningPiSession, setIsOpeningPiSession] = React.useState(false);
     const baseStatus = STATUS_CONFIG[session.state];
     // Override to solid blue when session has unread results
     const status = session.hasUnread
@@ -364,9 +367,35 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                     ? t('status.permissionRequired')
                     : t('status.online');
 
-    const handlePress = React.useCallback(() => {
-        navigateToSession(session.id);
-    }, [navigateToSession, session.id]);
+    const handlePress = React.useCallback(async () => {
+        if (!session.piSynthetic) {
+            navigateToSession(session.id);
+            return;
+        }
+
+        if (!session.machineId || !session.piSessionId || !session.path) {
+            Modal.alert(t('common.error'), 'Cannot open this local Pi session because node metadata is incomplete.');
+            return;
+        }
+
+        setIsOpeningPiSession(true);
+        try {
+            const result = await machineSpawnNewSession({
+                machineId: session.machineId,
+                directory: session.path,
+                sessionId: session.piSessionId,
+                agent: 'pi',
+                approvedNewDirectoryCreation: true,
+            });
+            if (result.type === 'success') {
+                navigateToSession(result.sessionId);
+            } else if (result.type === 'error') {
+                Modal.alert(t('common.error'), result.errorMessage);
+            }
+        } finally {
+            setIsOpeningPiSession(false);
+        }
+    }, [navigateToSession, session]);
 
     const handleContextMenu = React.useCallback((event: any) => {
         event.preventDefault?.();
@@ -379,7 +408,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
     }, []);
 
     const showActionAlert = useSessionActionAlert(session.id);
-    const menuProps = Platform.OS === 'web' ? {
+    const menuProps = session.piSynthetic ? {} : Platform.OS === 'web' ? {
         onContextMenu: handleContextMenu,
     } as any : {
         onLongPress: showActionAlert,
@@ -401,6 +430,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                         isLast ? styles.sessionItemLast : {}
             ]}
             onPress={handlePress}
+            disabled={isOpeningPiSession}
             {...menuProps}
         >
             <View style={styles.avatarContainer}>
@@ -425,7 +455,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                     </Text>
                 </View>
 
-                {session.path ? (
+                {session.path && !session.piDiscoveryState ? (
                     <View style={styles.sessionSubtitleRow}>
                         <Text style={styles.sessionSubtitle} numberOfLines={1}>
                             {session.path.split(/[/\\]/).filter(Boolean).pop()}

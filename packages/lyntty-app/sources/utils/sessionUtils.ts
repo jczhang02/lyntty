@@ -147,7 +147,18 @@ export function formatPathRelativeToHome(path: string, homeDir?: string): string
  */
 export function getSessionSubtitle(session: Session): string {
     if (session.metadata) {
-        return formatPathRelativeToHome(session.metadata.path, session.metadata.homeDir);
+        const path = formatPathRelativeToHome(session.metadata.path, session.metadata.homeDir);
+        if (session.metadata.piDiscoveryState) {
+            const details = [
+                path,
+                typeof session.metadata.piMessageCount === 'number'
+                    ? `${session.metadata.piMessageCount} messages`
+                    : undefined,
+                session.metadata.piHasHistoryGap ? 'history_gap' : session.metadata.piDiscoveryState,
+            ];
+            return details.filter(Boolean).join(' • ');
+        }
+        return path;
     }
     return t('status.unknown');
 }

@@ -30,6 +30,26 @@ function session(overrides: Partial<Session> = {}): Session {
     };
 }
 
+describe('getSessionSubtitle', () => {
+    it('shows Pi history details for discovered node sessions', async () => {
+        const { getSessionSubtitle } = await import('./sessionUtils');
+
+        expect(getSessionSubtitle(session({
+            metadata: {
+                path: '/home/jc/dev/lyntty',
+                host: 'thinkpad',
+                homeDir: '/home/jc',
+                piSessionId: 'pi-1',
+                name: 'Pi release fix',
+                flavor: 'pi',
+                piDiscoveryState: 'discovered_local',
+                piMessageCount: 42,
+                piHasHistoryGap: false,
+            },
+        }))).toBe('~/dev/lyntty • 42 messages • discovered_local');
+    });
+});
+
 describe('getSessionName', () => {
     it('uses Pi session metadata name before generated summaries', async () => {
         const { getSessionName } = await import('./sessionUtils');

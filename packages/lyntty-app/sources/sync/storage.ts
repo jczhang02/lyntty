@@ -26,6 +26,7 @@ import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadP
 import type { CustomerInfo } from './revenueCat/types';
 import React from "react";
 import { sync } from "./sync";
+import { getSyntheticPiSessionId } from './piDiscoveredSessions';
 import { getCurrentRealtimeSessionId, getVoiceSession } from '@/realtime/RealtimeSession';
 import { isMutableTool } from "@/components/tools/knownTools";
 import { DecryptedArtifact } from "./artifactTypes";
@@ -93,6 +94,11 @@ export interface SessionRowData {
     completedTodosCount: number;
     totalTodosCount: number;
     hasUnread: boolean;
+    piSessionId: string | null;
+    piDiscoveryState: string | null;
+    piMessageCount: number | null;
+    piRecoveryReason: string | null;
+    piSynthetic: boolean;
 }
 
 function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): SessionRowData {
@@ -126,6 +132,11 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         completedTodosCount: session.todos?.filter(todo => todo.status === 'completed').length ?? 0,
         totalTodosCount: session.todos?.length ?? 0,
         hasUnread: unreadSessionIds?.has(session.id) ?? false,
+        piSessionId: session.metadata?.piSessionId ?? null,
+        piDiscoveryState: session.metadata?.piDiscoveryState ?? null,
+        piMessageCount: session.metadata?.piMessageCount ?? null,
+        piRecoveryReason: session.metadata?.piRecoveryReason ?? null,
+        piSynthetic: session.metadata?.piSynthetic === true,
     };
 }
 
@@ -427,6 +438,10 @@ export const storage = create<StorageState>()((set, get) => {
                 const resolvedModelMode = existingModelMode ?? savedModelMode ?? session.modelMode ?? null;
                 const existingEffortLevel = state.sessions[session.id]?.effortLevel ?? null;
                 const resolvedEffortLevel = existingEffortLevel ?? savedEffortLevels[session.id] ?? session.effortLevel ?? null;
+
+                if (session.metadata?.machineId && session.metadata?.piSessionId && session.metadata.piSynthetic !== true) {
+                    delete mergedSessions[getSyntheticPiSessionId(session.metadata.machineId, session.metadata.piSessionId)];
+                }
 
                 mergedSessions[session.id] = {
                     ...session,

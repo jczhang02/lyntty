@@ -1,0 +1,125 @@
+import { describe, expect, it } from 'vitest';
+
+import type { Machine, PiMachineSessionRecord, Session } from './storageTypes';
+import { mergePiDiscoveredSessions } from './piDiscoveredSessions';
+
+const machine: Machine = {
+    id: 'machine-1',
+    seq: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    active: true,
+    activeAt: 1,
+    metadata: {
+        host: 'thinkpad',
+        platform: 'linux',
+        lynttyCliVersion: '1.1.10',
+        lynttyHomeDir: '/home/jc/.lyntty',
+        homeDir: '/home/jc',
+        cliAvailability: {
+            pi: true,
+            claude: false,
+            codex: false,
+            gemini: false,
+            openclaw: false,
+            detectedAt: 10,
+        },
+    },
+    metadataVersion: 1,
+    daemonState: null,
+    daemonStateVersion: 1,
+};
+
+function relaySession(overrides: Partial<Session> = {}): Omit<Session, 'presence'> & { presence?: Session['presence'] } {
+    return {
+        id: 'relay-1',
+        seq: 1,
+        createdAt: 100,
+        updatedAt: 100,
+        active: false,
+        activeAt: 100,
+        metadata: {
+            path: '/repo',
+            host: 'thinkpad',
+            machineId: 'machine-1',
+            flavor: 'pi',
+            piSessionId: 'pi-registered',
+            name: 'Old title',
+        },
+        metadataVersion: 1,
+        agentState: null,
+        agentStateVersion: 1,
+        thinking: false,
+        thinkingAt: 0,
+        ...overrides,
+    };
+}
+
+function piRecord(overrides: Partial<PiMachineSessionRecord>): PiMachineSessionRecord {
+    return {
+        state: 'discovered_local',
+        piSessionId: 'pi-local',
+        cwd: '/home/jc/dev/lyntty',
+        name: 'Pi canonical title',
+        createdAt: 1_000,
+        modifiedAt: 2_000,
+        firstMessage: 'first prompt',
+        messageCount: 42,
+        needsRegistration: true,
+        needsBackfill: true,
+        hasHistoryGap: false,
+        reason: 'local Pi JSONL session is not registered with relay',
+        ...overrides,
+    };
+}
+
+describe('mergePiDiscoveredSessions', () => {
+    it('adds node-local Pi sessions to Sessions Home data', () => {
+        const sessions = mergePiDiscoveredSessions([], [{ machine, sessions: [piRecord({})] }]);
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0]).toMatchObject({
+            id: 'pi-local:machine-1:pi-local',
+            createdAt: 1_000,
+            updatedAt: 2_000,
+            activeAt: 2_000,
+            active: false,
+            metadata: {
+                name: 'Pi canonical title',
+                path: '/home/jc/dev/lyntty',
+                machineId: 'machine-1',
+                piSessionId: 'pi-local',
+                piDiscoveryState: 'discovered_local',
+                piMessageCount: 42,
+                piFirstMessage: 'first prompt',
+                piSynthetic: true,
+            },
+        });
+    });
+
+    it('updates relay sessions with canonical Pi title and history info', () => {
+        const sessions = mergePiDiscoveredSessions([
+            relaySession(),
+        ], [{
+            machine,
+            sessions: [piRecord({
+                state: 'registered',
+                piSessionId: 'pi-registered',
+                relaySessionId: 'relay-1',
+                name: 'Renamed in Pi',
+                messageCount: 99,
+                needsRegistration: false,
+                reason: 'local Pi session is registered and in sync',
+            })],
+        }]);
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0].metadata).toMatchObject({
+            name: 'Renamed in Pi',
+            piSessionId: 'pi-registered',
+            piDiscoveryState: 'registered',
+            piMessageCount: 99,
+            piSynthetic: false,
+        });
+    });
+});

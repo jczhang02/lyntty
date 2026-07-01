@@ -5,7 +5,7 @@
 
 import { apiSocket } from './apiSocket';
 import { sync } from './sync';
-import type { MachineMetadata } from './storageTypes';
+import type { MachineMetadata, PiMachineSessionRecord, PiRecoveryState } from './storageTypes';
 
 // Strict type definitions for all operations
 
@@ -215,28 +215,7 @@ export interface ResumeSessionOptions {
     sessionId: string;
 }
 
-export type PiRecoveryState =
-    | 'discovered_local'
-    | 'registered'
-    | 'active_runtime'
-    | 'stale_local'
-    | 'missing_local_history'
-    | 'history_gap'
-    | 'import_failed';
-
-export interface PiMachineSessionRecord {
-    state: PiRecoveryState;
-    piSessionId: string;
-    relaySessionId?: string;
-    path?: string;
-    cwd?: string;
-    name?: string;
-    messageCount: number;
-    needsRegistration: boolean;
-    needsBackfill: boolean;
-    hasHistoryGap: boolean;
-    reason: string;
-}
+export type { PiMachineSessionRecord, PiRecoveryState };
 
 export type ListPiSessionsResult =
     | { type: 'success'; sessions: PiMachineSessionRecord[] }

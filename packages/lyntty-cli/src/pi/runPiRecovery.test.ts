@@ -98,6 +98,21 @@ describe('classifyPiSessionRecovery', () => {
     });
   });
 
+  it('truncates large Pi text fields before machine RPC exposure', () => {
+    const record = classifyPiSessionRecovery({
+      local: sessionInfo({
+        name: 'n'.repeat(400),
+        firstMessage: 'hello '.repeat(2000),
+      }),
+      now,
+    });
+
+    expect(record.name).toHaveLength(240);
+    expect(record.name?.endsWith('…')).toBe(true);
+    expect(record.firstMessage).toHaveLength(240);
+    expect(record.firstMessage?.endsWith('…')).toBe(true);
+  });
+
   it('marks import failures explicitly', () => {
     expect(classifyPiSessionRecovery({
       local: sessionInfo(),

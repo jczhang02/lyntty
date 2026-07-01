@@ -26,6 +26,9 @@ export interface PiSessionRecoveryRecord {
   path?: string;
   cwd?: string;
   name?: string;
+  createdAt?: number;
+  modifiedAt?: number;
+  firstMessage?: string;
   messageCount: number;
   needsRegistration: boolean;
   needsBackfill: boolean;
@@ -45,6 +48,18 @@ export interface DiscoverPiSessionsOptions {
 }
 
 const DEFAULT_STALE_AFTER_MS = 1000 * 60 * 60 * 24 * 14;
+const MAX_RELAY_TEXT_FIELD_LENGTH = 240;
+
+function truncateRelayText(value: string | undefined, maxLength = MAX_RELAY_TEXT_FIELD_LENGTH): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength - 1)}…`;
+}
 
 export function classifyPiSessionRecovery(input: {
   local?: SessionInfo;
@@ -64,7 +79,10 @@ export function classifyPiSessionRecovery(input: {
     relaySessionId: input.registered?.relaySessionId,
     path: input.local?.path,
     cwd: input.local?.cwd,
-    name: input.local?.name,
+    name: truncateRelayText(input.local?.name),
+    createdAt: input.local?.created.getTime(),
+    modifiedAt: input.local?.modified.getTime(),
+    firstMessage: truncateRelayText(input.local?.firstMessage),
     messageCount: localMessageCount,
   };
 
@@ -210,6 +228,7 @@ export function redactPiSessionForRelay(record: PiSessionRecoveryRecord, homeDir
     path: record.path ? redactPiTextForRelay(record.path, homeDir) : undefined,
     cwd: record.cwd ? redactPiTextForRelay(record.cwd, homeDir) : undefined,
     name: record.name ? redactPiTextForRelay(record.name, homeDir) : undefined,
+    firstMessage: record.firstMessage ? redactPiTextForRelay(record.firstMessage, homeDir) : undefined,
     reason: redactPiTextForRelay(record.reason, homeDir),
   };
 }

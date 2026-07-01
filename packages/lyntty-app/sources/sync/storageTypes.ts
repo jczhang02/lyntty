@@ -34,6 +34,20 @@ export const MetadataSchema = z.object({
     }).optional(),
     machineId: z.string().optional(),
     piSessionId: z.string().optional(), // Pi JSONL session ID
+    piDiscoveryState: z.enum([
+        'discovered_local',
+        'registered',
+        'active_runtime',
+        'stale_local',
+        'missing_local_history',
+        'history_gap',
+        'import_failed',
+    ]).optional(),
+    piMessageCount: z.number().optional(),
+    piFirstMessage: z.string().optional(),
+    piRecoveryReason: z.string().optional(),
+    piHasHistoryGap: z.boolean().optional(),
+    piSynthetic: z.boolean().optional(),
     claudeSessionId: z.string().optional(), // Legacy Claude Code session ID
     codexThreadId: z.string().optional(), // Legacy Codex app-server thread ID
     tools: z.array(z.string()).optional(),
@@ -222,6 +236,32 @@ export const MachineMetadataSchema = z.object({
 });
 
 export type MachineMetadata = z.infer<typeof MachineMetadataSchema>;
+
+export type PiRecoveryState =
+    | 'discovered_local'
+    | 'registered'
+    | 'active_runtime'
+    | 'stale_local'
+    | 'missing_local_history'
+    | 'history_gap'
+    | 'import_failed';
+
+export interface PiMachineSessionRecord {
+    state: PiRecoveryState;
+    piSessionId: string;
+    relaySessionId?: string;
+    path?: string;
+    cwd?: string;
+    name?: string;
+    createdAt?: number;
+    modifiedAt?: number;
+    firstMessage?: string;
+    messageCount: number;
+    needsRegistration: boolean;
+    needsBackfill: boolean;
+    hasHistoryGap: boolean;
+    reason: string;
+}
 
 export interface Machine {
     id: string;

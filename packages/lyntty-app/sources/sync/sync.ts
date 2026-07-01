@@ -13,7 +13,7 @@ import {
 } from './attachmentDiagnostics';
 import { ApiEphemeralUpdateSchema, ApiMessage, ApiUpdateContainerSchema } from './apiTypes';
 import type { ApiEphemeralActivityUpdate } from './apiTypes';
-import { Session, Machine } from './storageTypes';
+import { Session, Machine, type PiMachineSessionRecord } from './storageTypes';
 import { InvalidateSync } from '@/utils/sync';
 import { ActivityUpdateAccumulator } from './reducer/activityUpdateAccumulator';
 import { randomUUID } from 'expo-crypto';
@@ -61,6 +61,7 @@ import { encryptBlob } from '@/encryption/blob';
 import { readFileBytes } from '@/utils/readFileBytes';
 import { Modal } from '@/modal';
 import { t } from '@/text';
+import { mergePiDiscoveredSessions } from './piDiscoveredSessions';
 
 type V3GetSessionMessagesResponse = {
     messages: ApiMessage[];
@@ -906,6 +907,36 @@ class Sync {
     // Private
     //
 
+    private fetchMachinePiSessions = async (): Promise<Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }>> => {
+        const machines = Object.values(storage.getState().machines)
+            .filter(machine => machine.metadata?.cliAvailability?.pi !== false)
+            .filter(machine => machine.active);
+
+        const results = await Promise.allSettled(machines.map(async (machine) => {
+            const response = await apiSocket.machineRPC<
+                { type: 'success'; sessions: PiMachineSessionRecord[] } | { type: 'error'; errorMessage: string },
+                { scope: 'machine' }
+            >(machine.id, 'list-pi-sessions', { scope: 'machine' });
+
+            if (response.type !== 'success') {
+                throw new Error(response.errorMessage);
+            }
+
+            return { machine, sessions: response.sessions };
+        }));
+
+        const discovered: Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }> = [];
+        results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                discovered.push(result.value);
+            } else {
+                console.warn(`Failed to list Pi sessions for machine ${machines[index]?.id}: ${String(result.reason)}`);
+            }
+        });
+
+        return discovered;
+    }
+
     private fetchSessions = async () => {
         if (!this.credentials) return;
 
@@ -982,9 +1013,15 @@ class Sync {
             decryptedSessions.push(processedSession);
         }
 
+        const machinePiSessions = await this.fetchMachinePiSessions();
+        const sessionsWithPiHistory = mergePiDiscoveredSessions(
+            decryptedSessions,
+            machinePiSessions,
+        );
+
         // Apply to storage
-        this.applySessions(decryptedSessions);
-        log.log(`📥 fetchSessions completed - processed ${decryptedSessions.length} sessions`);
+        this.applySessions(sessionsWithPiHistory);
+        log.log(`📥 fetchSessions completed - processed ${decryptedSessions.length} relay sessions + ${sessionsWithPiHistory.length - decryptedSessions.length} local Pi sessions`);
 
     }
 
@@ -1413,6 +1450,7 @@ class Sync {
             return;
         }
         storage.getState().applyMachines(decryptedMachines, true);
+        this.sessionsSync.invalidate();
         log.log(`🖥️ fetchMachines completed - processed ${decryptedMachines.length} machines`);
     }
 
