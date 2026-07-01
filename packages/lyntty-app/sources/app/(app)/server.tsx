@@ -177,6 +177,8 @@ export default function ServerConfigScreen() {
                         <View style={styles.contentContainer}>
                             <Text style={styles.labelText}>{t('server.customServerUrlLabel').toUpperCase()}</Text>
                             <TextInput
+                                testID="lyntty-server-url-input"
+                                accessibilityLabel="Lyntty server URL"
                                 style={[
                                     styles.textInput,
                                     isValidating && styles.textInputValidating
@@ -206,6 +208,7 @@ export default function ServerConfigScreen() {
                             <View style={styles.buttonRow}>
                                 <View style={styles.buttonWrapper}>
                                     <RoundButton
+                                        testID="lyntty-server-reset"
                                         title={t('server.resetToDefault')}
                                         size="normal"
                                         display="inverted"
@@ -214,6 +217,7 @@ export default function ServerConfigScreen() {
                                 </View>
                                 <View style={styles.buttonWrapper}>
                                     <RoundButton
+                                        testID="lyntty-server-save"
                                         title={isValidating ? t('server.validating') : t('common.save')}
                                         size="normal"
                                         action={handleSave}

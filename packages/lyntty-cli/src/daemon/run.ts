@@ -29,7 +29,8 @@ import { buildResumeLaunch } from '@/resume/handleResumeCommand';
 import { detectResumeSupport } from '@/resume/localLynttyAgentAuth';
 import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
 import { resolvePiActivationLock } from './activationLock';
-import { discoverLocalPiSessions, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
+import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
+import { discoverLocalPiSessions, discoverLocalPiSessionsPage, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -682,6 +683,25 @@ export async function startDaemon(): Promise<void> {
       return sessionIdToFinishedSession.get(lynttySessionId);
     };
 
+    const piDiscoveryCache = new Map<string, { expiresAt: number; sessions: SessionInfo[] }>();
+    const PI_DISCOVERY_CACHE_TTL_MS = 10_000;
+
+    const listCachedPiSessionInfos = async (options?: { cwd?: string; scope?: 'cwd' | 'machine' }): Promise<SessionInfo[]> => {
+      const scope = options?.scope ?? 'machine';
+      const cacheKey = `${scope}:${options?.cwd ?? ''}`;
+      const nowMs = Date.now();
+      const cached = piDiscoveryCache.get(cacheKey);
+      if (cached && cached.expiresAt > nowMs) {
+        return cached.sessions;
+      }
+
+      const sessions = scope === 'machine' || !options?.cwd
+        ? await SessionManager.listAll()
+        : await SessionManager.list(options.cwd);
+      piDiscoveryCache.set(cacheKey, { expiresAt: nowMs + PI_DISCOVERY_CACHE_TTL_MS, sessions });
+      return sessions;
+    };
+
     const getRegisteredPiSessions = (): RegisteredPiSessionState[] => {
       return [...pidToTrackedSession.values(), ...sessionIdToFinishedSession.values()].flatMap((tracked) => {
         const metadata = tracked.lynttySessionMetadataFromLocalWebhook;
@@ -699,21 +719,28 @@ export async function startDaemon(): Promise<void> {
       });
     };
 
-    const listPiSessions = async (options?: { cwd?: string; scope?: 'cwd' | 'machine' }) => {
+    const listPiSessions = async (options?: { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }) => {
       const activePiSessionIds = getCurrentChildren()
         .map((tracked) => tracked.lynttySessionMetadataFromLocalWebhook?.piSessionId)
         .filter((id): id is string => typeof id === 'string' && id.length > 0);
 
-      const records = await discoverLocalPiSessions({
+      const page = await discoverLocalPiSessionsPage({
         cwd: options?.cwd,
         scope: options?.scope ?? 'machine',
         registeredSessions: getRegisteredPiSessions(),
         activePiSessionIds,
+        limit: options?.limit,
+        cursor: options?.cursor,
+        listSessions: () => listCachedPiSessionInfos(options),
       });
 
-      return records
-        .map((record) => redactPiSessionForRelay(record))
-        .sort((a, b) => Number(b.state === 'active_runtime') - Number(a.state === 'active_runtime'));
+      return {
+        sessions: page.records
+          .map((record) => redactPiSessionForRelay(record))
+          .sort((a, b) => Number(b.state === 'active_runtime') - Number(a.state === 'active_runtime')),
+        nextCursor: page.nextCursor,
+        total: page.total,
+      };
     };
 
     const fetchServerSessionMetadata = async (sessionId: string, encryptionKey: Uint8Array, encryptionVariant: 'legacy' | 'dataKey'): Promise<Metadata | null> => {

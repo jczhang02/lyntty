@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyPiSessionRecovery,
   discoverLocalPiSessions,
+  discoverLocalPiSessionsPage,
   piSessionDisplayName,
   redactPiSessionForRelay,
   redactPiTextForRelay,
@@ -134,6 +135,45 @@ describe('discoverLocalPiSessions', () => {
       now,
       listSessions: async () => [sessionInfo()],
     })).resolves.toMatchObject([{ state: 'active_runtime', piSessionId: 'pi-1' }]);
+  });
+
+  it('paginates machine-wide Pi discovery by newest modified sessions first', async () => {
+    await expect(discoverLocalPiSessionsPage({
+      scope: 'machine',
+      limit: 2,
+      cursor: '1',
+      now,
+      listSessions: async () => [
+        sessionInfo({ id: 'pi-old', cwd: '/repo/old', modified: new Date('2026-06-30T10:00:00Z') }),
+        sessionInfo({ id: 'pi-new', cwd: '/repo/new', modified: new Date('2026-06-30T14:00:00Z') }),
+        sessionInfo({ id: 'pi-mid', cwd: '/repo/mid', modified: new Date('2026-06-30T12:00:00Z') }),
+      ],
+    })).resolves.toMatchObject({
+      records: [
+        { piSessionId: 'pi-mid' },
+        { piSessionId: 'pi-old' },
+      ],
+      nextCursor: undefined,
+      total: 3,
+    });
+  });
+
+  it('orders active runtime sessions before pagination slices', async () => {
+    await expect(discoverLocalPiSessionsPage({
+      scope: 'machine',
+      limit: 1,
+      now,
+      activePiSessionIds: ['pi-active'],
+      registeredSessions: [{ piSessionId: 'pi-active', importedMessageCount: 1 }],
+      listSessions: async () => [
+        sessionInfo({ id: 'pi-new', cwd: '/repo/new', modified: new Date('2026-06-30T14:00:00Z') }),
+        sessionInfo({ id: 'pi-active', cwd: '/repo/active', modified: new Date('2026-06-30T09:00:00Z') }),
+      ],
+    })).resolves.toMatchObject({
+      records: [{ state: 'active_runtime', piSessionId: 'pi-active' }],
+      nextCursor: '1',
+      total: 2,
+    });
   });
 
   it('supports machine-wide historical Pi discovery without a cwd', async () => {

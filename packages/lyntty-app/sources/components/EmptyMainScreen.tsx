@@ -135,6 +135,7 @@ export function EmptyMainScreen() {
                     <View style={styles.buttonsContainer}>
                         <View style={styles.buttonWrapper}>
                             <RoundButton
+                                testID="lyntty-open-camera"
                                 title={t('components.emptyMainScreen.openCamera')}
                                 size="large"
                                 loading={isLoading}
@@ -143,6 +144,7 @@ export function EmptyMainScreen() {
                         </View>
                         <View style={styles.buttonWrapperSecondary}>
                             <RoundButton
+                                testID="lyntty-enter-url-manually"
                                 title={t('connect.enterUrlManually')}
                                 size="normal"
                                 display="inverted"

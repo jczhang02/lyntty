@@ -36,6 +36,12 @@ export interface PiSessionRecoveryRecord {
   reason: string;
 }
 
+export interface PiSessionDiscoveryPage {
+  records: PiSessionRecoveryRecord[];
+  nextCursor?: string;
+  total: number;
+}
+
 export interface DiscoverPiSessionsOptions {
   cwd?: string;
   sessionDir?: string;
@@ -44,6 +50,8 @@ export interface DiscoverPiSessionsOptions {
   activePiSessionIds?: string[];
   staleAfterMs?: number;
   now?: Date;
+  limit?: number;
+  cursor?: string;
   listSessions?: () => Promise<SessionInfo[]>;
 }
 
@@ -175,6 +183,35 @@ export function classifyPiSessionRecovery(input: {
   };
 }
 
+function compareSessionInfoByDiscoveryOrder(activePiIds: Set<string>): (a: SessionInfo, b: SessionInfo) => number {
+  return (a, b) => {
+    const activeDelta = Number(activePiIds.has(b.id)) - Number(activePiIds.has(a.id));
+    if (activeDelta !== 0) {
+      return activeDelta;
+    }
+    const modifiedDelta = b.modified.getTime() - a.modified.getTime();
+    return modifiedDelta !== 0 ? modifiedDelta : a.id.localeCompare(b.id);
+  };
+}
+
+function resolvePageOffset(cursor: string | undefined): number {
+  if (!cursor) {
+    return 0;
+  }
+  const parsed = Number.parseInt(cursor, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function resolvePageLimit(limit: number | undefined): number | undefined {
+  if (limit === undefined) {
+    return undefined;
+  }
+  if (!Number.isFinite(limit) || limit <= 0) {
+    return undefined;
+  }
+  return Math.min(Math.floor(limit), 500);
+}
+
 async function listPiSessionsForScope(options: DiscoverPiSessionsOptions): Promise<SessionInfo[]> {
   if (options.listSessions) {
     return options.listSessions();
@@ -189,18 +226,31 @@ async function listPiSessionsForScope(options: DiscoverPiSessionsOptions): Promi
   return SessionManager.list(options.cwd, options.sessionDir);
 }
 
-export async function discoverLocalPiSessions(options: DiscoverPiSessionsOptions): Promise<PiSessionRecoveryRecord[]> {
-  const sessions = await listPiSessionsForScope(options);
+export async function discoverLocalPiSessionsPage(options: DiscoverPiSessionsOptions): Promise<PiSessionDiscoveryPage> {
   const registeredByPiId = new Map((options.registeredSessions ?? []).map((entry) => [entry.piSessionId, entry]));
   const activePiIds = new Set(options.activePiSessionIds ?? []);
+  const sessions = (await listPiSessionsForScope(options)).sort(compareSessionInfoByDiscoveryOrder(activePiIds));
+  const total = sessions.length;
+  const offset = resolvePageOffset(options.cursor);
+  const limit = resolvePageLimit(options.limit);
+  const pageSessions = limit === undefined ? sessions.slice(offset) : sessions.slice(offset, offset + limit);
+  const nextOffset = offset + pageSessions.length;
 
-  return sessions.map((local) => classifyPiSessionRecovery({
-    local,
-    registered: registeredByPiId.get(local.id),
-    active: activePiIds.has(local.id),
-    staleAfterMs: options.staleAfterMs,
-    now: options.now,
-  }));
+  return {
+    records: pageSessions.map((local) => classifyPiSessionRecovery({
+      local,
+      registered: registeredByPiId.get(local.id),
+      active: activePiIds.has(local.id),
+      staleAfterMs: options.staleAfterMs,
+      now: options.now,
+    })),
+    nextCursor: nextOffset < total ? String(nextOffset) : undefined,
+    total,
+  };
+}
+
+export async function discoverLocalPiSessions(options: DiscoverPiSessionsOptions): Promise<PiSessionRecoveryRecord[]> {
+  return (await discoverLocalPiSessionsPage(options)).records;
 }
 
 const SECRET_PATTERNS: Array<[RegExp, string]> = [

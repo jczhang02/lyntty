@@ -90,7 +90,7 @@ describe('ApiMachineClient Codex fork RPCs', () => {
     });
 
     it('registers a Pi session discovery RPC', async () => {
-        const listPiSessions = vi.fn().mockResolvedValue([{ piSessionId: 'pi-1', state: 'discovered_local' }]);
+        const listPiSessions = vi.fn().mockResolvedValue({ sessions: [{ piSessionId: 'pi-1', state: 'discovered_local' }], nextCursor: '100', total: 101 });
 
         const { ApiMachineClient } = await import('./apiMachine');
         const client = new ApiMachineClient('token', machineClient());
@@ -103,8 +103,8 @@ describe('ApiMachineClient Codex fork RPCs', () => {
 
         const result = await handlersFrom(client).get('machine-1:list-pi-sessions')?.({ scope: 'machine' });
 
-        expect(result).toEqual({ type: 'success', sessions: [{ piSessionId: 'pi-1', state: 'discovered_local' }] });
-        expect(listPiSessions).toHaveBeenCalledWith({ scope: 'machine', cwd: undefined });
+        expect(result).toEqual({ type: 'success', sessions: [{ piSessionId: 'pi-1', state: 'discovered_local' }], nextCursor: '100', total: 101 });
+        expect(listPiSessions).toHaveBeenCalledWith({ scope: 'machine', cwd: undefined, limit: undefined, cursor: undefined });
     });
 
     it('forwards resumeCodexThreadId through the spawn RPC', async () => {

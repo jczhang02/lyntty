@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+name: Lyntty first run creates account
+tags:
+  - core
+  - onboarding
+---
+- clearState
+- launchApp
+- runFlow:
+    when:
+      visible: "DEVELOPMENT SERVERS"
+    commands:
+      - tapOn: "http://10.0.2.2:8081"
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - tapOn:
+          point: "90%,46%"
+- extendedWaitUntil:
+    visible: "Create account"
+    timeout: 60000
+- tapOn:
+    id: "lyntty-create-account"
+- extendedWaitUntil:
+    visible: "Install the Lyntty CLI"
+    timeout: 60000
+- assertVisible: "Run it"
+- assertVisible: "Open Camera"
+- assertVisible: "Enter URL manually"

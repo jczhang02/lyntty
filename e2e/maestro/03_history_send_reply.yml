@@ -1,0 +1,49 @@
+appId: ${APP_ID}
+name: Lyntty historical Pi session open and live reply
+tags:
+  - core
+  - sessions-home
+  - pi-history
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "DEVELOPMENT SERVERS"
+    commands:
+      - tapOn: "http://10.0.2.2:8081"
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - tapOn:
+          point: "90%,46%"
+- runFlow:
+    when:
+      visible: "Terminal connected successfully"
+    commands:
+      - tapOn: "OK"
+- runFlow:
+    when:
+      visible: "Pair Node"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: "${HISTORY_TITLE}"
+    timeout: 120000
+- tapOn: "${HISTORY_TITLE}"
+- waitForAnimationToEnd
+- assertNotVisible: "Session has been deleted"
+- tapOn:
+    id: "lyntty-session-input"
+- inputText: "${PROMPT}"
+- tapOn:
+    id: "lyntty-session-send"
+- extendedWaitUntil:
+    visible: "${PONG}"
+    timeout: 180000
+- assertNotVisible: "Session has been deleted"

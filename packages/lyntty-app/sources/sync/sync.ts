@@ -912,17 +912,33 @@ class Sync {
             .filter(machine => machine.metadata?.cliAvailability?.pi !== false)
             .filter(machine => machine.active);
 
+        const pageSize = 100;
+        const maxRecordsPerMachine = 5000;
         const results = await Promise.allSettled(machines.map(async (machine) => {
-            const response = await apiSocket.machineRPC<
-                { type: 'success'; sessions: PiMachineSessionRecord[] } | { type: 'error'; errorMessage: string },
-                { scope: 'machine' }
-            >(machine.id, 'list-pi-sessions', { scope: 'machine' });
+            const sessions: PiMachineSessionRecord[] = [];
+            let cursor: string | undefined;
+            let total: number | undefined;
 
-            if (response.type !== 'success') {
-                throw new Error(response.errorMessage);
+            do {
+                const response = await apiSocket.machineRPC<
+                    { type: 'success'; sessions: PiMachineSessionRecord[]; nextCursor?: string; total?: number } | { type: 'error'; errorMessage: string },
+                    { scope: 'machine'; limit: number; cursor?: string }
+                >(machine.id, 'list-pi-sessions', { scope: 'machine', limit: pageSize, cursor });
+
+                if (response.type !== 'success') {
+                    throw new Error(response.errorMessage);
+                }
+
+                sessions.push(...response.sessions);
+                cursor = response.nextCursor;
+                total = response.total;
+            } while (cursor && sessions.length < maxRecordsPerMachine);
+
+            if (cursor) {
+                console.warn(`Pi session discovery for machine ${machine.id} truncated at ${sessions.length}/${total ?? 'unknown'} records`);
             }
 
-            return { machine, sessions: response.sessions };
+            return { machine, sessions };
         }));
 
         const discovered: Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }> = [];

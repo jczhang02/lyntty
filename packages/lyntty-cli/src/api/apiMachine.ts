@@ -92,7 +92,7 @@ interface DaemonToServerEvents {
 type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
     resumeSession?: (sessionId: string, options?: { model?: string; permissionMode?: string }) => Promise<SpawnSessionResult>;
-    listPiSessions?: (options?: { cwd?: string; scope?: 'cwd' | 'machine' }) => Promise<PiSessionRecoveryRecord[]>;
+    listPiSessions?: (options?: { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }) => Promise<{ sessions: PiSessionRecoveryRecord[]; nextCursor?: string; total: number }>;
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
 }
@@ -196,8 +196,10 @@ export class ApiMachineClient {
 
             const cwd = typeof params?.cwd === 'string' && params.cwd.length > 0 ? params.cwd : undefined;
             const scope = params?.scope === 'cwd' ? 'cwd' : 'machine';
-            const sessions = await listPiSessions({ cwd, scope });
-            return { type: 'success', sessions };
+            const limit = typeof params?.limit === 'number' ? params.limit : undefined;
+            const cursor = typeof params?.cursor === 'string' && params.cursor.length > 0 ? params.cursor : undefined;
+            const page = await listPiSessions({ cwd, scope, limit, cursor });
+            return { type: 'success', ...page };
         });
 
         // Register stop session handler

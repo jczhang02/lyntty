@@ -97,6 +97,23 @@ describe('mergePiDiscoveredSessions', () => {
         });
     });
 
+    it('merges thousands of node-local Pi sessions without dropping rows', () => {
+        const records = Array.from({ length: 5000 }, (_value, index) => piRecord({
+            piSessionId: `pi-${index}`,
+            name: `Session ${index}`,
+            modifiedAt: 1_700_000_000_000 + index,
+        }));
+
+        const sessions = mergePiDiscoveredSessions([], [{ machine, sessions: records }]);
+
+        expect(sessions).toHaveLength(5000);
+        expect(sessions[0]).toMatchObject({
+            id: 'pi-local:machine-1:pi-0',
+            metadata: expect.objectContaining({ name: 'Session 0', piSynthetic: true }),
+        });
+        expect(new Set(sessions.map((session) => session.id)).size).toBe(5000);
+    });
+
     it('updates relay sessions with canonical Pi title and history info without replacing real path', () => {
         const sessions = mergePiDiscoveredSessions([
             relaySession({

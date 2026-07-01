@@ -218,7 +218,7 @@ export interface ResumeSessionOptions {
 export type { PiMachineSessionRecord, PiRecoveryState };
 
 export type ListPiSessionsResult =
-    | { type: 'success'; sessions: PiMachineSessionRecord[] }
+    | { type: 'success'; sessions: PiMachineSessionRecord[]; nextCursor?: string; total?: number }
     | { type: 'error'; errorMessage: string };
 
 // Exported session operation functions
@@ -409,14 +409,14 @@ export async function codexListRewindPoints(
     }
 }
 
-export async function machineListPiSessions(options: { machineId: string; cwd?: string; scope?: 'cwd' | 'machine' }): Promise<ListPiSessionsResult> {
-    const { machineId, cwd, scope = 'machine' } = options;
+export async function machineListPiSessions(options: { machineId: string; cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }): Promise<ListPiSessionsResult> {
+    const { machineId, cwd, scope = 'machine', limit, cursor } = options;
 
     try {
-        return await apiSocket.machineRPC<ListPiSessionsResult, { cwd?: string; scope?: 'cwd' | 'machine' }>(
+        return await apiSocket.machineRPC<ListPiSessionsResult, { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }>(
             machineId,
             'list-pi-sessions',
-            { cwd, scope },
+            { cwd, scope, limit, cursor },
         );
     } catch (error) {
         return {

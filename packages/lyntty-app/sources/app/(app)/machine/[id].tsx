@@ -168,13 +168,21 @@ export default function MachineDetailScreen() {
         }
 
         setIsLoadingPiSessions(true);
-        const result = await machineListPiSessions({ machineId, scope: 'machine' });
-        if (result.type === 'success') {
-            setPiSessions(result.sessions);
-            setPiSessionsError(null);
-        } else {
-            setPiSessionsError(result.errorMessage);
-        }
+        const sessions: PiMachineSessionRecord[] = [];
+        let cursor: string | undefined;
+        let errorMessage: string | null = null;
+        do {
+            const result = await machineListPiSessions({ machineId, scope: 'machine', limit: 100, cursor });
+            if (result.type !== 'success') {
+                errorMessage = result.errorMessage;
+                break;
+            }
+            sessions.push(...result.sessions);
+            cursor = result.nextCursor;
+        } while (cursor && sessions.length < 5000);
+
+        setPiSessions(sessions);
+        setPiSessionsError(errorMessage ?? (cursor ? 'Pi session list truncated at 5000 records. Use search/pagination support before relying on older rows.' : null));
         setIsLoadingPiSessions(false);
     }, [machineId, machine]);
 

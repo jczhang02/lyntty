@@ -1203,6 +1203,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                     <View style={[styles.inputContainer, props.minHeight ? { minHeight: props.minHeight } : undefined]}>
                         <MultiTextInput
                             ref={inputRef}
+                            testID="lyntty-session-input"
+                            accessibilityLabel="Lyntty session message input"
                             defaultValue={props.initialValue}
                             paddingTop={Platform.OS === 'web' ? 10 : 8}
                             paddingBottom={Platform.OS === 'web' ? 10 : 8}
@@ -1357,6 +1359,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     ]}
                                 >
                                     <Pressable
+                                        testID="lyntty-session-send"
+                                        accessibilityLabel="Send message"
                                         style={(p) => ({
                                             width: '100%',
                                             height: '100%',

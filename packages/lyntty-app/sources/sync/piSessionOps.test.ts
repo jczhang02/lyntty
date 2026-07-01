@@ -24,7 +24,7 @@ describe('Pi machine session ops', () => {
         });
 
         const { machineListPiSessions } = await import('./ops');
-        const result = await machineListPiSessions({ machineId: 'machine-1' });
+        const result = await machineListPiSessions({ machineId: 'machine-1', limit: 100, cursor: '100' });
 
         expect(result).toEqual({
             type: 'success',
@@ -33,6 +33,8 @@ describe('Pi machine session ops', () => {
         expect(machineRPC).toHaveBeenCalledWith('machine-1', 'list-pi-sessions', {
             cwd: undefined,
             scope: 'machine',
+            limit: 100,
+            cursor: '100',
         });
     });
 

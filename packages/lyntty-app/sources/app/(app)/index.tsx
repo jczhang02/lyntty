@@ -75,6 +75,7 @@ function NotAuthenticated() {
                     </View>
                     <View style={styles.buttonContainerSecondary}>
                         <RoundButton
+                            testID="lyntty-create-account"
                             size="normal"
                             title={t('welcome.createAccount')}
                             action={createAccount}
@@ -86,6 +87,7 @@ function NotAuthenticated() {
                 <>
                     <View style={styles.buttonContainer}>
                         <RoundButton
+                            testID="lyntty-create-account"
                             title={t('welcome.createAccount')}
                             action={createAccount}
                         />
@@ -136,6 +138,7 @@ function NotAuthenticated() {
                             </View>
                             <View style={styles.landscapeButtonContainerSecondary}>
                                 <RoundButton
+                                    testID="lyntty-create-account"
                                     size="normal"
                                     title={t('welcome.createAccount')}
                                     action={createAccount}
@@ -146,6 +149,7 @@ function NotAuthenticated() {
                         : (<>
                             <View style={styles.landscapeButtonContainer}>
                                 <RoundButton
+                                    testID="lyntty-create-account"
                                     title={t('welcome.createAccount')}
                                     action={createAccount}
                                 />
