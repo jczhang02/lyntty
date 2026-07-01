@@ -478,8 +478,75 @@ export async function machineStopDaemon(machineId: string): Promise<{ message: s
     return result;
 }
 
+export async function machineWorktreeCreate(
+    machineId: string,
+    basePath: string,
+    branchName: string,
+): Promise<{
+    success: boolean;
+    worktreePath: string;
+    branchName: string;
+    error?: string;
+}> {
+    try {
+        return await apiSocket.machineRPC(
+            machineId,
+            'worktree-create',
+            { basePath, branchName },
+        );
+    } catch (error) {
+        return {
+            success: false,
+            worktreePath: '',
+            branchName: '',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        };
+    }
+}
+
+export async function machineWorktreeList(
+    machineId: string,
+    basePath: string,
+): Promise<{ worktrees: Array<{ path: string; branch: string }> }> {
+    try {
+        return await apiSocket.machineRPC(machineId, 'worktree-list', { basePath });
+    } catch {
+        return { worktrees: [] };
+    }
+}
+
+export async function machineWorktreeRemove(
+    machineId: string,
+    worktreePath: string,
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        return await apiSocket.machineRPC(machineId, 'worktree-remove', { worktreePath });
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        };
+    }
+}
+
+export async function machineWorktreeStatus(
+    machineId: string,
+    worktreePath: string,
+): Promise<{ success: boolean; clean: boolean; error?: string }> {
+    try {
+        return await apiSocket.machineRPC(machineId, 'worktree-status', { worktreePath });
+    } catch (error) {
+        return {
+            success: false,
+            clean: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        };
+    }
+}
+
 /**
- * Execute a bash command on a specific machine
+ * Execute a bash command on a specific machine.
+ * Legacy compatibility only: relay denies generic machine bash for Lyntty UI.
  */
 export async function machineBash(
     machineId: string,

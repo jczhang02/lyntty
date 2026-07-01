@@ -60,6 +60,31 @@ describe('Pi machine session ops', () => {
         });
     });
 
+    it('uses narrow worktree machine RPC methods instead of generic bash', async () => {
+        machineRPC
+            .mockResolvedValueOnce({ success: true, worktreePath: '/repo/.dev/worktree/test', branchName: 'test' })
+            .mockResolvedValueOnce({ worktrees: [{ path: '/repo/.dev/worktree/test', branch: 'test' }] })
+            .mockResolvedValueOnce({ success: true, clean: true })
+            .mockResolvedValueOnce({ success: true });
+
+        const {
+            machineWorktreeCreate,
+            machineWorktreeList,
+            machineWorktreeStatus,
+            machineWorktreeRemove,
+        } = await import('./ops');
+
+        await expect(machineWorktreeCreate('machine-1', '/repo', 'test')).resolves.toMatchObject({ success: true });
+        await expect(machineWorktreeList('machine-1', '/repo')).resolves.toMatchObject({ worktrees: [{ branch: 'test' }] });
+        await expect(machineWorktreeStatus('machine-1', '/repo/.dev/worktree/test')).resolves.toMatchObject({ clean: true });
+        await expect(machineWorktreeRemove('machine-1', '/repo/.dev/worktree/test')).resolves.toMatchObject({ success: true });
+
+        expect(machineRPC).toHaveBeenNthCalledWith(1, 'machine-1', 'worktree-create', { basePath: '/repo', branchName: 'test' });
+        expect(machineRPC).toHaveBeenNthCalledWith(2, 'machine-1', 'worktree-list', { basePath: '/repo' });
+        expect(machineRPC).toHaveBeenNthCalledWith(3, 'machine-1', 'worktree-status', { worktreePath: '/repo/.dev/worktree/test' });
+        expect(machineRPC).toHaveBeenNthCalledWith(4, 'machine-1', 'worktree-remove', { worktreePath: '/repo/.dev/worktree/test' });
+    });
+
     it('passes an existing Pi session id when spawning from history', async () => {
         machineRPC.mockResolvedValue({ type: 'success', sessionId: 'lyntty-1' });
 

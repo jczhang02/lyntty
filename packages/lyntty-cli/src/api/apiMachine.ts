@@ -5,6 +5,12 @@
 
 import { io, Socket } from 'socket.io-client';
 import { logger } from '@/ui/logger';
+import {
+    createManagedWorktree,
+    getManagedWorktreeStatus,
+    listManagedWorktrees,
+    removeManagedWorktree,
+} from '@/modules/worktree/worktreeRpc';
 import { configuration } from '@/configuration';
 import { MachineMetadata, DaemonState, Machine, Update, UpdateMachineBody } from './types';
 import type { SpawnSessionOptions, SpawnSessionResult } from '../modules/common/registerCommonHandlers';
@@ -201,6 +207,23 @@ export class ApiMachineClient {
             const page = await listPiSessions({ cwd, scope, limit, cursor });
             return { type: 'success', ...page };
         });
+
+        this.rpcHandlerManager.registerHandler('worktree-create', async (params: any) => createManagedWorktree({
+            basePath: params?.basePath,
+            branchName: params?.branchName,
+        }));
+
+        this.rpcHandlerManager.registerHandler('worktree-list', async (params: any) => ({
+            worktrees: await listManagedWorktrees({ basePath: params?.basePath }),
+        }));
+
+        this.rpcHandlerManager.registerHandler('worktree-remove', async (params: any) => removeManagedWorktree({
+            worktreePath: params?.worktreePath,
+        }));
+
+        this.rpcHandlerManager.registerHandler('worktree-status', async (params: any) => getManagedWorktreeStatus({
+            worktreePath: params?.worktreePath,
+        }));
 
         // Register stop session handler
         this.rpcHandlerManager.registerHandler('stop-session', (params: any) => {

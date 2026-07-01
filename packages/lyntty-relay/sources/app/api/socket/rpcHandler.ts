@@ -95,6 +95,10 @@ const ALLOWED_MACHINE_RPC_METHODS = new Set([
     'codex-fork-thread',
     'codex-duplicate-thread',
     'codex-list-rewind-points',
+    'worktree-create',
+    'worktree-list',
+    'worktree-remove',
+    'worktree-status',
 ]);
 
 const MACHINE_DENIED_COMMON_RPC_METHODS = new Set([
@@ -104,6 +108,7 @@ const MACHINE_DENIED_COMMON_RPC_METHODS = new Set([
     'listDirectory',
     'getDirectoryTree',
     'ripgrep',
+    'difftastic',
 ]);
 
 const UUID_SCOPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -12,7 +12,7 @@
  */
 
 import { storage } from '@/sync/storage';
-import { machineBash } from '@/sync/ops';
+import { machineWorktreeStatus } from '@/sync/ops';
 import { isWorktreePath, removeWorktree } from '@/utils/worktree';
 import { Modal } from '@/modal';
 import { t } from '@/text';
@@ -41,13 +41,9 @@ export async function maybeCleanupWorktree(
         return;
     }
 
-    // 2. Check git status for uncommitted changes
-    const statusResult = await machineBash(
-        machineId,
-        'git status --porcelain',
-        sessionPath,
-    );
-    if (!statusResult.success || statusResult.stdout.trim().length > 0) {
+    // 2. Check git status for uncommitted changes via a narrow daemon RPC.
+    const statusResult = await machineWorktreeStatus(machineId, sessionPath);
+    if (!statusResult.success || !statusResult.clean) {
         // Either git failed (not a repo / machine offline) or there are changes → skip
         return;
     }

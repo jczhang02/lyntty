@@ -6,10 +6,18 @@ import { logger } from '@/ui/logger';
 
 const {
     mockIo,
-    mockShouldReconnect
+    mockShouldReconnect,
+    mockCreateManagedWorktree,
+    mockListManagedWorktrees,
+    mockRemoveManagedWorktree,
+    mockGetManagedWorktreeStatus,
 } = vi.hoisted(() => ({
     mockIo: vi.fn(),
-    mockShouldReconnect: vi.fn(() => true)
+    mockShouldReconnect: vi.fn(() => true),
+    mockCreateManagedWorktree: vi.fn(),
+    mockListManagedWorktrees: vi.fn(),
+    mockRemoveManagedWorktree: vi.fn(),
+    mockGetManagedWorktreeStatus: vi.fn(),
 }));
 
 vi.mock('socket.io-client', () => ({
@@ -32,6 +40,13 @@ vi.mock('@/ui/logger', () => ({
 
 vi.mock('@/modules/common/registerCommonHandlers', () => ({
     registerCommonHandlers: vi.fn()
+}));
+
+vi.mock('@/modules/worktree/worktreeRpc', () => ({
+    createManagedWorktree: mockCreateManagedWorktree,
+    listManagedWorktrees: mockListManagedWorktrees,
+    removeManagedWorktree: mockRemoveManagedWorktree,
+    getManagedWorktreeStatus: mockGetManagedWorktreeStatus,
 }));
 
 vi.mock('@/api/rpc/RpcHandlerManager', () => ({
@@ -101,6 +116,10 @@ describe('ApiMachineClient socket reconnection', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockShouldReconnect.mockReturnValue(true);
+        mockCreateManagedWorktree.mockResolvedValue({ success: true, worktreePath: '/repo/.dev/worktree/test', branchName: 'test' });
+        mockListManagedWorktrees.mockResolvedValue([{ path: '/repo/.dev/worktree/test', branch: 'test' }]);
+        mockRemoveManagedWorktree.mockResolvedValue({ success: true });
+        mockGetManagedWorktreeStatus.mockResolvedValue({ success: true, clean: true });
         socketHandlers = {};
         mockSocket = {
             connected: false,
@@ -131,6 +150,27 @@ describe('ApiMachineClient socket reconnection', () => {
         new ApiMachineClient('fake-token', makeMachine());
 
         expect(registerCommonHandlers).not.toHaveBeenCalled();
+    });
+
+    it('registers narrow worktree RPC handlers on machine RPC', async () => {
+        const client = new ApiMachineClient('fake-token', makeMachine());
+        client.setRPCHandlers({
+            spawnSession: vi.fn(async () => ({ type: 'success' as const, sessionId: 'session-1' })),
+            stopSession: vi.fn(() => true),
+            requestShutdown: vi.fn(),
+        });
+
+        const registeredMethods = (client as any).rpcHandlerManager.registerHandler.mock.calls.map(([method]: [string]) => method);
+        expect(registeredMethods).toContain('worktree-create');
+        expect(registeredMethods).toContain('worktree-list');
+        expect(registeredMethods).toContain('worktree-remove');
+        expect(registeredMethods).toContain('worktree-status');
+        expect(registeredMethods).not.toContain('bash');
+
+        const createHandler = (client as any).rpcHandlerManager.registerHandler.mock.calls
+            .find(([method]: [string]) => method === 'worktree-create')?.[1];
+        await expect(createHandler({ basePath: '/repo', branchName: 'safe-branch' })).resolves.toMatchObject({ success: true });
+        expect(mockCreateManagedWorktree).toHaveBeenCalledWith({ basePath: '/repo', branchName: 'safe-branch' });
     });
 
     it('redacts sensitive spawn RPC parameters from logs', async () => {
