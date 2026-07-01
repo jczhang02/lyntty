@@ -331,6 +331,37 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect((client as any).lastSeq).toBe(1);
     });
 
+    it('flushes long outbox batches in enqueue order', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        (client as any).pendingOutbox = Array.from({ length: 120 }, (_value, index) => ({
+            content: `encrypted-${index + 1}`,
+            localId: `local-${index + 1}`,
+        }));
+        let nextSeq = 1;
+        mockAxiosPost.mockImplementation(async (_url: string, payload: { messages: Array<{ localId: string }> }) => ({
+            data: {
+                messages: payload.messages.map((message) => ({
+                    id: `msg-${nextSeq}`,
+                    seq: nextSeq++,
+                    localId: message.localId,
+                    createdAt: nextSeq,
+                    updatedAt: nextSeq,
+                })),
+            },
+        }));
+
+        await (client as any).flushOutbox();
+
+        expect(mockAxiosPost).toHaveBeenCalledTimes(3);
+        expect(mockAxiosPost.mock.calls.map((call) => call[1].messages.map((message: { localId: string }) => message.localId))).toEqual([
+            Array.from({ length: 50 }, (_value, index) => `local-${index + 1}`),
+            Array.from({ length: 50 }, (_value, index) => `local-${index + 51}`),
+            Array.from({ length: 20 }, (_value, index) => `local-${index + 101}`),
+        ]);
+        expect((client as any).pendingOutbox).toHaveLength(0);
+        expect((client as any).lastSeq).toBe(120);
+    });
+
     it('sends claude user text as modern session envelope', async () => {
         const client = new ApiSessionClient('fake-token', session);
         mockAxiosPost.mockResolvedValueOnce({
