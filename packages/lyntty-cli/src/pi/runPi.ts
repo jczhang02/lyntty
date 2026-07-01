@@ -38,7 +38,11 @@ function summarizePiRuntimeList(items: string[], visibleCount = 8): string {
   return remaining > 0 ? `${visible}, +${remaining} more` : visible;
 }
 
-async function createPiRuntime(cwd: string): Promise<AgentSessionRuntime> {
+function getPiSessionDisplayName(session: AgentSessionRuntime['session']): string {
+  return session.sessionName ?? session.sessionId;
+}
+
+async function createPiRuntime(cwd: string, piSessionId?: string): Promise<AgentSessionRuntime> {
   const createRuntime = async ({
     cwd: runtimeCwd,
     agentDir,
@@ -57,10 +61,20 @@ async function createPiRuntime(cwd: string): Promise<AgentSessionRuntime> {
     };
   };
 
+  let sessionManager = SessionManager.create(cwd);
+  if (piSessionId) {
+    const sessions = await SessionManager.listAll();
+    const matched = sessions.find((entry) => entry.id === piSessionId);
+    if (!matched) {
+      throw new Error(`Pi session ${piSessionId} was not found on this machine`);
+    }
+    sessionManager = SessionManager.open(matched.path, undefined, matched.cwd || cwd);
+  }
+
   return createAgentSessionRuntime(createRuntime, {
     cwd,
     agentDir: getAgentDir(),
-    sessionManager: SessionManager.create(cwd),
+    sessionManager,
   });
 }
 
@@ -79,7 +93,8 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     metadata: initialMachineMetadata,
   });
 
-  const piRuntime = await createPiRuntime(process.cwd());
+  const requestedPiSessionId = process.env.LYNTTY_PI_SESSION_ID;
+  const piRuntime = await createPiRuntime(process.cwd(), requestedPiSessionId);
   let shutdownRequested: (() => void) | null = null;
   await bindPiSessionExtensions(piRuntime, {
     onShutdown: () => shutdownRequested?.(),
@@ -106,9 +121,8 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   ];
   metadata.currentThoughtLevelCode = piRuntime.session.thinkingLevel;
   metadata.slashCommands = initialFeatureSummary.slashCommands;
-  if (piRuntime.session.sessionFile) {
-    metadata.name = piRuntime.session.sessionId;
-  }
+  metadata.piSessionId = piRuntime.session.sessionId;
+  metadata.name = getPiSessionDisplayName(piRuntime.session);
 
   const response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
   let session: ApiSessionClient;
@@ -147,6 +161,13 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       thinking = false;
       session.sendSessionEvent({ type: 'ready' });
     }
+    if (event.type === 'session_info_changed') {
+      session.updateMetadata((currentMetadata) => ({
+        ...currentMetadata,
+        piSessionId: piRuntime.session.sessionId,
+        name: getPiSessionDisplayName(piRuntime.session),
+      }));
+    }
 
     sendPiEnvelopes(piSessionProtocol.mapEvent(event));
   });
@@ -160,6 +181,8 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     const nextSlashCommands = listPiRemoteSlashCommands(nextSession);
     session.updateMetadata((currentMetadata) => ({
       ...currentMetadata,
+      piSessionId: nextSession.sessionId,
+      name: getPiSessionDisplayName(nextSession),
       slashCommands: nextSlashCommands,
     }));
     unsubscribe = nextSession.subscribe((event) => {
@@ -167,6 +190,13 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       if (event.type === 'agent_end') {
         thinking = false;
         session.sendSessionEvent({ type: 'ready' });
+      }
+      if (event.type === 'session_info_changed') {
+        session.updateMetadata((currentMetadata) => ({
+          ...currentMetadata,
+          piSessionId: nextSession.sessionId,
+          name: getPiSessionDisplayName(nextSession),
+        }));
       }
       sendPiEnvelopes(piSessionProtocol.mapEvent(event));
     });

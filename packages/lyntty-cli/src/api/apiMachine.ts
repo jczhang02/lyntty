@@ -28,6 +28,7 @@ import {
     forkCodexThread,
     listCodexRewindPoints,
 } from '@/codex/codexThreadFork';
+import type { PiSessionRecoveryRecord } from '@/pi/runPiRecovery';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -91,6 +92,7 @@ interface DaemonToServerEvents {
 type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
     resumeSession?: (sessionId: string, options?: { model?: string; permissionMode?: string }) => Promise<SpawnSessionResult>;
+    listPiSessions?: (options?: { cwd?: string; scope?: 'cwd' | 'machine' }) => Promise<PiSessionRecoveryRecord[]>;
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
 }
@@ -139,6 +141,7 @@ export class ApiMachineClient {
     setRPCHandlers({
         spawnSession,
         resumeSession,
+        listPiSessions,
         stopSession,
         requestShutdown
     }: MachineRpcHandlers) {
@@ -170,6 +173,17 @@ export class ApiMachineClient {
         });
 
         this.syncResumeSessionRpcRegistration();
+
+        this.rpcHandlerManager.registerHandler('list-pi-sessions', async (params: any) => {
+            if (!listPiSessions) {
+                throw new Error('Pi session discovery is not available on this machine');
+            }
+
+            const cwd = typeof params?.cwd === 'string' && params.cwd.length > 0 ? params.cwd : undefined;
+            const scope = params?.scope === 'cwd' ? 'cwd' : 'machine';
+            const sessions = await listPiSessions({ cwd, scope });
+            return { type: 'success', sessions };
+        });
 
         // Register stop session handler
         this.rpcHandlerManager.registerHandler('stop-session', (params: any) => {

@@ -34,8 +34,9 @@ export interface PiSessionRecoveryRecord {
 }
 
 export interface DiscoverPiSessionsOptions {
-  cwd: string;
+  cwd?: string;
   sessionDir?: string;
+  scope?: 'cwd' | 'machine';
   registeredSessions?: RegisteredPiSessionState[];
   activePiSessionIds?: string[];
   staleAfterMs?: number;
@@ -156,8 +157,22 @@ export function classifyPiSessionRecovery(input: {
   };
 }
 
+async function listPiSessionsForScope(options: DiscoverPiSessionsOptions): Promise<SessionInfo[]> {
+  if (options.listSessions) {
+    return options.listSessions();
+  }
+
+  if (options.scope === 'machine' || !options.cwd) {
+    return options.sessionDir
+      ? SessionManager.listAll(options.sessionDir)
+      : SessionManager.listAll();
+  }
+
+  return SessionManager.list(options.cwd, options.sessionDir);
+}
+
 export async function discoverLocalPiSessions(options: DiscoverPiSessionsOptions): Promise<PiSessionRecoveryRecord[]> {
-  const sessions = await (options.listSessions ?? (() => SessionManager.list(options.cwd, options.sessionDir)))();
+  const sessions = await listPiSessionsForScope(options);
   const registeredByPiId = new Map((options.registeredSessions ?? []).map((entry) => [entry.piSessionId, entry]));
   const activePiIds = new Set(options.activePiSessionIds ?? []);
 

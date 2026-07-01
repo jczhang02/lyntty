@@ -301,8 +301,9 @@ export type Metadata = {
     updatedAt: number
   },
   machineId?: string,
-  claudeSessionId?: string, // Claude Code session ID
-  codexThreadId?: string, // Codex app-server thread ID
+  piSessionId?: string, // Pi JSONL session ID
+  claudeSessionId?: string, // Legacy Claude Code session ID
+  codexThreadId?: string, // Legacy Codex app-server thread ID
   tools?: string[],
   slashCommands?: string[],
   mcpServers?: Array<{ name: string; status: string }>,

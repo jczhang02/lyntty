@@ -142,6 +142,8 @@ export type SpawnSessionResult =
 export interface SpawnSessionOptions {
     machineId: string;
     directory: string;
+    /** Existing Pi JSONL session id to open on the machine. */
+    sessionId?: string;
     approvedNewDirectoryCreation?: boolean;
     token?: string;
     agent?: 'pi' | 'codex' | 'claude' | 'gemini' | 'openclaw';
@@ -213,6 +215,33 @@ export interface ResumeSessionOptions {
     sessionId: string;
 }
 
+export type PiRecoveryState =
+    | 'discovered_local'
+    | 'registered'
+    | 'active_runtime'
+    | 'stale_local'
+    | 'missing_local_history'
+    | 'history_gap'
+    | 'import_failed';
+
+export interface PiMachineSessionRecord {
+    state: PiRecoveryState;
+    piSessionId: string;
+    relaySessionId?: string;
+    path?: string;
+    cwd?: string;
+    name?: string;
+    messageCount: number;
+    needsRegistration: boolean;
+    needsBackfill: boolean;
+    hasHistoryGap: boolean;
+    reason: string;
+}
+
+export type ListPiSessionsResult =
+    | { type: 'success'; sessions: PiMachineSessionRecord[] }
+    | { type: 'error'; errorMessage: string };
+
 // Exported session operation functions
 
 /**
@@ -220,12 +249,13 @@ export interface ResumeSessionOptions {
  */
 export async function machineSpawnNewSession(options: SpawnSessionOptions): Promise<SpawnSessionResult> {
 
-    const { machineId, directory, approvedNewDirectoryCreation = false, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId } = options;
+    const { machineId, directory, sessionId, approvedNewDirectoryCreation = false, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId } = options;
 
     try {
         const result = await apiSocket.machineRPC<SpawnSessionResult, {
             type: 'spawn-in-directory'
             directory: string
+            sessionId?: string,
             approvedNewDirectoryCreation?: boolean,
             token?: string,
             agent?: 'pi' | 'codex' | 'claude' | 'gemini' | 'openclaw',
@@ -237,7 +267,7 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
         }>(
             machineId,
             'spawn-lyntty-session',
-            { type: 'spawn-in-directory', directory, approvedNewDirectoryCreation, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId }
+            { type: 'spawn-in-directory', directory, sessionId, approvedNewDirectoryCreation, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId }
         );
         return result;
     } catch (error) {
@@ -396,6 +426,23 @@ export async function codexListRewindPoints(
         return {
             type: 'error',
             errorMessage: error instanceof Error ? error.message : 'Failed to list Codex rewind points',
+        };
+    }
+}
+
+export async function machineListPiSessions(options: { machineId: string; cwd?: string; scope?: 'cwd' | 'machine' }): Promise<ListPiSessionsResult> {
+    const { machineId, cwd, scope = 'machine' } = options;
+
+    try {
+        return await apiSocket.machineRPC<ListPiSessionsResult, { cwd?: string; scope?: 'cwd' | 'machine' }>(
+            machineId,
+            'list-pi-sessions',
+            { cwd, scope },
+        );
+    } catch (error) {
+        return {
+            type: 'error',
+            errorMessage: error instanceof Error ? error.message : 'Failed to list Pi sessions',
         };
     }
 }

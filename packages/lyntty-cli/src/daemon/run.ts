@@ -29,6 +29,7 @@ import { buildResumeLaunch } from '@/resume/handleResumeCommand';
 import { detectResumeSupport } from '@/resume/localLynttyAgentAuth';
 import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
 import { resolvePiActivationLock } from './activationLock';
+import { discoverLocalPiSessions, redactPiSessionForRelay, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -352,6 +353,9 @@ export async function startDaemon(): Promise<void> {
           ...authEnv,
           ...(options.environmentVariables ?? {}),
         };
+        if (options.sessionId) {
+          extraEnv.LYNTTY_PI_SESSION_ID = options.sessionId;
+        }
         if (options.parentSessionId) {
           extraEnv.LYNTTY_FORKED_FROM_SESSION_ID = options.parentSessionId;
         }
@@ -641,6 +645,40 @@ export async function startDaemon(): Promise<void> {
       return sessionIdToFinishedSession.get(lynttySessionId);
     };
 
+    const getRegisteredPiSessions = (): RegisteredPiSessionState[] => {
+      return [...pidToTrackedSession.values(), ...sessionIdToFinishedSession.values()].flatMap((tracked) => {
+        const metadata = tracked.lynttySessionMetadataFromLocalWebhook;
+        if (!metadata?.piSessionId) {
+          return [];
+        }
+
+        return [{
+          piSessionId: metadata.piSessionId,
+          relaySessionId: tracked.lynttySessionId,
+          importedMessageCount: 0,
+          relayAvailable: !!tracked.lynttySessionId,
+          updatedAt: tracked.lynttySessionId ? new Date() : undefined,
+        }];
+      });
+    };
+
+    const listPiSessions = async (options?: { cwd?: string; scope?: 'cwd' | 'machine' }) => {
+      const activePiSessionIds = getCurrentChildren()
+        .map((tracked) => tracked.lynttySessionMetadataFromLocalWebhook?.piSessionId)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+      const records = await discoverLocalPiSessions({
+        cwd: options?.cwd,
+        scope: options?.scope ?? 'machine',
+        registeredSessions: getRegisteredPiSessions(),
+        activePiSessionIds,
+      });
+
+      return records
+        .map((record) => redactPiSessionForRelay(record))
+        .sort((a, b) => Number(b.state === 'active_runtime') - Number(a.state === 'active_runtime'));
+    };
+
     const fetchServerSessionMetadata = async (sessionId: string, encryptionKey: Uint8Array, encryptionVariant: 'legacy' | 'dataKey'): Promise<Metadata | null> => {
       try {
         const response = await axios.get(`${configuration.serverUrl}/v1/sessions`, {
@@ -832,6 +870,7 @@ export async function startDaemon(): Promise<void> {
     apiMachine.setRPCHandlers({
       spawnSession,
       resumeSession,
+      listPiSessions,
       stopSession,
       requestShutdown: () => requestShutdown('lyntty-app')
     });

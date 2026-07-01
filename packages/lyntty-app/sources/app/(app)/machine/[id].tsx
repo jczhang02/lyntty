@@ -8,7 +8,7 @@ import { Typography } from '@/constants/Typography';
 import { useSessions, useAllMachines, useMachine } from '@/sync/storage';
 import { Ionicons, Octicons } from '@expo/vector-icons';
 import type { Session } from '@/sync/storageTypes';
-import { machineStopDaemon, machineUpdateMetadata, machineDelete } from '@/sync/ops';
+import { machineStopDaemon, machineUpdateMetadata, machineDelete, machineListPiSessions, type PiMachineSessionRecord } from '@/sync/ops';
 import { Modal } from '@/modal';
 import { formatPathRelativeToHome, getSessionName, getSessionSubtitle } from '@/utils/sessionUtils';
 import { isMachineOnline } from '@/utils/machineUtils';
@@ -75,6 +75,9 @@ export default function MachineDetailScreen() {
     const [isDeletingMachine, setIsDeletingMachine] = useState(false);
     const [customPath, setCustomPath] = useState('');
     const [isSpawning, setIsSpawning] = useState(false);
+    const [isLoadingPiSessions, setIsLoadingPiSessions] = useState(false);
+    const [piSessions, setPiSessions] = useState<PiMachineSessionRecord[]>([]);
+    const [piSessionsError, setPiSessionsError] = useState<string | null>(null);
     const inputRef = useRef<MultiTextInputHandle>(null);
     const [showAllPaths, setShowAllPaths] = useState(false);
     // Variant D only
@@ -157,9 +160,34 @@ export default function MachineDetailScreen() {
 
     // inline control below
 
+    const refreshPiSessions = useCallback(async () => {
+        if (!machineId || !machine || !isMachineOnline(machine)) {
+            setPiSessions([]);
+            setPiSessionsError(null);
+            return;
+        }
+
+        setIsLoadingPiSessions(true);
+        const result = await machineListPiSessions({ machineId, scope: 'machine' });
+        if (result.type === 'success') {
+            setPiSessions(result.sessions);
+            setPiSessionsError(null);
+        } else {
+            setPiSessionsError(result.errorMessage);
+        }
+        setIsLoadingPiSessions(false);
+    }, [machineId, machine]);
+
+    React.useEffect(() => {
+        void refreshPiSessions();
+    }, [refreshPiSessions]);
+
     const handleRefresh = async () => {
         setIsRefreshing(true);
-        await sync.refreshMachines();
+        await Promise.all([
+            sync.refreshMachines(),
+            refreshPiSessions(),
+        ]);
         setIsRefreshing(false);
     };
 
@@ -273,10 +301,52 @@ export default function MachineDetailScreen() {
         }
     };
 
-    const pastUsedRelativePath = useCallback((session: Session) => {
-        if (!session.metadata) return 'unknown path';
-        return formatPathRelativeToHome(session.metadata.path, session.metadata.homeDir);
+    const handleOpenPiSession = useCallback(async (piSession: PiMachineSessionRecord) => {
+        if (!machineId || !machine) return;
+
+        if (piSession.relaySessionId) {
+            navigateToSession(piSession.relaySessionId);
+            return;
+        }
+
+        if (!piSession.cwd) {
+            Modal.alert(t('common.error'), 'Pi session has no working directory on this machine.');
+            return;
+        }
+
+        setIsSpawning(true);
+        try {
+            const result = await machineSpawnNewSession({
+                machineId,
+                directory: piSession.cwd,
+                sessionId: piSession.piSessionId,
+                agent: 'pi',
+                approvedNewDirectoryCreation: true,
+            });
+            if (result.type === 'success') {
+                router.back();
+                navigateToSession(result.sessionId);
+            } else if (result.type === 'error') {
+                Modal.alert(t('common.error'), result.errorMessage);
+            }
+        } finally {
+            setIsSpawning(false);
+        }
+    }, [machineId, machine, navigateToSession, router]);
+
+    const piSessionTitle = useCallback((piSession: PiMachineSessionRecord) => {
+        return piSession.name?.trim() || piSession.piSessionId;
     }, []);
+
+    const piSessionSubtitle = useCallback((piSession: PiMachineSessionRecord) => {
+        const bits = [
+            piSession.state,
+            piSession.cwd ? formatPathRelativeToHome(piSession.cwd, machine?.metadata?.homeDir) : undefined,
+            `${piSession.messageCount} messages`,
+            piSession.hasHistoryGap ? 'history_gap' : undefined,
+        ];
+        return bits.filter(Boolean).join(' • ');
+    }, [machine?.metadata?.homeDir]);
 
     if (!machine) {
         return (
@@ -535,9 +605,54 @@ export default function MachineDetailScreen() {
                     </ItemGroup>
                 )}
 
-                {/* Previous Sessions (debug view) */}
+                {/* Pi sessions on this machine */}
+                <ItemGroup title={'Pi sessions on this machine'}>
+                    {isLoadingPiSessions && piSessions.length === 0 ? (
+                        <Item
+                            title={'Scanning local Pi history…'}
+                            showChevron={false}
+                            rightElement={<ActivityIndicator size="small" color={theme.colors.textSecondary} />}
+                        />
+                    ) : piSessionsError ? (
+                        <Item
+                            title={'Unable to scan Pi sessions'}
+                            subtitle={piSessionsError}
+                            subtitleLines={0}
+                            showChevron={false}
+                        />
+                    ) : piSessions.length === 0 ? (
+                        <Item
+                            title={isMachineOnline(machine) ? 'No local Pi sessions found' : 'Machine offline'}
+                            subtitle={isMachineOnline(machine) ? 'Start a pi session on this node to create history.' : 'Connect this node to scan local Pi history.'}
+                            showChevron={false}
+                        />
+                    ) : (
+                        piSessions.slice(0, 12).map((piSession) => (
+                            <Item
+                                key={piSession.piSessionId}
+                                title={piSessionTitle(piSession)}
+                                subtitle={piSessionSubtitle(piSession)}
+                                subtitleLines={2}
+                                onPress={isMachineOnline(machine) ? () => handleOpenPiSession(piSession) : undefined}
+                                disabled={!isMachineOnline(machine) || isSpawning}
+                                rightElement={piSession.state === 'active_runtime'
+                                    ? <Text style={{ color: '#34C759', fontSize: 13 }}>{t('status.online')}</Text>
+                                    : <Ionicons name="play" size={18} color={theme.colors.textSecondary} />}
+                            />
+                        ))
+                    )}
+                    {piSessions.length > 12 && (
+                        <Item
+                            title={`Showing 12 of ${piSessions.length} Pi sessions`}
+                            showChevron={false}
+                            titleStyle={{ textAlign: 'center', color: theme.colors.textSecondary }}
+                        />
+                    )}
+                </ItemGroup>
+
+                {/* Previous Sessions (relay cache) */}
                 {previousSessions.length > 0 && (
-                    <ItemGroup title={'Previous Sessions (up to 5 most recent)'}>
+                    <ItemGroup title={'Relay sessions (up to 5 most recent)'}>
                         {previousSessions.map(session => (
                             <Item
                                 key={session.id}

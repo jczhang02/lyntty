@@ -64,6 +64,49 @@ describe('ApiMachineClient Codex fork RPCs', () => {
         expect(codexClientMethods.disconnect).toHaveBeenCalledOnce();
     });
 
+    it('forwards Pi sessionId through the spawn RPC', async () => {
+        const spawnSession = vi.fn().mockResolvedValue({ type: 'success', sessionId: 'lyntty-pi' });
+
+        const { ApiMachineClient } = await import('./apiMachine');
+        const client = new ApiMachineClient('token', machineClient());
+        client.setRPCHandlers({
+            spawnSession,
+            stopSession: vi.fn(),
+            requestShutdown: vi.fn(),
+        });
+
+        const result = await handlersFrom(client).get('machine-1:spawn-lyntty-session')?.({
+            directory: '/tmp/project',
+            agent: 'pi',
+            sessionId: 'pi-existing',
+        });
+
+        expect(result).toEqual({ type: 'success', sessionId: 'lyntty-pi' });
+        expect(spawnSession).toHaveBeenCalledWith(expect.objectContaining({
+            directory: '/tmp/project',
+            agent: 'pi',
+            sessionId: 'pi-existing',
+        }));
+    });
+
+    it('registers a Pi session discovery RPC', async () => {
+        const listPiSessions = vi.fn().mockResolvedValue([{ piSessionId: 'pi-1', state: 'discovered_local' }]);
+
+        const { ApiMachineClient } = await import('./apiMachine');
+        const client = new ApiMachineClient('token', machineClient());
+        client.setRPCHandlers({
+            spawnSession: vi.fn(),
+            listPiSessions,
+            stopSession: vi.fn(),
+            requestShutdown: vi.fn(),
+        });
+
+        const result = await handlersFrom(client).get('machine-1:list-pi-sessions')?.({ scope: 'machine' });
+
+        expect(result).toEqual({ type: 'success', sessions: [{ piSessionId: 'pi-1', state: 'discovered_local' }] });
+        expect(listPiSessions).toHaveBeenCalledWith({ scope: 'machine', cwd: undefined });
+    });
+
     it('forwards resumeCodexThreadId through the spawn RPC', async () => {
         const spawnSession = vi.fn().mockResolvedValue({ type: 'success', sessionId: 'lyntty-forked' });
 

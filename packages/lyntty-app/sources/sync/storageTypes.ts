@@ -33,8 +33,9 @@ export const MetadataSchema = z.object({
         updatedAt: z.number()
     }).optional(),
     machineId: z.string().optional(),
-    claudeSessionId: z.string().optional(), // Claude Code session ID
-    codexThreadId: z.string().optional(), // Codex app-server thread ID
+    piSessionId: z.string().optional(), // Pi JSONL session ID
+    claudeSessionId: z.string().optional(), // Legacy Claude Code session ID
+    codexThreadId: z.string().optional(), // Legacy Codex app-server thread ID
     tools: z.array(z.string()).optional(),
     slashCommands: z.array(z.string()).optional(),
     mcpServers: z.array(z.object({ name: z.string(), status: z.string() })).optional(),

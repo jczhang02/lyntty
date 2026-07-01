@@ -120,6 +120,20 @@ describe('discoverLocalPiSessions', () => {
       listSessions: async () => [sessionInfo()],
     })).resolves.toMatchObject([{ state: 'active_runtime', piSessionId: 'pi-1' }]);
   });
+
+  it('supports machine-wide historical Pi discovery without a cwd', async () => {
+    await expect(discoverLocalPiSessions({
+      scope: 'machine',
+      now,
+      listSessions: async () => [
+        sessionInfo({ id: 'pi-1', cwd: '/repo/one' }),
+        sessionInfo({ id: 'pi-2', cwd: '/repo/two', name: 'Two' }),
+      ],
+    })).resolves.toMatchObject([
+      { state: 'discovered_local', piSessionId: 'pi-1', cwd: '/repo/one' },
+      { state: 'discovered_local', piSessionId: 'pi-2', cwd: '/repo/two', name: 'Two' },
+    ]);
+  });
 });
 
 describe('Pi relay redaction', () => {

@@ -78,6 +78,10 @@ export function useSessionStatus(session: Session): SessionStatus {
  * Returns the last segment of the path, or 'unknown' if no path is available.
  */
 export function getSessionName(session: Session): string {
+    const piName = session.metadata?.name?.trim();
+    if (piName) {
+        return piName;
+    }
     if (session.metadata?.summary) {
         return session.metadata.summary.text;
     }
