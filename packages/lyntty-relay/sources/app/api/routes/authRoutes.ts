@@ -34,7 +34,7 @@ export function authRoutes(app: Fastify) {
 
         return reply.send({
             success: true,
-            token: await auth.createToken(user.id)
+            token: await auth.createToken(user.id, { allowedClientTypes: ['user-scoped'] })
         });
     });
 
@@ -75,7 +75,7 @@ export function authRoutes(app: Fastify) {
         });
 
         if (answer.response && answer.responseAccountId) {
-            const token = await auth.createToken(answer.responseAccountId!, { session: answer.id });
+            const token = await auth.createToken(answer.responseAccountId!, { session: answer.id, allowedClientTypes: ['machine-scoped', 'session-scoped'] });
             return reply.send({
                 state: 'authorized',
                 token: token,
@@ -199,7 +199,7 @@ export function authRoutes(app: Fastify) {
         });
 
         if (answer.response && answer.responseAccountId) {
-            const token = await auth.createToken(answer.responseAccountId!);
+            const token = await auth.createToken(answer.responseAccountId!, { allowedClientTypes: ['user-scoped'] });
             return reply.send({
                 state: 'authorized',
                 token: token,

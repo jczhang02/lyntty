@@ -28,6 +28,7 @@ model Account {
     updatedAt       DateTime    @updatedAt
     settings        String?
     settingsVersion Int         @default(0)
+    tokenVersion    Int         @default(0)
     githubUserId    String?     @unique
     githubUser      GithubUser? @relation(fields: [githubUserId], references: [id])
 
@@ -53,6 +54,18 @@ model Account {
     UserFeedItem        UserFeedItem[]
     UserKVStore         UserKVStore[]
     VoiceConversation   VoiceConversation[]
+    RevokedAuthToken    RevokedAuthToken[]
+}
+
+model RevokedAuthToken {
+    jti       String   @id
+    accountId String
+    account   Account  @relation(fields: [accountId], references: [id])
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    @@index([accountId])
+    @@index([expiresAt])
 }
 
 model TerminalAuthRequest {

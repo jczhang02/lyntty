@@ -21,6 +21,7 @@ export function enableAuthentication(app: Fastify) {
 
             log({ module: 'auth-decorator' }, `Auth success - user: ${verified.userId}`);
             request.userId = verified.userId;
+            request.authExtras = verified.extras;
         } catch (error) {
             return reply.code(401).send({ error: 'Authentication failed' });
         }

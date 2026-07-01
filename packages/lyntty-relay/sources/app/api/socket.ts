@@ -6,6 +6,7 @@ import { createAdapter } from "@socket.io/redis-streams-adapter";
 import { Redis } from "ioredis";
 import { log } from "@/utils/log";
 import { auth } from "@/app/auth/auth";
+import { isClientTypeAllowedByToken } from "@/app/auth/authScope";
 import { getMetricsLabelsFromSocket, redisStreamLagMsGauge, websocketConnectionsGauge, websocketEventsCounter } from "../monitoring/metrics2";
 import { usageHandler } from "./socket/usageHandler";
 import { rpcHandler } from "./socket/rpcHandler";
@@ -110,8 +111,16 @@ export function startSocket(app: Fastify) {
             return;
         }
 
+        const effectiveClientType = clientType || 'user-scoped';
+        if (!isClientTypeAllowedByToken(verified.extras, effectiveClientType)) {
+            log({ module: 'websocket' }, `Token scope rejected clientType: ${effectiveClientType}`);
+            next(new Error('Token scope does not allow requested client type'));
+            return;
+        }
+
         socket.data.userId = verified.userId;
         socket.data.clientType = clientType;
+        socket.data.authExtras = verified.extras;
         socket.data.sessionId = sessionId;
         socket.data.machineId = machineId;
         socket.data.lynttyClient = socket.handshake.auth.lynttyClient as string
