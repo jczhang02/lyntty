@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
-import { mapPiSessionEventToAgentMessages } from './runPiEvents';
+import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 
 function deliverRemoteText(input: {
   text: string;
@@ -47,24 +47,29 @@ describe('Pi command/event path smoke', () => {
     });
   });
 
-  it('simulates Pi SDK events returning as Session Remote agent messages', () => {
-    expect(mapPiSessionEventToAgentMessages({
+  it('simulates Pi SDK events returning as Session Remote session envelopes', () => {
+    const mapper = new PiSessionProtocolMapper();
+    expect(mapper.mapEvent({ type: 'agent_start' } as any).map((envelope) => envelope.ev.t)).toEqual(['turn-start']);
+    expect(mapper.mapEvent({
       type: 'message_update',
       assistantMessageEvent: { type: 'text_delta', delta: 'done' },
-    } as any)).toEqual([{ type: 'message', message: 'done', streaming: true }]);
+    } as any)).toEqual([]);
 
-    expect(mapPiSessionEventToAgentMessages({
+    const toolStart = mapper.mapEvent({
       type: 'tool_execution_start',
       toolCallId: 'tool-1',
       toolName: 'bash',
       args: { command: 'pnpm test' },
-    } as any)).toEqual([{ type: 'tool-call', callId: 'tool-1', id: 'tool-1', name: 'bash', input: { command: 'pnpm test' } }]);
+    } as any);
+    expect(toolStart.map((envelope) => envelope.ev.t)).toEqual(['text', 'tool-call-start']);
+    expect(toolStart[0]).toMatchObject({ ev: { t: 'text', text: 'done' } });
+    expect(toolStart[1]).toMatchObject({ ev: { t: 'tool-call-start', name: 'bash', args: { command: 'pnpm test' } } });
 
-    expect(mapPiSessionEventToAgentMessages({
+    expect(mapper.mapEvent({
       type: 'tool_execution_end',
       toolCallId: 'tool-1',
       result: 'ok',
       isError: false,
-    } as any)).toEqual([{ type: 'tool-result', callId: 'tool-1', id: 'tool-1', output: 'ok', isError: false }]);
+    } as any).map((envelope) => envelope.ev.t)).toEqual(['tool-call-end']);
   });
 });

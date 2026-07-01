@@ -165,8 +165,6 @@ export type ReducerState = {
         contextSize: number;
         timestamp: number;
     };
-    streamingTextMessageId?: string;
-    streamingThinkingMessageId?: string;
 };
 
 export function createReducer(): ReducerState {
@@ -232,11 +230,6 @@ function isDuplicateSidechainPrompt(
     }
 
     return text.trim() === ownerPrompt;
-}
-
-function clearStreamingText(state: ReducerState) {
-    state.streamingTextMessageId = undefined;
-    state.streamingThinkingMessageId = undefined;
 }
 
 export type ReducerResult = {
@@ -655,8 +648,6 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
 
     for (let msg of nonSidechainMessages) {
         if (msg.role === 'user') {
-            clearStreamingText(state);
-
             // Check if we've seen this localId before
             if (msg.localId && state.localIds.has(msg.localId)) {
                 continue;
@@ -707,20 +698,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
             for (let c of msg.content) {
                 if (c.type === 'text' || c.type === 'thinking') {
                     const isThinking = c.type === 'thinking';
-                    const streamingKey = isThinking ? 'streamingThinkingMessageId' : 'streamingTextMessageId';
-                    const existingStreamingMessageId = c.streaming ? state[streamingKey] : undefined;
-                    const existingStreamingMessage = existingStreamingMessageId
-                        ? state.messages.get(existingStreamingMessageId)
-                        : undefined;
                     const text = isThinking ? `*${c.thinking}*` : c.text;
-
-                    if (existingStreamingMessage?.text !== null && existingStreamingMessage?.tool === null) {
-                        existingStreamingMessage.text += text;
-                        existingStreamingMessage.realID = msg.id;
-                        state.messageIds.set(msg.id, existingStreamingMessage.id);
-                        changed.add(existingStreamingMessage.id);
-                        continue;
-                    }
 
                     let mid = allocateId();
                     state.messages.set(mid, {
@@ -734,14 +712,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                         event: null,
                         meta: msg.meta,
                     });
-                    if (c.streaming) {
-                        state[streamingKey] = mid;
-                    } else {
-                        clearStreamingText(state);
-                    }
                     changed.add(mid);
-                } else {
-                    clearStreamingText(state);
                 }
             }
         }

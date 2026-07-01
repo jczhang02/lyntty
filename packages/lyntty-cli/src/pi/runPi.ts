@@ -22,7 +22,7 @@ import { connectionState } from '@/utils/serverConnectionErrors';
 import { logger } from '@/ui/logger';
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
 import { bindPiSessionExtensions, getPiPluginFeatureSummary, listPiRemoteSlashCommands } from './runPiFeatures';
-import { mapPiSessionEventToAgentMessages } from './runPiEvents';
+import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 
 export interface RunPiOptions {
   credentials: Credentials;
@@ -128,6 +128,12 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   }
 
   let thinking = false;
+  const piSessionProtocol = new PiSessionProtocolMapper();
+  const sendPiEnvelopes = (envelopes: ReturnType<PiSessionProtocolMapper['mapEvent']>) => {
+    for (const envelope of envelopes) {
+      session.sendSessionProtocolMessage(envelope);
+    }
+  };
   let unsubscribe = piRuntime.session.subscribe((event) => {
     if (event.type === 'agent_start') thinking = true;
     if (event.type === 'agent_end') {
@@ -135,9 +141,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       session.sendSessionEvent({ type: 'ready' });
     }
 
-    for (const agentMessage of mapPiSessionEventToAgentMessages(event)) {
-      session.sendAgentMessage('pi', agentMessage);
-    }
+    sendPiEnvelopes(piSessionProtocol.mapEvent(event));
   });
 
   piRuntime.setRebindSession(async (nextSession) => {
@@ -152,9 +156,12 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       slashCommands: nextSlashCommands,
     }));
     unsubscribe = nextSession.subscribe((event) => {
-      for (const agentMessage of mapPiSessionEventToAgentMessages(event)) {
-        session.sendAgentMessage('pi', agentMessage);
+      if (event.type === 'agent_start') thinking = true;
+      if (event.type === 'agent_end') {
+        thinking = false;
+        session.sendSessionEvent({ type: 'ready' });
       }
+      sendPiEnvelopes(piSessionProtocol.mapEvent(event));
     });
   });
 
@@ -164,10 +171,9 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   });
 
   session.sendSessionEvent({ type: 'ready' });
-  session.sendAgentMessage('pi', {
-    type: 'message',
-    message: `Pi SDK runtime connected: ${piRuntime.session.sessionId}. Remote slash commands: ${initialFeatureSummary.slashCommands.join(', ')}. Active tools: ${initialFeatureSummary.activeTools.join(', ')}`,
-  });
+  sendPiEnvelopes(piSessionProtocol.serviceMessage(
+    `Pi SDK runtime connected: ${piRuntime.session.sessionId}. Remote slash commands: ${initialFeatureSummary.slashCommands.join(', ')}. Active tools: ${initialFeatureSummary.activeTools.join(', ')}`,
+  ));
 
   const commandLedger = new PiCommandLedger();
 
@@ -201,14 +207,13 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
           logger.debug('[pi] Aborting Pi SDK runtime by user request');
           return piRuntime.session.abort().then(() => {
             thinking = false;
-            session.sendAgentMessage('pi', { type: 'turn_aborted', id: randomUUID() });
+            sendPiEnvelopes(piSessionProtocol.endTurn('cancelled'));
             session.sendSessionEvent({ type: 'ready' });
           });
         case 'localOnlySlash':
-          session.sendAgentMessage('pi', {
-            type: 'message',
-            message: `${action.command} is ${action.reason === 'local_only' ? 'computer-side only' : 'not declared by pi runtime'}; not sent from Session Remote.`,
-          });
+          sendPiEnvelopes(piSessionProtocol.serviceMessage(
+            `${action.command} is ${action.reason === 'local_only' ? 'computer-side only' : 'not declared by pi runtime'}; not sent from Session Remote.`,
+          ));
           session.sendSessionEvent({ type: 'ready' });
           return null;
       }
@@ -217,7 +222,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     run?.catch((error) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       thinking = false;
-      session.sendAgentMessage('pi', { type: 'message', message: `pi error: ${errorMessage}` });
+      sendPiEnvelopes(piSessionProtocol.serviceMessage(`pi error: ${errorMessage}`));
       session.sendSessionEvent({ type: 'ready' });
     });
   });

@@ -28,9 +28,9 @@ import axios from 'axios';
  */
 export type ACPMessageData =
     // Core message types
-    | { type: 'message'; message: string; streaming?: boolean }
-    | { type: 'reasoning'; message: string; streaming?: boolean }
-    | { type: 'thinking'; text: string; streaming?: boolean }
+    | { type: 'message'; message: string }
+    | { type: 'reasoning'; message: string }
+    | { type: 'thinking'; text: string }
     // Tool interactions
     | { type: 'tool-call'; callId: string; name: string; input: unknown; id: string }
     | { type: 'tool-result'; callId: string; output: unknown; id: string; isError?: boolean }
@@ -47,7 +47,7 @@ export type ACPMessageData =
     // Usage/metrics
     | { type: 'token_count';[key: string]: unknown };
 
-export type ACPProvider = 'gemini' | 'codex' | 'claude' | 'opencode' | 'openclaw' | 'pi';
+export type ACPProvider = 'gemini' | 'codex' | 'claude' | 'opencode' | 'openclaw';
 
 type V3SessionMessage = {
     id: string;
@@ -811,7 +811,7 @@ export class ApiSessionClient extends EventEmitter {
      * @param provider - The agent provider sending the message (e.g., 'gemini', 'codex', 'claude')
      * @param body - The message payload (type: 'message' | 'reasoning' | 'tool-call' | 'tool-result')
      */
-    sendAgentMessage(provider: 'gemini' | 'codex' | 'claude' | 'opencode' | 'openclaw' | 'pi', body: ACPMessageData) {
+    sendAgentMessage(provider: ACPProvider, body: ACPMessageData) {
         let content = {
             role: 'agent',
             content: {
