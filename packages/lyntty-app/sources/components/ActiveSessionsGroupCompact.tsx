@@ -13,6 +13,7 @@ import { useAllMachines, useSessionGitStatus } from '@/sync/storage';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
+import { useOpenPiDiscoveredSession } from '@/hooks/useOpenPiDiscoveredSession';
 import { useLynttyAction } from '@/hooks/useLynttyAction';
 import { LynttyError } from '@/utils/errors';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
@@ -280,9 +281,11 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
         ? { ...baseStatus, color: '#007AFF', dotColor: '#007AFF', isPulsing: false, isConnected: baseStatus.isConnected }
         : baseStatus;
     const navigateToSession = useNavigateToSession();
+    const openPiDiscoveredSession = useOpenPiDiscoveredSession();
     const swipeableRef = React.useRef<Swipeable | null>(null);
-    const swipeEnabled = Platform.OS !== 'web';
+    const swipeEnabled = Platform.OS !== 'web' && !session.piSynthetic;
     const [actionsAnchor, setActionsAnchor] = React.useState<SessionActionsAnchor | null>(null);
+    const [isOpeningPiSession, setIsOpeningPiSession] = React.useState(false);
 
     const [archivingSession, performArchive] = useLynttyAction(async () => {
         const result = await sessionKill(session.id);
@@ -296,9 +299,19 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
         performArchive();
     }, [performArchive]);
 
-    const handlePress = React.useCallback(() => {
-        navigateToSession(session.id);
-    }, [navigateToSession, session.id]);
+    const handlePress = React.useCallback(async () => {
+        if (!session.piSynthetic) {
+            navigateToSession(session.id);
+            return;
+        }
+
+        setIsOpeningPiSession(true);
+        try {
+            await openPiDiscoveredSession(session);
+        } finally {
+            setIsOpeningPiSession(false);
+        }
+    }, [navigateToSession, openPiDiscoveredSession, session]);
 
     const handleContextMenu = React.useCallback((event: any) => {
         event.preventDefault?.();
@@ -311,7 +324,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     }, []);
 
     const showActionAlert = useSessionActionAlert(session.id);
-    const menuProps = Platform.OS === 'web' ? {
+    const menuProps = session.piSynthetic ? {} : Platform.OS === 'web' ? {
         onContextMenu: handleContextMenu,
     } as any : {
         onLongPress: showActionAlert,
@@ -351,6 +364,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                 selected && styles.sessionRowSelected
             ]}
             onPress={handlePress}
+            disabled={isOpeningPiSession}
             {...menuProps}
         >
             <View style={styles.sessionContent}>
@@ -403,7 +417,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
             ref={swipeableRef}
             renderRightActions={renderRightActions}
             overshootRight={false}
-            enabled={!archivingSession}
+            enabled={!archivingSession && !session.piSynthetic}
         >
             {itemContent}
         </Swipeable>

@@ -97,6 +97,30 @@ describe('mergePiDiscoveredSessions', () => {
         });
     });
 
+    it('marks active runtime synthetic Pi rows as online active sessions', () => {
+        const sessions = mergePiDiscoveredSessions([], [{
+            machine,
+            sessions: [piRecord({
+                state: 'active_runtime',
+                piSessionId: 'pi-active',
+                name: 'Active Pi',
+            })],
+        }]);
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0]).toMatchObject({
+            id: 'pi-local:machine-1:pi-active',
+            active: true,
+            presence: 'online',
+            metadata: {
+                piSessionId: 'pi-active',
+                piSynthetic: true,
+                piDiscoveryState: 'active_runtime',
+                name: 'Active Pi',
+            },
+        });
+    });
+
     it('merges thousands of node-local Pi sessions without dropping rows', () => {
         const records = Array.from({ length: 5000 }, (_value, index) => piRecord({
             piSessionId: `pi-${index}`,

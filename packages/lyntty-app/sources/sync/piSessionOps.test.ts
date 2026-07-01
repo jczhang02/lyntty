@@ -12,6 +12,28 @@ vi.mock('./sync', () => ({
     sync: {},
 }));
 
+describe('Pi session open helpers', () => {
+    it('builds spawn requests for synthetic Pi history rows', async () => {
+        const { buildPiSessionSpawnRequest, resolveOptimisticPiPath } = await import('./piSessionOpenRequest');
+        const session: any = {
+            id: 'pi-local:machine-1:pi-1',
+            machineId: 'machine-1',
+            piSessionId: 'pi-1',
+            path: '~/repo',
+            homeDir: '/home/jc',
+        };
+
+        expect(buildPiSessionSpawnRequest(session)).toEqual({
+            machineId: 'machine-1',
+            directory: '~/repo',
+            sessionId: 'pi-1',
+            agent: 'pi',
+            approvedNewDirectoryCreation: true,
+        });
+        expect(resolveOptimisticPiPath(session)).toBe('/home/jc/repo');
+    });
+});
+
 describe('Pi machine session ops', () => {
     beforeEach(() => {
         machineRPC.mockReset();
