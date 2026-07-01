@@ -28,9 +28,9 @@ import axios from 'axios';
  */
 export type ACPMessageData =
     // Core message types
-    | { type: 'message'; message: string }
-    | { type: 'reasoning'; message: string }
-    | { type: 'thinking'; text: string }
+    | { type: 'message'; message: string; streaming?: boolean }
+    | { type: 'reasoning'; message: string; streaming?: boolean }
+    | { type: 'thinking'; text: string; streaming?: boolean }
     // Tool interactions
     | { type: 'tool-call'; callId: string; name: string; input: unknown; id: string }
     | { type: 'tool-result'; callId: string; output: unknown; id: string; isError?: boolean }

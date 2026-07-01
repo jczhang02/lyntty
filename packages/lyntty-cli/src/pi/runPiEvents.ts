@@ -8,10 +8,10 @@ export function mapPiSessionEventToAgentMessages(event: AgentSessionEvent): ACPM
   switch (event.type) {
     case 'message_update':
       if (event.assistantMessageEvent.type === 'text_delta') {
-        return [{ type: 'message', message: event.assistantMessageEvent.delta }];
+        return [{ type: 'message', message: event.assistantMessageEvent.delta, streaming: true }];
       }
       if (event.assistantMessageEvent.type === 'thinking_delta') {
-        return [{ type: 'reasoning', message: event.assistantMessageEvent.delta }];
+        return [{ type: 'reasoning', message: event.assistantMessageEvent.delta, streaming: true }];
       }
       return [];
     case 'tool_execution_start':

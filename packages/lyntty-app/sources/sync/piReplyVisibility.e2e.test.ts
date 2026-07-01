@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { createReducer, reducer } from './reducer/reducer';
 import { normalizeRawMessage } from './typesRaw';
 
 describe('Pi reply visibility E2E smoke', () => {
@@ -50,6 +51,31 @@ describe('Pi reply visibility E2E smoke', () => {
                 id: 'tool-1',
                 name: 'bash',
             }],
+        });
+    });
+
+    it('coalesces streamed pi text deltas into one readable agent reply', () => {
+        const normalized = ['当前', '目录', '是 /home/jc/dev/lyntty'].map((message, index) => normalizeRawMessage(`delta-${index}`, null, 200 + index, {
+            role: 'agent',
+            content: {
+                type: 'acp',
+                provider: 'pi',
+                data: {
+                    type: 'message',
+                    message,
+                    streaming: true,
+                },
+            },
+            meta: { sentFrom: 'cli' },
+        } as any));
+
+        expect(normalized.every(Boolean)).toBe(true);
+        const result = reducer(createReducer(), normalized.filter((message) => message !== null));
+
+        expect(result.messages).toHaveLength(1);
+        expect(result.messages[0]).toMatchObject({
+            kind: 'agent-text',
+            text: '当前目录是 /home/jc/dev/lyntty',
         });
     });
 });

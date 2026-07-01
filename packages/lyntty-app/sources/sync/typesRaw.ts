@@ -319,9 +319,9 @@ const rawAgentRecordSchema = z.discriminatedUnion('type', [z.object({
     provider: z.enum(['gemini', 'codex', 'claude', 'opencode', 'openclaw', 'pi']),
     data: z.discriminatedUnion('type', [
         // Core message types
-        z.object({ type: z.literal('reasoning'), message: z.string() }),
-        z.object({ type: z.literal('message'), message: z.string() }),
-        z.object({ type: z.literal('thinking'), text: z.string() }),
+        z.object({ type: z.literal('reasoning'), message: z.string(), streaming: z.boolean().optional() }),
+        z.object({ type: z.literal('message'), message: z.string(), streaming: z.boolean().optional() }),
+        z.object({ type: z.literal('thinking'), text: z.string(), streaming: z.boolean().optional() }),
         // Tool interactions
         z.object({
             type: z.literal('tool-call'),
@@ -473,11 +473,13 @@ type NormalizedAgentContent =
         text: string;
         uuid: string;
         parentUUID: string | null;
+        streaming?: boolean;
     } | {
         type: 'thinking';
         thinking: string;
         uuid: string;
         parentUUID: string | null;
+        streaming?: boolean;
     } | {
         type: 'tool-call';
         id: string;
@@ -944,7 +946,7 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
                         type: 'text',
                         text: raw.content.data.message,
                         uuid: id,
-                        parentUUID: null
+                        parentUUID: null,
                     }],
                     meta: raw.meta
                 };
@@ -961,7 +963,7 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
                         type: 'text',
                         text: raw.content.data.message,
                         uuid: id,
-                        parentUUID: null
+                        parentUUID: null,
                     }],
                     meta: raw.meta
                 } satisfies NormalizedMessage;
@@ -1022,7 +1024,8 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
                         type: 'text',
                         text: raw.content.data.message,
                         uuid: id,
-                        parentUUID: null
+                        parentUUID: null,
+                        streaming: raw.content.data.streaming,
                     }],
                     meta: raw.meta
                 } satisfies NormalizedMessage;
@@ -1038,7 +1041,8 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
                         type: 'text',
                         text: raw.content.data.message,
                         uuid: id,
-                        parentUUID: null
+                        parentUUID: null,
+                        streaming: raw.content.data.streaming,
                     }],
                     meta: raw.meta
                 } satisfies NormalizedMessage;
@@ -1110,7 +1114,8 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
                         type: 'thinking',
                         thinking: raw.content.data.text,
                         uuid: id,
-                        parentUUID: null
+                        parentUUID: null,
+                        streaming: raw.content.data.streaming,
                     }],
                     meta: raw.meta
                 } satisfies NormalizedMessage;

@@ -51,7 +51,7 @@ describe('Pi command/event path smoke', () => {
     expect(mapPiSessionEventToAgentMessages({
       type: 'message_update',
       assistantMessageEvent: { type: 'text_delta', delta: 'done' },
-    } as any)).toEqual([{ type: 'message', message: 'done' }]);
+    } as any)).toEqual([{ type: 'message', message: 'done', streaming: true }]);
 
     expect(mapPiSessionEventToAgentMessages({
       type: 'tool_execution_start',

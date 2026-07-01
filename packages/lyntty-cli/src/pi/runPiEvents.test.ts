@@ -7,14 +7,14 @@ describe('mapPiSessionEventToAgentMessages', () => {
     expect(mapPiSessionEventToAgentMessages({
       type: 'message_update',
       assistantMessageEvent: { type: 'text_delta', delta: 'hello' },
-    } as any)).toEqual([{ type: 'message', message: 'hello' }]);
+    } as any)).toEqual([{ type: 'message', message: 'hello', streaming: true }]);
   });
 
   it('maps thinking deltas to reasoning messages', () => {
     expect(mapPiSessionEventToAgentMessages({
       type: 'message_update',
       assistantMessageEvent: { type: 'thinking_delta', delta: 'thinking' },
-    } as any)).toEqual([{ type: 'reasoning', message: 'thinking' }]);
+    } as any)).toEqual([{ type: 'reasoning', message: 'thinking', streaming: true }]);
   });
 
   it('maps tool lifecycle events', () => {
