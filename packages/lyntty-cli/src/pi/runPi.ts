@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import type { AgentSessionRuntime } from '@earendil-works/pi-coding-agent';
 import {
@@ -24,6 +24,7 @@ import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
 import { bindPiSessionExtensions, getPiPluginFeatureSummary, listPiRemoteSlashCommands } from './runPiFeatures';
 import { mapPiSessionHistoryPageToEnvelopes } from './runPiHistory';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';
+import { startPiExternalMirror } from './runPiExternalMirror';
 
 export interface RunPiOptions {
   credentials: Credentials;
@@ -33,6 +34,17 @@ export interface RunPiOptions {
 const LOCAL_ONLY_SLASH_COMMANDS = ['/model', '/settings', '/session', '/theme', '/help'];
 
 const PI_HISTORY_PAGE_MESSAGE_LIMIT = 50;
+
+export function resolvePiRelaySessionTag(machineId: string, piSessionId?: string): string {
+  if (!piSessionId) {
+    return randomUUID();
+  }
+  const digest = createHash('sha256')
+    .update(`${machineId}:${piSessionId}`)
+    .digest('hex')
+    .slice(0, 32);
+  return `pi:${digest}`;
+}
 
 function getPiSessionDisplayName(session: AgentSessionRuntime['session']): string {
   return session.sessionName ?? session.sessionId;
@@ -75,7 +87,6 @@ async function createPiRuntime(cwd: string, piSessionId?: string): Promise<Agent
 }
 
 export async function runPi(opts: RunPiOptions): Promise<void> {
-  const sessionTag = randomUUID();
   connectionState.setBackend('pi');
 
   const api = await ApiClient.create(opts.credentials);
@@ -90,6 +101,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   });
 
   const requestedPiSessionId = process.env.LYNTTY_PI_SESSION_ID;
+  const sessionTag = resolvePiRelaySessionTag(settings.machineId, requestedPiSessionId);
   const piRuntime = await createPiRuntime(process.cwd(), requestedPiSessionId);
   let shutdownRequested: (() => void) | null = null;
   await bindPiSessionExtensions(piRuntime, {
@@ -177,10 +189,18 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       totalMessages: page.totalMessages,
     };
   };
+  const externalMirror = startPiExternalMirror({
+    sessionFile: piRuntime.session.sessionManager.getSessionFile(),
+    initialEntries: piRuntime.session.sessionManager.getEntries(),
+    session: () => session,
+    isManagedRuntimeActive: () => thinking || piRuntime.session.isStreaming,
+  });
+
   let unsubscribe = piRuntime.session.subscribe((event) => {
     if (event.type === 'agent_start') thinking = true;
     if (event.type === 'agent_end') {
       thinking = false;
+      externalMirror?.markCurrentEntriesKnown();
       session.sendSessionEvent({ type: 'ready' });
     }
     if (event.type === 'session_info_changed') {
@@ -211,6 +231,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       if (event.type === 'agent_start') thinking = true;
       if (event.type === 'agent_end') {
         thinking = false;
+        externalMirror?.markCurrentEntriesKnown();
         session.sendSessionEvent({ type: 'ready' });
       }
       if (event.type === 'session_info_changed') {
@@ -301,6 +322,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       clearInterval(keepAlive);
       reconnectionHandle?.cancel();
       unsubscribe();
+      externalMirror?.stop();
       void piRuntime.dispose();
       session.sendSessionDeath();
       resolve();

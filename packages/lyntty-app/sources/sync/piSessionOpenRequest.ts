@@ -1,6 +1,10 @@
 import type { SessionRowData } from './storage';
 import type { SpawnSessionOptions } from './ops';
 
+export function shouldOpenPiSessionImmediately(source: SessionRowData): boolean {
+    return !!source.piSynthetic && source.id.startsWith('pi-local:');
+}
+
 export function resolveOptimisticPiPath(source: SessionRowData): string {
     const path = source.path ?? source.subtitle ?? '';
     if (path === '~' && source.homeDir) {

@@ -28,7 +28,7 @@ import { detectCLIAvailability } from '@/utils/detectCLI';
 import { buildResumeLaunch } from '@/resume/handleResumeCommand';
 import { detectResumeSupport } from '@/resume/localLynttyAgentAuth';
 import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
-import { resolvePiActivationLock } from './activationLock';
+import { resolveActivePiSessionReuse, resolvePiActivationLock } from './activationLock';
 import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
 import { discoverLocalPiSessions, discoverLocalPiSessionsPage, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
 
@@ -316,6 +316,14 @@ export async function startDaemon(): Promise<void> {
         directory = expandHomeDirectory(directory);
       }
       const spawnOptions = { ...options, directory };
+      const activeMatchingPiSession = resolveActivePiSessionReuse(sessionId, getCurrentChildren());
+      if (activeMatchingPiSession?.lynttySessionId) {
+        logger.debug(`[DAEMON RUN] Reusing active Pi runtime ${activeMatchingPiSession.lynttySessionId} for Pi session ${sessionId}`);
+        return {
+          type: 'success',
+          sessionId: activeMatchingPiSession.lynttySessionId,
+        };
+      }
       let directoryCreated = false;
 
       try {
@@ -568,8 +576,6 @@ export async function startDaemon(): Promise<void> {
           ];
 
 
-          // TODO: In future, sessionId could be used with --resume to continue existing sessions
-          // For now, we ignore it - each spawn creates a new session
           return spawnTrackedLynttyProcess({
             args,
             cwd: directory,

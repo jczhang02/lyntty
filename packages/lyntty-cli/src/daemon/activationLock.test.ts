@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolvePiActivationLock } from './activationLock';
+import { resolveActivePiSessionReuse, resolvePiActivationLock } from './activationLock';
 import type { TrackedSession } from './types';
 
 const activePiSession = (overrides: Partial<TrackedSession> = {}): TrackedSession => ({
@@ -10,6 +10,24 @@ const activePiSession = (overrides: Partial<TrackedSession> = {}): TrackedSessio
   directory: '/repo',
   agent: 'pi',
   ...overrides,
+});
+
+describe('resolveActivePiSessionReuse', () => {
+  it('reuses an active runtime for the same Pi session id', () => {
+    const session = activePiSession({
+      lynttySessionId: 'relay-session-1',
+      lynttySessionMetadataFromLocalWebhook: { piSessionId: 'pi-session-1' } as any,
+    });
+    expect(resolveActivePiSessionReuse('pi-session-1', [session])?.lynttySessionId).toBe('relay-session-1');
+  });
+
+  it('does not reuse a different Pi session id', () => {
+    const session = activePiSession({
+      lynttySessionId: 'relay-session-1',
+      lynttySessionMetadataFromLocalWebhook: { piSessionId: 'pi-session-1' } as any,
+    });
+    expect(resolveActivePiSessionReuse('pi-session-2', [session])).toBeNull();
+  });
 });
 
 describe('resolvePiActivationLock', () => {

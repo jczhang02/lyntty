@@ -3,6 +3,17 @@ import type { TrackedSession } from './types';
 
 export type PiTakeoverChoice = 'wait' | 'stop' | 'interrupt';
 
+export function resolveActivePiSessionReuse(piSessionId: string | undefined, sessions: readonly TrackedSession[]): TrackedSession | null {
+  if (!piSessionId) {
+    return null;
+  }
+  return sessions.find((session) => (
+    session.agent === 'pi'
+    && !!session.lynttySessionId
+    && session.lynttySessionMetadataFromLocalWebhook?.piSessionId === piSessionId
+  )) ?? null;
+}
+
 export type PiActivationLockResult =
   | { type: 'allow' }
   | { type: 'takeover'; activeSessionId: string; activePid: number; choice: Extract<PiTakeoverChoice, 'stop' | 'interrupt'> }

@@ -115,6 +115,7 @@ class Sync {
     // advanced downward by loadOlderMessages.
     private sessionOldestSeq = new Map<string, number>();
     private pendingOutbox = new Map<string, OutboxMessage[]>();
+    private pendingSyntheticOutbox = new Map<string, Array<{ text: string; options?: SendMessageOptions }>>();
     private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
     private sessionQueueProcessing = new Set<string>();
     private sessionMessageLocks = new Map<string, AsyncLock>();
@@ -559,19 +560,42 @@ class Sync {
         return { uploaded, failed };
     }
 
-    async sendMessage(sessionId: string, text: string, options?: SendMessageOptions) {
+    private queueSyntheticMessage(sessionId: string, text: string, options?: SendMessageOptions) {
+        const pending = this.pendingSyntheticOutbox.get(sessionId) ?? [];
+        pending.push({ text, options });
+        this.pendingSyntheticOutbox.set(sessionId, pending);
 
-        // Get encryption — may not be ready yet if sessions are still syncing
-        let encryption = this.encryption.getSessionEncryption(sessionId);
-        if (!encryption) {
-            // Wait for sessions sync to complete (initializes encryption keys)
-            await this.sessionsSync.awaitQueue();
-            encryption = this.encryption.getSessionEncryption(sessionId);
-            if (!encryption) {
-                console.error(`Session ${sessionId} not found after sync`);
-                return;
-            }
+        const localId = randomUUID();
+        const record: RawRecord = {
+            role: 'user',
+            content: { type: 'text', text },
+            meta: {
+                sentFrom: Platform.OS === 'android' ? 'android' : Platform.OS === 'ios' ? 'ios' : 'web',
+                ...(options?.displayText ? { displayText: options.displayText } : {}),
+            },
+        };
+        const normalized = normalizeRawMessage(localId, localId, Date.now(), record);
+        if (normalized) {
+            this.enqueueMessages(sessionId, [normalized]);
         }
+    }
+
+    async flushSyntheticMessages(syntheticSessionId: string, relaySessionId: string) {
+        const pending = this.pendingSyntheticOutbox.get(syntheticSessionId);
+        if (!pending || pending.length === 0) {
+            return;
+        }
+        await this.sessionsSync.awaitQueue();
+        if (!this.encryption.getSessionEncryption(relaySessionId)) {
+            return;
+        }
+        this.pendingSyntheticOutbox.delete(syntheticSessionId);
+        for (const item of pending) {
+            await this.sendMessage(relaySessionId, item.text, item.options);
+        }
+    }
+
+    async sendMessage(sessionId: string, text: string, options?: SendMessageOptions) {
 
         // Get session data from storage
         let session = storage.getState().sessions[sessionId];
@@ -580,6 +604,24 @@ class Sync {
             session = storage.getState().sessions[sessionId];
             if (!session) {
                 console.error(`Session ${sessionId} not found in storage after sync`);
+                return;
+            }
+        }
+
+        // Get encryption — may not be ready yet if sessions are still syncing.
+        // Synthetic Pi rows intentionally have no relay encryption yet; queue
+        // their sends locally until the background open call resolves a real
+        // relay session id.
+        let encryption = this.encryption.getSessionEncryption(sessionId);
+        if (!encryption) {
+            await this.sessionsSync.awaitQueue();
+            encryption = this.encryption.getSessionEncryption(sessionId);
+            if (!encryption && session.metadata?.piSynthetic) {
+                this.queueSyntheticMessage(sessionId, text, options);
+                return;
+            }
+            if (!encryption) {
+                console.error(`Session ${sessionId} not found after sync`);
                 return;
             }
         }
