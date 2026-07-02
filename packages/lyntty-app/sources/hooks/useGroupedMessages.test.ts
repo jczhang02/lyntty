@@ -159,6 +159,40 @@ describe('useGroupedMessages', () => {
         ]);
     });
 
+    it('shows current thinking but folds completed thinking into agent work', () => {
+        const messages: Message[] = [
+            {
+                kind: 'agent-text',
+                id: 'agent-final',
+                localId: null,
+                createdAt: 4,
+                text: 'done',
+            },
+            {
+                kind: 'agent-text',
+                id: 'thinking',
+                localId: null,
+                createdAt: 3,
+                text: 'inspect files',
+                isThinking: true,
+            },
+            {
+                kind: 'user-text',
+                id: 'user',
+                localId: null,
+                createdAt: 1,
+                text: 'run tools',
+            },
+        ];
+
+        const completed = groupMessagesForDisplay(messages, true);
+        expect(completed.map((item) => item.type)).toEqual(['message', 'agent-work-group', 'message']);
+        expect(completed[1]).toMatchObject({ type: 'agent-work-group' });
+
+        const running = groupMessagesForDisplay(messages, true, { collapseCurrentTurn: false });
+        expect(running.map((item) => item.id)).toEqual(['agent-final', 'thinking', 'user']);
+    });
+
     it('does not collapse the current turn while the agent is still working', () => {
         const messages: Message[] = [
             {

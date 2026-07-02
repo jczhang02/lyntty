@@ -14,7 +14,6 @@ import {
 import { getSuggestions } from '@/components/autocomplete/suggestions';
 import { ChatHeaderView } from '@/components/ChatHeaderView';
 import { ChatList } from '@/components/ChatList';
-import { ReviewEvidencePanel } from '@/components/ReviewEvidencePanel';
 import { Deferred } from '@/components/Deferred';
 import { EmptyMessages } from '@/components/EmptyMessages';
 import { Avatar } from '@/components/Avatar';
@@ -23,7 +22,6 @@ import { useImagePicker } from '@/hooks/useImagePicker';
 import { Modal } from '@/modal';
 import { gitStatusSync } from '@/sync/gitStatusSync';
 import { sessionAbort, sessionGoalAction } from '@/sync/ops';
-import { buildReviewEvidence } from '@/sync/reviewEvidence';
 import { storage, useIsDataReady, useLocalSetting, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
 import { useSession } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
@@ -620,11 +618,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         };
     }, [sessionId]);
 
-    const reviewEvidence = React.useMemo(() => buildReviewEvidence(messages), [messages]);
-
     let content = (
         <>
-            <ReviewEvidencePanel evidence={reviewEvidence} />
             <Deferred>
                 {messages.length > 0 && (
                     <ChatList session={session} />

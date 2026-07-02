@@ -67,14 +67,13 @@ describe('PiSessionProtocolMapper', () => {
     expect(toolEnd[0].ev).toMatchObject({ t: 'tool-call-end', call: toolStart[1].ev.t === 'tool-call-start' ? toolStart[1].ev.call : '' });
   });
 
-  it('wraps service messages in session-protocol lifecycle envelopes', () => {
+  it('does not turn Pi debug/status events into chat-visible service messages', () => {
     const mapper = new PiSessionProtocolMapper();
-    const envelopes = mapper.serviceMessage('Pi SDK runtime connected');
 
-    expect(envelopes.map((envelope) => envelope.ev.t)).toEqual(['turn-start', 'service', 'turn-end']);
-    expect(envelopes[1]).toMatchObject({
-      role: 'agent',
-      ev: { t: 'service', text: 'Pi SDK runtime connected' },
-    });
+    expect(mapper.mapEvent(event({ type: 'queue_update', steering: [], followUp: [] }))).toEqual([]);
+    expect(mapper.mapEvent(event({ type: 'compaction_start', reason: 'manual' }))).toEqual([]);
+    expect(mapper.mapEvent(event({ type: 'compaction_end', reason: 'manual', aborted: false }))).toEqual([]);
+    expect(mapper.mapEvent(event({ type: 'auto_retry_start', attempt: 1, maxAttempts: 3, errorMessage: 'timeout' }))).toEqual([]);
+    expect(mapper.mapEvent(event({ type: 'auto_retry_end', attempt: 1, success: true }))).toEqual([]);
   });
 });

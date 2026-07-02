@@ -34,6 +34,9 @@ export const MetadataSchema = z.object({
     }).optional(),
     machineId: z.string().optional(),
     piSessionId: z.string().optional(), // Pi JSONL session ID
+    piHistoryCursor: z.string().optional(),
+    piHistoryHasMore: z.boolean().optional(),
+    piHistoryTotalMessages: z.number().optional(),
     piDiscoveryState: z.enum([
         'discovered_local',
         'registered',

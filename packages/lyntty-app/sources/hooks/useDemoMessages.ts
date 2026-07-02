@@ -27,7 +27,8 @@ export function useDemoMessages(messages: Message[]) {
                     reducerState: createReducer(),
                     isLoaded: true,
                     hasMoreOlder: false,
-                    isLoadingOlder: false
+                    isLoadingOlder: false,
+                    olderLoadError: null,
                 }
             }
         }));

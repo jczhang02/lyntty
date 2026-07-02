@@ -22,7 +22,7 @@ import { connectionState } from '@/utils/serverConnectionErrors';
 import { logger } from '@/ui/logger';
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
 import { bindPiSessionExtensions, getPiPluginFeatureSummary, listPiRemoteSlashCommands } from './runPiFeatures';
-import { mapPiSessionHistoryToEnvelopes } from './runPiHistory';
+import { mapPiSessionHistoryPageToEnvelopes } from './runPiHistory';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 
 export interface RunPiOptions {
@@ -32,12 +32,7 @@ export interface RunPiOptions {
 
 const LOCAL_ONLY_SLASH_COMMANDS = ['/model', '/settings', '/session', '/theme', '/help'];
 
-function summarizePiRuntimeList(items: string[], visibleCount = 8): string {
-  if (items.length === 0) return 'none';
-  const visible = items.slice(0, visibleCount).join(', ');
-  const remaining = items.length - visibleCount;
-  return remaining > 0 ? `${visible}, +${remaining} more` : visible;
-}
+const PI_HISTORY_PAGE_MESSAGE_LIMIT = 50;
 
 function getPiSessionDisplayName(session: AgentSessionRuntime['session']): string {
   return session.sessionName ?? session.sessionId;
@@ -124,6 +119,9 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   metadata.slashCommands = initialFeatureSummary.slashCommands;
   metadata.piSessionId = piRuntime.session.sessionId;
   metadata.name = getPiSessionDisplayName(piRuntime.session);
+  if (requestedPiSessionId) {
+    metadata.piHistoryHasMore = true;
+  }
 
   const response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
   let session: ApiSessionClient;
@@ -155,6 +153,29 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     for (const envelope of envelopes) {
       session.sendSessionProtocolMessage(envelope);
     }
+  };
+  const sendPiHistoryPage = async (beforeEntryId?: string) => {
+    const page = mapPiSessionHistoryPageToEnvelopes(
+      piRuntime.session.sessionManager.getBranch(),
+      { beforeEntryId, limit: PI_HISTORY_PAGE_MESSAGE_LIMIT },
+    );
+    for (const envelope of page.envelopes) {
+      session.sendSessionProtocolMessage(envelope);
+    }
+    await session.flush();
+    await session.updateMetadataAndAwait((currentMetadata) => ({
+      ...currentMetadata,
+      piHistoryCursor: page.nextCursor,
+      piHistoryHasMore: page.hasMore,
+      piHistoryTotalMessages: page.totalMessages,
+    }));
+    return {
+      type: 'success' as const,
+      sent: page.envelopes.length,
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
+      totalMessages: page.totalMessages,
+    };
   };
   let unsubscribe = piRuntime.session.subscribe((event) => {
     if (event.type === 'agent_start') thinking = true;
@@ -208,21 +229,15 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     shutdownRequested?.();
   });
 
+  session.rpcHandlerManager.registerHandler('pi-history-page', async (params: unknown) => {
+    const record = params && typeof params === 'object' && !Array.isArray(params)
+      ? params as Record<string, unknown>
+      : {};
+    const beforeEntryId = typeof record.beforeEntryId === 'string' ? record.beforeEntryId : undefined;
+    return sendPiHistoryPage(beforeEntryId);
+  });
+
   session.sendSessionEvent({ type: 'ready' });
-
-  if (requestedPiSessionId) {
-    const historyEnvelopes = mapPiSessionHistoryToEnvelopes(piRuntime.session.sessionManager.getEntries());
-    for (const envelope of historyEnvelopes) {
-      session.sendSessionProtocolMessage(envelope);
-    }
-    sendPiEnvelopes(piSessionProtocol.serviceMessage(
-      `Imported ${historyEnvelopes.length} historical Pi session events from ${piRuntime.session.sessionId}.`,
-    ));
-  }
-
-  sendPiEnvelopes(piSessionProtocol.serviceMessage(
-    `Pi SDK runtime connected: ${piRuntime.session.sessionId}. Remote slash commands: ${summarizePiRuntimeList(initialFeatureSummary.slashCommands)}. Active tools: ${summarizePiRuntimeList(initialFeatureSummary.activeTools)}.`,
-  ));
 
   const commandLedger = new PiCommandLedger();
 
@@ -260,9 +275,10 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
             session.sendSessionEvent({ type: 'ready' });
           });
         case 'localOnlySlash':
-          sendPiEnvelopes(piSessionProtocol.serviceMessage(
-            `${action.command} is ${action.reason === 'local_only' ? 'computer-side only' : 'not declared by pi runtime'}; not sent from Session Remote.`,
-          ));
+          logger.warn('[pi] Rejected Session Remote slash command', {
+            command: action.command,
+            reason: action.reason,
+          });
           session.sendSessionEvent({ type: 'ready' });
           return null;
       }
@@ -271,7 +287,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     run?.catch((error) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       thinking = false;
-      sendPiEnvelopes(piSessionProtocol.serviceMessage(`pi error: ${errorMessage}`));
+      logger.warn('[pi] Failed to handle Session Remote command', { errorMessage });
       session.sendSessionEvent({ type: 'ready' });
     });
   });

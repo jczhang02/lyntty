@@ -111,6 +111,21 @@ const MACHINE_DENIED_COMMON_RPC_METHODS = new Set([
     'difftastic',
 ]);
 
+const ALLOWED_USER_SESSION_RPC_METHODS = new Set([
+    'abort',
+    'permission',
+    'switch',
+    'goal-action',
+    'bash',
+    'readFile',
+    'writeFile',
+    'listDirectory',
+    'getDirectoryTree',
+    'ripgrep',
+    'killSession',
+    'pi-history-page',
+]);
+
 const UUID_SCOPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function splitRpcMethod(method: string): { scopeId: string; base: string } | null {
@@ -156,14 +171,14 @@ export function canCallRpcMethod(socketData: any, method: string): boolean {
     }
 
     if (ALLOWED_MACHINE_RPC_METHODS.has(parts.base)) {
-        return true;
+        return UUID_SCOPE_RE.test(parts.scopeId);
     }
 
     if (MACHINE_DENIED_COMMON_RPC_METHODS.has(parts.base) && UUID_SCOPE_RE.test(parts.scopeId)) {
         return false;
     }
 
-    return parts.base.length > 0;
+    return ALLOWED_USER_SESSION_RPC_METHODS.has(parts.base);
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

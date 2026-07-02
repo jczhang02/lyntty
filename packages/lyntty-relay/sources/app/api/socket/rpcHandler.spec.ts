@@ -30,6 +30,13 @@ describe('RPC scope guards', () => {
         expect(canCallRpcMethod({ clientType: 'session-scoped', sessionId }, `other-session:bash`)).toBe(false);
     });
 
+    it('allows only declared user-scoped session RPC methods', () => {
+        expect(canCallRpcMethod({ clientType: 'user-scoped' }, `${sessionId}:pi-history-page`)).toBe(true);
+        expect(canCallRpcMethod({ clientType: 'user-scoped' }, `${sessionId}:bash`)).toBe(true);
+        expect(canCallRpcMethod({ clientType: 'user-scoped' }, `${sessionId}:worktree-create`)).toBe(false);
+        expect(canCallRpcMethod({ clientType: 'user-scoped' }, `${sessionId}:internal-debug-dump`)).toBe(false);
+    });
+
     it('prevents machine sockets from issuing RPC calls', () => {
         expect(canCallRpcMethod({ clientType: 'machine-scoped', machineId }, `${sessionId}:bash`)).toBe(false);
         expect(canCallRpcMethod({ clientType: 'machine-scoped', machineId }, `${machineId}:list-pi-sessions`)).toBe(false);

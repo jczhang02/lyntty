@@ -24,8 +24,8 @@ export default function FeaturesSettingsScreen() {
                 footer="Optional panels and layout elements."
             >
                 <Item
-                    title="Review Evidence Sidebar"
-                    subtitle="Show structured evidence details on larger screens"
+                    title="File Diffs Sidebar"
+                    subtitle="Show changed-file details on larger screens"
                     icon={<Ionicons name="git-branch-outline" size={29} color="#5AC8FA" />}
                     rightElement={
                         <Switch

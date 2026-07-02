@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useSession, useSessionMessages, useSetting } from "@/sync/storage";
 import { sync } from '@/sync/sync';
-import { ActivityIndicator, AppState, FlatList, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, Text, View } from 'react-native';
 import { useCallback } from 'react';
 import { useHeaderHeight } from '@/utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +20,7 @@ import { useSessionQuickActions } from '@/hooks/useSessionQuickActions';
 const SCROLL_THRESHOLD = 300;
 
 export const ChatList = React.memo((props: { session: Session }) => {
-    const { messages, hasMoreOlder, isLoadingOlder } = useSessionMessages(props.session.id);
+    const { messages, hasMoreOlder, isLoadingOlder, olderLoadError } = useSessionMessages(props.session.id);
     return (
         <ChatListInternal
             metadata={props.session.metadata}
@@ -28,13 +28,15 @@ export const ChatList = React.memo((props: { session: Session }) => {
             messages={messages}
             hasMoreOlder={hasMoreOlder}
             isLoadingOlder={isLoadingOlder}
+            olderLoadError={olderLoadError}
         />
     )
 });
 
-const ListHeader = React.memo((props: { isLoadingOlder: boolean }) => {
+const ListHeader = React.memo((props: { isLoadingOlder: boolean; olderLoadError: string | null; onRetry: () => void }) => {
     const headerHeight = useHeaderHeight();
     const safeArea = useSafeAreaInsets();
+    const { theme } = useUnistyles();
     // ListFooterComponent on an inverted FlatList renders at the visual top
     // — that is exactly where the spinner for "loading older messages"
     // belongs. The spacer below keeps the header bar from clipping the
@@ -45,6 +47,16 @@ const ListHeader = React.memo((props: { isLoadingOlder: boolean }) => {
                 <View style={{ paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}>
                     <ActivityIndicator size="small" />
                 </View>
+            )}
+            {!props.isLoadingOlder && props.olderLoadError && (
+                <Pressable
+                    onPress={props.onRetry}
+                    style={{ paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center' }}
+                >
+                    <View style={{ borderColor: theme.colors.divider, borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12 }}>
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>Could not load older messages · Retry</Text>
+                    </View>
+                </Pressable>
             )}
             <View style={{ flexDirection: 'row', alignItems: 'center', height: headerHeight + safeArea.top + 32 }} />
         </View>
@@ -64,6 +76,7 @@ const ChatListInternal = React.memo((props: {
     messages: Message[],
     hasMoreOlder: boolean,
     isLoadingOlder: boolean,
+    olderLoadError: string | null,
 }) => {
     const { theme } = useUnistyles();
     const flatListRef = React.useRef<FlatList>(null);
@@ -283,10 +296,18 @@ const ChatListInternal = React.memo((props: {
     const sessionId = props.sessionId;
     const hasMoreOlder = props.hasMoreOlder;
     const isLoadingOlder = props.isLoadingOlder;
+    const olderLoadError = props.olderLoadError;
+    const runLoadOlder = useCallback(() => {
+        void sync.loadOlderMessages(sessionId).catch(() => undefined);
+    }, [sessionId]);
     const handleLoadOlder = useCallback(() => {
+        if (!hasMoreOlder || isLoadingOlder || olderLoadError) return;
+        runLoadOlder();
+    }, [hasMoreOlder, isLoadingOlder, olderLoadError, runLoadOlder]);
+    const handleRetryLoadOlder = useCallback(() => {
         if (!hasMoreOlder || isLoadingOlder) return;
-        void sync.loadOlderMessages(sessionId);
-    }, [sessionId, hasMoreOlder, isLoadingOlder]);
+        runLoadOlder();
+    }, [hasMoreOlder, isLoadingOlder, runLoadOlder]);
 
     // On macOS/web, Shift+wheel swaps deltaX/deltaY — restore vertical scrolling
     React.useEffect(() => {
@@ -330,7 +351,7 @@ const ChatListInternal = React.memo((props: {
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
                 ListHeaderComponent={<ListFooter sessionId={props.sessionId} />}
-                ListFooterComponent={<ListHeader isLoadingOlder={props.isLoadingOlder} />}
+                ListFooterComponent={<ListHeader isLoadingOlder={props.isLoadingOlder} olderLoadError={props.olderLoadError} onRetry={handleRetryLoadOlder} />}
                 onEndReached={handleLoadOlder}
                 onEndReachedThreshold={0.5}
             />

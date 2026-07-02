@@ -1819,6 +1819,7 @@ class Sync {
     private fetchMessages = async (sessionId: string) => {
         log.log(`💬 fetchMessages starting for session ${sessionId} - acquiring lock`);
         const lock = this.getSessionMessageLock(sessionId);
+        let shouldLoadInitialPiHistory = false;
         await lock.inLock(async () => {
             const encryption = this.encryption.getSessionEncryption(sessionId);
             if (!encryption) {
@@ -1831,9 +1832,8 @@ class Sync {
             if (isInitialLoad) {
                 // Initial load. Pull only the most recent page so the user can
                 // start chatting immediately. Older history streams in lazily
-                // through loadOlderMessages() when the user scrolls up — and
-                // also through a background prefetch kicked off below, so the
-                // history fills in even when the user doesn't scroll.
+                // through loadOlderMessages() when the user scrolls up or when
+                // an empty Pi history session needs its first visible tail page.
                 //
                 // Previously this method walked forward from seq=0 until every
                 // page had been fetched and decrypted, which blocked the chat
@@ -1851,49 +1851,18 @@ class Sync {
             storage.getState().applyMessagesLoaded(sessionId);
             log.log(`💬 fetchMessages completed for session ${sessionId}`);
 
-            if (isInitialLoad) {
-                // Fire-and-forget. The chat is interactive at this point;
-                // background pages stream in without blocking either the
-                // surrounding lock or the UI. loadOlderMessages takes the
-                // same lock internally, so the loop naturally serialises
-                // with on-scroll triggers and live socket updates.
-                void this.prefetchOlderMessagesInBackground(sessionId);
-            }
-        });
-    }
-
-    private prefetchOlderMessagesInBackground = async (sessionId: string) => {
-        const SLEEP_BETWEEN_PAGES_MS = 250;
-        // While loadOlderMessages handles the actual work, this loop is what
-        // keeps it going without user input. We keep stepping until either:
-        //   - the server says there is no more older history, or
-        //   - the session is no longer present in the store (user navigated
-        //     away and the session was unloaded), or
-        //   - we hit seq = 1 (the very first message), or
-        //   - the encryption key is gone (logged out).
-        // The loop yields between pages to keep the UI thread responsive
-        // and to spread out server load.
-        while (true) {
             const sessionMessages = storage.getState().sessionMessages[sessionId];
-            if (!sessionMessages || !sessionMessages.hasMoreOlder) {
-                return;
-            }
-            if (!this.encryption.getSessionEncryption(sessionId)) {
-                return;
-            }
-            const oldestSeq = this.sessionOldestSeq.get(sessionId);
-            if (oldestSeq === undefined || oldestSeq <= 1) {
-                return;
-            }
+            const session = storage.getState().sessions[sessionId];
+            shouldLoadInitialPiHistory = isInitialLoad
+                && session?.metadata?.piHistoryHasMore === true
+                && (sessionMessages?.messages.length ?? 0) === 0;
 
-            try {
-                await this.loadOlderMessages(sessionId);
-            } catch (error) {
-                log.log(`💬 prefetchOlderMessagesInBackground: error for ${sessionId}, stopping: ${String(error)}`);
-                return;
-            }
-
-            await new Promise((resolve) => setTimeout(resolve, SLEEP_BETWEEN_PAGES_MS));
+            // Older pages load on demand when the user scrolls upward. Do not
+            // background-drain long Pi/relay histories; that keeps session open
+            // fast and avoids APK freezes on large timelines.
+        });
+        if (shouldLoadInitialPiHistory) {
+            void this.loadOlderMessages(sessionId).catch(() => undefined);
         }
     }
 
@@ -1924,8 +1893,9 @@ class Sync {
         if (messages.length > 0) {
             this.sessionOldestSeq.set(sessionId, minSeq);
         }
+        const session = storage.getState().sessions[sessionId];
         storage.getState().applyOlderMessagesPagination(sessionId, {
-            hasMore: !!data.hasMore && messages.length > 0
+            hasMore: (!!data.hasMore && messages.length > 0) || session?.metadata?.piHistoryHasMore === true
         });
     }
 
@@ -1990,11 +1960,13 @@ class Sync {
      */
     loadOlderMessages = async (sessionId: string) => {
         const oldestSeq = this.sessionOldestSeq.get(sessionId);
-        if (oldestSeq === undefined || oldestSeq <= 1) {
+        const session = storage.getState().sessions[sessionId];
+        const hasMorePiHistory = session?.metadata?.piHistoryHasMore === true;
+        if ((oldestSeq === undefined || oldestSeq <= 1) && !hasMorePiHistory) {
             return;
         }
         const sessionMessages = storage.getState().sessionMessages[sessionId];
-        if (!sessionMessages || sessionMessages.isLoadingOlder || !sessionMessages.hasMoreOlder) {
+        if (!sessionMessages || sessionMessages.isLoadingOlder || (!sessionMessages.hasMoreOlder && !hasMorePiHistory)) {
             return;
         }
 
@@ -2005,6 +1977,35 @@ class Sync {
                 const encryption = this.encryption.getSessionEncryption(sessionId);
                 if (!encryption) {
                     log.log(`💬 loadOlderMessages: encryption not ready for ${sessionId}`);
+                    return;
+                }
+                const currentSession = storage.getState().sessions[sessionId];
+                if (currentSession?.metadata?.piHistoryHasMore === true) {
+                    const fromSeq = this.sessionLastSeq.get(sessionId) ?? 0;
+                    const result = await apiSocket.sessionRPC<{
+                        type: 'success';
+                        sent: number;
+                        nextCursor?: string;
+                        hasMore: boolean;
+                        totalMessages: number;
+                    }, { beforeEntryId?: string }>(
+                        sessionId,
+                        'pi-history-page',
+                        currentSession.metadata.piHistoryCursor ? { beforeEntryId: currentSession.metadata.piHistoryCursor } : {},
+                    );
+                    storage.getState().applySessions([{
+                        ...currentSession,
+                        metadata: {
+                            ...currentSession.metadata,
+                            piHistoryCursor: result.nextCursor,
+                            piHistoryHasMore: result.hasMore,
+                            piHistoryTotalMessages: result.totalMessages,
+                        },
+                    }]);
+                    await this.fetchForwardSince(sessionId, encryption, fromSeq);
+                    storage.getState().applyOlderMessagesPagination(sessionId, {
+                        hasMore: result.hasMore || (this.sessionOldestSeq.get(sessionId) ?? 0) > 1,
+                    });
                     return;
                 }
                 // Re-read the cursor inside the lock. A concurrent
@@ -2035,6 +2036,13 @@ class Sync {
                     hasMore: !!data.hasMore && messages.length > 0
                 });
             });
+            storage.getState().applyOlderMessagesError(sessionId, null);
+        } catch (error) {
+            storage.getState().applyOlderMessagesError(
+                sessionId,
+                error instanceof Error ? error.message : String(error),
+            );
+            throw error;
         } finally {
             storage.getState().applyOlderMessagesLoading(sessionId, false);
         }

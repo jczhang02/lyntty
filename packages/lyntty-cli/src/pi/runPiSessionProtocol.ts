@@ -124,15 +124,6 @@ export class PiSessionProtocolMapper {
     return envelopes;
   }
 
-  serviceMessage(text: string): SessionEnvelope[] {
-    const turnId = createId();
-    return [
-      createEnvelope('agent', { t: 'turn-start' }, { turn: turnId, time: this.nextTime() }),
-      createEnvelope('agent', { t: 'service', text }, { turn: turnId, time: this.nextTime() }),
-      createEnvelope('agent', { t: 'turn-end', status: 'completed' }, { turn: turnId, time: this.nextTime() }),
-    ];
-  }
-
   mapEvent(event: AgentSessionEvent): SessionEnvelope[] {
     switch (event.type) {
       case 'agent_start':
@@ -177,15 +168,11 @@ export class PiSessionProtocolMapper {
         return envelopes;
       }
       case 'queue_update':
-        return this.serviceMessage(`Queue updated: ${event.steering.length} steering, ${event.followUp.length} follow-up`);
       case 'compaction_start':
-        return this.serviceMessage(`Compaction started: ${event.reason}`);
       case 'compaction_end':
-        return this.serviceMessage(`Compaction ended: ${event.reason}${event.aborted ? ' (aborted)' : ''}`);
       case 'auto_retry_start':
-        return this.serviceMessage(`Retry ${event.attempt}/${event.maxAttempts}: ${event.errorMessage}`);
       case 'auto_retry_end':
-        return this.serviceMessage(event.success ? `Retry ${event.attempt} succeeded` : `Retry ${event.attempt} failed`);
+        return [];
       default:
         return [];
     }

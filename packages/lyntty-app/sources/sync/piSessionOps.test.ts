@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { machineRPC } = vi.hoisted(() => ({
+const { machineRPC, sessionRPC } = vi.hoisted(() => ({
     machineRPC: vi.fn(),
+    sessionRPC: vi.fn(),
 }));
 
 vi.mock('./apiSocket', () => ({
-    apiSocket: { machineRPC },
+    apiSocket: { machineRPC, sessionRPC },
 }));
 
 vi.mock('./sync', () => ({
@@ -37,6 +38,7 @@ describe('Pi session open helpers', () => {
 describe('Pi machine session ops', () => {
     beforeEach(() => {
         machineRPC.mockReset();
+        sessionRPC.mockReset();
     });
 
     it('lists machine-wide Pi sessions through machine RPC', async () => {
@@ -115,5 +117,15 @@ describe('Pi machine session ops', () => {
             agent: 'pi',
             sessionId: 'pi-existing',
         }));
+    });
+
+    it('loads Pi history pages through a narrow session RPC', async () => {
+        sessionRPC.mockResolvedValue({ type: 'success', sent: 4, nextCursor: 'entry-1', hasMore: true, totalMessages: 20 });
+
+        const { sessionLoadPiHistoryPage } = await import('./ops');
+        const result = await sessionLoadPiHistoryPage('session-1', 'entry-2');
+
+        expect(result).toMatchObject({ type: 'success', sent: 4, nextCursor: 'entry-1', hasMore: true });
+        expect(sessionRPC).toHaveBeenCalledWith('session-1', 'pi-history-page', { beforeEntryId: 'entry-2' });
     });
 });

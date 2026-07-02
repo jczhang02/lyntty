@@ -184,13 +184,8 @@ function AgentTextBlock(props: {
     sync.sendMessage(props.sessionId, option.title, { source: 'option' });
   }, [props.sessionId]);
 
-  // Hide thinking messages
-  if (props.message.isThinking) {
-    return null;
-  }
-
   return (
-    <View style={styles.agentMessageContainer}>
+    <View style={[styles.agentMessageContainer, props.message.isThinking ? styles.agentThinkingContainer : null]}>
       <MarkdownView markdown={props.message.text} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
     </View>
   );
@@ -326,6 +321,9 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: 12,
     borderRadius: 16,
     maxWidth: '100%',
+  },
+  agentThinkingContainer: {
+    opacity: 0.72,
   },
   agentEventContainer: {
     marginHorizontal: 8,

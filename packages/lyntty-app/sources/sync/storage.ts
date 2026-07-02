@@ -71,6 +71,7 @@ interface SessionMessages {
     // chat list to render a loading footer at the top of the inverted list
     // and to suppress duplicate triggers from FlatList onEndReached.
     isLoadingOlder: boolean;
+    olderLoadError: string | null;
 }
 
 // Machine type is now imported from storageTypes - represents persisted machine data
@@ -199,6 +200,7 @@ interface StorageState {
     applyMessagesLoaded: (sessionId: string) => void;
     applyOlderMessagesPagination: (sessionId: string, info: { hasMore: boolean }) => void;
     applyOlderMessagesLoading: (sessionId: string, isLoading: boolean) => void;
+    applyOlderMessagesError: (sessionId: string, error: string | null) => void;
     applySettings: (settings: Settings, version: number) => void;
     applySettingsLocal: (settings: Partial<Settings>) => void;
     applyLocalSettings: (settings: Partial<LocalSettings>) => void;
@@ -562,10 +564,11 @@ export const storage = create<StorageState>()((set, get) => {
                     updatedSessionMessages[session.id] = {
                         messages: messagesArray,
                         messagesMap: mergedMessagesMap,
-                        reducerState: existingSessionMessages.reducerState, // The reducer modifies state in-place, so this has the updates
-                        isLoaded: existingSessionMessages.isLoaded,
-                        hasMoreOlder: existingSessionMessages.hasMoreOlder,
-                        isLoadingOlder: existingSessionMessages.isLoadingOlder
+                reducerState: existingSessionMessages.reducerState, // The reducer modifies state in-place, so this has the updates
+                isLoaded: existingSessionMessages.isLoaded,
+                hasMoreOlder: existingSessionMessages.hasMoreOlder,
+                isLoadingOlder: existingSessionMessages.isLoadingOlder,
+                olderLoadError: existingSessionMessages.olderLoadError,
                     };
 
                     // IMPORTANT: Copy latestUsage from reducerState to Session for immediate availability
@@ -575,6 +578,14 @@ export const storage = create<StorageState>()((set, get) => {
                             latestUsage: { ...existingSessionMessages.reducerState.latestUsage }
                         };
                     }
+                }
+
+                const maybeUpdatedSessionMessages = updatedSessionMessages[session.id];
+                if (maybeUpdatedSessionMessages && newSession.metadata?.piHistoryHasMore === true && !maybeUpdatedSessionMessages.hasMoreOlder) {
+                    updatedSessionMessages[session.id] = {
+                        ...maybeUpdatedSessionMessages,
+                        hasMoreOlder: true,
+                    } satisfies SessionMessages;
                 }
             });
 
@@ -657,10 +668,11 @@ export const storage = create<StorageState>()((set, get) => {
                 const existingSession: SessionMessages = state.sessionMessages[sessionId] || {
                     messages: [],
                     messagesMap: {},
-                    reducerState: createReducer(),
-                    isLoaded: false,
-                    hasMoreOlder: false,
-                    isLoadingOlder: false
+                reducerState: createReducer(),
+                isLoaded: false,
+                hasMoreOlder: false,
+                isLoadingOlder: false,
+                olderLoadError: null,
                 };
 
                 // Get the session's agentState if available
@@ -802,9 +814,10 @@ export const storage = create<StorageState>()((set, get) => {
                             reducerState,
                             messages,
                             messagesMap,
-                            isLoaded: true,
-                            hasMoreOlder: false,
-                            isLoadingOlder: false
+                    isLoaded: true,
+                    hasMoreOlder: false,
+                    isLoadingOlder: false,
+                    olderLoadError: null,
                         } satisfies SessionMessages
                     }
                 };
@@ -839,7 +852,8 @@ export const storage = create<StorageState>()((set, get) => {
                     ...state.sessionMessages,
                     [sessionId]: {
                         ...existing,
-                        hasMoreOlder: info.hasMore
+                        hasMoreOlder: info.hasMore,
+                        ...(info.hasMore ? {} : { olderLoadError: null }),
                     } satisfies SessionMessages
                 }
             };
@@ -858,7 +872,27 @@ export const storage = create<StorageState>()((set, get) => {
                     ...state.sessionMessages,
                     [sessionId]: {
                         ...existing,
-                        isLoadingOlder: isLoading
+                        isLoadingOlder: isLoading,
+                        ...(isLoading ? { olderLoadError: null } : {}),
+                    } satisfies SessionMessages
+                }
+            };
+        }),
+        applyOlderMessagesError: (sessionId: string, error: string | null) => set((state) => {
+            const existing = state.sessionMessages[sessionId];
+            if (!existing) {
+                return state;
+            }
+            if (existing.olderLoadError === error) {
+                return state;
+            }
+            return {
+                ...state,
+                sessionMessages: {
+                    ...state.sessionMessages,
+                    [sessionId]: {
+                        ...existing,
+                        olderLoadError: error,
                     } satisfies SessionMessages
                 }
             };
@@ -1459,7 +1493,8 @@ export function useSessionMessages(sessionId: string): {
     messages: Message[],
     isLoaded: boolean,
     hasMoreOlder: boolean,
-    isLoadingOlder: boolean
+    isLoadingOlder: boolean,
+    olderLoadError: string | null,
 } {
     return storage(useShallow((state) => {
         const session = state.sessionMessages[sessionId];
@@ -1467,7 +1502,8 @@ export function useSessionMessages(sessionId: string): {
             messages: session?.messages ?? emptyArray,
             isLoaded: session?.isLoaded ?? false,
             hasMoreOlder: session?.hasMoreOlder ?? false,
-            isLoadingOlder: session?.isLoadingOlder ?? false
+            isLoadingOlder: session?.isLoadingOlder ?? false,
+            olderLoadError: session?.olderLoadError ?? null,
         };
     }));
 }

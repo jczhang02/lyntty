@@ -861,6 +861,25 @@ export async function sessionKill(sessionId: string): Promise<SessionKillRespons
     }
 }
 
+export type PiHistoryPageResponse = {
+    type: 'success';
+    sent: number;
+    nextCursor?: string;
+    hasMore: boolean;
+    totalMessages: number;
+};
+
+export async function sessionLoadPiHistoryPage(
+    sessionId: string,
+    beforeEntryId?: string,
+): Promise<PiHistoryPageResponse> {
+    return apiSocket.sessionRPC<PiHistoryPageResponse, { beforeEntryId?: string }>(
+        sessionId,
+        'pi-history-page',
+        beforeEntryId ? { beforeEntryId } : {},
+    );
+}
+
 /**
  * Archive a session by deactivating it on the server.
  * Use this when the CLI process is already dead and sessionKill can't reach it.

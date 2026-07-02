@@ -302,6 +302,9 @@ export type Metadata = {
   },
   machineId?: string,
   piSessionId?: string, // Pi JSONL session ID
+  piHistoryCursor?: string,
+  piHistoryHasMore?: boolean,
+  piHistoryTotalMessages?: number,
   claudeSessionId?: string, // Legacy Claude Code session ID
   codexThreadId?: string, // Legacy Codex app-server thread ID
   tools?: string[],
