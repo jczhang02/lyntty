@@ -20,6 +20,7 @@ import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPop
 import { useSessionActionAlert } from '@/hooks/useSessionQuickActions';
 import { sessionKill } from '@/sync/ops';
 import { isWorktreePath, getRepoPath, getWorktreeName } from '@/utils/worktree';
+import { compareSessionsByRecencyDesc } from '@/sync/sessionRecency';
 import { useNewSessionDraft } from '@/hooks/useNewSessionDraft';
 import { useRouter } from 'expo-router';
 
@@ -215,7 +216,7 @@ export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: Acti
         // Sort sessions within each project group
         byMachine.forEach(mg => {
             mg.projects.forEach(pg => {
-                pg.sessions.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+                pg.sessions.sort(compareSessionsByRecencyDesc);
             });
         });
 

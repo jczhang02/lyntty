@@ -509,7 +509,14 @@ export async function machineWorktreeList(
     basePath: string,
 ): Promise<{ worktrees: Array<{ path: string; branch: string }> }> {
     try {
-        return await apiSocket.machineRPC(machineId, 'worktree-list', { basePath });
+        const result = await apiSocket.machineRPC<
+            { worktrees?: Array<{ path: string; branch: string }> } | Array<{ path: string; branch: string }>,
+            { basePath: string }
+        >(machineId, 'worktree-list', { basePath });
+        if (Array.isArray(result)) {
+            return { worktrees: result };
+        }
+        return { worktrees: Array.isArray(result.worktrees) ? result.worktrees : [] };
     } catch {
         return { worktrees: [] };
     }

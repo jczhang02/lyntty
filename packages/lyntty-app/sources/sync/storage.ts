@@ -27,6 +27,7 @@ import type { CustomerInfo } from './revenueCat/types';
 import React from "react";
 import { sync } from "./sync";
 import { getSyntheticPiSessionId } from './piDiscoveredSessions';
+import { compareSessionsByRecencyDesc, nextSessionUpdatedAt, sessionRecencyAt } from './sessionRecency';
 import { getCurrentRealtimeSessionId, getVoiceSession } from '@/realtime/RealtimeSession';
 import { isMutableTool } from "@/components/tools/knownTools";
 import { DecryptedArtifact } from "./artifactTypes";
@@ -86,6 +87,7 @@ export interface SessionRowData {
     // and activeAt updates on every heartbeat, causing needless deep-equal diffs
     activeAt?: number;
     createdAt?: number;
+    updatedAt?: number;
     hasDraft: boolean;
     active: boolean;
     machineId: string | null;
@@ -125,7 +127,8 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         avatarId: getSessionAvatarId(session),
         flavor: session.metadata?.flavor ?? null,
         state,
-        ...(!session.active && { activeAt: session.activeAt, createdAt: session.createdAt }),
+        ...(!session.active && { activeAt: session.activeAt, createdAt: session.createdAt, updatedAt: session.updatedAt }),
+        ...(session.active && { updatedAt: session.updatedAt }),
         hasDraft: !!session.draft,
         active: session.active,
         machineId: session.metadata?.machineId ?? null,
@@ -262,9 +265,9 @@ function buildSessionListViewData(
         }
     });
 
-    // Sort by creation date (newest first) — matches applySessions behavior
-    activeSessions.sort((a, b) => b.createdAt - a.createdAt);
-    inactiveSessions.sort((a, b) => b.createdAt - a.createdAt);
+    // Sort/group by last communication time, not creation time.
+    activeSessions.sort(compareSessionsByRecencyDesc);
+    inactiveSessions.sort(compareSessionsByRecencyDesc);
 
     // Build unified list view data
     const listData: SessionListViewItem[] = [];
@@ -283,7 +286,7 @@ function buildSessionListViewData(
     let currentDateString: string | null = null;
 
     for (const session of inactiveSessions) {
-        const sessionDate = new Date(session.createdAt);
+        const sessionDate = new Date(sessionRecencyAt(session));
         const dateString = sessionDate.toDateString();
 
         if (currentDateString !== dateString) {
@@ -478,9 +481,9 @@ export const storage = create<StorageState>()((set, get) => {
                 }
             });
 
-            // Sort both arrays by creation date for stable ordering
-            activeSessions.sort((a, b) => b.createdAt - a.createdAt);
-            inactiveSessions.sort((a, b) => b.createdAt - a.createdAt);
+            // Sort both arrays by last communication time for stable ordering.
+            activeSessions.sort(compareSessionsByRecencyDesc);
+            inactiveSessions.sort(compareSessionsByRecencyDesc);
 
             // Build flat list data for FlashList
             const listData: SessionListItem[] = [];
@@ -626,6 +629,7 @@ export const storage = create<StorageState>()((set, get) => {
         applyMessages: (sessionId: string, messages: NormalizedMessage[]) => {
             let changed = new Set<string>();
             let hasReadyEvent = false;
+            const latestMessageAt = messages.reduce((latest, message) => Math.max(latest, message.createdAt), 0);
 
             // Track plan mode transitions through the batch in order.
             // Set true on EnterPlanMode, false on ExitPlanMode. The final value
@@ -690,7 +694,12 @@ export const storage = create<StorageState>()((set, get) => {
                 // IMPORTANT: We extract latestUsage from the mutable reducerState and copy it to the Session object
                 // This ensures latestUsage is available immediately on load, even before messages are fully loaded
                 let updatedSessions = state.sessions;
-                const needsUpdate = (reducerResult.todos !== undefined || existingSession.reducerState.latestUsage || shouldEnterPlanMode) && session;
+                const needsUpdate = (
+                    reducerResult.todos !== undefined
+                    || existingSession.reducerState.latestUsage
+                    || shouldEnterPlanMode
+                    || (session && nextSessionUpdatedAt(session.updatedAt, latestMessageAt) !== session.updatedAt)
+                ) && session;
 
                 if (needsUpdate) {
                     updatedSessions = {
@@ -703,14 +712,19 @@ export const storage = create<StorageState>()((set, get) => {
                                 ...existingSession.reducerState.latestUsage
                             } : session.latestUsage,
                             // Auto-switch to plan mode when EnterPlanMode tool call is detected
-                            ...(shouldEnterPlanMode && { permissionMode: 'plan' })
+                            ...(shouldEnterPlanMode && { permissionMode: 'plan' }),
+                            updatedAt: nextSessionUpdatedAt(session.updatedAt, latestMessageAt)
                         }
                     };
                 }
+                const nextUnreadSessionIds = state.unreadSessionIds;
 
                 return {
                     ...state,
                     sessions: updatedSessions,
+                    sessionListViewData: updatedSessions === state.sessions
+                        ? state.sessionListViewData
+                        : buildSessionListViewData(updatedSessions, nextUnreadSessionIds),
                     sessionMessages: {
                         ...state.sessionMessages,
                         [sessionId]: {

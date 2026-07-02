@@ -24,6 +24,27 @@ describe('Pi reply visibility E2E smoke', () => {
         });
     });
 
+    it('renders relay-delivered pi session-protocol thinking as a thinking message', () => {
+        const normalized = normalizeRawMessage('server-msg-thinking', null, 123, {
+            role: 'session',
+            content: createEnvelope('agent', {
+                t: 'text',
+                text: 'Need inspect files',
+                thinking: true,
+            }, { turn: 'pi-turn-thinking', time: 123 }),
+            meta: { sentFrom: 'cli' },
+        } as any);
+
+        expect(normalized).not.toBeNull();
+        const result = reducer(createReducer(), normalized ? [normalized] : []);
+        expect(result.messages).toHaveLength(1);
+        expect(result.messages[0]).toMatchObject({
+            kind: 'agent-text',
+            isThinking: true,
+            text: '*Need inspect files*',
+        });
+    });
+
     it('renders relay-delivered pi session-protocol tool events as agent tool messages', () => {
         const normalized = [
             normalizeRawMessage('server-msg-2', null, 124, {

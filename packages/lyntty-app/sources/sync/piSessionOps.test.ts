@@ -85,6 +85,19 @@ describe('Pi machine session ops', () => {
         expect(machineRPC).toHaveBeenNthCalledWith(4, 'machine-1', 'worktree-remove', { worktreePath: '/repo/.dev/worktree/test' });
     });
 
+    it('normalizes legacy or malformed worktree-list RPC responses to an array', async () => {
+        machineRPC
+            .mockResolvedValueOnce([{ path: '/repo/.dev/worktree/legacy', branch: 'legacy' }])
+            .mockResolvedValueOnce({});
+
+        const { machineWorktreeList } = await import('./ops');
+
+        await expect(machineWorktreeList('machine-1', '/repo')).resolves.toEqual({
+            worktrees: [{ path: '/repo/.dev/worktree/legacy', branch: 'legacy' }],
+        });
+        await expect(machineWorktreeList('machine-1', '/repo')).resolves.toEqual({ worktrees: [] });
+    });
+
     it('passes an existing Pi session id when spawning from history', async () => {
         machineRPC.mockResolvedValue({ type: 'success', sessionId: 'lyntty-1' });
 

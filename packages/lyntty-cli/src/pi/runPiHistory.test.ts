@@ -31,24 +31,51 @@ describe('mapPiSessionHistoryToEnvelopes', () => {
     expect(envelopes[2]).toMatchObject({ role: 'agent', ev: { t: 'text', text: '2' } });
   });
 
-  it('imports tool results as thinking text so historical tool output is visible', () => {
+  it('imports thinking and tool calls with the same visible session-protocol shapes as live Pi events', () => {
     const envelopes = mapPiSessionHistoryToEnvelopes([
       {
         type: 'message',
+        id: 'a1',
+        parentId: 'u1',
+        timestamp: '2026-07-01T09:00:01.000Z',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'Need inspect files' },
+            { type: 'toolCall', id: 'call-1', name: 'find', arguments: { pattern: '*.ts' } },
+            { type: 'text', text: 'Found files' },
+          ],
+        },
+      },
+      {
+        type: 'message',
         id: 't1',
-        parentId: null,
-        timestamp: '2026-07-01T09:00:00.000Z',
+        parentId: 'a1',
+        timestamp: '2026-07-01T09:00:02.000Z',
         message: {
           role: 'toolResult',
-          toolName: 'bash',
-          content: [{ type: 'text', text: 'stdout' }],
+          toolCallId: 'call-1',
+          toolName: 'find',
+          content: [{ type: 'text', text: 'a.ts' }],
+          isError: false,
         },
       },
     ] as any);
 
-    expect(envelopes[1]).toMatchObject({
-      role: 'agent',
-      ev: { t: 'text', text: 'bash result:\nstdout', thinking: true },
-    });
+    expect(envelopes.map((envelope) => envelope.ev.t)).toEqual([
+      'turn-start',
+      'text',
+      'tool-call-start',
+      'text',
+      'turn-end',
+      'turn-start',
+      'text',
+      'tool-call-end',
+      'turn-end',
+    ]);
+    expect(envelopes[1]).toMatchObject({ role: 'agent', ev: { t: 'text', text: 'Need inspect files', thinking: true } });
+    expect(envelopes[2]).toMatchObject({ role: 'agent', ev: { t: 'tool-call-start', call: 'call-1', name: 'find', args: { pattern: '*.ts' } } });
+    expect(envelopes[7]).toMatchObject({ role: 'agent', ev: { t: 'tool-call-end', call: 'call-1' } });
+    expect(envelopes.filter((envelope) => envelope.ev.t === 'tool-call-start')).toHaveLength(1);
   });
 });
