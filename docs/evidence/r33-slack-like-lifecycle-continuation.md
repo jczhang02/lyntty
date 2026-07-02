@@ -53,6 +53,7 @@ Files:
 
 - `packages/lyntty-app/sources/hooks/useOpenPiDiscoveredSession.ts`
 - `packages/lyntty-app/sources/sync/piDiscoveredSessions.ts`
+- `packages/lyntty-app/sources/sync/piSessionOpenRequest.ts`
 - `packages/lyntty-app/sources/sync/sync.ts`
 
 Behavior:
@@ -60,6 +61,7 @@ Behavior:
 - Synthetic historical rows still navigate immediately.
 - The app now also asks the node to ensure a Pi mirror so a relay shell/tail can appear before full runtime spawn when possible.
 - The first resolved relay session id wins to avoid mirror/spawn navigation ping-pong.
+- A late `spawn-lyntty-session` timeout is suppressed once the mirror/relay session has already attached, preventing a stale modal over an otherwise usable Session Remote.
 - Synthetic queued sends are protected by a per-session flush guard; concurrent flush calls cannot duplicate sends.
 - Synthetic queued sends bump recency and are preserved if real session encryption is not ready.
 - Synthetic metadata exposes `piHistoryHasMore` / `piHistoryTotalMessages` for the Session Remote loading affordance.
@@ -70,12 +72,14 @@ Files:
 
 - `packages/lyntty-cli/src/daemon/activationLock.ts`
 - `packages/lyntty-cli/src/daemon/run.ts`
+- `packages/lyntty-cli/src/index.ts`
 
 Behavior:
 
 - Active Pi runtime reuse and activation checks now use `machineId + piSessionId` when a Pi session id is known.
 - Directory locking remains the fallback for new Pi sessions without a session id.
 - Same directory with different Pi session ids is no longer falsely blocked.
+- Daemon-spawned `lyntty pi --started-by daemon` no longer calls `ensureDaemonRunning()`, avoiding the release-APK bug where a Pi child started a second daemon and disconnected the machine RPC target.
 
 ## Verification
 
@@ -90,7 +94,7 @@ pnpm --filter ./packages/lyntty-cli test src/api/apiDataKey.test.ts src/api/apiM
 # 5 files, 21 tests passed
 
 pnpm --filter ./packages/lyntty-app test sources/sync/ops.codexFork.test.ts sources/sync/piDiscoveredSessions.test.ts sources/sync/piSessionOpen.test.ts
-# 3 files, 9 tests passed
+# 3 files, 11 tests passed after the release-APK stale-spawn-modal fix
 
 pnpm --filter ./packages/lyntty-relay test sources/app/api/socket/rpcHandler.spec.ts
 # 1 file, 6 tests passed
@@ -123,24 +127,61 @@ still fails in pre-existing watcher/session-scanner tests outside this Pi lifecy
 
 The changed Pi/API/daemon areas passed targeted tests and typecheck. The same two areas were already failing before this continuation.
 
-## APK / Maestro attempt
+## Release APK / Maestro validation
 
-A fresh local relay was started successfully on `:3005` with `LYNTTY_HOME_DIR=/tmp/lyntty-r33-node`.
+Metro/Expo Dev Client initially failed with `EMFILE: too many open files, watch '/home/jc/dev/lyntty/node_modules'` on this machine (`fs.inotify.max_user_instances=128`, no permission to raise it). To avoid treating a local watcher limit as product evidence, validation switched to a release APK with the JS bundle embedded.
 
-Metro/Expo Dev Client startup failed before Maestro could run:
+Release APK fixes made during validation:
+
+- `packages/lyntty-app/app.config.js` and `packages/lyntty-app/plugins/withEinkCompatibility.js`: development/preview Android builds now explicitly set `android:usesCleartextTraffic="true"`; the release APK built as the development variant can talk to the local relay at `http://10.0.2.2:3005`.
+- `packages/lyntty-app/sources/app/(app)/index.tsx`: first-run onboarding now uses a text `LYNTTY` wordmark instead of the stale Happy-like logotype image.
+- `packages/lyntty-cli/src/index.ts`: daemon-spawned `pi` sessions skip daemon self-ensure, preventing the spawned runtime from replacing the daemon that owns the machine RPC socket.
+- `packages/lyntty-app/sources/hooks/useOpenPiDiscoveredSession.ts`: if mirror attach has already resolved a relay session, late spawn timeout errors are ignored instead of showing a stale modal.
+
+Release APK build:
 
 ```text
-Error: EMFILE: too many open files, watch '/home/jc/dev/lyntty/node_modules'
+EXPO_PUBLIC_LYNTTY_SERVER_URL=http://10.0.2.2:3005 \
+CCACHE_DISABLE=1 CMAKE_C_COMPILER_LAUNCHER= CMAKE_CXX_COMPILER_LAUNCHER= \
+./gradlew assembleRelease --no-daemon
+# packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk, 291M
 ```
 
-System context:
+Release APK Maestro run with local relay `LYNTTY_HOME_DIR=/tmp/lyntty-r35-release-node`:
 
-- `fs.inotify.max_user_instances` is `128`.
-- Attempting to raise it via `sysctl -w fs.inotify.max_user_instances=1024` failed with permission denied.
-- Relay/Metro test processes were cleaned up after the attempt; no listeners remained on `:3005` or `:8081`.
+```text
+e2e/maestro/01_first_run.yml
+# passed in 14s
+
+e2e/maestro/02_pair_node.yml
+# prepare passed in 9s; accept passed in 3s
+
+e2e/maestro/03_history_send_reply.yml
+# passed in 28s with PONG marker R33_OK
+
+e2e/maestro/04_reconnect_smoke.yml
+# passed in 1m20s
+```
+
+Artifacts:
+
+- `docs/evidence/artifacts/r33-release-apk/prebuild-cleartext-plugin.log`
+- `docs/evidence/artifacts/r33-release-apk/assemble-release-after-spawn-error-fix.log`
+- `docs/evidence/artifacts/r33-release-apk/run7/01_first_run/junit.xml`
+- `docs/evidence/artifacts/r33-release-apk/run7/02_pair/prepare/prepare-junit.xml`
+- `docs/evidence/artifacts/r33-release-apk/run7/02_pair/accept/accept-junit.xml`
+- `docs/evidence/artifacts/r33-release-apk/run7/03_history/junit.xml`
+- `docs/evidence/artifacts/r33-release-apk/run7/04_reconnect/junit.xml`
+- `docs/evidence/artifacts/r33-release-apk/run7/final-session-screen.png`
+- `docs/evidence/artifacts/r33-release-apk/run7/logcat-tail.txt`
+
+Log checks after the passing run:
+
+- no `FATAL EXCEPTION`, `CLEARTEXT`, `Session encryption not ready`, or `operation has timed out` errors in the captured app log tail;
+- daemon-spawned Pi runtime log no longer contains `Ensuring Lyntty background service...`;
+- historical Pi session opened from Sessions Home, attached to relay session `cmr3qzzh5000wovggiy5n1y9w`, and returned `R33_OK` through the release APK.
 
 ## Remaining risks / next work
 
-- Fresh APK/Maestro validation still needs an environment that can run Metro or a preview/release APK that embeds the bundle.
-- Real physical ordinary `pi` TUI mirror should still be exercised end-to-end; this slice adds the daemon/app/RPC path and deterministic coverage but did not run a real external TUI process.
+- Real physical ordinary `pi` TUI mirror was covered by deterministic `PiExternalMirror` JSONL tests and release-APK mirror attach logs, but not by a separate human typing session in the desktop TUI.
 - Legacy relay sessions created with old random data-key semantics may not be recoverable by deterministic-key CLI processes; new stable Pi tags use the fixed derivation.

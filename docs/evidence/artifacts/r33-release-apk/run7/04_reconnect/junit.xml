@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty-api35" tests="1" failures="0" time="80.0">
+    <testcase id="Lyntty app relaunch visible-session smoke" name="Lyntty app relaunch visible-session smoke" classname="Lyntty app relaunch visible-session smoke" file="/tmp/tmp.ezBGxYYaS8/04_reconnect_smoke.yml" time="80.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="reconnect, smoke"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

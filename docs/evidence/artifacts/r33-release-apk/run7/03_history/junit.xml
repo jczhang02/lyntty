@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty-api35" tests="1" failures="0" time="28.0">
+    <testcase id="Lyntty historical Pi session open and live reply" name="Lyntty historical Pi session open and live reply" classname="Lyntty historical Pi session open and live reply" file="/tmp/tmp.MRe8jj8x3X/03_history_send_reply.yml" time="28.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="core, sessions-home, pi-history"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

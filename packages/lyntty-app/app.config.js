@@ -110,6 +110,7 @@ export default {
                 "android.permission.READ_MEDIA_VIDEO",
             ],
             package: bundleId,
+            usesCleartextTraffic: variant !== 'production',
             googleServicesFile: "./google-services.json",
             intentFilters: variant === 'production' ? [
                 {

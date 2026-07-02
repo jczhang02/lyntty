@@ -61,7 +61,9 @@ import { handleCodexCommand } from './commands/codexCommand'
       }
     }
     const { credentials } = await authAndSetupMachineIfNeeded();
-    await ensureDaemonRunning();
+    if (startedBy !== 'daemon') {
+      await ensureDaemonRunning();
+    }
     await runPi({ credentials, startedBy });
   };
 
@@ -487,7 +489,9 @@ Conversation history is preserved on the server, but in-flight tool calls are in
       }
 
       const { credentials } = await authAndSetupMachineIfNeeded();
-      await ensureDaemonRunning();
+      if (startedBy !== 'daemon') {
+        await ensureDaemonRunning();
+      }
 
       await runPi({
         credentials,

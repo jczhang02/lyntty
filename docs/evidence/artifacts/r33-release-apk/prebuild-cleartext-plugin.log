@@ -1,0 +1,17 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+- Creating native directory (./android)
+✔ Created native directory | reusing /android
+- Updating package.json
+› Using react-native@0.83.1 instead of recommended react-native@0.83.2.
+- Updating package.json
+✔ Updated package.json | no changes
+- Running prebuild
+✅ E-ink compatibility plugin applied successfully
+- Running prebuild
+   Added 0 optional hardware features
+- Running prebuild
+   Added comprehensive screen size support
+- Running prebuild
+   Added 0 flexible input method configurations
+- Running prebuild
+✔ Finished prebuild

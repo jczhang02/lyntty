@@ -164,6 +164,12 @@ const withEinkCompatibility = (
       }
     });
 
+    const application = manifest.application?.[0];
+    if (application && config.android?.usesCleartextTraffic === true) {
+      application.$ = application.$ || {};
+      application.$['android:usesCleartextTraffic'] = 'true';
+    }
+
     // Log plugin activity if verbose mode is enabled
     if (verbose) {
       console.log('✅ E-ink compatibility plugin applied successfully');

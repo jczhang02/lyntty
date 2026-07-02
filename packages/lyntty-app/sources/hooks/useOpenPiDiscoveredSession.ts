@@ -2,7 +2,7 @@ import React from 'react';
 
 import { Modal } from '@/modal';
 import { machineEnsurePiSessionMirror, machineSpawnNewSession } from '@/sync/ops';
-import { applyOptimisticPiSession, buildPiSessionSpawnRequest, shouldOpenPiSessionImmediately } from '@/sync/piSessionOpen';
+import { applyOptimisticPiSession, buildPiSessionSpawnRequest, shouldOpenPiSessionImmediately, shouldReportPiSpawnError } from '@/sync/piSessionOpen';
 import type { SessionRowData } from '@/sync/storage';
 import { sync } from '@/sync/sync';
 import { t } from '@/text';
@@ -53,7 +53,7 @@ export function useOpenPiDiscoveredSession() {
         const result = await machineSpawnNewSession(request);
         if (result.type === 'success') {
             await attachRelaySession(result.sessionId);
-        } else if (result.type === 'error') {
+        } else if (result.type === 'error' && shouldReportPiSpawnError(resolvedRelaySessionId)) {
             Modal.alert(t('common.error'), result.errorMessage);
         }
     }, [navigateToSession]);

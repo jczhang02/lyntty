@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldOpenPiSessionImmediately } from './piSessionOpenRequest';
+import { shouldOpenPiSessionImmediately, shouldReportPiSpawnError } from './piSessionOpenRequest';
 import type { SessionRowData } from './storage';
 
 function row(overrides: Partial<SessionRowData>): SessionRowData {
@@ -26,6 +26,16 @@ function row(overrides: Partial<SessionRowData>): SessionRowData {
         ...overrides,
     } as SessionRowData;
 }
+
+describe('shouldReportPiSpawnError', () => {
+    it('suppresses late spawn errors after a relay session already attached', () => {
+        expect(shouldReportPiSpawnError('relay-session')).toBe(false);
+    });
+
+    it('reports spawn errors when no relay session was resolved', () => {
+        expect(shouldReportPiSpawnError(null)).toBe(true);
+    });
+});
 
 describe('shouldOpenPiSessionImmediately', () => {
     it('opens synthetic Pi history rows before node attach completes', () => {

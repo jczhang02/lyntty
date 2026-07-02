@@ -1,7 +1,7 @@
 import { storage, type SessionRowData } from './storage';
 import { resolveOptimisticPiPath } from './piSessionOpenRequest';
 
-export { buildPiSessionSpawnRequest, resolveOptimisticPiPath, shouldOpenPiSessionImmediately } from './piSessionOpenRequest';
+export { buildPiSessionSpawnRequest, resolveOptimisticPiPath, shouldOpenPiSessionImmediately, shouldReportPiSpawnError } from './piSessionOpenRequest';
 
 export function applyOptimisticPiSession(source: SessionRowData, sessionId: string) {
     const now = Date.now();

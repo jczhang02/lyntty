@@ -5,6 +5,10 @@ export function shouldOpenPiSessionImmediately(source: SessionRowData): boolean 
     return !!source.piSynthetic && source.id.startsWith('pi-local:');
 }
 
+export function shouldReportPiSpawnError(resolvedRelaySessionId: string | null): boolean {
+    return !resolvedRelaySessionId;
+}
+
 export function resolveOptimisticPiPath(source: SessionRowData): string {
     const path = source.path ?? source.subtitle ?? '';
     if (path === '~' && source.homeDir) {
