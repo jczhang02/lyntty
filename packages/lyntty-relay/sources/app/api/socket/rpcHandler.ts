@@ -87,6 +87,7 @@ const ALLOWED_MACHINE_RPC_METHODS = new Set([
     'spawn-lyntty-session',
     'resume-lyntty-session',
     'list-pi-sessions',
+    'ensure-pi-session-mirror',
     'stop-session',
     'stop-daemon',
     'claude-fork-session',

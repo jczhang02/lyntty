@@ -99,6 +99,7 @@ type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
     resumeSession?: (sessionId: string, options?: { model?: string; permissionMode?: string }) => Promise<SpawnSessionResult>;
     listPiSessions?: (options?: { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }) => Promise<{ sessions: PiSessionRecoveryRecord[]; nextCursor?: string; total: number }>;
+    ensurePiSessionMirror?: (options: { piSessionId: string; directory?: string; machineId?: string }) => Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }>;
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
 }
@@ -150,6 +151,7 @@ export class ApiMachineClient {
         spawnSession,
         resumeSession,
         listPiSessions,
+        ensurePiSessionMirror,
         stopSession,
         requestShutdown
     }: MachineRpcHandlers) {
@@ -206,6 +208,20 @@ export class ApiMachineClient {
             const cursor = typeof params?.cursor === 'string' && params.cursor.length > 0 ? params.cursor : undefined;
             const page = await listPiSessions({ cwd, scope, limit, cursor });
             return { type: 'success', ...page };
+        });
+
+        this.rpcHandlerManager.registerHandler('ensure-pi-session-mirror', async (params: any) => {
+            if (!ensurePiSessionMirror) {
+                throw new Error('Pi session mirror is not available on this machine');
+            }
+            const piSessionId = requireNonEmptyString(params?.piSessionId, 'piSessionId');
+            const directory = typeof params?.directory === 'string' && params.directory.length > 0 ? params.directory : undefined;
+            const machineId = typeof params?.machineId === 'string' && params.machineId.length > 0 ? params.machineId : undefined;
+            const result = await ensurePiSessionMirror({ piSessionId, directory, machineId });
+            if (result.type === 'error') {
+                throw new Error(result.errorMessage);
+            }
+            return result;
         });
 
         this.rpcHandlerManager.registerHandler('worktree-create', async (params: any) => createManagedWorktree({

@@ -92,6 +92,8 @@ describe('mergePiDiscoveredSessions', () => {
                 piDiscoveryState: 'discovered_local',
                 piMessageCount: 42,
                 piFirstMessage: 'first prompt',
+                piHistoryHasMore: true,
+                piHistoryTotalMessages: 42,
                 piSynthetic: true,
             },
         });

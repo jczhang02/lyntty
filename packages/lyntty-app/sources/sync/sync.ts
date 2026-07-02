@@ -116,6 +116,7 @@ class Sync {
     private sessionOldestSeq = new Map<string, number>();
     private pendingOutbox = new Map<string, OutboxMessage[]>();
     private pendingSyntheticOutbox = new Map<string, Array<{ text: string; options?: SendMessageOptions }>>();
+    private flushingSyntheticOutbox = new Set<string>();
     private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
     private sessionQueueProcessing = new Set<string>();
     private sessionMessageLocks = new Map<string, AsyncLock>();
@@ -565,6 +566,16 @@ class Sync {
         pending.push({ text, options });
         this.pendingSyntheticOutbox.set(sessionId, pending);
 
+        const now = Date.now();
+        const session = storage.getState().sessions[sessionId];
+        if (session) {
+            storage.getState().applySessions([{
+                ...session,
+                updatedAt: Math.max(session.updatedAt, now),
+                activeAt: Math.max(session.activeAt, now),
+            }]);
+        }
+
         const localId = randomUUID();
         const record: RawRecord = {
             role: 'user',
@@ -574,24 +585,44 @@ class Sync {
                 ...(options?.displayText ? { displayText: options.displayText } : {}),
             },
         };
-        const normalized = normalizeRawMessage(localId, localId, Date.now(), record);
+        const normalized = normalizeRawMessage(localId, localId, now, record);
         if (normalized) {
             this.enqueueMessages(sessionId, [normalized]);
         }
     }
 
     async flushSyntheticMessages(syntheticSessionId: string, relaySessionId: string) {
-        const pending = this.pendingSyntheticOutbox.get(syntheticSessionId);
-        if (!pending || pending.length === 0) {
+        if (this.flushingSyntheticOutbox.has(syntheticSessionId)) {
             return;
         }
-        await this.sessionsSync.awaitQueue();
-        if (!this.encryption.getSessionEncryption(relaySessionId)) {
-            return;
-        }
-        this.pendingSyntheticOutbox.delete(syntheticSessionId);
-        for (const item of pending) {
-            await this.sendMessage(relaySessionId, item.text, item.options);
+        this.flushingSyntheticOutbox.add(syntheticSessionId);
+        try {
+            const pending = this.pendingSyntheticOutbox.get(syntheticSessionId);
+            if (!pending || pending.length === 0) {
+                return;
+            }
+            await this.sessionsSync.awaitQueue();
+            if (!this.encryption.getSessionEncryption(relaySessionId)) {
+                return;
+            }
+            while (true) {
+                const current = this.pendingSyntheticOutbox.get(syntheticSessionId);
+                if (!current || current.length === 0) {
+                    this.pendingSyntheticOutbox.delete(syntheticSessionId);
+                    return;
+                }
+                const item = current[0];
+                await this.sendMessage(relaySessionId, item.text, item.options);
+                const afterSend = this.pendingSyntheticOutbox.get(syntheticSessionId) ?? [];
+                const remaining = afterSend.filter((entry) => entry !== item);
+                if (remaining.length > 0) {
+                    this.pendingSyntheticOutbox.set(syntheticSessionId, remaining);
+                } else {
+                    this.pendingSyntheticOutbox.delete(syntheticSessionId);
+                }
+            }
+        } finally {
+            this.flushingSyntheticOutbox.delete(syntheticSessionId);
         }
     }
 

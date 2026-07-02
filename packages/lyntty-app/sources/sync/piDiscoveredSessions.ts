@@ -34,6 +34,10 @@ function buildPiMetadata(
         piFirstMessage: record.firstMessage,
         piRecoveryReason: record.reason,
         piHasHistoryGap: record.hasHistoryGap,
+        ...(synthetic ? {
+            piHistoryHasMore: (record.messageCount ?? 0) > 0,
+            piHistoryTotalMessages: record.messageCount,
+        } : {}),
         piSynthetic: synthetic,
         lifecycleState: record.state,
         lifecycleStateSince: resolveTimestamp(record.modifiedAt, Date.now()),

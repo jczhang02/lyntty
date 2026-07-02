@@ -3,14 +3,34 @@ import type { TrackedSession } from './types';
 
 export type PiTakeoverChoice = 'wait' | 'stop' | 'interrupt';
 
-export function resolveActivePiSessionReuse(piSessionId: string | undefined, sessions: readonly TrackedSession[]): TrackedSession | null {
+function sessionMatchesPiLease(session: TrackedSession, machineId: string | undefined, piSessionId: string | undefined): boolean {
+  if (!piSessionId) {
+    return false;
+  }
+  if (session.agent !== 'pi') {
+    return false;
+  }
+  const metadata = session.lynttySessionMetadataFromLocalWebhook;
+  if (metadata?.piSessionId !== piSessionId) {
+    return false;
+  }
+  if (machineId && metadata.machineId && metadata.machineId !== machineId) {
+    return false;
+  }
+  return true;
+}
+
+export function resolveActivePiSessionReuse(
+  piSessionId: string | undefined,
+  sessions: readonly TrackedSession[],
+  machineId?: string,
+): TrackedSession | null {
   if (!piSessionId) {
     return null;
   }
   return sessions.find((session) => (
-    session.agent === 'pi'
-    && !!session.lynttySessionId
-    && session.lynttySessionMetadataFromLocalWebhook?.piSessionId === piSessionId
+    !!session.lynttySessionId
+    && sessionMatchesPiLease(session, machineId, piSessionId)
   )) ?? null;
 }
 
@@ -30,15 +50,24 @@ function isActivePiSession(session: TrackedSession, directory: string): boolean 
   return normalizeDirectory(session.directory) === normalizeDirectory(directory);
 }
 
+function describePiLease(options: Pick<SpawnSessionOptions, 'directory' | 'machineId' | 'sessionId'>): string {
+  if (options.sessionId) {
+    return `${options.machineId ?? 'local'}:${options.sessionId}`;
+  }
+  return normalizeDirectory(options.directory);
+}
+
 export function resolvePiActivationLock(
-  options: Pick<SpawnSessionOptions, 'directory' | 'agent' | 'takeoverChoice'>,
+  options: Pick<SpawnSessionOptions, 'directory' | 'agent' | 'takeoverChoice' | 'machineId' | 'sessionId'>,
   sessions: readonly TrackedSession[],
 ): PiActivationLockResult {
   if (options.agent !== 'pi') {
     return { type: 'allow' };
   }
 
-  const active = sessions.find((session) => isActivePiSession(session, options.directory));
+  const active = options.sessionId
+    ? sessions.find((session) => session.pid && sessionMatchesPiLease(session, options.machineId, options.sessionId))
+    : sessions.find((session) => isActivePiSession(session, options.directory));
   if (!active) {
     return { type: 'allow' };
   }
@@ -55,6 +84,6 @@ export function resolvePiActivationLock(
     type: 'blocked',
     activeSessionId,
     activePid: active.pid,
-    errorMessage: `active runtime already holds lease for ${normalizeDirectory(options.directory)}; ${queueMessage}`,
+    errorMessage: `active runtime already holds lease for ${describePiLease(options)}; ${queueMessage}`,
   };
 }

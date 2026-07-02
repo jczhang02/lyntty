@@ -13,6 +13,37 @@ vi.mock('./sync', () => ({
     sync: { refreshSessions },
 }));
 
+describe('machine session ops', () => {
+    beforeEach(() => {
+        machineRPC.mockReset();
+        refreshSessions.mockReset();
+    });
+
+    it('forwards machineId inside spawn payload so daemon can enforce Pi leases', async () => {
+        machineRPC.mockResolvedValue({ type: 'success', sessionId: 'relay-pi' });
+
+        const { machineSpawnNewSession } = await import('./ops');
+        await machineSpawnNewSession({
+            machineId: 'machine-1',
+            directory: '/tmp/project',
+            sessionId: 'pi-session-1',
+            agent: 'pi',
+            approvedNewDirectoryCreation: true,
+        });
+
+        expect(machineRPC).toHaveBeenCalledWith(
+            'machine-1',
+            'spawn-lyntty-session',
+            expect.objectContaining({
+                machineId: 'machine-1',
+                directory: '/tmp/project',
+                sessionId: 'pi-session-1',
+                agent: 'pi',
+            }),
+        );
+    });
+});
+
 describe('codex fork ops', () => {
     beforeEach(() => {
         machineRPC.mockReset();

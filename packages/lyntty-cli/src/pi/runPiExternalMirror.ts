@@ -16,7 +16,7 @@ function isSessionEntry(entry: unknown): entry is SessionEntry {
     && typeof (entry as { id?: unknown }).id === 'string';
 }
 
-function readSessionEntries(file: string): SessionEntry[] {
+export function readPiSessionEntries(file: string): SessionEntry[] {
   return readFileSync(file, 'utf8')
     .split('\n')
     .filter((line) => line.trim().length > 0)
@@ -48,7 +48,7 @@ export class PiExternalMirror {
   }
 
   markCurrentEntriesKnown(): void {
-    const entries = readSessionEntries(this.sessionFile);
+    const entries = readPiSessionEntries(this.sessionFile);
     const pendingIds = new Set(this.pendingEntries.map((entry) => entry.id));
     for (const entry of entries) {
       if (!pendingIds.has(entry.id)) {
@@ -67,7 +67,7 @@ export class PiExternalMirror {
     }
     this.lastMtimeMs = stat.mtimeMs;
 
-    const entries = readSessionEntries(this.sessionFile);
+    const entries = readPiSessionEntries(this.sessionFile);
     const newEntries = entries.filter((entry: SessionEntry) => !this.knownEntryIds.has(entry.id));
     if (newEntries.length > 0) {
       for (const entry of newEntries) {

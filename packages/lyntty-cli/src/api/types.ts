@@ -305,6 +305,12 @@ export type Metadata = {
   piHistoryCursor?: string,
   piHistoryHasMore?: boolean,
   piHistoryTotalMessages?: number,
+  piDiscoveryState?: string,
+  piMessageCount?: number,
+  piFirstMessage?: string,
+  piRecoveryReason?: string,
+  piHasHistoryGap?: boolean,
+  piSynthetic?: boolean,
   claudeSessionId?: string, // Legacy Claude Code session ID
   codexThreadId?: string, // Legacy Codex app-server thread ID
   tools?: string[],

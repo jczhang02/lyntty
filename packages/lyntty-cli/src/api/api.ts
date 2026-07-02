@@ -1,14 +1,24 @@
+import { createHash } from 'node:crypto';
+
 import axios from 'axios'
 import { logger } from '@/ui/logger'
 import type { AgentState, CreateSessionResponse, Metadata, Session, Machine, MachineMetadata, DaemonState } from '@/api/types'
 import { ApiSessionClient } from './apiSession';
 import { ApiMachineClient } from './apiMachine';
-import { decodeBase64, encodeBase64, getRandomBytes, encrypt, decrypt, libsodiumEncryptForPublicKey } from './encryption';
+import { decodeBase64, encodeBase64, encrypt, decrypt, libsodiumEncryptForPublicKey } from './encryption';
 import { PushNotificationClient } from './pushNotifications';
 import { configuration } from '@/configuration';
 import chalk from 'chalk';
 import { Credentials } from '@/persistence';
 import { connectionState, isNetworkError } from '@/utils/serverConnectionErrors';
+
+export function deriveSessionDataKey(machineKey: Uint8Array, tag: string): Uint8Array {
+  return new Uint8Array(createHash('sha256')
+    .update('lyntty-session-data-key-v1')
+    .update(machineKey)
+    .update(tag)
+    .digest());
+}
 
 export class ApiClient {
 
@@ -39,8 +49,14 @@ export class ApiClient {
     let encryptionVariant: 'legacy' | 'dataKey';
     if (this.credential.encryption.type === 'dataKey') {
 
-      // Generate new encryption key
-      encryptionKey = getRandomBytes(32);
+      // Derive the session data key from the local machine key + session tag.
+      // The relay's /v1/sessions endpoint is tag-idempotent: if two local
+      // processes race to open the same stable Pi tag, the loser receives the
+      // existing encrypted metadata. A random per-call key cannot decrypt that
+      // existing ciphertext. Deriving from machineKey+tag keeps stable-tag Pi
+      // sessions decryptable across mirror/runtime processes while still
+      // encrypting the data key to the app account public key for mobile sync.
+      encryptionKey = deriveSessionDataKey(this.credential.encryption.machineKey, opts.tag);
       encryptionVariant = 'dataKey';
 
       // Derive and encrypt data encryption key

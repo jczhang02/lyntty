@@ -8,6 +8,7 @@ describe('RPC scope guards', () => {
     it('allows machine sockets to register only safe machine RPC methods for their own machine', () => {
         expect(canRegisterRpcMethod({ clientType: 'machine-scoped', machineId }, `${machineId}:list-pi-sessions`)).toBe(true);
         expect(canRegisterRpcMethod({ clientType: 'machine-scoped', machineId }, `${machineId}:spawn-lyntty-session`)).toBe(true);
+        expect(canRegisterRpcMethod({ clientType: 'machine-scoped', machineId }, `${machineId}:ensure-pi-session-mirror`)).toBe(true);
         expect(canRegisterRpcMethod({ clientType: 'machine-scoped', machineId }, `${machineId}:worktree-create`)).toBe(true);
         expect(canRegisterRpcMethod({ clientType: 'machine-scoped', machineId }, `${machineId}:worktree-status`)).toBe(true);
         expect(canRegisterRpcMethod({ clientType: 'machine-scoped', machineId }, `${machineId}:bash`)).toBe(false);
@@ -16,6 +17,7 @@ describe('RPC scope guards', () => {
 
     it('prevents user sockets from calling machine-scoped shell/file RPC methods', () => {
         expect(canCallRpcMethod({ clientType: 'user-scoped' }, `${machineId}:list-pi-sessions`)).toBe(true);
+        expect(canCallRpcMethod({ clientType: 'user-scoped' }, `${machineId}:ensure-pi-session-mirror`)).toBe(true);
         expect(canCallRpcMethod({ clientType: 'user-scoped' }, `${machineId}:worktree-create`)).toBe(true);
         expect(canCallRpcMethod({ clientType: 'user-scoped' }, `${machineId}:bash`)).toBe(false);
         expect(canCallRpcMethod({ clientType: 'user-scoped' }, `${machineId}:readFile`)).toBe(false);

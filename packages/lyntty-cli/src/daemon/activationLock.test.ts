@@ -16,17 +16,18 @@ describe('resolveActivePiSessionReuse', () => {
   it('reuses an active runtime for the same Pi session id', () => {
     const session = activePiSession({
       lynttySessionId: 'relay-session-1',
-      lynttySessionMetadataFromLocalWebhook: { piSessionId: 'pi-session-1' } as any,
+      lynttySessionMetadataFromLocalWebhook: { machineId: 'machine-1', piSessionId: 'pi-session-1' } as any,
     });
-    expect(resolveActivePiSessionReuse('pi-session-1', [session])?.lynttySessionId).toBe('relay-session-1');
+    expect(resolveActivePiSessionReuse('pi-session-1', [session], 'machine-1')?.lynttySessionId).toBe('relay-session-1');
   });
 
-  it('does not reuse a different Pi session id', () => {
+  it('does not reuse a different Pi session id or machine id', () => {
     const session = activePiSession({
       lynttySessionId: 'relay-session-1',
-      lynttySessionMetadataFromLocalWebhook: { piSessionId: 'pi-session-1' } as any,
+      lynttySessionMetadataFromLocalWebhook: { machineId: 'machine-1', piSessionId: 'pi-session-1' } as any,
     });
-    expect(resolveActivePiSessionReuse('pi-session-2', [session])).toBeNull();
+    expect(resolveActivePiSessionReuse('pi-session-2', [session], 'machine-1')).toBeNull();
+    expect(resolveActivePiSessionReuse('pi-session-1', [session], 'machine-2')).toBeNull();
   });
 });
 
@@ -39,7 +40,21 @@ describe('resolvePiActivationLock', () => {
     expect(resolvePiActivationLock({ directory: '/repo', agent: 'pi' }, [activePiSession({ agent: 'codex' })])).toEqual({ type: 'allow' });
   });
 
-  it('requires takeover when an active Pi runtime already owns the directory', () => {
+  it('uses the Pi session lease before falling back to directory locks', () => {
+    const active = activePiSession({
+      lynttySessionMetadataFromLocalWebhook: { machineId: 'machine-1', piSessionId: 'pi-session-1' } as any,
+    });
+
+    expect(resolvePiActivationLock({ directory: '/repo', machineId: 'machine-1', sessionId: 'pi-session-2', agent: 'pi' }, [active])).toEqual({ type: 'allow' });
+    expect(resolvePiActivationLock({ directory: '/repo', machineId: 'machine-1', sessionId: 'pi-session-1', agent: 'pi' }, [active])).toEqual({
+      type: 'blocked',
+      activeSessionId: 'ses-active',
+      activePid: 123,
+      errorMessage: 'active runtime already holds lease for machine-1:pi-session-1; choose stop or interrupt to take over',
+    });
+  });
+
+  it('requires takeover when a new Pi runtime without session id already owns the directory', () => {
     expect(resolvePiActivationLock({ directory: '/repo', agent: 'pi' }, [activePiSession()])).toEqual({
       type: 'blocked',
       activeSessionId: 'ses-active',

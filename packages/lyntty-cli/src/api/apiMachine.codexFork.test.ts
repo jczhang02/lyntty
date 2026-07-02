@@ -107,6 +107,32 @@ describe('ApiMachineClient Codex fork RPCs', () => {
         expect(listPiSessions).toHaveBeenCalledWith({ scope: 'machine', cwd: undefined, limit: undefined, cursor: undefined });
     });
 
+    it('registers a Pi mirror RPC', async () => {
+        const ensurePiSessionMirror = vi.fn().mockResolvedValue({ type: 'success', sessionId: 'relay-pi', sent: 12 });
+
+        const { ApiMachineClient } = await import('./apiMachine');
+        const client = new ApiMachineClient('token', machineClient());
+        client.setRPCHandlers({
+            spawnSession: vi.fn(),
+            ensurePiSessionMirror,
+            stopSession: vi.fn(),
+            requestShutdown: vi.fn(),
+        });
+
+        const result = await handlersFrom(client).get('machine-1:ensure-pi-session-mirror')?.({
+            machineId: 'machine-1',
+            piSessionId: 'pi-1',
+            directory: '/tmp/project',
+        });
+
+        expect(result).toEqual({ type: 'success', sessionId: 'relay-pi', sent: 12 });
+        expect(ensurePiSessionMirror).toHaveBeenCalledWith({
+            machineId: 'machine-1',
+            piSessionId: 'pi-1',
+            directory: '/tmp/project',
+        });
+    });
+
     it('forwards resumeCodexThreadId through the spawn RPC', async () => {
         const spawnSession = vi.fn().mockResolvedValue({ type: 'success', sessionId: 'lyntty-forked' });
 

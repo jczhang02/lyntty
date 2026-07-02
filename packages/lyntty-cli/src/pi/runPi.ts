@@ -1,5 +1,3 @@
-import { createHash, randomUUID } from 'node:crypto';
-
 import type { AgentSessionRuntime } from '@earendil-works/pi-coding-agent';
 import {
   createAgentSessionFromServices,
@@ -25,6 +23,7 @@ import { bindPiSessionExtensions, getPiPluginFeatureSummary, listPiRemoteSlashCo
 import { mapPiSessionHistoryPageToEnvelopes } from './runPiHistory';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 import { startPiExternalMirror } from './runPiExternalMirror';
+import { resolvePiRelaySessionTag } from './piRelaySessionTag';
 
 export interface RunPiOptions {
   credentials: Credentials;
@@ -34,17 +33,6 @@ export interface RunPiOptions {
 const LOCAL_ONLY_SLASH_COMMANDS = ['/model', '/settings', '/session', '/theme', '/help'];
 
 const PI_HISTORY_PAGE_MESSAGE_LIMIT = 50;
-
-export function resolvePiRelaySessionTag(machineId: string, piSessionId?: string): string {
-  if (!piSessionId) {
-    return randomUUID();
-  }
-  const digest = createHash('sha256')
-    .update(`${machineId}:${piSessionId}`)
-    .digest('hex')
-    .slice(0, 32);
-  return `pi:${digest}`;
-}
 
 function getPiSessionDisplayName(session: AgentSessionRuntime['session']): string {
   return session.sessionName ?? session.sessionId;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolvePiRelaySessionTag } from './runPi';
+import { resolvePiRelaySessionTag } from './piRelaySessionTag';
 
 describe('resolvePiRelaySessionTag', () => {
   it('uses a stable relay tag for the same machine and Pi session', () => {

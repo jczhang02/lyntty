@@ -4,6 +4,7 @@ import * as tmp from 'tmp';
 import axios from 'axios';
 
 import { ApiClient } from '@/api/api';
+import { ApiSessionClient } from '@/api/apiSession';
 import { TrackedSession, SessionEncryptionData } from './types';
 import { MachineMetadata, DaemonState, Metadata } from '@/api/types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
@@ -31,6 +32,9 @@ import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
 import { resolveActivePiSessionReuse, resolvePiActivationLock } from './activationLock';
 import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
 import { discoverLocalPiSessions, discoverLocalPiSessionsPage, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
+import { mapPiSessionHistoryPageToEnvelopes } from '@/pi/runPiHistory';
+import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalMirror';
+import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -316,7 +320,7 @@ export async function startDaemon(): Promise<void> {
         directory = expandHomeDirectory(directory);
       }
       const spawnOptions = { ...options, directory };
-      const activeMatchingPiSession = resolveActivePiSessionReuse(sessionId, getCurrentChildren());
+      const activeMatchingPiSession = resolveActivePiSessionReuse(sessionId, getCurrentChildren(), machineId);
       if (activeMatchingPiSession?.lynttySessionId) {
         logger.debug(`[DAEMON RUN] Reusing active Pi runtime ${activeMatchingPiSession.lynttySessionId} for Pi session ${sessionId}`);
         return {
@@ -933,6 +937,123 @@ export async function startDaemon(): Promise<void> {
     });
     logger.debug(`[DAEMON RUN] Machine registered: ${machine.id}`);
 
+    const externalPiMirrors = new Map<string, { sessionId: string; stop: () => void }>();
+    const externalPiMirrorStarts = new Map<string, Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }>>();
+
+    const ensurePiSessionMirror = async (options: { piSessionId: string; directory?: string; machineId?: string }): Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }> => {
+      const piSessionId = options.piSessionId;
+      const mirrorKey = `${options.machineId ?? machine.id}:${piSessionId}`;
+      const existing = externalPiMirrors.get(mirrorKey);
+      if (existing) {
+        return { type: 'success', sessionId: existing.sessionId, sent: 0 };
+      }
+      const inFlight = externalPiMirrorStarts.get(mirrorKey);
+      if (inFlight) {
+        return inFlight;
+      }
+
+      const startPromise = (async () => {
+      const localSessions = await listCachedPiSessionInfos({ scope: 'machine' });
+      const local = localSessions.find((session) => session.id === piSessionId);
+      if (!local) {
+        return { type: 'error' as const, errorMessage: `Pi session ${piSessionId} was not found on this node` };
+      }
+
+      const sessionFile = local.path;
+      const entries = readPiSessionEntries(sessionFile);
+      const page = mapPiSessionHistoryPageToEnvelopes(entries, { limit: 50 });
+      const sessionTag = resolvePiRelaySessionTag(machine.id, piSessionId);
+      const metadata: Metadata = {
+        path: local.cwd || options.directory || os.homedir(),
+        host: initialMachineMetadata.host,
+        version: packageJson.version,
+        os: os.platform(),
+        machineId: machine.id,
+        homeDir: os.homedir(),
+        lynttyHomeDir: configuration.lynttyHomeDir,
+        lynttyLibDir: projectPath(),
+        lynttyToolsDir: join(projectPath(), 'tools', 'unpacked'),
+        startedFromDaemon: true,
+        hostPid: process.pid,
+        startedBy: 'daemon',
+        lifecycleState: 'external_pi',
+        lifecycleStateSince: Date.now(),
+        flavor: 'pi',
+        piSessionId,
+        name: local.name ?? local.firstMessage ?? piSessionId,
+        piMessageCount: local.messageCount,
+        piFirstMessage: local.firstMessage,
+        piHistoryCursor: page.nextCursor,
+        piHistoryHasMore: page.hasMore,
+        piHistoryTotalMessages: page.totalMessages,
+      };
+      const response = await api.getOrCreateSession({
+        tag: sessionTag,
+        metadata,
+        state: { controlledByUser: false },
+      });
+      if (!response) {
+        return { type: 'error' as const, errorMessage: 'Failed to create or load relay session for Pi mirror' };
+      }
+
+      const sessionClient = new ApiSessionClient(credentials.token, response);
+      for (const envelope of page.envelopes) {
+        sessionClient.sendSessionProtocolMessage(envelope);
+      }
+      await sessionClient.flush();
+      sessionClient.updateMetadata((currentMetadata) => ({
+        ...currentMetadata,
+        piHistoryCursor: page.nextCursor,
+        piHistoryHasMore: page.hasMore,
+        piHistoryTotalMessages: page.totalMessages,
+      }));
+
+      sessionClient.rpcHandlerManager.registerHandler('pi-history-page', async (params: unknown) => {
+        const record = params && typeof params === 'object' && !Array.isArray(params)
+          ? params as Record<string, unknown>
+          : {};
+        const beforeEntryId = typeof record.beforeEntryId === 'string' ? record.beforeEntryId : undefined;
+        const currentEntries = readPiSessionEntries(sessionFile);
+        const nextPage = mapPiSessionHistoryPageToEnvelopes(currentEntries, { beforeEntryId, limit: 50 });
+        for (const envelope of nextPage.envelopes) {
+          sessionClient.sendSessionProtocolMessage(envelope);
+        }
+        await sessionClient.flush();
+        sessionClient.updateMetadata((currentMetadata) => ({
+          ...currentMetadata,
+          piHistoryCursor: nextPage.nextCursor,
+          piHistoryHasMore: nextPage.hasMore,
+          piHistoryTotalMessages: nextPage.totalMessages,
+        }));
+        return {
+          type: 'success' as const,
+          sent: nextPage.envelopes.length,
+          nextCursor: nextPage.nextCursor,
+          hasMore: nextPage.hasMore,
+          totalMessages: nextPage.totalMessages,
+        };
+      });
+
+      const mirror = startPiExternalMirror({
+        sessionFile,
+        initialEntries: entries,
+        session: () => sessionClient,
+        isManagedRuntimeActive: () => !!resolveActivePiSessionReuse(piSessionId, getCurrentChildren(), machine.id),
+      });
+      if (mirror) {
+        externalPiMirrors.set(mirrorKey, { sessionId: response.id, stop: mirror.stop });
+      }
+
+      return { type: 'success' as const, sessionId: response.id, sent: page.envelopes.length };
+      })();
+      externalPiMirrorStarts.set(mirrorKey, startPromise);
+      try {
+        return await startPromise;
+      } finally {
+        externalPiMirrorStarts.delete(mirrorKey);
+      }
+    };
+
     // Create realtime machine session
     const apiMachine = api.machineSyncClient(machine);
 
@@ -941,6 +1062,7 @@ export async function startDaemon(): Promise<void> {
       spawnSession,
       resumeSession,
       listPiSessions,
+      ensurePiSessionMirror,
       stopSession,
       requestShutdown: () => requestShutdown('lyntty-app')
     });

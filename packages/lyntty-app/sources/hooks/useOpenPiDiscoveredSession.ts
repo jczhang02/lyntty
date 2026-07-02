@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { Modal } from '@/modal';
-import { machineSpawnNewSession } from '@/sync/ops';
+import { machineEnsurePiSessionMirror, machineSpawnNewSession } from '@/sync/ops';
 import { applyOptimisticPiSession, buildPiSessionSpawnRequest, shouldOpenPiSessionImmediately } from '@/sync/piSessionOpen';
 import type { SessionRowData } from '@/sync/storage';
 import { sync } from '@/sync/sync';
@@ -19,20 +19,40 @@ export function useOpenPiDiscoveredSession() {
         }
 
         const shouldOpenImmediately = shouldOpenPiSessionImmediately(session);
+        let resolvedRelaySessionId: string | null = null;
+        const attachRelaySession = async (relaySessionId: string) => {
+            if (resolvedRelaySessionId) {
+                return;
+            }
+            resolvedRelaySessionId = relaySessionId;
+            applyOptimisticPiSession(session, relaySessionId);
+            if (relaySessionId !== session.id) {
+                navigateToSession(relaySessionId);
+            }
+            await sync.refreshSessions();
+            if (relaySessionId !== session.id) {
+                void sync.flushSyntheticMessages(session.id, relaySessionId);
+            }
+        };
+
         if (shouldOpenImmediately) {
             navigateToSession(session.id);
+            if (session.machineId && session.piSessionId) {
+                void machineEnsurePiSessionMirror({
+                    machineId: session.machineId,
+                    piSessionId: session.piSessionId,
+                    directory: session.path ?? undefined,
+                }).then((mirrorResult) => {
+                    if (mirrorResult.type === 'success') {
+                        void attachRelaySession(mirrorResult.sessionId);
+                    }
+                });
+            }
         }
 
         const result = await machineSpawnNewSession(request);
         if (result.type === 'success') {
-            applyOptimisticPiSession(session, result.sessionId);
-            if (result.sessionId !== session.id) {
-                navigateToSession(result.sessionId);
-            }
-            await sync.refreshSessions();
-            if (result.sessionId !== session.id) {
-                void sync.flushSyntheticMessages(session.id, result.sessionId);
-            }
+            await attachRelaySession(result.sessionId);
         } else if (result.type === 'error') {
             Modal.alert(t('common.error'), result.errorMessage);
         }

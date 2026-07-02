@@ -221,6 +221,10 @@ export type ListPiSessionsResult =
     | { type: 'success'; sessions: PiMachineSessionRecord[]; nextCursor?: string; total?: number }
     | { type: 'error'; errorMessage: string };
 
+export type EnsurePiSessionMirrorResult =
+    | { type: 'success'; sessionId: string; sent: number }
+    | { type: 'error'; errorMessage: string };
+
 // Exported session operation functions
 
 /**
@@ -236,6 +240,7 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
             directory: string
             sessionId?: string,
             approvedNewDirectoryCreation?: boolean,
+            machineId?: string,
             token?: string,
             agent?: 'pi' | 'codex' | 'claude' | 'gemini' | 'openclaw',
             takeoverChoice?: 'wait' | 'stop' | 'interrupt',
@@ -246,7 +251,7 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
         }>(
             machineId,
             'spawn-lyntty-session',
-            { type: 'spawn-in-directory', directory, sessionId, approvedNewDirectoryCreation, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId }
+            { type: 'spawn-in-directory', directory, sessionId, approvedNewDirectoryCreation, machineId, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId }
         );
         return result;
     } catch (error) {
@@ -422,6 +427,22 @@ export async function machineListPiSessions(options: { machineId: string; cwd?: 
         return {
             type: 'error',
             errorMessage: error instanceof Error ? error.message : 'Failed to list Pi sessions',
+        };
+    }
+}
+
+export async function machineEnsurePiSessionMirror(options: { machineId: string; piSessionId: string; directory?: string }): Promise<EnsurePiSessionMirrorResult> {
+    const { machineId, piSessionId, directory } = options;
+    try {
+        return await apiSocket.machineRPC<EnsurePiSessionMirrorResult, { machineId: string; piSessionId: string; directory?: string }>(
+            machineId,
+            'ensure-pi-session-mirror',
+            { machineId, piSessionId, directory },
+        );
+    } catch (error) {
+        return {
+            type: 'error',
+            errorMessage: error instanceof Error ? error.message : 'Failed to start Pi session mirror',
         };
     }
 }
