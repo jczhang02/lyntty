@@ -35,19 +35,25 @@ export function useOpenPiDiscoveredSession() {
             }
         };
 
+        const ensureMirror = async () => {
+            if (!session.machineId || !session.piSessionId) {
+                return;
+            }
+            const mirrorResult = await machineEnsurePiSessionMirror({
+                machineId: session.machineId,
+                piSessionId: session.piSessionId,
+                directory: session.path ?? undefined,
+            });
+            if (mirrorResult.type === 'success') {
+                await attachRelaySession(mirrorResult.sessionId);
+            }
+        };
+
         if (shouldOpenImmediately) {
             navigateToSession(session.id);
-            if (session.machineId && session.piSessionId) {
-                void machineEnsurePiSessionMirror({
-                    machineId: session.machineId,
-                    piSessionId: session.piSessionId,
-                    directory: session.path ?? undefined,
-                }).then((mirrorResult) => {
-                    if (mirrorResult.type === 'success') {
-                        void attachRelaySession(mirrorResult.sessionId);
-                    }
-                });
-            }
+            void ensureMirror();
+        } else if (session.piSynthetic) {
+            await ensureMirror();
         }
 
         const result = await machineSpawnNewSession(request);

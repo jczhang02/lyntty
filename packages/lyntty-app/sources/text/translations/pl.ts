@@ -313,6 +313,7 @@ export const pl: TranslationStructure = {
     session: {
         inputPlaceholder: 'Wpisz wiadomość...',
         inactiveArchived: 'Ta sesja jest nieaktywna.',
+    loadingLatestMessages: 'Ładowanie najnowszych wiadomości…',
         resumeFromTerminal: 'Aby wznowić ją z terminala:',
         newChat: 'Nowy czat',
         forkAction: 'Rozwidl sesję',

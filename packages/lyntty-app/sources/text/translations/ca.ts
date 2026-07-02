@@ -296,6 +296,7 @@ export const ca: TranslationStructure = {
     session: {
         inputPlaceholder: 'Escriu un missatge...',
         inactiveArchived: 'Aquesta sessió està inactiva.',
+    loadingLatestMessages: 'Carregant els darrers missatges…',
         resumeFromTerminal: 'Per reprendre-la des del terminal:',
         newChat: 'Nou xat',
         forkAction: 'Bifurca la sessió',

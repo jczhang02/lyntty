@@ -416,6 +416,7 @@ export const ru: TranslationStructure = {
     session: {
         inputPlaceholder: 'Введите сообщение...',
         inactiveArchived: 'Эта сессия неактивна.',
+    loadingLatestMessages: 'Загрузка последних сообщений…',
         resumeFromTerminal: 'Чтобы возобновить её из терминала:',
         newChat: 'Новый чат',
         forkAction: 'Форкнуть сессию',

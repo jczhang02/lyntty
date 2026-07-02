@@ -26,11 +26,13 @@ describe('terminal tool display helpers', () => {
         expect(isTerminalToolName('CodexBash')).toBe(true);
         expect(isTerminalToolName('GeminiBash')).toBe(true);
         expect(isTerminalToolName('execute')).toBe(true);
+        expect(isTerminalToolName('bash')).toBe(true);
         expect(isTerminalToolName('Read')).toBe(false);
     });
 
     it('extracts one-line command summaries from shell tools', () => {
         expect(getTerminalToolCommand(tool('Bash', { command: 'pnpm test' }))).toBe('pnpm test');
+        expect(getTerminalToolCommand(tool('bash', { command: 'git status --short' }))).toBe('git status --short');
 
         expect(getTerminalToolCommand(tool(
             'CodexBash',
@@ -57,10 +59,15 @@ describe('terminal tool display helpers', () => {
 
     it('classifies tools for compact transcript rows', () => {
         expect(getToolSummaryCategory('CodexBash')).toBe('terminal');
+        expect(getToolSummaryCategory('bash')).toBe('terminal');
         expect(getToolSummaryCategory('CodexPatch')).toBe('edit');
         expect(getToolSummaryCategory('Read')).toBe('read');
+        expect(getToolSummaryCategory('ls')).toBe('read');
         expect(getToolSummaryCategory('Grep')).toBe('search');
+        expect(getToolSummaryCategory('grep')).toBe('search');
+        expect(getToolSummaryCategory('find')).toBe('search');
         expect(getToolSummaryCategory('WebFetch')).toBe('web');
+        expect(getToolSummaryCategory('web_search')).toBe('web');
     });
 
     it('extracts compact transcript row details', () => {

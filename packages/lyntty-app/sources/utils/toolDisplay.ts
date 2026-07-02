@@ -5,6 +5,7 @@ const TERMINAL_TOOL_NAMES = new Set([
     'Bash',
     'CodexBash',
     'GeminiBash',
+    'bash',
     'shell',
     'execute',
 ]);
@@ -24,17 +25,22 @@ const READ_TOOL_NAMES = new Set([
     'read',
     'NotebookRead',
     'LS',
+    'ls',
 ]);
 
 const SEARCH_TOOL_NAMES = new Set([
     'Grep',
+    'grep',
     'Glob',
+    'find',
     'search',
     'WebSearch',
 ]);
 
 const WEB_TOOL_NAMES = new Set([
     'WebFetch',
+    'web_search',
+    'fetch_content',
 ]);
 
 const TASK_TOOL_NAMES = new Set([

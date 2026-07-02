@@ -133,6 +133,7 @@ class Sync {
     private friendsSync: InvalidateSync;
     private friendRequestsSync: InvalidateSync;
     private feedSync: InvalidateSync;
+    private piSessionsFetchInFlight: Promise<Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }>> | null = null;
     private activityAccumulator: ActivityUpdateAccumulator;
     private pendingSettings: Partial<Settings> = loadPendingSettings();
     private appState: AppStateStatus = AppState.currentState;
@@ -981,49 +982,64 @@ class Sync {
     //
 
     private fetchMachinePiSessions = async (): Promise<Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }>> => {
-        const machines = Object.values(storage.getState().machines)
-            .filter(machine => machine.metadata?.cliAvailability?.pi !== false)
-            .filter(machine => machine.active);
+        if (this.piSessionsFetchInFlight) {
+            return this.piSessionsFetchInFlight;
+        }
 
-        const pageSize = 100;
-        const maxRecordsPerMachine = 5000;
-        const results = await Promise.allSettled(machines.map(async (machine) => {
-            const sessions: PiMachineSessionRecord[] = [];
-            let cursor: string | undefined;
-            let total: number | undefined;
+        const request = (async () => {
+            const machines = Object.values(storage.getState().machines)
+                .filter(machine => machine.metadata?.cliAvailability?.pi !== false)
+                .filter(machine => machine.active);
 
-            do {
-                const response = await apiSocket.machineRPC<
-                    { type: 'success'; sessions: PiMachineSessionRecord[]; nextCursor?: string; total?: number } | { type: 'error'; errorMessage: string },
-                    { scope: 'machine'; limit: number; cursor?: string }
-                >(machine.id, 'list-pi-sessions', { scope: 'machine', limit: pageSize, cursor });
+            const pageSize = 100;
+            const maxRecordsPerMachine = 5000;
+            const results = await Promise.allSettled(machines.map(async (machine) => {
+                const sessions: PiMachineSessionRecord[] = [];
+                let cursor: string | undefined;
+                let total: number | undefined;
 
-                if (response.type !== 'success') {
-                    throw new Error(response.errorMessage);
+                do {
+                    const response = await apiSocket.machineRPC<
+                        { type: 'success'; sessions: PiMachineSessionRecord[]; nextCursor?: string; total?: number } | { type: 'error'; errorMessage: string },
+                        { scope: 'machine'; limit: number; cursor?: string }
+                    >(machine.id, 'list-pi-sessions', { scope: 'machine', limit: pageSize, cursor });
+
+                    if (response.type !== 'success') {
+                        throw new Error(response.errorMessage);
+                    }
+
+                    sessions.push(...response.sessions);
+                    cursor = response.nextCursor;
+                    total = response.total;
+                } while (cursor && sessions.length < maxRecordsPerMachine);
+
+                if (cursor) {
+                    console.warn(`Pi session discovery for machine ${machine.id} truncated at ${sessions.length}/${total ?? 'unknown'} records`);
                 }
 
-                sessions.push(...response.sessions);
-                cursor = response.nextCursor;
-                total = response.total;
-            } while (cursor && sessions.length < maxRecordsPerMachine);
+                return { machine, sessions };
+            }));
 
-            if (cursor) {
-                console.warn(`Pi session discovery for machine ${machine.id} truncated at ${sessions.length}/${total ?? 'unknown'} records`);
+            const discovered: Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }> = [];
+            results.forEach((result, index) => {
+                if (result.status === 'fulfilled') {
+                    discovered.push(result.value);
+                } else {
+                    console.warn(`Failed to list Pi sessions for machine ${machines[index]?.id}: ${String(result.reason)}`);
+                }
+            });
+
+            return discovered;
+        })();
+
+        this.piSessionsFetchInFlight = request;
+        try {
+            return await request;
+        } finally {
+            if (this.piSessionsFetchInFlight === request) {
+                this.piSessionsFetchInFlight = null;
             }
-
-            return { machine, sessions };
-        }));
-
-        const discovered: Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }> = [];
-        results.forEach((result, index) => {
-            if (result.status === 'fulfilled') {
-                discovered.push(result.value);
-            } else {
-                console.warn(`Failed to list Pi sessions for machine ${machines[index]?.id}: ${String(result.reason)}`);
-            }
-        });
-
-        return discovered;
+        }
     }
 
     private fetchSessions = async () => {

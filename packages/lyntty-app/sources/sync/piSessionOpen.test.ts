@@ -38,8 +38,12 @@ describe('shouldReportPiSpawnError', () => {
 });
 
 describe('shouldOpenPiSessionImmediately', () => {
-    it('opens synthetic Pi history rows before node attach completes', () => {
-        expect(shouldOpenPiSessionImmediately(row({}))).toBe(true);
+    it('opens active synthetic Pi rows before node attach completes', () => {
+        expect(shouldOpenPiSessionImmediately(row({ active: true }))).toBe(true);
+    });
+
+    it('opens inactive synthetic Pi rows immediately with a loading shell', () => {
+        expect(shouldOpenPiSessionImmediately(row({ active: false }))).toBe(true);
     });
 
     it('does not short-circuit real relay sessions', () => {

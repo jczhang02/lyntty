@@ -310,6 +310,7 @@ export const en: TranslationStructure = {
     session: {
         inputPlaceholder: 'Type a message ...',
         inactiveArchived: 'This session is inactive.',
+    loadingLatestMessages: 'Loading latest messages…',
         resumeFromTerminal: 'To resume it from the terminal:',
         newChat: 'New chat',
         forkAction: 'Fork session',

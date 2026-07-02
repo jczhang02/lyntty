@@ -72,6 +72,24 @@ export function choosePiSpawnDirectory(
   return expandHomeDirectory(directory, homeDir);
 }
 
+async function findPiSessionNearDirectory(sessionId: string, directory?: string): Promise<SessionInfo | undefined> {
+  const expandedDirectory = directory ? expandHomeDirectory(directory) : undefined;
+  if (expandedDirectory) {
+    try {
+      const cwdSessions = await SessionManager.list(expandedDirectory);
+      const matched = cwdSessions.find((session) => session.id === sessionId);
+      if (matched) {
+        return matched;
+      }
+    } catch (error) {
+      logger.debug(`[DAEMON RUN] Failed scoped Pi session lookup for ${expandedDirectory}: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  const machineSessions = await SessionManager.listAll();
+  return machineSessions.find((session) => session.id === sessionId);
+}
+
 export const initialMachineMetadata: MachineMetadata = {
   host: os.hostname() + hostSuffix,
   platform: os.platform(),
@@ -310,8 +328,8 @@ export async function startDaemon(): Promise<void> {
 
       let { directory, sessionId, machineId, approvedNewDirectoryCreation = true } = options;
       if (sessionId) {
-        const records = await discoverLocalPiSessions({ scope: 'machine' });
-        const resolvedDirectory = choosePiSpawnDirectory(directory, sessionId, records);
+        const localPiSession = await findPiSessionNearDirectory(sessionId, directory);
+        const resolvedDirectory = localPiSession?.cwd ?? expandHomeDirectory(directory);
         if (resolvedDirectory !== directory) {
           logger.debug(`[DAEMON RUN] Resolved Pi session spawn directory from ${directory} to ${resolvedDirectory}`);
           directory = resolvedDirectory;
@@ -953,8 +971,7 @@ export async function startDaemon(): Promise<void> {
       }
 
       const startPromise = (async () => {
-      const localSessions = await listCachedPiSessionInfos({ scope: 'machine' });
-      const local = localSessions.find((session) => session.id === piSessionId);
+      const local = await findPiSessionNearDirectory(piSessionId, options.directory);
       if (!local) {
         return { type: 'error' as const, errorMessage: `Pi session ${piSessionId} was not found on this node` };
       }

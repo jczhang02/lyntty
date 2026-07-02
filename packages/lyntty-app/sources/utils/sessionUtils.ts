@@ -145,6 +145,17 @@ export function formatPathRelativeToHome(path: string, homeDir?: string): string
 /**
  * Returns the session path for the subtitle.
  */
+export function shouldShowPiHistoryLoading(session: Session, visibleMessageCount: number): boolean {
+    if (visibleMessageCount > 0) {
+        return false;
+    }
+    const metadata = session.metadata;
+    if (metadata?.flavor !== 'pi' || !metadata.piSessionId) {
+        return false;
+    }
+    return metadata.piHistoryHasMore === true || (metadata.piMessageCount ?? 0) > 0;
+}
+
 export function getSessionSubtitle(session: Session): string {
     if (session.metadata) {
         const path = formatPathRelativeToHome(session.metadata.path, session.metadata.homeDir);

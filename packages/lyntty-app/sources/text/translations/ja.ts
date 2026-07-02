@@ -297,6 +297,7 @@ export const ja: TranslationStructure = {
     session: {
         inputPlaceholder: 'メッセージを入力...',
         inactiveArchived: 'このセッションは非アクティブです。',
+    loadingLatestMessages: '最新のメッセージを読み込み中…',
         resumeFromTerminal: 'ターミナルから再開するには:',
         newChat: '新規チャット',
         forkAction: 'セッションをフォーク',

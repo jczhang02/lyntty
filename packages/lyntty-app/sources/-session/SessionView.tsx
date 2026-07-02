@@ -35,7 +35,7 @@ import { FileViewPanel } from '@/components/FileViewPanel';
 import { prefetchPierreDiff } from '@/components/diff/PierreDiffView';
 import { GitFileStatus } from '@/sync/gitStatusFiles';
 import { useOverlayNav } from '@/-session/sessionOverlayNav';
-import { formatPathRelativeToHome, getResumeCommandBlock, getSessionAvatarId, getSessionName, useSessionStatus } from '@/utils/sessionUtils';
+import { formatPathRelativeToHome, getResumeCommandBlock, getSessionAvatarId, getSessionName, shouldShowPiHistoryLoading, useSessionStatus } from '@/utils/sessionUtils';
 import { useSessionQuickActions } from '@/hooks/useSessionQuickActions';
 import { isVersionSupported, MINIMUM_CLI_VERSION } from '@/utils/versionUtils';
 import * as Clipboard from 'expo-clipboard';
@@ -618,6 +618,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         };
     }, [sessionId]);
 
+    const showPiHistoryLoading = shouldShowPiHistoryLoading(session, messages.length);
+
     let content = (
         <>
             <Deferred>
@@ -629,7 +631,14 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     );
     const placeholder = messages.length === 0 ? (
         <>
-            {isLoaded ? (
+            {showPiHistoryLoading ? (
+                <View style={{ alignItems: 'center', gap: 10 }}>
+                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                    <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>
+                        {t('session.loadingLatestMessages')}
+                    </Text>
+                </View>
+            ) : isLoaded ? (
                 <EmptyMessages session={session} />
             ) : (
                 <ActivityIndicator size="small" color={theme.colors.textSecondary} />
@@ -677,7 +686,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     // Resume button when canResume is true, falls back to the
     // copy-this-command hint when the experiments toggle is off or the
     // machine isn't reachable.
-    const inactiveHint = isDisconnected ? (
+    const inactiveHint = isDisconnected && !showPiHistoryLoading ? (
         <CenteredInputWidth horizontalPadding={sessionInputHorizontalPadding}>
             <InactiveArchivedHint
                 resumeCommandBlock={expResumeSession ? resumeCommandBlock : null}

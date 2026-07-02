@@ -50,6 +50,36 @@ describe('getSessionSubtitle', () => {
     });
 });
 
+describe('shouldShowPiHistoryLoading', () => {
+    it('shows loading for empty Pi sessions with known historical messages', async () => {
+        const { shouldShowPiHistoryLoading } = await import('./sessionUtils');
+
+        expect(shouldShowPiHistoryLoading(session({
+            metadata: {
+                path: '/repo',
+                host: 'node',
+                flavor: 'pi',
+                piSessionId: 'pi-1',
+                piMessageCount: 7354,
+            },
+        }), 0)).toBe(true);
+    });
+
+    it('does not show loading once Pi history has visible messages', async () => {
+        const { shouldShowPiHistoryLoading } = await import('./sessionUtils');
+
+        expect(shouldShowPiHistoryLoading(session({
+            metadata: {
+                path: '/repo',
+                host: 'node',
+                flavor: 'pi',
+                piSessionId: 'pi-1',
+                piMessageCount: 7354,
+            },
+        }), 1)).toBe(false);
+    });
+});
+
 describe('getSessionName', () => {
     it('uses Pi session metadata name before generated summaries', async () => {
         const { getSessionName } = await import('./sessionUtils');
