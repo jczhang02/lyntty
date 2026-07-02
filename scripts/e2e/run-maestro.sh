@@ -95,15 +95,70 @@ PY
 )"
 fi
 
+run_maestro_flow() {
+  local flow="$1"
+  local artifact_dir="$2"
+  local output_name="${3:-junit.xml}"
+  local args=(test "$flow" --debug-output "$artifact_dir/debug" --test-output-dir "$artifact_dir/output" --format JUNIT --output "$artifact_dir/$output_name" -e APP_ID="$APP_ID" -e PAIRING_URL="$PAIRING_URL" -e HISTORY_TITLE="$HISTORY_TITLE" -e PONG="$PONG" -e PROMPT="$PROMPT")
+  if [[ -n "$DEVICE" ]]; then
+    args+=(--device "$DEVICE")
+  fi
+  maestro "${args[@]}"
+}
+
 if [[ "$PRELAUNCH" != "0" && -n "$DEVICE" ]] && command -v adb >/dev/null 2>&1; then
   adb -s "$DEVICE" shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
   adb -s "$DEVICE" shell am start -n "$APP_ID/.MainActivity" >/dev/null 2>&1 || true
   sleep 2
 fi
 
-args=(test "$rendered_flow" --debug-output "$ARTIFACT_DIR/debug" --test-output-dir "$ARTIFACT_DIR/output" --format JUNIT --output "$ARTIFACT_DIR/junit.xml" -e APP_ID="$APP_ID" -e PAIRING_URL="$PAIRING_URL" -e HISTORY_TITLE="$HISTORY_TITLE" -e PONG="$PONG" -e PROMPT="$PROMPT")
-if [[ -n "$DEVICE" ]]; then
-  args+=(--device "$DEVICE")
+if [[ "$(basename "$FLOW_PATH")" == "02_pair_node.yml" && -n "$PAIRING_URL" && -n "$DEVICE" ]] && command -v adb >/dev/null 2>&1; then
+  pair_dir="${cleanup_dir:-$(mktemp -d)}"
+  prep_flow="$pair_dir/02_pair_node_prepare.yml"
+  accept_flow="$pair_dir/02_pair_node_accept.yml"
+  cat >"$prep_flow" <<EOF
+appId: $APP_ID
+name: Lyntty terminal pairing prepare
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "DEVELOPMENT SERVERS"
+    commands:
+      - tapOn: "http://10.0.2.2:8081"
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - tapOn:
+          point: "90%,46%"
+EOF
+  cat >"$accept_flow" <<EOF
+appId: $APP_ID
+name: Lyntty terminal pairing accept
+---
+- extendedWaitUntil:
+    visible: "Pair Node"
+    timeout: 30000
+- assertVisible: "End-to-end encrypted"
+- tapOn:
+    id: "lyntty-pair-accept"
+- extendedWaitUntil:
+    visible: "Terminal connected successfully"
+    timeout: 60000
+EOF
+  run_maestro_flow "$prep_flow" "$ARTIFACT_DIR/prepare" "prepare-junit.xml"
+  adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "$PAIRING_URL" "$APP_ID" >"$ARTIFACT_DIR/adb-openlink.log" 2>&1
+  sleep 1
+  adb -s "$DEVICE" shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "$PAIRING_URL" "$APP_ID" >>"$ARTIFACT_DIR/adb-openlink.log" 2>&1
+  sleep 2
+  run_maestro_flow "$accept_flow" "$ARTIFACT_DIR/accept" "accept-junit.xml"
+  exit $?
 fi
 
-exec maestro "${args[@]}"
+run_maestro_flow "$rendered_flow" "$ARTIFACT_DIR" "junit.xml"

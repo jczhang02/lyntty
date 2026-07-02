@@ -48,12 +48,12 @@ When `LYNTTY_MAESTRO_NODE_HOME` is set, the runner starts `lyntty daemon start` 
 ## Coverage
 
 - `01_first_run.yml`: onboarding/account creation into empty Sessions Home.
-- `02_pair_node.yml`: terminal deep-link pairing through the Pair Node accept screen.
+- `02_pair_node.yml`: terminal deep-link pairing through the Pair Node accept screen. On Android dev-client builds the runner uses an adb deep-link fallback because Maestro `openLink` can report success without delivering the custom `lyntty://` scheme to Expo Router.
 - `03_history_send_reply.yml`: Sessions Home Pi history row open, deleted-session regression guard, prompt send, visible Pi reply token. The prompt intentionally does **not** contain the expected reply token to avoid passing on the user bubble.
 - `04_reconnect_smoke.yml`: visible session survives app relaunch. This is an app relaunch smoke, not a daemon/relay restart test.
 
 ## Current limitations
 
-- Dev-client APKs remain less deterministic than preview/release APKs; keep Metro running and inspect artifacts under `LYNTTY_MAESTRO_ARTIFACT_DIR` on failure.
+- Dev-client APKs remain less deterministic than preview/release APKs; keep Metro running and inspect artifacts under `LYNTTY_MAESTRO_ARTIFACT_DIR` on failure. Pairing flows may still require a second adb deep-link delivery when Expo Dev Launcher steals focus; preview/release APKs should be used before release confidence claims.
 - Session-row opening still uses a screen coordinate because historical rows do not yet expose stable row-level testIDs.
 - Full daemon/relay restart and offline-status automation is still separate from `04_reconnect_smoke.yml`.

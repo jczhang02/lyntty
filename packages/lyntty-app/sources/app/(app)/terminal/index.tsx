@@ -150,6 +150,7 @@ export default function TerminalScreen() {
                         gap: 12
                     }}>
                         <RoundButton
+                            testID="lyntty-pair-accept"
                             title={isLoading ? t('terminal.connecting') : t('terminal.acceptConnection')}
                             onPress={handleConnect}
                             size="large"
@@ -157,6 +158,7 @@ export default function TerminalScreen() {
                             loading={isLoading}
                         />
                         <RoundButton
+                            testID="lyntty-pair-reject"
                             title={t('terminal.reject')}
                             onPress={handleReject}
                             size="large"
