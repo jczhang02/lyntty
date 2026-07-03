@@ -1,0 +1,16 @@
+07-03 22:54:12.048 12204 12204 W dev.expo.updates: {"timestamp":1783090452048,"message":"The expo-updates system is explicitly disabled. To enable it, set the enabled setting to true.","code":"InitializationError","level":"warn"}
+07-03 22:54:12.566 12204 12241 W BridgelessReactContext: [WARNING] Bridgeless doesn't support CatalystInstance. Accessing an API that's not part of the new architecture is not encouraged usage.
+07-03 22:54:12.574 12204 12240 W BridgelessReactContext: [WARNING] Bridgeless doesn't support CatalystInstance. Accessing an API that's not part of the new architecture is not encouraged usage.
+07-03 22:54:12.719 12204 12240 I ReactNativeJS: Running "main"
+07-03 22:54:12.734 12204 12240 I ReactNativeJS: calling Libsodium.install
+07-03 22:54:12.739 12204 12240 I ReactNativeJS: '[loadAppConfig] Loaded from ExponentConstants:', [ 'elevenLabsAgentId',
+07-03 22:54:12.739 12204 12240 I ReactNativeJS:   'consoleLoggingDefault',
+07-03 22:54:12.739 12204 12240 I ReactNativeJS:   'buildCommitSha',
+07-03 22:54:12.739 12204 12240 I ReactNativeJS:   'buildCommitTimestamp' ]
+07-03 22:54:12.739 12204 12240 I ReactNativeJS: '[loadAppConfig] Loaded from Constants.expoConfig:', [ 'elevenLabsAgentId',
+07-03 22:54:12.739 12204 12240 I ReactNativeJS:   'consoleLoggingDefault',
+07-03 22:54:12.739 12204 12240 I ReactNativeJS:   'buildCommitSha',
+07-03 22:54:12.739 12204 12240 I ReactNativeJS:   'buildCommitTimestamp' ]
+07-03 22:54:12.739 12204 12240 I ReactNativeJS: '[loadAppConfig] Final merged config:', '{\n  "elevenLabsAgentId": "agent_6701k211syvvegba4kt7m68nxjmw",\n  "consoleLoggingDefault": true,\n  "buildCommitSha": "8c0baee6f9c9f47a72756a2563252c23e83ed29a",\n  "buildCommitTimestamp": "2026-07-03T21:42:02+08:00"\n}'
+07-03 22:54:12.739 12204 12240 I ReactNativeJS: '[ConsoleLogging] Initialized', '(output enabled)'
+07-03 22:54:13.828 12204 12221 E FirebaseMessaging: Topic sync or token retrieval failed on hard failure exceptions: java.util.concurrent.ExecutionException: java.io.IOException: FIS_AUTH_ERROR. Won't retry the operation.

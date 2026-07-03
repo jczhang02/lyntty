@@ -3,6 +3,8 @@ import { z } from "zod";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 
+const MAX_ACCESS_KEY_DATA_LENGTH = 1_000_000;
+
 export function accessKeysRoutes(app: Fastify) {
     // Get Access Key API
     app.get('/v1/access-keys/:sessionId/:machineId', {
@@ -86,7 +88,7 @@ export function accessKeysRoutes(app: Fastify) {
                 machineId: z.string()
             }),
             body: z.object({
-                data: z.string()
+                data: z.string().max(MAX_ACCESS_KEY_DATA_LENGTH)
             }),
             response: {
                 200: z.object({
@@ -182,7 +184,7 @@ export function accessKeysRoutes(app: Fastify) {
                 machineId: z.string()
             }),
             body: z.object({
-                data: z.string(),
+                data: z.string().max(MAX_ACCESS_KEY_DATA_LENGTH),
                 expectedVersion: z.number().int().min(0)
             }),
             response: {

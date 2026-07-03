@@ -65,9 +65,19 @@ const rpcFetchSocketsTimeouts = new Counter({
     registers: [register]
 });
 
-export function isOversizedRpcString(value: unknown, maxChars: number): boolean {
-    return typeof value === 'string' && value.length > maxChars;
+export function isOversizedRpcPayload(value: unknown, maxChars: number): boolean {
+    if (typeof value === 'string') {
+        return value.length > maxChars;
+    }
+    try {
+        const serialized = JSON.stringify(value);
+        return typeof serialized === 'string' && serialized.length > maxChars;
+    } catch {
+        return true;
+    }
 }
+
+export const isOversizedRpcString = isOversizedRpcPayload;
 
 function rpcRoom(userId: string, method: string): string {
     return `${RPC_ROOM_PREFIX}${userId}:${method}`;
@@ -292,7 +302,7 @@ export function rpcHandler(userId: string, socket: Socket, io: Server) {
                 callback?.({ ok: false, error: 'RPC method not allowed for this socket scope' });
                 return;
             }
-            if (isOversizedRpcString(params, MAX_RPC_PARAMS_CHARS)) {
+            if (isOversizedRpcPayload(params, MAX_RPC_PARAMS_CHARS)) {
                 finish('request_too_large');
                 callback?.({ ok: false, error: 'RPC request too large' });
                 return;
@@ -362,7 +372,7 @@ export function rpcHandler(userId: string, socket: Socket, io: Server) {
 
             try {
                 const response = await Promise.race([ackPromise, presencePoll]);
-                if (isOversizedRpcString(response, MAX_RPC_RESPONSE_CHARS)) {
+                if (isOversizedRpcPayload(response, MAX_RPC_RESPONSE_CHARS)) {
                     finish('response_too_large');
                     callback?.({ ok: false, error: 'RPC response too large' });
                     return;

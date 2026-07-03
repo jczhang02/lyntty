@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import * as Updates from 'expo-updates';
 import { trackOtaUpdateAvailable, trackOtaUpdateApplied } from '@/track';
+import { shouldCheckForUpdates } from './useUpdatesUtils';
 
 type PendingOtaUpdate = {
     ota_version?: string;
@@ -32,8 +33,8 @@ export function useUpdates() {
     };
 
     const checkForUpdates = async () => {
-        if (__DEV__) {
-            // Don't check for updates in development
+        if (!shouldCheckForUpdates(__DEV__, Updates.isEnabled)) {
+            // Don't check for updates in development or when Expo Updates is disabled.
             return;
         }
 

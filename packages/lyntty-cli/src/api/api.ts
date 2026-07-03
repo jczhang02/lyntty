@@ -299,6 +299,26 @@ export class ApiClient {
     return new ApiMachineClient(this.credential.token, machine);
   }
 
+  async markMachineOffline(machineId: string): Promise<boolean> {
+    try {
+      const response = await axios.post(
+        `${configuration.serverUrl}/v1/machines/${machineId}/offline`,
+        {},
+        {
+          headers: {
+            'Authorization': `Bearer ${this.credential.token}`,
+            'X-Lyntty-Client': `cli-daemon/${configuration.currentCliVersion}`,
+          },
+          timeout: 3000,
+        },
+      );
+      return response.status >= 200 && response.status < 300;
+    } catch (error) {
+      logger.debug('[API] markMachineOffline failed:', error);
+      return false;
+    }
+  }
+
   push(): PushNotificationClient {
     return this.pushClient;
   }

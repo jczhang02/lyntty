@@ -15,6 +15,7 @@ import { sessionUpdateHandler } from "./socket/sessionUpdateHandler";
 import { machineUpdateHandler } from "./socket/machineUpdateHandler";
 import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
 import { accessKeyHandler } from "./socket/accessKeyHandler";
+import { db } from "@/storage/db";
 
 export function startSocket(app: Fastify) {
     const io = new Server(app.server, {
@@ -204,7 +205,14 @@ export function startSocket(app: Fastify) {
 
             // Broadcast daemon offline status
             if (connection.connectionType === 'machine-scoped') {
-                const machineActivity = buildMachineActivityEphemeral(connection.machineId, false, Date.now());
+                const disconnectedAt = Date.now();
+                db.machine.updateMany({
+                    where: { accountId: userId, id: connection.machineId },
+                    data: { active: false, lastActiveAt: new Date(disconnectedAt) }
+                }).catch((error) => {
+                    log({ module: 'websocket', level: 'error' }, `Error marking machine offline: ${error}`);
+                });
+                const machineActivity = buildMachineActivityEphemeral(connection.machineId, false, disconnectedAt);
                 eventRouter.emitEphemeral({
                     userId,
                     payload: machineActivity,

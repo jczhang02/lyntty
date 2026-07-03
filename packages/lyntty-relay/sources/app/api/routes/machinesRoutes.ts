@@ -110,6 +110,28 @@ export function machinesRoutes(app: Fastify) {
 
 
     // Machines API
+    app.post('/v1/machines/:machineId/offline', {
+        preHandler: app.authenticate,
+        schema: {
+            params: z.object({ machineId: z.string() }),
+            response: {
+                200: z.object({ ok: z.literal(true) }),
+                404: z.object({ error: z.literal('Machine not found') }),
+            },
+        },
+    }, async (request, reply) => {
+        const userId = request.userId;
+        const { machineId } = request.params;
+        const result = await db.machine.updateMany({
+            where: { id: machineId, accountId: userId },
+            data: { active: false, lastActiveAt: new Date() },
+        });
+        if (result.count === 0) {
+            return reply.code(404).send({ error: 'Machine not found' });
+        }
+        return reply.send({ ok: true });
+    });
+
     app.get('/v1/machines', {
         preHandler: app.authenticate,
     }, async (request, reply) => {

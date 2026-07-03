@@ -183,12 +183,26 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
         }
     });
 
+    const MAX_SOCKET_MESSAGE_CONTENT_LENGTH = 1_000_000;
+    const MAX_SOCKET_MESSAGE_LOCAL_ID_LENGTH = 240;
+
     const receiveMessageLock = new AsyncLock();
     socket.on('message', async (data: any) => {
         await receiveMessageLock.inLock(async () => {
             try {
                 websocketEventsCounter.inc({ event_type: 'message', ...labels });
-                const { sid, message, localId } = data;
+                const { sid, message, localId } = data ?? {};
+                if (typeof sid !== 'string' || typeof message !== 'string') {
+                    return;
+                }
+                if (message.length > MAX_SOCKET_MESSAGE_CONTENT_LENGTH) {
+                    log({ module: 'websocket', level: 'warn' }, `Rejected oversized socket message: sessionId=${sid}, messageLength=${message.length}`);
+                    return;
+                }
+                if (typeof localId === 'string' && localId.length > MAX_SOCKET_MESSAGE_LOCAL_ID_LENGTH) {
+                    log({ module: 'websocket', level: 'warn' }, `Rejected socket message with oversized localId: sessionId=${sid}, localIdLength=${localId.length}`);
+                    return;
+                }
 
                 log({ module: 'websocket' }, `Received message from socket ${socket.id}: sessionId=${sid}, messageLength=${message.length} bytes, connectionType=${connection.connectionType}, connectionSessionId=${connection.connectionType === 'session-scoped' ? connection.sessionId : 'N/A'}`);
 

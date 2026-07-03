@@ -278,7 +278,7 @@ export function sessionRoutes(app: Fastify) {
                 userId,
                 sessionId: session.id,
                 updateType: 'new-session',
-                updatePayload: JSON.stringify(updatePayload)
+                updateSeq: updatePayload.seq,
             }, `Emitting new-session update to user-scoped connections`);
             eventRouter.emitUpdate({
                 userId,

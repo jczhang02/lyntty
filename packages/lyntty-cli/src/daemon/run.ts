@@ -1301,6 +1301,7 @@ export async function startDaemon(): Promise<void> {
 
       // Give time for metadata update to send
       await new Promise(resolve => setTimeout(resolve, 100));
+      await api.markMachineOffline(machine.id);
 
       for (const mirror of externalPiMirrors.values()) {
         mirror.stop();

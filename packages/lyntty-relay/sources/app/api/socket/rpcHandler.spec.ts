@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_RPC_PARAMS_CHARS, MAX_RPC_RESPONSE_CHARS, canCallRpcMethod, canRegisterRpcMethod, isOversizedRpcString } from './rpcHandler';
+import { MAX_RPC_PARAMS_CHARS, MAX_RPC_RESPONSE_CHARS, canCallRpcMethod, canRegisterRpcMethod, isOversizedRpcPayload } from './rpcHandler';
 
 const machineId = '3f761d9e-5ef6-4b8a-8b13-a20bc0fed470';
 const sessionId = 'cmr21ruo5000rovv87u2os57a';
@@ -44,10 +44,17 @@ describe('RPC scope guards', () => {
         expect(canCallRpcMethod({ clientType: 'machine-scoped', machineId }, `${machineId}:list-pi-sessions`)).toBe(false);
     });
 
-    it('detects oversized RPC string payloads', () => {
-        expect(isOversizedRpcString('x'.repeat(MAX_RPC_PARAMS_CHARS), MAX_RPC_PARAMS_CHARS)).toBe(false);
-        expect(isOversizedRpcString('x'.repeat(MAX_RPC_PARAMS_CHARS + 1), MAX_RPC_PARAMS_CHARS)).toBe(true);
-        expect(isOversizedRpcString('x'.repeat(MAX_RPC_RESPONSE_CHARS + 1), MAX_RPC_RESPONSE_CHARS)).toBe(true);
-        expect(isOversizedRpcString({ value: 'not-wire-format' }, MAX_RPC_PARAMS_CHARS)).toBe(false);
+    it('detects oversized RPC payloads including nested objects', () => {
+        expect(isOversizedRpcPayload('x'.repeat(MAX_RPC_PARAMS_CHARS), MAX_RPC_PARAMS_CHARS)).toBe(false);
+        expect(isOversizedRpcPayload('x'.repeat(MAX_RPC_PARAMS_CHARS + 1), MAX_RPC_PARAMS_CHARS)).toBe(true);
+        expect(isOversizedRpcPayload('x'.repeat(MAX_RPC_RESPONSE_CHARS + 1), MAX_RPC_RESPONSE_CHARS)).toBe(true);
+        expect(isOversizedRpcPayload({ value: 'x'.repeat(MAX_RPC_PARAMS_CHARS) }, MAX_RPC_PARAMS_CHARS)).toBe(true);
+        expect(isOversizedRpcPayload({ value: 'small' }, MAX_RPC_PARAMS_CHARS)).toBe(false);
+        expect(isOversizedRpcPayload(undefined, MAX_RPC_PARAMS_CHARS)).toBe(false);
+        expect(isOversizedRpcPayload(() => undefined, MAX_RPC_PARAMS_CHARS)).toBe(false);
+        expect(isOversizedRpcPayload(Symbol('not-json'), MAX_RPC_PARAMS_CHARS)).toBe(false);
+        const cyclic: Record<string, unknown> = {};
+        cyclic.self = cyclic;
+        expect(isOversizedRpcPayload(cyclic, MAX_RPC_PARAMS_CHARS)).toBe(true);
     });
 });
