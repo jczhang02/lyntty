@@ -198,6 +198,11 @@ function toolCallId(message: unknown): string | undefined {
       : undefined;
 }
 
+function toolResultIsError(message: unknown): boolean {
+  if (!message || typeof message !== 'object') return false;
+  return (message as Record<string, unknown>).isError === true || (message as Record<string, unknown>).is_error === true;
+}
+
 export function mapPiSessionEntryToHistoryEnvelopes(entry: SessionEntry): SessionEnvelope[] {
   if (entry.type !== 'message') {
     return [];
@@ -259,10 +264,12 @@ export function mapPiSessionEntryToHistoryEnvelopes(entry: SessionEntry): Sessio
         args: {},
       }, { id: `pi-history-${entry.id}-tool-start`, turn, time: time + 1 }),
     ];
-    if (text) {
-      envelopes.push(createEnvelope('agent', { t: 'text', text, thinking: true }, { id: `pi-history-${entry.id}-tool-output`, turn, time: time + 2 }));
-    }
-    envelopes.push(createEnvelope('agent', { t: 'tool-call-end', call }, { id: `pi-history-${entry.id}-tool-end`, turn, time: time + 3 }));
+    envelopes.push(createEnvelope('agent', {
+      t: 'tool-call-end',
+      call,
+      ...(text ? { result: text } : {}),
+      ...(toolResultIsError(entry.message) ? { isError: true } : {}),
+    }, { id: `pi-history-${entry.id}-tool-end`, turn, time: time + 3 }));
     envelopes.push(createEnvelope('agent', { t: 'turn-end', status: 'completed' }, { id: `pi-history-${entry.id}-end`, turn, time: time + 4 }));
     return envelopes;
   }
@@ -290,10 +297,12 @@ export function mapPiSessionHistoryToEnvelopes(entries: SessionEntry[]): Session
       if (turn) {
         const time = entryTime(entry);
         const text = collectText(messageContent(messageEntry?.message));
-        if (text) {
-          envelopes.push(createEnvelope('agent', { t: 'text', text, thinking: true }, { id: `pi-history-${entry.id}-tool-output`, turn, time: time + 1 }));
-        }
-        envelopes.push(createEnvelope('agent', { t: 'tool-call-end', call }, { id: `pi-history-${entry.id}-tool-end`, turn, time: time + 2 }));
+        envelopes.push(createEnvelope('agent', {
+          t: 'tool-call-end',
+          call,
+          ...(text ? { result: text } : {}),
+          ...(toolResultIsError(messageEntry?.message) ? { isError: true } : {}),
+        }, { id: `pi-history-${entry.id}-tool-end`, turn, time: time + 2 }));
         const remaining = (pendingToolCallCountByTurn.get(turn) ?? 1) - 1;
         if (remaining <= 0) {
           pendingToolCallCountByTurn.delete(turn);

@@ -1621,6 +1621,24 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             }
         });
 
+        it('drops legacy historical Pi tool-result text envelopes', () => {
+            const normalized = normalizeRawMessage('db-legacy-tool-output', 'session:pi-history-t1-tool-output', 1, {
+                ...base,
+                content: {
+                    type: 'session',
+                    data: {
+                        id: 'pi-history-t1-tool-output',
+                        time: 1,
+                        role: 'agent',
+                        turn: 'pi-history-turn-a1',
+                        ev: { t: 'text', text: 'available work\\nbd show <id>', thinking: true }
+                    }
+                }
+            });
+
+            expect(normalized).toBeNull();
+        });
+
         it('normalizes service events to visible agent text', () => {
             const normalized = normalizeRawMessage('db-service-1', null, 1, {
                 ...base,
@@ -1690,7 +1708,9 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
                         turn: 'turn-1',
                         ev: {
                             t: 'tool-call-end',
-                            call: 'call-1'
+                            call: 'call-1',
+                            result: 'a.ts',
+                            isError: true
                         }
                     }
                 }
@@ -1698,6 +1718,32 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             expect(end).toBeTruthy();
             if (end && end.role === 'agent') {
                 expect(end.content[0]).toMatchObject({
+                    type: 'tool-result',
+                    tool_use_id: 'call-1',
+                    content: 'a.ts',
+                    is_error: true
+                });
+            }
+
+            const legacyEnd = normalizeRawMessage('db-4b', null, 1, {
+                ...base,
+                content: {
+                    type: 'session',
+                    data: {
+                        id: 'env-4b',
+                        time: 1,
+                        role: 'agent',
+                        turn: 'turn-1',
+                        ev: {
+                            t: 'tool-call-end',
+                            call: 'call-1'
+                        }
+                    }
+                }
+            });
+            expect(legacyEnd).toBeTruthy();
+            if (legacyEnd && legacyEnd.role === 'agent') {
+                expect(legacyEnd.content[0]).toMatchObject({
                     type: 'tool-result',
                     tool_use_id: 'call-1',
                     content: null,

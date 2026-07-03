@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { mapPiSessionHistoryPageToEnvelopes, mapPiSessionHistoryToEnvelopes } from './runPiHistory';
+import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 
 describe('mapPiSessionHistoryToEnvelopes', () => {
   it('imports Pi user and assistant JSONL messages as session protocol content', () => {
@@ -62,20 +63,40 @@ describe('mapPiSessionHistoryToEnvelopes', () => {
       },
     ] as any);
 
+    const live = new PiSessionProtocolMapper();
+    const liveEnvelopes = [
+      ...live.mapEvent({ type: 'agent_start' } as any),
+      ...live.mapEvent({ type: 'message_update', assistantMessageEvent: { type: 'thinking_delta', delta: 'Need inspect files' } } as any),
+      ...live.mapEvent({ type: 'tool_execution_start', toolCallId: 'call-1', toolName: 'find', args: { pattern: '*.ts' } } as any),
+      ...live.mapEvent({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'Found files' } } as any),
+      ...live.mapEvent({ type: 'tool_execution_end', toolCallId: 'call-1', toolName: 'find', result: 'a.ts', isError: false } as any),
+      ...live.mapEvent({ type: 'agent_end' } as any),
+    ];
+
+    const visibleShape = (items: typeof envelopes) => items.map((envelope) => ({
+      event: envelope.ev.t,
+      thinking: envelope.ev.t === 'text' ? envelope.ev.thinking === true : undefined,
+      name: envelope.ev.t === 'tool-call-start' ? envelope.ev.name : undefined,
+      hasResult: envelope.ev.t === 'tool-call-end' ? envelope.ev.result !== undefined : undefined,
+    }));
+
+    expect(visibleShape(envelopes)).toEqual(visibleShape(liveEnvelopes));
     expect(envelopes.map((envelope) => envelope.ev.t)).toEqual([
       'turn-start',
       'text',
       'tool-call-start',
-      'text',
       'text',
       'tool-call-end',
       'turn-end',
     ]);
     expect(envelopes[1]).toMatchObject({ role: 'agent', ev: { t: 'text', text: 'Need inspect files', thinking: true } });
     expect(envelopes[2]).toMatchObject({ role: 'agent', ev: { t: 'tool-call-start', call: 'call-1', name: 'find', args: { pattern: '*.ts' } } });
-    expect(envelopes[5]).toMatchObject({ role: 'agent', ev: { t: 'tool-call-end', call: 'call-1' } });
-    expect(envelopes[2].turn).toBe(envelopes[5].turn);
+    expect(envelopes[4]).toMatchObject({ role: 'agent', ev: { t: 'tool-call-end', call: 'call-1', result: 'a.ts' } });
+    expect(envelopes[2].turn).toBe(envelopes[4].turn);
     expect(envelopes.filter((envelope) => envelope.ev.t === 'tool-call-start')).toHaveLength(1);
+    expect(envelopes).not.toContainEqual(expect.objectContaining({
+      ev: expect.objectContaining({ t: 'text', text: 'a.ts' }),
+    }));
   });
 
   it('keeps one shared turn open until all historical tool results arrive', () => {
@@ -114,12 +135,16 @@ describe('mapPiSessionHistoryToEnvelopes', () => {
       'turn-start',
       'tool-call-start',
       'tool-call-start',
-      'text',
       'tool-call-end',
-      'text',
       'tool-call-end',
       'turn-end',
     ]);
+    expect(envelopes).not.toContainEqual(expect.objectContaining({
+      ev: expect.objectContaining({ t: 'text', text: expect.stringContaining('output') }),
+    }));
+    expect(envelopes.filter((envelope) => envelope.ev.t === 'tool-call-end').map((envelope) => (
+      envelope.ev.t === 'tool-call-end' ? envelope.ev.result : undefined
+    ))).toEqual(['read output', 'grep output']);
     expect(envelopes.filter((envelope) => envelope.ev.t === 'turn-end')).toHaveLength(1);
     const turnIds = new Set(envelopes.map((envelope) => envelope.turn).filter(Boolean));
     expect(turnIds.size).toBe(1);

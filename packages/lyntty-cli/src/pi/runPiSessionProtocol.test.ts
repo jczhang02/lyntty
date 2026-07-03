@@ -64,7 +64,11 @@ describe('PiSessionProtocolMapper', () => {
       isError: false,
     }));
     expect(toolEnd.map((envelope) => envelope.ev.t)).toEqual(['tool-call-end']);
-    expect(toolEnd[0].ev).toMatchObject({ t: 'tool-call-end', call: toolStart[1].ev.t === 'tool-call-start' ? toolStart[1].ev.call : '' });
+    expect(toolEnd[0].ev).toMatchObject({
+      t: 'tool-call-end',
+      call: toolStart[1].ev.t === 'tool-call-start' ? toolStart[1].ev.call : '',
+      result: 'ok',
+    });
   });
 
   it('does not turn Pi debug/status events into chat-visible service messages', () => {

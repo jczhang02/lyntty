@@ -3,6 +3,8 @@ import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent';
 import { createEnvelope, type CreateEnvelopeOptions, type SessionEnvelope, type SessionTurnEndStatus } from 'lyntty-wire';
 
 const PI_SYSTEM_TURN_ID = 'pi-system';
+const MAX_TOOL_RESULT_LENGTH = 20_000;
+const TOOL_RESULT_TRUNCATION_MARKER = '\n\n[truncated by Lyntty tool-result import]';
 
 type PendingTextType = 'text' | 'thinking';
 
@@ -11,17 +13,22 @@ function stableOptions(turnId: string | null, time: number): CreateEnvelopeOptio
 }
 
 function stringifyToolPayload(value: unknown): string {
+  let text = '';
   if (typeof value === 'string') {
-    return value;
-  }
-  if (value === undefined || value === null) {
+    text = value;
+  } else if (value === undefined || value === null) {
     return '';
+  } else {
+    try {
+      text = JSON.stringify(value);
+    } catch {
+      text = String(value);
+    }
   }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
+  if (text.length <= MAX_TOOL_RESULT_LENGTH) {
+    return text;
   }
+  return `${text.slice(0, MAX_TOOL_RESULT_LENGTH)}${TOOL_RESULT_TRUNCATION_MARKER}`;
 }
 
 function buildToolDescription(toolName: string): string {
@@ -158,13 +165,13 @@ export class PiSessionProtocolMapper {
       case 'tool_execution_end': {
         const envelopes = this.flush();
         const call = this.ensureSessionCallId(event.toolCallId);
-        if (event.isError) {
-          const output = stringifyToolPayload(event.result);
-          if (output) {
-            envelopes.push(createEnvelope('agent', { t: 'text', text: output, thinking: true }, this.turnOptions()));
-          }
-        }
-        envelopes.push(createEnvelope('agent', { t: 'tool-call-end', call }, this.turnOptions()));
+        const result = stringifyToolPayload(event.result);
+        envelopes.push(createEnvelope('agent', {
+          t: 'tool-call-end',
+          call,
+          ...(result ? { result } : {}),
+          ...(event.isError ? { isError: true } : {}),
+        }, this.turnOptions()));
         return envelopes;
       }
       case 'queue_update':

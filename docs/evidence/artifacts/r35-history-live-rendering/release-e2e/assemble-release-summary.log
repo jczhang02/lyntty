@@ -1,0 +1,5 @@
+Command:
+cd packages/lyntty-app/android && EXPO_PUBLIC_LYNTTY_SERVER_URL=http://10.0.2.2:3005 CCACHE_DISABLE=1 CMAKE_C_COMPILER_LAUNCHER= CMAKE_CXX_COMPILER_LAUNCHER= ./gradlew assembleRelease --no-daemon
+
+Result: exit 0
+APK: packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk

@@ -1,0 +1,8 @@
+Command:
+LYNTTY_HOME_DIR=/tmp/lyntty-r35-node LYNTTY_SERVER_URL=http://127.0.0.1:3005 lyntty auth login --method mobile
+
+Pairing URL: lyntty://terminal?<redacted-public-key>
+
+Result:
+Authentication successful
+Machine ID: 326e8fcf-752e-4dd9-9740-8730e118a345
