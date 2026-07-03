@@ -8,6 +8,13 @@ function resolveTimestamp(value: number | undefined, fallback: number): number {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+function resolvePiActivityTimestamp(record: PiMachineSessionRecord, fallback: number): number {
+    if (record.state === 'active_runtime') {
+        return resolveTimestamp(record.registeredUpdatedAt, resolveTimestamp(record.modifiedAt, fallback));
+    }
+    return resolveTimestamp(record.modifiedAt, resolveTimestamp(record.registeredUpdatedAt, fallback));
+}
+
 function resolvePiSessionTitle(record: PiMachineSessionRecord): string {
     return record.name?.trim() || record.firstMessage?.trim() || record.piSessionId;
 }
@@ -40,7 +47,7 @@ function buildPiMetadata(
         } : {}),
         piSynthetic: synthetic,
         lifecycleState: record.state,
-        lifecycleStateSince: resolveTimestamp(record.modifiedAt, Date.now()),
+        lifecycleStateSince: resolvePiActivityTimestamp(record, Date.now()),
     };
 }
 
@@ -50,9 +57,14 @@ export function enrichSessionWithPiDiscovery(
     machine: Machine,
 ): Omit<Session, 'presence'> & { presence?: Session['presence'] } {
     const discoveredMetadata = buildPiMetadata(record, machine, false);
+    const active = record.state === 'active_runtime';
+    const updatedAt = Math.max(session.updatedAt, resolvePiActivityTimestamp(record, session.updatedAt));
     return {
         ...session,
-        updatedAt: Math.max(session.updatedAt, resolveTimestamp(record.modifiedAt, session.updatedAt)),
+        updatedAt,
+        active: active ? true : session.active,
+        activeAt: active ? updatedAt : session.activeAt,
+        presence: active ? 'online' : session.presence,
         metadata: {
             ...(session.metadata ?? {}),
             ...discoveredMetadata,
@@ -69,8 +81,8 @@ export function createSyntheticPiSession(
     machine: Machine,
 ): Omit<Session, 'presence'> & { presence?: Session['presence'] } {
     const now = Date.now();
-    const createdAt = resolveTimestamp(record.createdAt, resolveTimestamp(record.modifiedAt, now));
-    const updatedAt = resolveTimestamp(record.modifiedAt, createdAt);
+    const createdAt = resolveTimestamp(record.createdAt, resolvePiActivityTimestamp(record, now));
+    const updatedAt = resolvePiActivityTimestamp(record, createdAt);
     const active = record.state === 'active_runtime';
 
     return {

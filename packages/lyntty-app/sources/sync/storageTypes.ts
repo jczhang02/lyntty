@@ -258,6 +258,7 @@ export interface PiMachineSessionRecord {
     name?: string;
     createdAt?: number;
     modifiedAt?: number;
+    registeredUpdatedAt?: number;
     firstMessage?: string;
     messageCount: number;
     needsRegistration: boolean;

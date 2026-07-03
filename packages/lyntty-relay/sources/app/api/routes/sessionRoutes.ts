@@ -238,19 +238,24 @@ export function sessionRoutes(app: Fastify) {
         });
         if (session) {
             log({ module: 'session-create', sessionId: session.id, userId, tag }, `Found existing session: ${session.id} for tag ${tag}`);
+            const now = new Date();
+            const touchedSession = await db.session.update({
+                where: { id: session.id },
+                data: { active: true, lastActiveAt: now, updatedAt: now },
+            });
             return reply.send({
                 session: {
-                    id: session.id,
-                    seq: session.seq,
-                    metadata: session.metadata,
-                    metadataVersion: session.metadataVersion,
-                    agentState: session.agentState,
-                    agentStateVersion: session.agentStateVersion,
-                    dataEncryptionKey: session.dataEncryptionKey ? Buffer.from(session.dataEncryptionKey).toString('base64') : null,
-                    active: session.active,
-                    activeAt: session.lastActiveAt.getTime(),
-                    createdAt: session.createdAt.getTime(),
-                    updatedAt: session.updatedAt.getTime(),
+                    id: touchedSession.id,
+                    seq: touchedSession.seq,
+                    metadata: touchedSession.metadata,
+                    metadataVersion: touchedSession.metadataVersion,
+                    agentState: touchedSession.agentState,
+                    agentStateVersion: touchedSession.agentStateVersion,
+                    dataEncryptionKey: touchedSession.dataEncryptionKey ? Buffer.from(touchedSession.dataEncryptionKey).toString('base64') : null,
+                    active: touchedSession.active,
+                    activeAt: touchedSession.lastActiveAt.getTime(),
+                    createdAt: touchedSession.createdAt.getTime(),
+                    updatedAt: touchedSession.updatedAt.getTime(),
                     lastMessage: null
                 }
             });

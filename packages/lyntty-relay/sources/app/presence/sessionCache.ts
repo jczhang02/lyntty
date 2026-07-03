@@ -7,6 +7,7 @@ interface SessionCacheEntry {
     lastUpdateSent: number;
     pendingUpdate: number | null;
     userId: string;
+    active: boolean;
 }
 
 interface MachineCacheEntry {
@@ -14,6 +15,7 @@ interface MachineCacheEntry {
     lastUpdateSent: number;
     pendingUpdate: number | null;
     userId: string;
+    active: boolean;
 }
 
 class ActivityCache {
@@ -70,7 +72,8 @@ class ActivityCache {
                     validUntil: now + this.CACHE_TTL,
                     lastUpdateSent: session.lastActiveAt.getTime(),
                     pendingUpdate: null,
-                    userId
+                    userId,
+                    active: session.active
                 });
                 return true;
             }
@@ -111,7 +114,8 @@ class ActivityCache {
                     validUntil: now + this.CACHE_TTL,
                     lastUpdateSent: machine.lastActiveAt?.getTime() || 0,
                     pendingUpdate: null,
-                    userId
+                    userId,
+                    active: machine.active
                 });
                 return true;
             }
@@ -131,7 +135,7 @@ class ActivityCache {
 
         // Only queue if time difference is significant
         const timeDiff = Math.abs(timestamp - cached.lastUpdateSent);
-        if (timeDiff > this.UPDATE_THRESHOLD) {
+        if (timeDiff > this.UPDATE_THRESHOLD || !cached.active) {
             cached.pendingUpdate = timestamp;
             return true;
         }
@@ -148,7 +152,7 @@ class ActivityCache {
 
         // Only queue if time difference is significant
         const timeDiff = Math.abs(timestamp - cached.lastUpdateSent);
-        if (timeDiff > this.UPDATE_THRESHOLD) {
+        if (timeDiff > this.UPDATE_THRESHOLD || !cached.active) {
             cached.pendingUpdate = timestamp;
             return true;
         }
@@ -166,6 +170,7 @@ class ActivityCache {
             if (entry.pendingUpdate) {
                 sessionUpdates.push({ id: sessionId, timestamp: entry.pendingUpdate });
                 entry.lastUpdateSent = entry.pendingUpdate;
+                entry.active = true;
                 entry.pendingUpdate = null;
             }
         }
@@ -179,6 +184,7 @@ class ActivityCache {
                     userId: entry.userId
                 });
                 entry.lastUpdateSent = entry.pendingUpdate;
+                entry.active = true;
                 entry.pendingUpdate = null;
             }
         }
@@ -210,7 +216,7 @@ class ActivityCache {
                                 id: update.id
                             }
                         },
-                        data: { lastActiveAt: new Date(update.timestamp) }
+                        data: { lastActiveAt: new Date(update.timestamp), active: true }
                     })
                 ));
 

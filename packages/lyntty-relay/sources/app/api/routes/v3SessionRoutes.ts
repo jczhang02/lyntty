@@ -214,6 +214,20 @@ export function v3SessionRoutes(app: Fastify) {
                 createdMessages.push(createdMessage);
             }
 
+            if (createdMessages.length > 0) {
+                const lastMessageTime = createdMessages.reduce((latest, message) => (
+                    message.createdAt.getTime() > latest ? message.createdAt.getTime() : latest
+                ), createdMessages[0].createdAt.getTime());
+                await tx.session.update({
+                    where: { id: sessionId },
+                    data: {
+                        updatedAt: new Date(lastMessageTime),
+                        lastActiveAt: new Date(lastMessageTime),
+                        active: true
+                    }
+                });
+            }
+
             const responseMessages = [...existing, ...createdMessages].sort((a, b) => a.seq - b.seq);
 
             return {

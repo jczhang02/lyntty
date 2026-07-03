@@ -785,8 +785,24 @@ export async function startDaemon(): Promise<void> {
       return sessions;
     };
 
+    type ExternalPiMirrorState = {
+      sessionId: string;
+      stop: () => void | Promise<void>;
+      markCurrentEntriesKnown: () => void;
+      markCurrentEntriesDelivered: () => void;
+      markCurrentEntriesDeliveredSince: (cutoffTimeMs: number) => void;
+      extensionCoveredSince: number | null;
+      sessionClient: ApiSessionClient;
+      mapper: PiSessionProtocolMapper;
+      lastExtensionSeenAt: number;
+      keepAliveInterval: ReturnType<typeof setInterval> | null;
+    };
+
+    const externalPiMirrors = new Map<string, ExternalPiMirrorState>();
+    const EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS = 1000 * 60 * 2;
+
     const getRegisteredPiSessions = (): RegisteredPiSessionState[] => {
-      return [...pidToTrackedSession.values(), ...sessionIdToFinishedSession.values()].flatMap((tracked) => {
+      const trackedRegistrations = [...pidToTrackedSession.values(), ...sessionIdToFinishedSession.values()].flatMap((tracked) => {
         const metadata = tracked.lynttySessionMetadataFromLocalWebhook;
         if (!metadata?.piSessionId) {
           return [];
@@ -800,12 +816,34 @@ export async function startDaemon(): Promise<void> {
           updatedAt: tracked.lynttySessionId ? new Date() : undefined,
         }];
       });
+
+      const mirrorRegistrations: RegisteredPiSessionState[] = [];
+      for (const [key, mirror] of externalPiMirrors.entries()) {
+        const piSessionId = key.slice(key.indexOf(':') + 1);
+        if (!piSessionId) continue;
+        const metadata = mirror.sessionClient.getMetadata() as Metadata | null;
+        mirrorRegistrations.push({
+          piSessionId,
+          relaySessionId: mirror.sessionId,
+          importedMessageCount: metadata?.piHistoryTotalMessages ?? metadata?.piMessageCount ?? 0,
+          relayAvailable: true,
+          updatedAt: new Date(Math.max(mirror.lastExtensionSeenAt || 0, Date.now() - EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS)),
+        });
+      }
+
+      return [...trackedRegistrations, ...mirrorRegistrations];
     };
 
     const listPiSessions = async (options?: { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }) => {
       const activePiSessionIds = getCurrentChildren()
         .map((tracked) => tracked.lynttySessionMetadataFromLocalWebhook?.piSessionId)
         .filter((id): id is string => typeof id === 'string' && id.length > 0);
+      const nowMs = Date.now();
+      for (const [key, mirror] of externalPiMirrors.entries()) {
+        if (nowMs - mirror.lastExtensionSeenAt > EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS) continue;
+        const piSessionId = key.slice(key.indexOf(':') + 1);
+        if (piSessionId) activePiSessionIds.push(piSessionId);
+      }
 
       const page = await discoverLocalPiSessionsPage({
         cwd: options?.cwd,
@@ -1036,19 +1074,6 @@ export async function startDaemon(): Promise<void> {
     });
     logger.debug(`[DAEMON RUN] Machine registered: ${machine.id}`);
 
-    type ExternalPiMirrorState = {
-      sessionId: string;
-      stop: () => void | Promise<void>;
-      markCurrentEntriesKnown: () => void;
-      markCurrentEntriesDelivered: () => void;
-      markCurrentEntriesDeliveredSince: (cutoffTimeMs: number) => void;
-      extensionCoveredSince: number | null;
-      sessionClient: ApiSessionClient;
-      mapper: PiSessionProtocolMapper;
-      lastExtensionSeenAt: number;
-    };
-
-    const externalPiMirrors = new Map<string, ExternalPiMirrorState>();
     const externalPiMirrorStarts = new Map<string, Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }>>();
 
     const ensurePiSessionMirror = async (options: { piSessionId: string; directory?: string; machineId?: string; sessionFile?: string }): Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }> => {
@@ -1153,9 +1178,20 @@ export async function startDaemon(): Promise<void> {
           || (!!mirrorState && Date.now() - mirrorState.lastExtensionSeenAt < 5_000),
       });
       if (mirror) {
+        const keepAliveInterval = setInterval(() => {
+          const state = externalPiMirrors.get(mirrorKey);
+          if (!state || Date.now() - state.lastExtensionSeenAt > EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS) {
+            return;
+          }
+          state.sessionClient.keepAlive(false, 'remote');
+        }, 30_000);
+        keepAliveInterval.unref?.();
         mirrorState = {
           sessionId: response.id,
-          stop: mirror.stop,
+          stop: async () => {
+            clearInterval(keepAliveInterval);
+            await mirror.stop();
+          },
           markCurrentEntriesKnown: mirror.markCurrentEntriesKnown,
           markCurrentEntriesDelivered: mirror.markCurrentEntriesDelivered,
           markCurrentEntriesDeliveredSince: mirror.markCurrentEntriesDeliveredSince,
@@ -1163,6 +1199,7 @@ export async function startDaemon(): Promise<void> {
           sessionClient,
           mapper: new PiSessionProtocolMapper(),
           lastExtensionSeenAt: 0,
+          keepAliveInterval,
         };
         externalPiMirrors.set(mirrorKey, mirrorState);
       }
@@ -1197,6 +1234,11 @@ export async function startDaemon(): Promise<void> {
 
       const eventTime = typeof payload.timestamp === 'number' ? payload.timestamp : Date.now();
       mirror.lastExtensionSeenAt = Date.now();
+      const isThinking = event.type === 'agent_start'
+        || event.type === 'message_update'
+        || event.type === 'tool_execution_start'
+        || event.type === 'tool_execution_update';
+      mirror.sessionClient.keepAlive(isThinking, 'remote');
       if (mirror.extensionCoveredSince === null || event.type === 'session_start') {
         mirror.extensionCoveredSince = eventTime;
       }

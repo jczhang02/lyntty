@@ -27,6 +27,7 @@ describe('Pi extension event bridge', () => {
   it('treats session lifecycle events as metadata-only bridge events', () => {
     expect(isLifecyclePiExtensionEvent({ type: 'session_start' })).toBe(true);
     expect(isLifecyclePiExtensionEvent({ type: 'session_info_changed' })).toBe(true);
+    expect(isLifecyclePiExtensionEvent({ type: 'remote_heartbeat' })).toBe(true);
     expect(isLifecyclePiExtensionEvent({ type: 'message_update' })).toBe(false);
   });
 
@@ -43,7 +44,9 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('/pi-extension/event');
       expect(source).toContain('127.0.0.1');
       expect(source).toContain('RETRY_DELAY_MS');
+      expect(source).toContain('HEARTBEAT_MS');
       expect(source).toContain('queuedPayloads');
+      expect(source).toContain('startHeartbeat(ctx)');
     } finally {
       await rm(home, { recursive: true, force: true });
     }

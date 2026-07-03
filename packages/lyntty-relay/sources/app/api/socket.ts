@@ -197,7 +197,14 @@ export function startSocket(app: Fastify) {
         // Broadcast daemon online status
         if (connection.connectionType === 'machine-scoped') {
             // Broadcast daemon online
-            const machineActivity = buildMachineActivityEphemeral(machineId!, true, Date.now());
+            const connectedAt = Date.now();
+            db.machine.updateMany({
+                where: { accountId: userId, id: connection.machineId },
+                data: { active: true, lastActiveAt: new Date(connectedAt) }
+            }).catch((error) => {
+                log({ module: 'websocket', level: 'error' }, `Error marking machine online: ${error}`);
+            });
+            const machineActivity = buildMachineActivityEphemeral(machineId!, true, connectedAt);
             eventRouter.emitEphemeral({
                 userId,
                 payload: machineActivity,

@@ -46,5 +46,6 @@ export function toPiAgentSessionEvent(event: Record<string, unknown>): AgentSess
 export function isLifecyclePiExtensionEvent(event: Record<string, unknown>): boolean {
   return event.type === 'session_start'
     || event.type === 'session_info_changed'
-    || event.type === 'session_shutdown';
+    || event.type === 'session_shutdown'
+    || event.type === 'remote_heartbeat';
 }

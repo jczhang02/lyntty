@@ -7,6 +7,9 @@ type SessionRecord = {
     id: string;
     accountId: string;
     seq: number;
+    active: boolean;
+    lastActiveAt: Date;
+    updatedAt: Date;
 };
 
 type MessageRecord = {
@@ -47,7 +50,10 @@ const {
         state.sessions.push({
             id: input.id,
             accountId: input.accountId,
-            seq: input.seq ?? 0
+            seq: input.seq ?? 0,
+            active: input.active ?? false,
+            lastActiveAt: input.lastActiveAt ?? new Date(state.nowMs),
+            updatedAt: input.updatedAt ?? new Date(state.nowMs)
         });
         if (!state.accountSeqById.has(input.accountId)) {
             state.accountSeqById.set(input.accountId, 0);
@@ -106,6 +112,15 @@ const {
         }
         const increment = args?.data?.seq?.increment ?? 0;
         session.seq += increment;
+        if (typeof args?.data?.active === "boolean") {
+            session.active = args.data.active;
+        }
+        if (args?.data?.lastActiveAt instanceof Date) {
+            session.lastActiveAt = args.data.lastActiveAt;
+        }
+        if (args?.data?.updatedAt instanceof Date) {
+            session.updatedAt = args.data.updatedAt;
+        }
         return selectFields(session as unknown as Record<string, unknown>, args?.select);
     });
 
@@ -446,6 +461,9 @@ describe("v3SessionRoutes", () => {
 
         expect(state.messages).toHaveLength(1);
         expect(state.messages[0].content).toEqual({ t: "encrypted", c: "enc-content-1" });
+        expect(state.sessions[0].active).toBe(true);
+        expect(state.sessions[0].lastActiveAt.getTime()).toBe(state.messages[0].createdAt.getTime());
+        expect(state.sessions[0].updatedAt.getTime()).toBe(state.messages[0].createdAt.getTime());
         expect(emitUpdateMock).toHaveBeenCalledTimes(1);
     });
 

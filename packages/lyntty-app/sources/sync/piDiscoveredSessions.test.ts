@@ -140,6 +140,34 @@ describe('mergePiDiscoveredSessions', () => {
         expect(new Set(sessions.map((session) => session.id)).size).toBe(5000);
     });
 
+    it('marks real relay rows active when Pi discovery reports an active runtime', () => {
+        const sessions = mergePiDiscoveredSessions([relaySession()], [{
+            machine,
+            sessions: [piRecord({
+                state: 'active_runtime',
+                piSessionId: 'pi-registered',
+                relaySessionId: 'relay-1',
+                modifiedAt: 2_000,
+                registeredUpdatedAt: 5_000,
+                needsRegistration: false,
+                reason: 'local Pi session is currently active',
+            })],
+        }]);
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0]).toMatchObject({
+            id: 'relay-1',
+            active: true,
+            activeAt: 5_000,
+            presence: 'online',
+            metadata: {
+                piSessionId: 'pi-registered',
+                piDiscoveryState: 'active_runtime',
+                piSynthetic: false,
+            },
+        });
+    });
+
     it('updates relay sessions with canonical Pi title and history info without replacing real path', () => {
         const sessions = mergePiDiscoveredSessions([
             relaySession({

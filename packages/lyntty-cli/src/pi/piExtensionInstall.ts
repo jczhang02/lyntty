@@ -9,12 +9,14 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 
 const REQUEST_TIMEOUT_MS = 750;
 const RETRY_DELAY_MS = 1_000;
+const HEARTBEAT_MS = 60_000;
 const MAX_QUEUED_SENDS = 1_000;
 let enabled = true;
 let lastStatus = "not connected";
 let draining = false;
 type QueuedPayload = { session: ReturnType<typeof sessionSnapshot>; event: Record<string, unknown>; timestamp: number; attempts?: number };
 const queuedPayloads: QueuedPayload[] = [];
+const heartbeatTimers = new Map<string, ReturnType<typeof setInterval>>();
 
 function lynttyHome(): string {
   return process.env.LYNTTY_HOME_DIR || join(homedir(), ".lyntty");
@@ -114,12 +116,33 @@ function send(ctx: ExtensionContext, event: Record<string, unknown>): void {
   if (!enabled) return;
   const session = sessionSnapshot(ctx);
   if (!session.piSessionId) return;
+  if (event.type !== "session_shutdown") {
+    startHeartbeat(ctx);
+  }
   enqueuePayload({
     session,
     event,
     timestamp: Date.now(),
   });
   drainQueue();
+}
+
+function startHeartbeat(ctx: ExtensionContext): void {
+  const sessionId = ctx.sessionManager.getSessionId();
+  if (!sessionId || heartbeatTimers.has(sessionId)) return;
+  const timer = setInterval(() => {
+    send(ctx, { type: "remote_heartbeat" });
+  }, HEARTBEAT_MS);
+  timer.unref?.();
+  heartbeatTimers.set(sessionId, timer);
+}
+
+function stopHeartbeat(ctx: ExtensionContext): void {
+  const sessionId = ctx.sessionManager.getSessionId();
+  const timer = sessionId ? heartbeatTimers.get(sessionId) : undefined;
+  if (!timer) return;
+  clearInterval(timer);
+  heartbeatTimers.delete(sessionId);
 }
 
 export default function lynttyRemoteExtension(pi: ExtensionAPI) {
@@ -139,6 +162,7 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
         return;
       }
 
+      startHeartbeat(ctx);
       const ok = await postToDaemon("/pi-extension/status", { session: sessionSnapshot(ctx) });
       ctx.ui.notify(ok ? "Lyntty remote: connected" : ` + "`Lyntty remote: ${lastStatus}`" + `, ok ? "info" : "warning");
     },
@@ -159,12 +183,14 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
         ctx.ui.notify("Lyntty remote sync enabled", "info");
         return;
       }
+      startHeartbeat(ctx);
       const ok = await postToDaemon("/pi-extension/status", { session: sessionSnapshot(ctx) });
       ctx.ui.notify(ok ? "Lyntty remote: connected" : ` + "`Lyntty remote: ${lastStatus}`" + `, ok ? "info" : "warning");
     },
   });
 
   pi.on("session_start", async (event, ctx) => {
+    startHeartbeat(ctx);
     send(ctx, { type: "session_start", reason: event.reason });
   });
 
@@ -198,6 +224,7 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
 
   pi.on("session_shutdown", async (event, ctx) => {
     send(ctx, { type: "session_shutdown", reason: event.reason });
+    stopHeartbeat(ctx);
   });
 }
 `;
