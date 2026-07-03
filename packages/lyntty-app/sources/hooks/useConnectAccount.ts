@@ -49,16 +49,34 @@ export function useConnectAccount(options?: UseConnectAccountOptions) {
         }
     }, [auth.credentials, options]);
 
+    const promptForAuthUrl = React.useCallback(async () => {
+        const url = await Modal.prompt(
+            t('settingsAccount.linkNewDevice'),
+            t('modals.pasteUrlFromTerminal'),
+            { placeholder: 'lyntty:///account?...' }
+        );
+        if (url?.trim()) {
+            await processAuthUrl(url.trim());
+        }
+    }, [processAuthUrl]);
+
     const connectAccount = React.useCallback(async () => {
         if (await checkScannerPermissions()) {
-            // Use camera scanner
-            CameraView.launchScanner({
-                barcodeTypes: ['qr']
-            });
+            try {
+                if (!CameraView.isModernBarcodeScannerAvailable) {
+                    throw new Error('Modern barcode scanner unavailable');
+                }
+                await CameraView.launchScanner({
+                    barcodeTypes: ['qr']
+                });
+            } catch (error) {
+                console.warn('Failed to launch QR scanner', error);
+                await promptForAuthUrl();
+            }
         } else {
             Modal.alert(t('common.error'), t('modals.cameraPermissionsRequiredToScanQr'), [{ text: t('common.ok') }]);
         }
-    }, [checkScannerPermissions]);
+    }, [checkScannerPermissions, promptForAuthUrl]);
 
     const connectWithUrl = React.useCallback(async (url: string) => {
         return await processAuthUrl(url);

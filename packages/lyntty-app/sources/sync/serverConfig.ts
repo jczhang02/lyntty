@@ -1,4 +1,6 @@
 import { MMKV } from 'react-native-mmkv';
+import { loadAppConfig } from './appConfig';
+import { validateServerUrlForEnvironment } from './serverConfigUtils';
 
 // Separate MMKV instance for server config that persists across logouts
 const serverConfigStorage = new MMKV({ id: 'server-config' });
@@ -63,17 +65,5 @@ export function getServerInfo(): { hostname: string; port?: number; isCustom: bo
 }
 
 export function validateServerUrl(url: string): { valid: boolean; error?: string } {
-    if (!url || !url.trim()) {
-        return { valid: false, error: 'Server URL cannot be empty' };
-    }
-
-    try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-            return { valid: false, error: 'Server URL must use HTTP or HTTPS protocol' };
-        }
-        return { valid: true };
-    } catch {
-        return { valid: false, error: 'Invalid URL format' };
-    }
+    return validateServerUrlForEnvironment(url, loadAppConfig().appEnv || process.env.APP_ENV);
 }

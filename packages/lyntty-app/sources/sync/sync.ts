@@ -2845,6 +2845,11 @@ export async function syncRestore(credentials: AuthCredentials) {
     await syncInit(credentials, true);
 }
 
+export function syncReset() {
+    apiSocket.disconnect();
+    isInitialized = false;
+}
+
 async function syncInit(credentials: AuthCredentials, restore: boolean) {
 
     // Initialize sync engine

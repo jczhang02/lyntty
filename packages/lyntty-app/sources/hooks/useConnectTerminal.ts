@@ -54,16 +54,34 @@ export function useConnectTerminal(options?: UseConnectTerminalOptions) {
         }
     }, [auth.credentials, options]);
 
+    const promptForAuthUrl = React.useCallback(async () => {
+        const url = await Modal.prompt(
+            t('modals.authenticateTerminal'),
+            t('modals.pasteUrlFromTerminal'),
+            { placeholder: 'lyntty://terminal?...' }
+        );
+        if (url?.trim()) {
+            await processAuthUrl(url.trim());
+        }
+    }, [processAuthUrl]);
+
     const connectTerminal = React.useCallback(async () => {
         if (await checkScannerPermissions()) {
-            // Use camera scanner
-            CameraView.launchScanner({
-                barcodeTypes: ['qr']
-            });
+            try {
+                if (!CameraView.isModernBarcodeScannerAvailable) {
+                    throw new Error('Modern barcode scanner unavailable');
+                }
+                await CameraView.launchScanner({
+                    barcodeTypes: ['qr']
+                });
+            } catch (error) {
+                console.warn('Failed to launch QR scanner', error);
+                await promptForAuthUrl();
+            }
         } else {
             Modal.alert(t('common.error'), t('modals.cameraPermissionsRequiredToConnectTerminal'), [{ text: t('common.ok') }]);
         }
-    }, [checkScannerPermissions]);
+    }, [checkScannerPermissions, promptForAuthUrl]);
 
     const connectWithUrl = React.useCallback(async (url: string) => {
         return await processAuthUrl(url);

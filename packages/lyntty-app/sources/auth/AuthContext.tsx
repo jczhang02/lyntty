@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { TokenStorage, AuthCredentials } from '@/auth/tokenStorage';
-import { syncCreate } from '@/sync/sync';
+import { syncCreate, syncReset } from '@/sync/sync';
 import * as Updates from 'expo-updates';
 import { clearPersistence, loadRegisteredPushToken } from '@/sync/persistence';
 import { unregisterPushToken } from '@/sync/apiPush';
@@ -12,7 +12,7 @@ interface AuthContextType {
     isAuthenticated: boolean;
     credentials: AuthCredentials | null;
     login: (token: string, secret: string) => Promise<void>;
-    logout: () => Promise<void>;
+    logout: (options?: { skipPushUnregister?: boolean }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +22,7 @@ export function AuthProvider({ children, initialCredentials }: { children: React
     const [credentials, setCredentials] = useState<AuthCredentials | null>(initialCredentials);
 
     const clearLocalAuth = async () => {
+        syncReset();
         clearPersistence();
         await TokenStorage.removeCredentials();
         setCredentials(null);
@@ -51,9 +52,9 @@ export function AuthProvider({ children, initialCredentials }: { children: React
         }
     };
 
-    const logout = async () => {
+    const logout = async (options?: { skipPushUnregister?: boolean }) => {
         trackLogout();
-        const registeredPushToken = credentials ? loadRegisteredPushToken() : null;
+        const registeredPushToken = credentials && !options?.skipPushUnregister ? loadRegisteredPushToken() : null;
         if (credentials && registeredPushToken) {
             try {
                 await unregisterPushToken(credentials, registeredPushToken);

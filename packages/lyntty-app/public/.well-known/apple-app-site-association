@@ -3,7 +3,7 @@
     "details": [
       {
         "appIDs": [
-          "466DQWDR8C.com.ex3ndr.lyntty"
+          "466DQWDR8C.dev.jczhang.lyntty"
         ],
         "components": [
           {
@@ -16,7 +16,7 @@
   },
   "activitycontinuation": {
     "apps": [
-      "466DQWDR8C.com.ex3ndr.lyntty"
+      "466DQWDR8C.dev.jczhang.lyntty"
     ]
   }
 }

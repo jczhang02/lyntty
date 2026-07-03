@@ -95,7 +95,7 @@ export default {
                     ? { NSAllowsLocalNetworking: true }
                     : { NSAllowsLocalNetworking: true, NSAllowsArbitraryLoads: true }
             },
-            associatedDomains: variant === 'production' ? ["applinks:app.lyntty.local"] : []
+            associatedDomains: variant === 'production' ? ["applinks:app.lyntty.engineering"] : []
         },
         android: {
             adaptiveIcon: {
@@ -127,7 +127,7 @@ export default {
                     "data": [
                         {
                             "scheme": "https",
-                            "host": "app.lyntty.local",
+                            "host": "app.lyntty.engineering",
                             "pathPrefix": "/"
                         }
                     ],
@@ -232,6 +232,7 @@ export default {
                 revenueCatStripeKey: process.env.EXPO_PUBLIC_REVENUE_CAT_STRIPE,
                 elevenLabsAgentId,
                 consoleLoggingDefault,
+                appEnv: variant,
                 buildCommitSha: buildMetadata.commitSha,
                 buildCommitTimestamp: buildMetadata.commitTimestamp,
             }

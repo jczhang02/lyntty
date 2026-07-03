@@ -8,6 +8,7 @@ export interface AppConfig {
     revenueCatStripeKey?: string;
     elevenLabsAgentId?: string;
     consoleLoggingDefault?: boolean;
+    appEnv?: string;
     serverUrl?: string;
     buildCommitSha?: string;
     buildCommitTimestamp?: string;
