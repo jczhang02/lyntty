@@ -182,7 +182,7 @@ describe('useGroupedMessages', () => {
         expect(groups.some((group) => group.type === 'message' && group.message.id === 'pi-history-entry-1-tool-output')).toBe(false);
     });
 
-    it('hides current-session mirrored serialized Pi tool-output thinking text', () => {
+    it('hides current-session mirrored serialized Pi tool-output agent text', () => {
         const messages: Message[] = [
             {
                 kind: 'agent-text',
@@ -197,6 +197,13 @@ describe('useGroupedMessages', () => {
                 localId: null,
                 createdAt: 2,
                 text: '{"content":[]}{"content":[{"type":"text","text":" M .beads/interactions.jsonl\\nM packages/lyntty-app/sources/sync/reducer/reducer.ts"}],"details":{}}',
+            },
+            {
+                kind: 'agent-text',
+                id: 'mirror-tool-output-current-session-thinking',
+                localId: null,
+                createdAt: 1.5,
+                text: '{"content":[]}{"content":[{"type":"text","text":"beads.role not configured"}],"details":{}}',
                 isThinking: true,
             },
             {
@@ -212,6 +219,30 @@ describe('useGroupedMessages', () => {
 
         expect(groups).toHaveLength(2);
         expect(groups.some((group) => group.type === 'message' && group.message.id === 'mirror-tool-output-current-session')).toBe(false);
+        expect(groups.some((group) => group.type === 'message' && group.message.id === 'mirror-tool-output-current-session-thinking')).toBe(false);
+    });
+
+    it('keeps legitimate assistant JSON text visible', () => {
+        const messages: Message[] = [
+            {
+                kind: 'agent-text',
+                id: 'assistant-json',
+                localId: null,
+                createdAt: 2,
+                text: '{"content":"human-readable summary","details":{"source":"assistant"}}',
+            },
+            {
+                kind: 'user-text',
+                id: 'user',
+                localId: null,
+                createdAt: 1,
+                text: 'return json',
+            },
+        ];
+
+        const groups = groupMessagesForDisplay(messages, false);
+
+        expect(groups.some((group) => group.type === 'message' && group.message.id === 'assistant-json')).toBe(true);
     });
 
     it('keeps the final agent message visible and collapses earlier agent work', () => {

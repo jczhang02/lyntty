@@ -3,6 +3,7 @@ import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { TokenStorage } from '@/auth/tokenStorage';
 import { Encryption } from './encryption/encryption';
+import { isAuthInvalidationMessage, requestAuthInvalidation } from '@/auth/authInvalidation';
 import { storage } from './storage';
 
 export function getLynttyClientId(): string {
@@ -261,6 +262,17 @@ class ApiSocket {
         }
     }
 
+    private handleSocketAuthError(error: unknown) {
+        const message = error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+                ? error
+                : JSON.stringify(error);
+        if (isAuthInvalidationMessage(message)) {
+            requestAuthInvalidation(message);
+        }
+    }
+
     private setupEventHandlers() {
         if (!this.socket) return;
 
@@ -288,6 +300,7 @@ class ApiSocket {
             if (this.isVerboseLogging()) {
                 console.error('🔌 SyncSocket: Connection error', error);
             }
+            this.handleSocketAuthError(error);
             this.updateStatus('error');
         });
 
@@ -295,6 +308,7 @@ class ApiSocket {
             if (this.isVerboseLogging()) {
                 console.error('🔌 SyncSocket: Error', error);
             }
+            this.handleSocketAuthError(error);
             this.updateStatus('error');
         });
 

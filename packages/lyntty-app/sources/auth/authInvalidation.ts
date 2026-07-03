@@ -3,11 +3,15 @@ type AuthInvalidationListener = (reason: string) => void | Promise<void>;
 const listeners = new Set<AuthInvalidationListener>();
 let invalidationRequested = false;
 
+export function isAuthInvalidationMessage(message: string): boolean {
+    return /(:\s*401\b|\b401\b|Invalid token|Invalid authentication token|Unauthorized)/i.test(message);
+}
+
 export function isAuthInvalidationError(error: unknown): boolean {
     if (!(error instanceof Error)) {
         return false;
     }
-    return /(:\s*401\b|\b401\b|Invalid token|Unauthorized)/i.test(error.message);
+    return isAuthInvalidationMessage(error.message);
 }
 
 export function subscribeAuthInvalidation(listener: AuthInvalidationListener): () => void {

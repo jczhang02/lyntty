@@ -64,11 +64,12 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     let noStatus = false;
     let hideDefaultError = false;
 
-    // For Gemini: unknown tools should be rendered as minimal (hidden)
-    // This prevents showing raw INPUT/OUTPUT for internal Gemini tools
-    // that we haven't explicitly added to knownTools
+    // Unknown provider tools should render as compact cards, not raw JSON.
+    // Pi can expose dynamic built-in/extension tools (for example get_goal or
+    // custom project tools), and their large structured outputs must stay folded.
     const isGemini = props.metadata?.flavor === 'gemini';
-    if (!knownTool && isGemini) {
+    const isPi = props.metadata?.flavor === 'pi';
+    if (!knownTool && (isGemini || isPi)) {
         minimal = true;
     }
 

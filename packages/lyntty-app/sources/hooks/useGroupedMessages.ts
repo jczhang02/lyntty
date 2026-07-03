@@ -308,24 +308,31 @@ function collectAgentWorkGroups(messages: Message[], turnOf: number[], collapseC
 
 /** Returns true for messages that render as null and should be excluded entirely */
 function isLegacyPiHistoryToolOutputText(msg: Message): boolean {
-    if (msg.kind !== 'agent-text' || msg.isThinking !== true) return false;
-    if (/^pi-history-.+-tool-output$/.test(msg.id)) return true;
+    if (msg.kind !== 'agent-text') return false;
+    if (msg.isThinking === true && /^pi-history-.+-tool-output$/.test(msg.id)) return true;
 
     // Current-session mirror compatibility: older/current relay state can contain
-    // serialized Pi tool result payloads as thinking text with non-history ids.
-    // Real thinking should not be an escaped tool-result JSON object with details.
+    // serialized Pi tool result payloads as plain or thinking agent text with
+    // non-history ids. Real assistant prose should not be an escaped
+    // tool-result JSON object with content+details.
     const text = msg.text.trim();
     const hasDetails = text.includes('"details"') || text.includes('\\"details\\"');
     const hasContent = text.includes('"content"') || text.includes('\\"content\\"');
-    const looksLikeToolPayload = hasDetails && hasContent && (
-        text.startsWith('{')
-        || text.includes('toolResult')
+    if (!hasDetails || !hasContent) return false;
+
+    const hasConcatenatedToolPayload = text.includes('}{"content"') || text.includes('}\\"{\\"content\\"');
+    const hasKnownToolNoise = (
+        text.includes('toolResult')
         || text.includes('tool_result')
         || text.includes('bd show')
         || text.includes('gpg: Signature made')
         || text.includes('beads.role not configured')
     );
-    return looksLikeToolPayload;
+
+    if (msg.isThinking === true) {
+        return text.startsWith('{') || hasConcatenatedToolPayload || hasKnownToolNoise;
+    }
+    return hasConcatenatedToolPayload || hasKnownToolNoise;
 }
 
 function isInvisibleMessage(msg: Message): boolean {
