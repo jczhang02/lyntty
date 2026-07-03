@@ -117,6 +117,39 @@ describe('useGroupedMessages', () => {
         expect(groups[1]?.messages.map((message) => message.id)).toEqual(['tool-1', 'tool-2']);
     });
 
+    it('hides persisted legacy Pi history tool-output thinking text', () => {
+        const messages: Message[] = [
+            {
+                kind: 'agent-text',
+                id: 'agent-final',
+                localId: null,
+                createdAt: 3,
+                text: 'done',
+            },
+            {
+                kind: 'agent-text',
+                id: 'pi-history-entry-1-tool-output',
+                localId: null,
+                createdAt: 2,
+                text: 'available work\\nbd show ... {"details":{}}',
+                isThinking: true,
+            },
+            {
+                kind: 'user-text',
+                id: 'user',
+                localId: null,
+                createdAt: 1,
+                text: 'show task',
+            },
+        ];
+
+        const groups = groupMessagesForDisplay(messages, true);
+
+        expect(groups).toHaveLength(2);
+        expect(groups.map((group) => group.type)).toEqual(['message', 'message']);
+        expect(groups.some((group) => group.type === 'message' && group.message.id === 'pi-history-entry-1-tool-output')).toBe(false);
+    });
+
     it('keeps the final agent message visible and collapses earlier agent work', () => {
         const messages: Message[] = [
             {

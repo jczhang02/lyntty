@@ -303,6 +303,12 @@ function collectAgentWorkGroups(messages: Message[], turnOf: number[], collapseC
 }
 
 /** Returns true for messages that render as null and should be excluded entirely */
+function isLegacyPiHistoryToolOutputText(msg: Message): boolean {
+    return msg.kind === 'agent-text'
+        && msg.isThinking === true
+        && /^pi-history-.+-tool-output$/.test(msg.id);
+}
+
 function isInvisibleMessage(msg: Message): boolean {
     // Hidden tools (ToolSearch, CodexReasoning, etc.)
     if (msg.kind === 'tool-call') {
@@ -311,6 +317,10 @@ function isInvisibleMessage(msg: Message): boolean {
     }
     if (msg.kind === 'agent-text') {
         if (msg.text.trim().length === 0) return true;
+        // Older app builds normalized historical Pi toolResult payloads into
+        // persisted thinking-text messages. Hide them at render grouping time too,
+        // because raw-sync normalization will not revisit already-stored rows.
+        if (isLegacyPiHistoryToolOutputText(msg)) return true;
     }
     return false;
 }
