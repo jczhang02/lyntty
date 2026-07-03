@@ -11,19 +11,22 @@ import { Metadata } from '@/api/types';
 import { decodeBase64 } from '@/api/encryption';
 import { TrackedSession, SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
+import type { LynttyPiExtensionPayload } from '@/pi/piExtensionEvent';
 
 export function startDaemonControlServer({
   getChildren,
   stopSession,
   spawnSession,
   requestShutdown,
-  onLynttySessionWebhook
+  onLynttySessionWebhook,
+  onPiExtensionEvent,
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   requestShutdown: () => void;
   onLynttySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
+  onPiExtensionEvent?: (payload: LynttyPiExtensionPayload) => Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }>;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
   return new Promise((resolve) => {
     const app = fastify({
@@ -74,6 +77,43 @@ export function startDaemonControlServer({
       onLynttySessionWebhook(sessionId, metadata, encryptionData);
 
       return { status: 'ok' as const };
+    });
+
+    const PiExtensionPayloadSchema = z.object({
+      session: z.object({
+        piSessionId: z.string(),
+        sessionFile: z.string().optional(),
+        cwd: z.string().optional(),
+        name: z.string().optional(),
+      }),
+      event: z.record(z.string(), z.unknown()),
+      timestamp: z.number().optional(),
+    });
+
+    typed.post('/pi-extension/status', {
+      schema: {
+        body: z.object({ session: z.any().optional() }).optional(),
+        response: { 200: z.object({ status: z.literal('ok') }) }
+      }
+    }, async () => ({ status: 'ok' as const }));
+
+    typed.post('/pi-extension/event', {
+      schema: {
+        body: PiExtensionPayloadSchema,
+        response: {
+          200: z.object({ status: z.literal('ok'), sessionId: z.string().optional() }),
+          500: z.object({ status: z.literal('error'), error: z.string() }),
+        }
+      }
+    }, async (request, reply) => {
+      if (!onPiExtensionEvent) {
+        return { status: 'ok' as const };
+      }
+      const result = await onPiExtensionEvent(request.body);
+      if (result.status === 'error') {
+        reply.code(500);
+      }
+      return result;
     });
 
     // List all tracked sessions

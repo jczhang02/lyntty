@@ -34,6 +34,7 @@ import { extractNoSandboxFlag } from './utils/sandboxFlags'
 import { handleResumeCommand } from '@/resume/handleResumeCommand'
 import { ensureDaemonRunning } from './daemon/ensureDaemonRunning'
 import { handleCodexCommand } from './commands/codexCommand'
+import { installLynttyPiExtension, lynttyPiExtensionPath } from './pi/piExtensionInstall'
 
 
 (async () => {
@@ -162,6 +163,25 @@ Conversation history is preserved on the server, but in-flight tool calls are in
   } else if (subcommand === 'bye') {
     console.log('Bye!');
     process.exit(0);
+  } else if (subcommand === 'remote') {
+    const remoteSubcommand = args[1] ?? 'install';
+    if (remoteSubcommand === 'install') {
+      const result = await installLynttyPiExtension();
+      console.log(`${result.changed ? 'Installed' : 'Already installed'} Lyntty Pi extension: ${result.path}`);
+      return;
+    }
+    if (remoteSubcommand === 'status') {
+      console.log(`Lyntty Pi extension path: ${lynttyPiExtensionPath()}`);
+      return;
+    }
+    console.log(`
+${chalk.bold('lyntty remote')} - Pi extension remote sync
+
+${chalk.bold('Usage:')}
+  lyntty remote install          Install/update the global Pi extension
+  lyntty remote status           Show extension path
+`);
+    return;
   } else if (subcommand === 'resume') {
     try {
       await handleResumeCommand(args.slice(1));
@@ -565,6 +585,9 @@ Conversation history is preserved on the server, but in-flight tool calls are in
       return
 
     } else if (daemonSubcommand === 'start') {
+      await installLynttyPiExtension().catch((error) => {
+        logger.warn(`Failed to install Lyntty Pi extension: ${error instanceof Error ? error.message : error}`);
+      });
       // Spawn detached daemon process
       const child = spawnLynttyCLI(['daemon', 'start-sync'], {
         detached: true,
@@ -591,6 +614,9 @@ Conversation history is preserved on the server, but in-flight tool calls are in
       }
       process.exit(0);
     } else if (daemonSubcommand === 'start-sync') {
+      await installLynttyPiExtension().catch((error) => {
+        logger.warn(`Failed to install Lyntty Pi extension: ${error instanceof Error ? error.message : error}`);
+      });
       await startDaemon()
       process.exit(0)
     } else if (daemonSubcommand === 'stop') {

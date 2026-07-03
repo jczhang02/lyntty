@@ -45,6 +45,7 @@ function run(cmd, args, { allowFailure = false } = {}) {
 run('pnpm', ['run', 'build']);
 run('lyntty', ['daemon', 'stop'], { allowFailure: true });
 run('npm', ['link']);
+run('lyntty', ['remote', 'install'], { allowFailure: true });
 run('lyntty', ['daemon', 'start'], { allowFailure: true });
 run('lyntty', ['--version']);
 

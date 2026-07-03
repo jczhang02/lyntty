@@ -35,6 +35,8 @@ import { discoverLocalPiSessions, discoverLocalPiSessionsPage, redactPiSessionFo
 import { mapPiSessionHistoryPageToEnvelopes } from '@/pi/runPiHistory';
 import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalMirror';
 import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
+import { PiSessionProtocolMapper } from '@/pi/runPiSessionProtocol';
+import { isLifecyclePiExtensionEvent, toPiAgentSessionEvent, type LynttyPiExtensionPayload } from '@/pi/piExtensionEvent';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -900,13 +902,26 @@ export async function startDaemon(): Promise<void> {
       pidToTrackedSession.delete(pid);
     };
 
+    let onPiExtensionEventHandler: ((payload: LynttyPiExtensionPayload) => Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }>) | null = null;
+    const pendingPiExtensionEvents: LynttyPiExtensionPayload[] = [];
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
       stopSession,
       spawnSession,
       requestShutdown: () => requestShutdown('lyntty-cli'),
-      onLynttySessionWebhook
+      onLynttySessionWebhook,
+      onPiExtensionEvent: async (payload) => {
+        if (onPiExtensionEventHandler) {
+          return onPiExtensionEventHandler(payload);
+        }
+        pendingPiExtensionEvents.push(payload);
+        if (pendingPiExtensionEvents.length > 100) {
+          pendingPiExtensionEvents.shift();
+        }
+        return { status: 'ok' as const };
+      },
     });
 
     // Write initial daemon state (no lock needed for state file)
@@ -955,7 +970,16 @@ export async function startDaemon(): Promise<void> {
     });
     logger.debug(`[DAEMON RUN] Machine registered: ${machine.id}`);
 
-    const externalPiMirrors = new Map<string, { sessionId: string; stop: () => void }>();
+    type ExternalPiMirrorState = {
+      sessionId: string;
+      stop: () => void;
+      markCurrentEntriesKnown: () => void;
+      sessionClient: ApiSessionClient;
+      mapper: PiSessionProtocolMapper;
+      lastExtensionSeenAt: number;
+    };
+
+    const externalPiMirrors = new Map<string, ExternalPiMirrorState>();
     const externalPiMirrorStarts = new Map<string, Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }>>();
 
     const ensurePiSessionMirror = async (options: { piSessionId: string; directory?: string; machineId?: string }): Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }> => {
@@ -1051,14 +1075,24 @@ export async function startDaemon(): Promise<void> {
         };
       });
 
+      let mirrorState: ExternalPiMirrorState | null = null;
       const mirror = startPiExternalMirror({
         sessionFile,
         initialEntries: entries,
         session: () => sessionClient,
-        isManagedRuntimeActive: () => !!resolveActivePiSessionReuse(piSessionId, getCurrentChildren(), machine.id),
+        isManagedRuntimeActive: () => !!resolveActivePiSessionReuse(piSessionId, getCurrentChildren(), machine.id)
+          || (!!mirrorState && Date.now() - mirrorState.lastExtensionSeenAt < 5_000),
       });
       if (mirror) {
-        externalPiMirrors.set(mirrorKey, { sessionId: response.id, stop: mirror.stop });
+        mirrorState = {
+          sessionId: response.id,
+          stop: mirror.stop,
+          markCurrentEntriesKnown: mirror.markCurrentEntriesKnown,
+          sessionClient,
+          mapper: new PiSessionProtocolMapper(),
+          lastExtensionSeenAt: 0,
+        };
+        externalPiMirrors.set(mirrorKey, mirrorState);
       }
 
       return { type: 'success' as const, sessionId: response.id, sent: page.envelopes.length };
@@ -1070,6 +1104,62 @@ export async function startDaemon(): Promise<void> {
         externalPiMirrorStarts.delete(mirrorKey);
       }
     };
+
+    onPiExtensionEventHandler = async (payload) => {
+      const { session, event } = payload;
+      const result = await ensurePiSessionMirror({
+        piSessionId: session.piSessionId,
+        directory: session.cwd,
+        machineId: machine.id,
+      });
+      if (result.type === 'error') {
+        return { status: 'error' as const, error: result.errorMessage };
+      }
+
+      const mirrorKey = `${machine.id}:${session.piSessionId}`;
+      const mirror = externalPiMirrors.get(mirrorKey);
+      if (!mirror) {
+        return { status: 'ok' as const, sessionId: result.sessionId };
+      }
+
+      mirror.lastExtensionSeenAt = Date.now();
+      mirror.markCurrentEntriesKnown();
+
+      if (event.type === 'session_start' || event.type === 'session_info_changed') {
+        mirror.sessionClient.updateMetadata((currentMetadata) => ({
+          ...currentMetadata,
+          lifecycleState: 'external_pi',
+          lifecycleStateSince: Date.now(),
+          name: session.name ?? currentMetadata.name,
+          path: session.cwd ?? currentMetadata.path,
+          piSessionId: session.piSessionId,
+        }));
+      }
+
+      if (isLifecyclePiExtensionEvent(event)) {
+        return { status: 'ok' as const, sessionId: result.sessionId };
+      }
+
+      const agentEvent = toPiAgentSessionEvent(event);
+      if (!agentEvent) {
+        return { status: 'ok' as const, sessionId: result.sessionId };
+      }
+
+      const envelopes = mirror.mapper.mapEvent(agentEvent);
+      for (const envelope of envelopes) {
+        mirror.sessionClient.sendSessionProtocolMessage(envelope);
+      }
+      if (envelopes.length > 0) {
+        await mirror.sessionClient.flush();
+      }
+      return { status: 'ok' as const, sessionId: result.sessionId };
+    };
+
+    for (const payload of pendingPiExtensionEvents.splice(0)) {
+      void onPiExtensionEventHandler(payload).catch((error) => {
+        logger.debug('[pi] Failed to process queued Pi extension event', error);
+      });
+    }
 
     // Create realtime machine session
     const apiMachine = api.machineSyncClient(machine);
@@ -1140,6 +1230,10 @@ export async function startDaemon(): Promise<void> {
         // `lyntty daemon start` reads our still-present daemon.state.json, sees
         // isDaemonRunningCurrentlyInstalledLynttyVersion() === true, and exits —
         // leaving nothing running once we also exit.
+        for (const mirror of externalPiMirrors.values()) {
+          mirror.stop();
+        }
+        externalPiMirrors.clear();
         apiMachine.shutdown();
         await stopControlServer();
         await cleanupDaemonState();
@@ -1208,6 +1302,10 @@ export async function startDaemon(): Promise<void> {
       // Give time for metadata update to send
       await new Promise(resolve => setTimeout(resolve, 100));
 
+      for (const mirror of externalPiMirrors.values()) {
+        mirror.stop();
+      }
+      externalPiMirrors.clear();
       apiMachine.shutdown();
       await stopControlServer();
       await cleanupDaemonState();
