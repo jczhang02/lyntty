@@ -1,0 +1,200 @@
+[20:36:18.771] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:18.771] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 6824 }
+[20:36:18.777] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:18.778] Shell command request: git -c core.quotepath=false diff --numstat
+[20:36:18.778] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:18.788] In production, skipping message inspection 
+[20:36:18.788] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[20:36:18.801] Shell command executed, processing result... 
+[20:36:18.802] Shell command result: { success: true, exitCode: 0, stdoutLen: 827, stderrLen: 0 }
+[20:36:18.802] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:18.803] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 1272 }
+[20:36:18.843] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:18.843] Shell command request: git -c core.quotepath=false diff --cached --numstat
+[20:36:18.843] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:18.854] Shell command executed, processing result... 
+[20:36:18.854] Shell command result: { success: true, exitCode: 0, stdoutLen: 24, stderrLen: 0 }
+[20:36:18.854] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:18.854] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 148 }
+[20:36:18.868] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:18.868] Shell command request: git rev-parse --is-inside-work-tree
+[20:36:18.869] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 5000 }
+[20:36:19.722] Shell command executed, processing result... 
+[20:36:19.722] Shell command result: { success: true, exitCode: 0, stdoutLen: 5, stderrLen: 0 }
+[20:36:19.722] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:19.723] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 120 }
+[20:36:19.728] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:19.729] Shell command request: git -c core.quotepath=false status --porcelain=v2 --branch --show-stash --untracked-files=all
+[20:36:19.729] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:19.758] Shell command executed, processing result... 
+[20:36:19.759] Shell command result: { success: true, exitCode: 0, stdoutLen: 4990, stderrLen: 0 }
+[20:36:19.759] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:19.759] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 6824 }
+[20:36:19.767] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:19.767] Shell command request: git -c core.quotepath=false diff --numstat
+[20:36:19.768] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:19.789] Shell command executed, processing result... 
+[20:36:19.790] Shell command result: { success: true, exitCode: 0, stdoutLen: 827, stderrLen: 0 }
+[20:36:19.790] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:19.790] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 1272 }
+[20:36:19.795] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:19.796] Shell command request: git -c core.quotepath=false diff --cached --numstat
+[20:36:19.796] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:19.809] Shell command executed, processing result... 
+[20:36:19.810] Shell command result: { success: true, exitCode: 0, stdoutLen: 24, stderrLen: 0 }
+[20:36:19.810] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:19.810] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 148 }
+[20:36:24.740] In production, skipping message inspection 
+[20:36:24.741] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[20:36:24.760] In production, skipping message inspection 
+[20:36:24.760] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[20:36:24.803] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:24.803] Shell command request: git rev-parse --is-inside-work-tree
+[20:36:24.803] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 5000 }
+[20:36:24.815] Shell command executed, processing result... 
+[20:36:24.816] Shell command result: { success: true, exitCode: 0, stdoutLen: 5, stderrLen: 0 }
+[20:36:24.816] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:24.817] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 120 }
+[20:36:24.853] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:24.854] Shell command request: git -c core.quotepath=false status --porcelain=v2 --branch --show-stash --untracked-files=all
+[20:36:24.854] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:24.880] Shell command executed, processing result... 
+[20:36:24.881] Shell command result: { success: true, exitCode: 0, stdoutLen: 4990, stderrLen: 0 }
+[20:36:24.881] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:24.883] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 6824 }
+[20:36:25.336] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:25.336] Shell command request: git -c core.quotepath=false diff --numstat
+[20:36:25.336] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:25.799] Shell command executed, processing result... 
+[20:36:25.800] Shell command result: { success: true, exitCode: 0, stdoutLen: 827, stderrLen: 0 }
+[20:36:25.800] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:25.800] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 1272 }
+[20:36:25.805] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:25.805] Shell command request: git -c core.quotepath=false diff --cached --numstat
+[20:36:25.805] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:25.819] Shell command executed, processing result... 
+[20:36:25.820] Shell command result: { success: true, exitCode: 0, stdoutLen: 24, stderrLen: 0 }
+[20:36:25.820] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:25.820] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 148 }
+[20:36:25.832] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:25.833] Shell command request: git rev-parse --is-inside-work-tree
+[20:36:25.833] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 5000 }
+[20:36:25.845] Shell command executed, processing result... 
+[20:36:25.845] Shell command result: { success: true, exitCode: 0, stdoutLen: 5, stderrLen: 0 }
+[20:36:25.846] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:25.846] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 120 }
+[20:36:25.854] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:25.854] Shell command request: git -c core.quotepath=false status --porcelain=v2 --branch --show-stash --untracked-files=all
+[20:36:25.855] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:25.879] Shell command executed, processing result... 
+[20:36:25.880] Shell command result: { success: true, exitCode: 0, stdoutLen: 4990, stderrLen: 0 }
+[20:36:25.880] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:25.881] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 6824 }
+[20:36:26.371] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:26.372] Shell command request: git -c core.quotepath=false diff --numstat
+[20:36:26.372] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:26.814] Shell command executed, processing result... 
+[20:36:26.814] Shell command result: { success: true, exitCode: 0, stdoutLen: 827, stderrLen: 0 }
+[20:36:26.815] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:26.815] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 1272 }
+[20:36:26.825] In production, skipping message inspection 
+[20:36:26.826] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[20:36:26.826] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:26.827] Shell command request: git -c core.quotepath=false diff --cached --numstat
+[20:36:26.827] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:26.844] Shell command executed, processing result... 
+[20:36:26.845] Shell command result: { success: true, exitCode: 0, stdoutLen: 24, stderrLen: 0 }
+[20:36:26.845] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:26.845] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 148 }
+[20:36:26.856] In production, skipping message inspection 
+[20:36:26.856] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[20:36:27.313] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:27.314] Shell command request: git rev-parse --is-inside-work-tree
+[20:36:27.314] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 5000 }
+[20:36:27.774] Shell command executed, processing result... 
+[20:36:27.774] Shell command result: { success: true, exitCode: 0, stdoutLen: 5, stderrLen: 0 }
+[20:36:27.774] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:27.774] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 120 }
+[20:36:27.780] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:27.781] Shell command request: git -c core.quotepath=false status --porcelain=v2 --branch --show-stash --untracked-files=all
+[20:36:27.781] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:27.800] Shell command executed, processing result... 
+[20:36:27.801] Shell command result: { success: true, exitCode: 0, stdoutLen: 4990, stderrLen: 0 }
+[20:36:27.801] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:27.801] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 6824 }
+[20:36:27.806] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:27.806] Shell command request: git -c core.quotepath=false diff --numstat
+[20:36:27.806] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:27.829] Shell command executed, processing result... 
+[20:36:27.829] Shell command result: { success: true, exitCode: 0, stdoutLen: 827, stderrLen: 0 }
+[20:36:27.829] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:27.831] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 1272 }
+[20:36:27.836] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:27.837] Shell command request: git -c core.quotepath=false diff --cached --numstat
+[20:36:27.837] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:27.848] Shell command executed, processing result... 
+[20:36:27.848] Shell command result: { success: true, exitCode: 0, stdoutLen: 24, stderrLen: 0 }
+[20:36:27.849] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:27.849] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 148 }
+[20:36:27.860] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:27.860] Shell command request: git rev-parse --is-inside-work-tree
+[20:36:27.861] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 5000 }
+[20:36:27.878] Shell command executed, processing result... 
+[20:36:27.878] Shell command result: { success: true, exitCode: 0, stdoutLen: 5, stderrLen: 0 }
+[20:36:27.879] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:27.879] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 120 }
+[20:36:28.344] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:28.345] Shell command request: git -c core.quotepath=false status --porcelain=v2 --branch --show-stash --untracked-files=all
+[20:36:28.345] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:28.356] In production, skipping message inspection 
+[20:36:28.358] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[20:36:28.359] In production, skipping message inspection 
+[20:36:28.359] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[20:36:28.360] In production, skipping message inspection 
+[20:36:28.360] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[20:36:28.839] Shell command executed, processing result... 
+[20:36:28.839] Shell command result: { success: true, exitCode: 0, stdoutLen: 4990, stderrLen: 0 }
+[20:36:28.839] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:28.840] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 6824 }
+[20:36:28.847] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:28.847] Shell command request: git -c core.quotepath=false diff --numstat
+[20:36:28.847] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:28.870] Shell command executed, processing result... 
+[20:36:28.871] Shell command result: { success: true, exitCode: 0, stdoutLen: 827, stderrLen: 0 }
+[20:36:28.871] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:28.872] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 1272 }
+[20:36:28.884] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:28.884] Shell command request: git -c core.quotepath=false diff --cached --numstat
+[20:36:28.884] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:29.717] Shell command executed, processing result... 
+[20:36:29.718] Shell command result: { success: true, exitCode: 0, stdoutLen: 24, stderrLen: 0 }
+[20:36:29.718] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:29.718] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 148 }
+[20:36:29.728] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:29.728] Shell command request: git rev-parse --is-inside-work-tree
+[20:36:29.730] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 5000 }
+[20:36:29.742] Shell command executed, processing result... 
+[20:36:29.742] Shell command result: { success: true, exitCode: 0, stdoutLen: 5, stderrLen: 0 }
+[20:36:29.743] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:29.743] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 120 }
+[20:36:29.750] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:29.750] Shell command request: git -c core.quotepath=false status --porcelain=v2 --branch --show-stash --untracked-files=all
+[20:36:29.751] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:29.769] Shell command executed, processing result... 
+[20:36:29.770] Shell command result: { success: true, exitCode: 0, stdoutLen: 4990, stderrLen: 0 }
+[20:36:29.770] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:29.770] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 6824 }
+[20:36:29.774] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:29.775] Shell command request: git -c core.quotepath=false diff --numstat
+[20:36:29.775] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:29.795] Shell command executed, processing result... 
+[20:36:29.795] Shell command result: { success: true, exitCode: 0, stdoutLen: 827, stderrLen: 0 }
+[20:36:29.796] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:29.796] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 1272 }
+[20:36:29.802] [RPC] Calling handler { method: 'cmr4wywwf000tov37yb2cjwk9:bash' }
+[20:36:29.802] Shell command request: git -c core.quotepath=false diff --cached --numstat
+[20:36:29.802] Shell command executing... { cwd: '/home/jc/dev/lyntty', timeout: 10000 }
+[20:36:29.813] Shell command executed, processing result... 
+[20:36:29.813] Shell command result: { success: true, exitCode: 0, stdoutLen: 24, stderrLen: 0 }
+[20:36:29.813] [RPC] Handler returned { method: 'cmr4wywwf000tov37yb2cjwk9:bash', hasResult: true }
+[20:36:29.814] [RPC] Sending encrypted response { method: 'cmr4wywwf000tov37yb2cjwk9:bash', responseLength: 148 }

@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty-api35" tests="1" failures="1" time="123.0">
+    <testcase id="Lyntty historical Pi session open and live reply" name="Lyntty historical Pi session open and live reply" classname="Lyntty historical Pi session open and live reply" file="/tmp/tmp.AV1kpptnk3/03_history_send_reply.yml" time="123.0" status="ERROR">
+      <properties>
+        <property name="tags" value="core, sessions-home, pi-history"/>
+      </properties>
+      <failure>Assertion is false: "lyntty: happy fork pi agent support research" is visible</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

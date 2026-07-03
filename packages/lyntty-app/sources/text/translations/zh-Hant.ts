@@ -296,6 +296,8 @@ export const zhHant: TranslationStructure = {
     session: {
         inputPlaceholder: '輸入訊息...',
         inactiveArchived: '此會話處於非活動狀態。',
+        historyOnly: 'History only. Start Pi to make this session active via Lyntty.',
+        computerOffline: 'Computer offline. History is still available.',
     loadingLatestMessages: '正在載入最新訊息…',
         resumeFromTerminal: '若要從終端恢復它：',
         newChat: '新對話',

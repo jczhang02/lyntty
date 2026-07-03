@@ -296,8 +296,10 @@ export const zhHans: TranslationStructure = {
 
     session: {
         inputPlaceholder: '输入消息...',
-        inactiveArchived: '此会话处于非活动状态。',
-    loadingLatestMessages: '正在加载最新消息…',
+        inactiveArchived: '此会话已归档。',
+        historyOnly: '仅浏览历史。启动 Pi 后此会话才会通过 Lyntty 变为活动。',
+        computerOffline: '电脑离线。仍可查看历史。',
+        loadingLatestMessages: '正在加载最新消息…',
         resumeFromTerminal: '要从终端恢复它：',
         newChat: '新对话',
         forkAction: '分叉会话',
@@ -501,8 +503,8 @@ export const zhHans: TranslationStructure = {
 
     sidebar: {
         sessionsTitle: 'Lyntty',
-        showArchived: '显示已归档',
-        hideArchived: '隐藏已归档',
+        showArchived: '显示历史',
+        hideArchived: '隐藏历史',
         newSession: '新建会话',
     },
 

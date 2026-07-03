@@ -308,8 +308,10 @@ export const en = {
 
     session: {
         inputPlaceholder: 'Type a message ...',
-        inactiveArchived: 'This session is inactive.',
-    loadingLatestMessages: 'Loading latest messages…',
+        inactiveArchived: 'This session is archived.',
+        historyOnly: 'History only. Start Pi to make this session active via Lyntty.',
+        computerOffline: 'Computer offline. History is still available.',
+        loadingLatestMessages: 'Loading latest messages…',
         resumeFromTerminal: 'To resume it from the terminal:',
         newChat: 'New chat',
         // Fork / duplicate / rewind flow (pi only)
@@ -514,8 +516,8 @@ export const en = {
 
     sidebar: {
         sessionsTitle: 'Lyntty',
-        showArchived: 'Show archived',
-        hideArchived: 'Hide archived',
+        showArchived: 'Show history',
+        hideArchived: 'Hide history',
         newSession: 'New session',
     },
 

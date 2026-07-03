@@ -1,0 +1,45 @@
+Force authentication requested.
+This will:
+  • Clear existing credentials
+  • Clear machine ID
+  • Stop daemon if running
+  • Re-authenticate and register machine
+
+✓ Stopped daemon
+✓ Cleared credentials
+✓ Cleared machine ID
+
+
+Mobile Authentication
+
+Scan this QR code with your Lyntty mobile app:
+
+================================================================================
+📱 To authenticate, scan this QR code with your mobile device:
+================================================================================
+          ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+          █ ▄▄▄▄▄ █ ▀▀▄   █▀ █▄▀▄█▄▀█ ▄▄▄▄▄ █
+          █ █   █ ███ ▄▄▄▀▄█▄▀██▄▀▄ █ █   █ █
+          █ █▄▄▄█ █ ▄▄ ██ █▀█▄▄█▄▄█▀█ █▄▄▄█ █
+          █▄▄▄▄▄▄▄█ █ ▀ █ █ █ █ █ ▀▄█▄▄▄▄▄▄▄█
+          █ ▄ █▀ ▄█▄  ██ ▄▀ ▀▀▄ ▀█▀ ▄  ▄▀█  █
+          █▀▄▀▄▄▄▄▄ ▀█▄█▀█ ▀▄   ██ ▄ ▄ ▀ ▄█▄█
+          █▀▀▄ ▀▄▄▄▀ █▄ ▄██▀▄█▀ ▄█▄ █  ██▀▀ █
+          ██▀▀▀▄ ▄█ ▀▄▀ ▄ ▄▀██ ▀█▀▄▀███ █▄█ █
+          █▄▀ ▀ █▄██████  █ ▀ ▄ ██▀    ██▀█▀█
+          █    ▀▄▄▀▀  ▄█▀█▄█▄▄▄▄█▀ ▄▀▀▀ ▄█▀▄█
+          ██▀▄▀▀▀▄██▄ ▄ ▄██ ▄▀▄▀▀  ██▄ █ ▀ ▀█
+          █▄▄▄█▀▄▄▀█▄▀▀ ▄ ▄▄█  ▄▄  ▀▀▄▄████▄█
+          █▄▄████▄▄ ▄███  ▄▀▄█ █▄█  ▄▄▄  ▀█▀█
+          █ ▄▄▄▄▄ █▀ ▀▄█▀█ ▄█▄ ▀▄ ▀ █▄█ ▀█▀▄█
+          █ █   █ ██  ▄ ▄█ ████▀██ ▄ ▄  ▀█▀▀█
+          █ █▄▄▄█ █  ▀▀ ▄ ▄▄▄▀ █▄ █▀▄ ▀▄ ▄▄▄█
+          █▄▄▄▄▄▄▄█▄████▄▄███▄▄▄▄█▄▄▄▄█▄▄██▄█
+          
+================================================================================
+
+Or manually enter this URL:
+lyntty://terminal?<redacted-public-key>
+
+Waiting for authentication
+Waiting for authentication.   

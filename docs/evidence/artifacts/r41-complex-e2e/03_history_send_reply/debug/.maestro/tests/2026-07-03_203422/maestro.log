@@ -1,0 +1,73 @@
+20:34:22.722 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: /home/jc/dev/lyntty/docs/evidence/artifacts/r41-complex-e2e/03_history_send_reply/debug/.maestro/tests/2026-07-03_203422
+20:34:22.725 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+20:34:22.725 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.6.1
+20:34:22.726 [ INFO] MAESTRO.logSystemInfo: CI: Undefined
+20:34:22.726 [ INFO] MAESTRO.logSystemInfo: OS Name: Linux
+20:34:22.726 [ INFO] MAESTRO.logSystemInfo: OS Version: 6.19.10-jc-xanmod1
+20:34:22.727 [ INFO] MAESTRO.logSystemInfo: Architecture: amd64
+20:34:22.729 [ INFO] MAESTRO.logSystemInfo: Java Version: 21
+20:34:22.730 [ INFO] MAESTRO.logSystemInfo: Xcode Version: null
+20:34:22.732 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+20:34:22.737 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+20:34:22.737 [ INFO] MAESTRO.logSystemInfo: ---------------------
+20:34:24.316 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+20:34:25.944 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device emulator-5554 using port 35679 with execution plan ExecutionPlan(flowsToRun=[/tmp/tmp.9K5hUrij60/03_history_send_reply.yml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+20:34:27.209 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow:  Running flow Lyntty historical Pi session open and live reply
+20:34:27.220 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+20:34:27.277 [ERROR] maestro.drivers.AndroidDriver.runDeviceCall: Not able to reach the gRPC server while processing deviceInfo command
+20:34:27.277 [ERROR] maestro.cli.runner.TestSuiteInteractor.runFlow: Failed to complete flow
+io.grpc.StatusRuntimeException: UNAVAILABLE
+	at io.grpc.stub.ClientCalls.toStatusRuntimeException(ClientCalls.java:275)
+	at io.grpc.stub.ClientCalls.getUnchecked(ClientCalls.java:256)
+	at io.grpc.stub.ClientCalls.blockingUnaryCall(ClientCalls.java:169)
+	at maestro_android.MaestroDriverGrpc$MaestroDriverBlockingStub.deviceInfo(MaestroDriverGrpc.java:740)
+	at maestro.drivers.AndroidDriver.deviceInfo$lambda$5(AndroidDriver.kt:201)
+	at maestro.drivers.AndroidDriver.runDeviceCall(AndroidDriver.kt:1273)
+	at maestro.drivers.AndroidDriver.deviceInfo(AndroidDriver.kt:200)
+	at maestro.Maestro.cachedDeviceInfo_delegate$lambda$0(Maestro.kt:54)
+	at kotlin.SynchronizedLazyImpl.getValue(LazyJVM.kt:86)
+	at maestro.Maestro.getCachedDeviceInfo(Maestro.kt:52)
+	at maestro.orchestra.Orchestra._init_$lambda$11(Orchestra.kt:149)
+	at maestro.orchestra.Orchestra.initJsEngine(Orchestra.kt:311)
+	at maestro.orchestra.Orchestra.runFlow(Orchestra.kt:169)
+	at maestro.cli.runner.TestSuiteInteractor.runFlow(TestSuiteInteractor.kt:247)
+	at maestro.cli.runner.TestSuiteInteractor.runTestSuite(TestSuiteInteractor.kt:100)
+	at maestro.cli.command.TestCommand.runMultipleFlows(TestCommand.kt:629)
+	at maestro.cli.command.TestCommand.access$runMultipleFlows(TestCommand.kt:81)
+	at maestro.cli.command.TestCommand$runShardSuite$1$1.invokeSuspend(TestCommand.kt:505)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:263)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:94)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:70)
+	at kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:48)
+	at kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)
+	at maestro.cli.command.TestCommand.runShardSuite$lambda$10(TestCommand.kt:504)
+	at maestro.cli.session.MaestroSessionManager.newSession(MaestroSessionManager.kt:136)
+	at maestro.cli.session.MaestroSessionManager.newSession$default(MaestroSessionManager.kt:67)
+	at maestro.cli.command.TestCommand.runShardSuite(TestCommand.kt:479)
+	at maestro.cli.command.TestCommand.access$runShardSuite(TestCommand.kt:81)
+	at maestro.cli.command.TestCommand$handleSessions$1$results$1$1.invokeSuspend(TestCommand.kt:438)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+Caused by: java.io.IOException: Command failed (tcp:35679): closed
+	at dadb.adbserver.AdbServer.send$dadb(AdbServer.kt:103)
+	at dadb.adbserver.AdbServerDadb.open(AdbServer.kt:149)
+	at maestro.drivers.AndroidDriver.channel$lambda$0(AndroidDriver.kt:81)
+	at maestro.android.AdbSocket.connect(AdbSocketFactory.kt:40)
+	at maestro.android.AdbSocket.connect(AdbSocketFactory.kt:44)
+	at maestro.android.AdbSocketFactory.createSocket(AdbSocketFactory.kt:19)
+	at maestro.android.AdbSocketFactory.createSocket(AdbSocketFactory.kt:25)
+	at io.grpc.okhttp.OkHttpClientTransport$3.run(OkHttpClientTransport.java:535)
+	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+20:34:27.290 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from /home/jc/dev/lyntty/docs/evidence/artifacts/r41-complex-e2e/03_history_send_reply/output

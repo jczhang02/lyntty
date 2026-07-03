@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty-api35" tests="1" failures="0" time="12.0">
+    <testcase id="Open R41 long history session" name="Open R41 long history session" classname="Open R41 long history session" file="/tmp/r41-open-long.yml" time="12.0" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

@@ -196,7 +196,7 @@ describe('useGroupedMessages', () => {
                 id: 'mirror-tool-output-current-session',
                 localId: null,
                 createdAt: 2,
-                text: '{"content":[{"type":"text","text":"746cfbe gpg: Signature made\\nwarning: beads.role not configured"}],"details":{}}',
+                text: '{"content":[]}{"content":[{"type":"text","text":" M .beads/interactions.jsonl\\nM packages/lyntty-app/sources/sync/reducer/reducer.ts"}],"details":{}}',
                 isThinking: true,
             },
             {

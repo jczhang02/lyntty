@@ -297,6 +297,8 @@ export const ja: TranslationStructure = {
     session: {
         inputPlaceholder: 'メッセージを入力...',
         inactiveArchived: 'このセッションは非アクティブです。',
+        historyOnly: 'History only. Start Pi to make this session active via Lyntty.',
+        computerOffline: 'Computer offline. History is still available.',
     loadingLatestMessages: '最新のメッセージを読み込み中…',
         resumeFromTerminal: 'ターミナルから再開するには:',
         newChat: '新規チャット',

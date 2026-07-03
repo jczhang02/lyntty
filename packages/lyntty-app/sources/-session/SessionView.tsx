@@ -22,7 +22,7 @@ import { useImagePicker } from '@/hooks/useImagePicker';
 import { Modal } from '@/modal';
 import { gitStatusSync } from '@/sync/gitStatusSync';
 import { sessionAbort, sessionGoalAction } from '@/sync/ops';
-import { storage, useIsDataReady, useLocalSetting, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
+import { storage, useIsDataReady, useLocalSetting, useMachine, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
 import { useSession } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
 import { sync } from '@/sync/sync';
@@ -475,6 +475,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     ), [availableEffortLevels, session.effortLevel, effectiveAgentDefaults.effortLevel]);
 
     const sessionStatus = useSessionStatus(session);
+    const machine = useMachine(session.metadata?.machineId ?? '');
     const sessionUsage = useSessionUsage(sessionId);
     const alwaysShowContextSize = useSetting('alwaysShowContextSize');
     const experiments = useSetting('experiments');
@@ -690,6 +691,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         <CenteredInputWidth horizontalPadding={sessionInputHorizontalPadding}>
             <InactiveArchivedHint
                 resumeCommandBlock={expResumeSession ? resumeCommandBlock : null}
+                hintText={resolveInactiveSessionHint(session, machine ? machine.active === true : null)}
                 canResume={canResume}
                 resuming={resumingSession}
                 onResume={resumeSession}
@@ -800,8 +802,23 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     )
 }
 
+function resolveInactiveSessionHint(session: Session, machineOnline: boolean | null): string {
+    const metadata = session.metadata;
+    if (metadata?.lifecycleState === 'archived' || metadata?.archivedBy) {
+        return t('session.inactiveArchived');
+    }
+    if (metadata?.flavor === 'pi' && metadata.piSessionId) {
+        if (machineOnline === false) {
+            return t('session.computerOffline');
+        }
+        return t('session.historyOnly');
+    }
+    return t('session.inactiveArchived');
+}
+
 function InactiveArchivedHint(props: {
     resumeCommandBlock: NonNullable<ReturnType<typeof getResumeCommandBlock>> | null;
+    hintText: string;
     canResume: boolean;
     resuming: boolean;
     onResume: () => void;
@@ -823,7 +840,7 @@ function InactiveArchivedHint(props: {
         }}>
             <View style={{ paddingHorizontal: 8, gap: 4 }}>
                 <Text style={hintTextStyle}>
-                    {t('session.inactiveArchived')}
+                    {props.hintText}
                 </Text>
                 {props.canResume ? null : props.resumeCommandBlock && (
                     <Text style={hintTextStyle}>

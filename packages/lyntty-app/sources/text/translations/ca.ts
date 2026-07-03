@@ -296,6 +296,8 @@ export const ca: TranslationStructure = {
     session: {
         inputPlaceholder: 'Escriu un missatge...',
         inactiveArchived: 'Aquesta sessió està inactiva.',
+        historyOnly: 'History only. Start Pi to make this session active via Lyntty.',
+        computerOffline: 'Computer offline. History is still available.',
     loadingLatestMessages: 'Carregant els darrers missatges…',
         resumeFromTerminal: 'Per reprendre-la des del terminal:',
         newChat: 'Nou xat',

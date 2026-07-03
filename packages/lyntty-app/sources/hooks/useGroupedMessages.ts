@@ -318,7 +318,8 @@ function isLegacyPiHistoryToolOutputText(msg: Message): boolean {
     const hasDetails = text.includes('"details"') || text.includes('\\"details\\"');
     const hasContent = text.includes('"content"') || text.includes('\\"content\\"');
     const looksLikeToolPayload = hasDetails && hasContent && (
-        text.includes('toolResult')
+        text.startsWith('{')
+        || text.includes('toolResult')
         || text.includes('tool_result')
         || text.includes('bd show')
         || text.includes('gpg: Signature made')

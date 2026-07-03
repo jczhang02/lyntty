@@ -416,6 +416,8 @@ export const ru: TranslationStructure = {
     session: {
         inputPlaceholder: 'Введите сообщение...',
         inactiveArchived: 'Эта сессия неактивна.',
+        historyOnly: 'History only. Start Pi to make this session active via Lyntty.',
+        computerOffline: 'Computer offline. History is still available.',
     loadingLatestMessages: 'Загрузка последних сообщений…',
         resumeFromTerminal: 'Чтобы возобновить её из терминала:',
         newChat: 'Новый чат',

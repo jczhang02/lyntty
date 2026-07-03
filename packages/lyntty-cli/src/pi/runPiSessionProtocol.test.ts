@@ -80,4 +80,38 @@ describe('PiSessionProtocolMapper', () => {
     expect(mapper.mapEvent(event({ type: 'auto_retry_start', attempt: 1, maxAttempts: 3, errorMessage: 'timeout' }))).toEqual([]);
     expect(mapper.mapEvent(event({ type: 'auto_retry_end', attempt: 1, success: true }))).toEqual([]);
   });
+
+  it('keeps partial tool output out of chat text and uses the final tool result', () => {
+    const mapper = new PiSessionProtocolMapper();
+    mapper.mapEvent(event({ type: 'agent_start' }));
+    const start = mapper.mapEvent(event({
+      type: 'tool_execution_start',
+      toolCallId: 'tool-raw',
+      toolName: 'bash',
+      args: { command: 'git status' },
+    }));
+    const startEnvelope = start.find((envelope) => envelope.ev.t === 'tool-call-start');
+    expect(startEnvelope?.ev.t).toBe('tool-call-start');
+    const call = startEnvelope?.ev.t === 'tool-call-start' ? startEnvelope.ev.call : undefined;
+
+    expect(mapper.mapEvent(event({
+      type: 'tool_execution_update',
+      toolCallId: 'tool-raw',
+      partialResult: { content: [{ type: 'text', text: ' M file.ts' }], details: {} },
+    }))).toEqual([]);
+
+    const end = mapper.mapEvent(event({
+      type: 'tool_execution_end',
+      toolCallId: 'tool-raw',
+      result: { content: [{ type: 'text', text: ' M file.ts' }], details: {} },
+      isError: false,
+    }));
+
+    expect(end.map((envelope) => envelope.ev.t)).toEqual(['tool-call-end']);
+    expect(end[0].ev).toMatchObject({
+      t: 'tool-call-end',
+      call,
+      result: '{"content":[{"type":"text","text":" M file.ts"}],"details":{}}',
+    });
+  });
 });

@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty-api35" tests="1" failures="1" time="211.0">
+    <testcase id="Lyntty historical Pi session open and live reply" name="Lyntty historical Pi session open and live reply" classname="Lyntty historical Pi session open and live reply" file="/tmp/tmp.66l6ZyunIY/03_history_send_reply.yml" time="211.0" status="ERROR">
+      <properties>
+        <property name="tags" value="core, sessions-home, pi-history"/>
+      </properties>
+      <failure>Assertion is false: "R41_E2E_OK" is visible</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

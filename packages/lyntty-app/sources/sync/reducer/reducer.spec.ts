@@ -1221,6 +1221,57 @@ describe('reducer', () => {
             }
         });
 
+        it('completes a tool when the result arrives before the tool call', () => {
+            const state = createReducer();
+
+            const earlyResult: NormalizedMessage[] = [
+                {
+                    id: 'msg-result-first',
+                    localId: null,
+                    createdAt: 2000,
+                    role: 'agent',
+                    content: [{
+                        type: 'tool-result',
+                        tool_use_id: 'tool-out-of-order',
+                        content: 'done',
+                        is_error: false,
+                        uuid: 'result-uuid-first',
+                        parentUUID: null
+                    }],
+                    isSidechain: false
+                }
+            ];
+            expect(reducer(state, earlyResult).messages).toHaveLength(0);
+
+            const toolCall: NormalizedMessage[] = [
+                {
+                    id: 'msg-tool-late',
+                    localId: null,
+                    createdAt: 1000,
+                    role: 'agent',
+                    content: [{
+                        type: 'tool-call',
+                        id: 'tool-out-of-order',
+                        name: 'bash',
+                        input: { command: 'echo done' },
+                        description: 'Running bash',
+                        uuid: 'tool-uuid-late',
+                        parentUUID: null
+                    }],
+                    isSidechain: false
+                }
+            ];
+
+            const result = reducer(state, toolCall);
+            expect(result.messages).toHaveLength(1);
+            expect(result.messages[0].kind).toBe('tool-call');
+            if (result.messages[0].kind === 'tool-call') {
+                expect(result.messages[0].tool.state).toBe('completed');
+                expect(result.messages[0].tool.result).toBe('done');
+                expect(result.messages[0].tool.completedAt).toBe(2000);
+            }
+        });
+
         it('should handle denied and canceled permissions correctly', () => {
             const state = createReducer();
 
@@ -1338,8 +1389,9 @@ describe('reducer', () => {
             const result2 = reducer(state, toolMessages);
             expect(result2.messages).toHaveLength(1);
             if (result2.messages[0].kind === 'tool-call') {
-                expect(result2.messages[0].tool.state).toBe('running'); // Result was ignored
-                expect(result2.messages[0].tool.result).toBeUndefined();
+                expect(result2.messages[0].tool.state).toBe('completed');
+                expect(result2.messages[0].tool.result).toBe('Success');
+                expect(result2.messages[0].tool.completedAt).toBe(1000);
             }
 
             // Result arrives again (with different message ID since it's a new message)
@@ -1368,11 +1420,9 @@ describe('reducer', () => {
             const msgId = state.toolIdToMessageId.get(toolId);
             const message = msgId ? state.messages.get(msgId) : null;
 
-            expect(result3.messages).toHaveLength(1);
-            if (result3.messages[0].kind === 'tool-call') {
-                expect(result3.messages[0].tool.state).toBe('completed');
-                expect(result3.messages[0].tool.result).toBe('Success');
-            }
+            expect(result3.messages).toHaveLength(0);
+            expect(message?.tool?.state).toBe('completed');
+            expect(message?.tool?.result).toBe('Success');
         });
 
         it('should handle interleaved messages from multiple sources correctly', () => {

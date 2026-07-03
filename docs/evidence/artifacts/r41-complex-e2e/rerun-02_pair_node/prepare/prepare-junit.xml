@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty-api35" tests="1" failures="0" time="9.0">
+    <testcase id="Lyntty terminal pairing prepare" name="Lyntty terminal pairing prepare" classname="Lyntty terminal pairing prepare" file="/tmp/tmp.lxp0DwEPDy/02_pair_node_prepare.yml" time="9.0" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

@@ -158,10 +158,12 @@ export class PiSessionProtocolMapper {
         }, this.turnOptions()));
         return envelopes;
       }
-      case 'tool_execution_update': {
-        const output = stringifyToolPayload(event.partialResult);
-        return output ? this.appendText('thinking', output) : [];
-      }
+      case 'tool_execution_update':
+        // Pi streams partial tool output while the tool is still running. The
+        // final structured payload arrives on tool_execution_end and is rendered
+        // by the app inside the folded tool card. Emitting partial output as
+        // thinking text makes raw JSON/stdout appear in the chat timeline.
+        return [];
       case 'tool_execution_end': {
         const envelopes = this.flush();
         const call = this.ensureSessionCallId(event.toolCallId);
