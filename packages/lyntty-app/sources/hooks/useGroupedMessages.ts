@@ -56,7 +56,9 @@ export function groupMessagesForDisplay(
     options: { collapseCurrentTurn?: boolean } = {},
 ): DisplayItem[] {
     if (!enabled) {
-        return messages.map((msg) => ({ type: 'message', id: msg.id, message: msg } as TextItem));
+        return messages
+            .filter((msg) => !isInvisibleMessage(msg))
+            .map((msg) => ({ type: 'message', id: msg.id, message: msg } as TextItem));
     }
 
     const collapseCurrentTurn = options.collapseCurrentTurn ?? true;
@@ -138,7 +140,9 @@ export function groupToolCallsForDisplay(
     options: { groupSingleToolCalls?: boolean } = {},
 ): ToolDisplayItem[] {
     if (!enabled) {
-        return messages.map((msg) => ({ type: 'message', id: msg.id, message: msg } as TextItem));
+        return messages
+            .filter((msg) => !isInvisibleMessage(msg))
+            .map((msg) => ({ type: 'message', id: msg.id, message: msg } as TextItem));
     }
 
     const groupSingleToolCalls = options.groupSingleToolCalls ?? false;
