@@ -101,9 +101,11 @@ export class PiExternalMirror {
     this.markCurrentEntriesDeliveredSince(Number.NEGATIVE_INFINITY);
   }
 
-  markCurrentEntriesDeliveredSince(cutoffTimeMs: number): void {
+  markCurrentEntriesDeliveredSince(cutoffTimeMs: number, options: { includeAssistantMessages?: boolean } = {}): void {
     const entries = readPiSessionEntries(this.sessionFile);
-    const deliveredIds = new Set(entries.filter((entry) => this.isExtensionDeliveredEntry(entry, cutoffTimeMs)).map((entry) => entry.id));
+    const deliveredIds = new Set(entries
+      .filter((entry) => this.isExtensionDeliveredEntry(entry, cutoffTimeMs, options.includeAssistantMessages === true))
+      .map((entry) => entry.id));
     this.pendingEntries = this.pendingEntries.filter((entry) => {
       if (!deliveredIds.has(entry.id)) return true;
       return false;
@@ -113,7 +115,7 @@ export class PiExternalMirror {
     }
   }
 
-  private isExtensionDeliveredEntry(entry: SessionEntry, cutoffTimeMs: number): boolean {
+  private isExtensionDeliveredEntry(entry: SessionEntry, cutoffTimeMs: number, includeAssistantMessages: boolean): boolean {
     const entryTime = Date.parse(entry.timestamp);
     if (!Number.isFinite(entryTime) || entryTime < cutoffTimeMs) {
       return false;
@@ -122,7 +124,9 @@ export class PiExternalMirror {
       return true;
     }
     const role = (entry.message as { role?: unknown }).role;
-    return role !== 'user';
+    if (role === 'user') return false;
+    if (role === 'assistant') return includeAssistantMessages;
+    return true;
   }
 
   async tick(now = Date.now()): Promise<void> {
@@ -164,7 +168,7 @@ export function startPiExternalMirror(options: {
   session: () => ApiSessionClient;
   isManagedRuntimeActive?: () => boolean;
   pollMs?: number;
-}): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number) => void } | null {
+}): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void } | null {
   if (!options.sessionFile) {
     return null;
   }
@@ -204,7 +208,12 @@ export function startPiExternalMirror(options: {
     currentPoll = (async () => {
     try {
       if (options.isManagedRuntimeActive?.()) {
-        mirror.markCurrentEntriesKnown();
+        // Do not advance the JSONL fallback watermark just because a live Pi
+        // extension/runtime is active. Live delivery can buffer text until a
+        // debounce/turn boundary, and extension events can be dropped. Entries
+        // are marked known only after session-protocol envelopes are flushed
+        // through markCurrentEntriesDelivered*. This keeps the fallback able to
+        // recover a missing tail instead of permanently hiding it.
         return;
       }
       await mirror.tick();
@@ -225,6 +234,6 @@ export function startPiExternalMirror(options: {
     },
     markCurrentEntriesKnown: () => mirror.markCurrentEntriesKnown(),
     markCurrentEntriesDelivered: () => mirror.markCurrentEntriesDelivered(),
-    markCurrentEntriesDeliveredSince: (cutoffTimeMs: number) => mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs),
+    markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options),
   };
 }

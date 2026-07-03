@@ -1,0 +1,61 @@
+[05:52:05.774] [ClaudeSettings] Successfully read Claude settings from /home/jc/.claude/settings.json 
+[05:52:05.774] [ClaudeSettings] includeCoAuthoredBy: undefined 
+[05:52:05.796] Starting lyntty CLI with args:  [ '/usr/bin/node', '/home/jc/dev/lyntty/packages/lyntty-cli/dist/index.mjs', 'daemon', 'start-sync' ]
+[05:52:05.807] [DAEMON RUN] Starting daemon process... 
+[05:52:05.808] In production, skipping message inspection 
+[05:52:05.808] [DAEMON CONTROL] Checking if daemon is running same version 
+[05:52:05.808] [DAEMON CONTROL] No daemon running, returning false 
+[05:52:05.808] [DAEMON RUN] Daemon version mismatch detected, restarting daemon with current CLI version 
+[05:52:05.808] No daemon state found 
+[05:52:05.809] [caffeinate] Not on macOS, skipping caffeinate 
+[05:52:05.809] [AUTH] Starting auth and machine setup... 
+[05:52:05.811] [AUTH] Using existing credentials 
+[05:52:05.812] [AUTH] Machine ID: 1c655e08-3c2c-4e34-81c0-844b6639b322 
+[05:52:05.812] [DAEMON RUN] Auth and machine setup complete 
+[05:52:05.843] [CONTROL SERVER] Started on port 33617 
+[05:52:05.843] [DAEMON RUN] Daemon state written 
+[05:52:05.867] [API] Machine 1c655e08-3c2c-4e34-81c0-844b6639b322 registered/updated with server 
+[05:52:05.868] [DAEMON RUN] Machine registered: 1c655e08-3c2c-4e34-81c0-844b6639b322 
+[05:52:05.869] [API MACHINE] Connecting to ws://127.0.0.1:3005 
+[05:52:05.872] [DAEMON RUN] Daemon started successfully, waiting for shutdown request 
+[05:52:05.881] [API MACHINE] Connected to server 
+[05:52:05.883] [API MACHINE] Keep-alive started (20s interval) 
+[05:52:05.889] [API MACHINE] Received external daemon state update 
+[05:52:05.890] [API MACHINE] Daemon state updated successfully 
+[05:52:05.942] [CONTROL SERVER] Listing 0 sessions 
+[05:52:08.160] [DAEMON RUN] Failed exact Pi session file lookup for /home/jc/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-03T21-52-06-392Z_019f29f7-b0f8-71ba-a602-0a97f965e9cf.jsonl: ENOENT: no such file or directory, open '/home/jc/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-03T21-52-06-392Z_019f29f7-b0f8-71ba-a602-0a97f965e9cf.jsonl' 
+[05:52:11.794] [DAEMON RUN] Failed exact Pi session file lookup for /home/jc/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-03T21-52-06-392Z_019f29f7-b0f8-71ba-a602-0a97f965e9cf.jsonl: ENOENT: no such file or directory, open '/home/jc/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-03T21-52-06-392Z_019f29f7-b0f8-71ba-a602-0a97f965e9cf.jsonl' 
+[05:52:15.145] [DAEMON RUN] Failed exact Pi session file lookup for /home/jc/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-03T21-52-06-392Z_019f29f7-b0f8-71ba-a602-0a97f965e9cf.jsonl: ENOENT: no such file or directory, open '/home/jc/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-03T21-52-06-392Z_019f29f7-b0f8-71ba-a602-0a97f965e9cf.jsonl' 
+[05:52:18.556] [DAEMON RUN] Failed exact Pi session file lookup for /home/jc/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-03T21-52-06-392Z_019f29f7-b0f8-71ba-a602-0a97f965e9cf.jsonl: ENOENT: no such file or directory, open '/home/jc/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-03T21-52-06-392Z_019f29f7-b0f8-71ba-a602-0a97f965e9cf.jsonl' 
+[05:52:21.956] Session created/loaded: cmr5gydoi01b7ovwxp21ltoxt (tag: pi:0ec0af648c576101ce8d4160735e1866) 
+[05:52:21.963] Socket connected successfully 
+[05:52:21.972] In production, skipping message inspection 
+[05:52:21.973] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[05:52:21.986] In production, skipping message inspection 
+[05:52:21.986] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[05:52:21.987] In production, skipping message inspection 
+[05:52:21.987] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[05:52:21.988] In production, skipping message inspection 
+[05:52:21.988] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[05:52:21.996] In production, skipping message inspection 
+[05:52:22.004] In production, skipping message inspection 
+[05:52:22.005] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[05:52:22.006] In production, skipping message inspection 
+[05:52:22.023] In production, skipping message inspection 
+[05:52:22.023] [RPC] Calling handler { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions' }
+[05:52:24.991] [RPC] Handler returned { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions', hasResult: true }
+[05:52:24.992] [RPC] Sending encrypted response { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions', responseLength: 100508 }
+[05:52:25.046] In production, skipping message inspection 
+[05:52:25.047] [RPC] Calling handler { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions' }
+[05:52:25.222] [RPC] Handler returned { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions', hasResult: true }
+[05:52:25.223] [RPC] Sending encrypted response { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions', responseLength: 110260 }
+[05:52:25.233] In production, skipping message inspection 
+[05:52:25.234] [RPC] Calling handler { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions' }
+[05:52:25.393] [RPC] Handler returned { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions', hasResult: true }
+[05:52:25.393] [RPC] Sending encrypted response { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions', responseLength: 82180 }
+[05:52:25.404] In production, skipping message inspection 
+[05:52:25.404] [RPC] Calling handler { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions' }
+[05:52:25.575] [RPC] Handler returned { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions', hasResult: true }
+[05:52:25.575] [RPC] Sending encrypted response { method: '1c655e08-3c2c-4e34-81c0-844b6639b322:list-pi-sessions', responseLength: 62928 }
+[05:52:25.928] [API MACHINE] Received external metadata update 
+[05:52:25.929] [API MACHINE] Metadata updated successfully 

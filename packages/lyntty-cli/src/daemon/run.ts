@@ -790,16 +790,18 @@ export async function startDaemon(): Promise<void> {
       stop: () => void | Promise<void>;
       markCurrentEntriesKnown: () => void;
       markCurrentEntriesDelivered: () => void;
-      markCurrentEntriesDeliveredSince: (cutoffTimeMs: number) => void;
+      markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void;
       extensionCoveredSince: number | null;
       sessionClient: ApiSessionClient;
       mapper: PiSessionProtocolMapper;
       lastExtensionSeenAt: number;
       keepAliveInterval: ReturnType<typeof setInterval> | null;
+      pendingTextFlushTimer: ReturnType<typeof setTimeout> | null;
     };
 
     const externalPiMirrors = new Map<string, ExternalPiMirrorState>();
     const EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS = 1000 * 60 * 2;
+    const PI_LIVE_TEXT_FLUSH_DELAY_MS = 750;
 
     const getRegisteredPiSessions = (): RegisteredPiSessionState[] => {
       const trackedRegistrations = [...pidToTrackedSession.values(), ...sessionIdToFinishedSession.values()].flatMap((tracked) => {
@@ -1190,6 +1192,10 @@ export async function startDaemon(): Promise<void> {
           sessionId: response.id,
           stop: async () => {
             clearInterval(keepAliveInterval);
+            if (mirrorState?.pendingTextFlushTimer) {
+              clearTimeout(mirrorState.pendingTextFlushTimer);
+              mirrorState.pendingTextFlushTimer = null;
+            }
             await mirror.stop();
           },
           markCurrentEntriesKnown: mirror.markCurrentEntriesKnown,
@@ -1200,6 +1206,7 @@ export async function startDaemon(): Promise<void> {
           mapper: new PiSessionProtocolMapper(),
           lastExtensionSeenAt: 0,
           keepAliveInterval,
+          pendingTextFlushTimer: null,
         };
         externalPiMirrors.set(mirrorKey, mirrorState);
       }
@@ -1212,6 +1219,56 @@ export async function startDaemon(): Promise<void> {
       } finally {
         externalPiMirrorStarts.delete(mirrorKey);
       }
+    };
+
+    const clearPendingTextFlush = (mirror: ExternalPiMirrorState): void => {
+      if (!mirror.pendingTextFlushTimer) return;
+      clearTimeout(mirror.pendingTextFlushTimer);
+      mirror.pendingTextFlushTimer = null;
+    };
+
+    const hasDeliveredContentEnvelope = (envelopes: ReturnType<PiSessionProtocolMapper['mapEvent']>): boolean => envelopes.some((envelope) => {
+      return envelope.ev.t === 'text' || envelope.ev.t === 'tool-call-start' || envelope.ev.t === 'tool-call-end';
+    });
+
+    const markExtensionDelivered = (mirror: ExternalPiMirrorState, cutoffTimeMs: number, options: { includeAssistantMessages?: boolean } = {}): void => {
+      try {
+        mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options);
+      } catch (error) {
+        logger.debug('[pi] Failed to mark Pi extension-delivered entries', error);
+      }
+      setTimeout(() => {
+        try {
+          mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options);
+        } catch (error) {
+          logger.debug('[pi] Failed delayed Pi extension-delivered mark', error);
+        }
+      }, 2_500).unref?.();
+    };
+
+    const flushPendingLiveText = async (mirror: ExternalPiMirrorState, cutoffTimeMs: number): Promise<void> => {
+      clearPendingTextFlush(mirror);
+      const envelopes = mirror.mapper.flushPendingText();
+      if (envelopes.length === 0) return;
+      for (const envelope of envelopes) {
+        mirror.sessionClient.sendSessionProtocolMessage(envelope);
+      }
+      await mirror.sessionClient.flush();
+      markExtensionDelivered(mirror, cutoffTimeMs);
+    };
+
+    const schedulePendingLiveTextFlush = (mirrorKey: string, mirror: ExternalPiMirrorState, cutoffTimeMs: number): void => {
+      clearPendingTextFlush(mirror);
+      mirror.pendingTextFlushTimer = setTimeout(() => {
+        piExtensionEventChain = piExtensionEventChain.then(async () => {
+          const current = externalPiMirrors.get(mirrorKey);
+          if (current !== mirror || !current.mapper.hasPendingText()) return;
+          await flushPendingLiveText(current, cutoffTimeMs);
+        }).catch((error) => {
+          logger.debug('[pi] Failed to flush pending live Pi text', error);
+        });
+      }, PI_LIVE_TEXT_FLUSH_DELAY_MS);
+      mirror.pendingTextFlushTimer.unref?.();
     };
 
     onPiExtensionEventHandler = async (payload) => {
@@ -1242,21 +1299,7 @@ export async function startDaemon(): Promise<void> {
       if (mirror.extensionCoveredSince === null || event.type === 'session_start') {
         mirror.extensionCoveredSince = eventTime;
       }
-      const markDeliveredAgain = () => {
-        const cutoff = mirror.extensionCoveredSince ?? eventTime;
-        try {
-          mirror.markCurrentEntriesDeliveredSince(cutoff);
-        } catch (error) {
-          logger.debug('[pi] Failed to mark Pi extension-delivered entries', error);
-        }
-        setTimeout(() => {
-          try {
-            mirror.markCurrentEntriesDeliveredSince(cutoff);
-          } catch (error) {
-            logger.debug('[pi] Failed delayed Pi extension-delivered mark', error);
-          }
-        }, 2_500).unref?.();
-      };
+      const deliveredCutoff = mirror.extensionCoveredSince ?? eventTime;
 
       if (event.type === 'session_start' || event.type === 'session_info_changed') {
         mirror.sessionClient.updateMetadata((currentMetadata) => ({
@@ -1270,24 +1313,32 @@ export async function startDaemon(): Promise<void> {
       }
 
       if (isLifecyclePiExtensionEvent(event)) {
-        markDeliveredAgain();
         return { status: 'ok' as const, sessionId: result.sessionId };
       }
 
       const agentEvent = toPiAgentSessionEvent(event);
       if (!agentEvent) {
-        markDeliveredAgain();
         return { status: 'ok' as const, sessionId: result.sessionId };
       }
 
       const envelopes = mirror.mapper.mapEvent(agentEvent);
+      if (agentEvent.type !== 'message_update') {
+        clearPendingTextFlush(mirror);
+      }
       for (const envelope of envelopes) {
         mirror.sessionClient.sendSessionProtocolMessage(envelope);
       }
       if (envelopes.length > 0) {
         await mirror.sessionClient.flush();
       }
-      markDeliveredAgain();
+      if (agentEvent.type === 'agent_end' && envelopes.length > 0) {
+        markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: true });
+      } else if (hasDeliveredContentEnvelope(envelopes)) {
+        markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: agentEvent.type === 'agent_end' });
+      }
+      if (mirror.mapper.hasPendingText()) {
+        schedulePendingLiveTextFlush(mirrorKey, mirror, deliveredCutoff);
+      }
       return { status: 'ok' as const, sessionId: result.sessionId };
     };
 

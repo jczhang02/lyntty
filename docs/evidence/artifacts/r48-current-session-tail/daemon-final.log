@@ -1,0 +1,25 @@
+[05:48:40.797] [ClaudeSettings] Successfully read Claude settings from /home/jc/.claude/settings.json 
+[05:48:40.798] [ClaudeSettings] includeCoAuthoredBy: undefined 
+[05:48:40.820] Starting lyntty CLI with args:  [ '/usr/bin/node', '/home/jc/dev/lyntty/packages/lyntty-cli/dist/index.mjs', 'daemon', 'start-sync' ]
+[05:48:40.832] [DAEMON RUN] Starting daemon process... 
+[05:48:40.833] In production, skipping message inspection 
+[05:48:40.833] [DAEMON CONTROL] Checking if daemon is running same version 
+[05:48:40.833] [DAEMON CONTROL] No daemon running, returning false 
+[05:48:40.833] [DAEMON RUN] Daemon version mismatch detected, restarting daemon with current CLI version 
+[05:48:40.834] No daemon state found 
+[05:48:40.834] [caffeinate] Not on macOS, skipping caffeinate 
+[05:48:40.835] [AUTH] Starting auth and machine setup... 
+[05:48:40.836] [AUTH] Using existing credentials 
+[05:48:40.837] [AUTH] Machine ID: 1c655e08-3c2c-4e34-81c0-844b6639b322 
+[05:48:40.837] [DAEMON RUN] Auth and machine setup complete 
+[05:48:40.859] [CONTROL SERVER] Started on port 42449 
+[05:48:40.860] [DAEMON RUN] Daemon state written 
+[05:48:40.880] [API] Machine 1c655e08-3c2c-4e34-81c0-844b6639b322 registered/updated with server 
+[05:48:40.880] [DAEMON RUN] Machine registered: 1c655e08-3c2c-4e34-81c0-844b6639b322 
+[05:48:40.881] [API MACHINE] Connecting to ws://127.0.0.1:3005 
+[05:48:40.884] [DAEMON RUN] Daemon started successfully, waiting for shutdown request 
+[05:48:40.890] [CONTROL SERVER] Listing 0 sessions 
+[05:48:40.892] [API MACHINE] Connected to server 
+[05:48:40.893] [API MACHINE] Keep-alive started (20s interval) 
+[05:48:40.899] [API MACHINE] Received external daemon state update 
+[05:48:40.900] [API MACHINE] Daemon state updated successfully 

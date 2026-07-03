@@ -29,6 +29,32 @@ describe('PiSessionProtocolMapper', () => {
     expect(end[0].turn).toBe(end[1].turn);
   });
 
+  it('can flush live text before agent_end without ending the turn', () => {
+    const mapper = new PiSessionProtocolMapper();
+
+    expect(mapper.mapEvent(event({ type: 'agent_start' })).map((envelope) => envelope.ev.t)).toEqual(['turn-start']);
+    expect(mapper.mapEvent(event({
+      type: 'message_update',
+      assistantMessageEvent: { type: 'text_delta', delta: '后续' },
+    }))).toEqual([]);
+    expect(mapper.hasPendingText()).toBe(true);
+
+    const liveFlush = mapper.flushPendingText();
+    expect(liveFlush.map((envelope) => envelope.ev.t)).toEqual(['text']);
+    expect(liveFlush[0]).toMatchObject({ role: 'agent', ev: { t: 'text', text: '后续' } });
+    expect(mapper.hasPendingText()).toBe(false);
+
+    mapper.mapEvent(event({
+      type: 'message_update',
+      assistantMessageEvent: { type: 'text_delta', delta: '文本' },
+    }));
+    const end = mapper.mapEvent(event({ type: 'agent_end' }));
+    expect(end.map((envelope) => envelope.ev.t)).toEqual(['text', 'turn-end']);
+    expect(end[0]).toMatchObject({ role: 'agent', ev: { t: 'text', text: '文本' } });
+    expect(end[0].turn).toBe(liveFlush[0].turn);
+    expect(end[1].turn).toBe(liveFlush[0].turn);
+  });
+
   it('flushes text before tool envelopes and never emits ACP messages', () => {
     const mapper = new PiSessionProtocolMapper();
     mapper.mapEvent(event({ type: 'agent_start' }));

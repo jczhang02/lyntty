@@ -114,6 +114,14 @@ export class PiSessionProtocolMapper {
     return envelopes;
   }
 
+  hasPendingText(): boolean {
+    return !!this.pendingText && !!this.pendingType;
+  }
+
+  flushPendingText(): SessionEnvelope[] {
+    return this.flush();
+  }
+
   startTurn(): SessionEnvelope[] {
     return this.ensureTurn();
   }
