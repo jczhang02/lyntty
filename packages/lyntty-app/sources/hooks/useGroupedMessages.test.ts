@@ -182,6 +182,38 @@ describe('useGroupedMessages', () => {
         expect(groups.some((group) => group.type === 'message' && group.message.id === 'pi-history-entry-1-tool-output')).toBe(false);
     });
 
+    it('hides current-session mirrored serialized Pi tool-output thinking text', () => {
+        const messages: Message[] = [
+            {
+                kind: 'agent-text',
+                id: 'agent-final',
+                localId: null,
+                createdAt: 3,
+                text: 'fixed in 746cfbe',
+            },
+            {
+                kind: 'agent-text',
+                id: 'mirror-tool-output-current-session',
+                localId: null,
+                createdAt: 2,
+                text: '{"content":[{"type":"text","text":"746cfbe gpg: Signature made\\nwarning: beads.role not configured"}],"details":{}}',
+                isThinking: true,
+            },
+            {
+                kind: 'user-text',
+                id: 'user',
+                localId: null,
+                createdAt: 1,
+                text: 'commit it',
+            },
+        ];
+
+        const groups = groupMessagesForDisplay(messages, false);
+
+        expect(groups).toHaveLength(2);
+        expect(groups.some((group) => group.type === 'message' && group.message.id === 'mirror-tool-output-current-session')).toBe(false);
+    });
+
     it('keeps the final agent message visible and collapses earlier agent work', () => {
         const messages: Message[] = [
             {
