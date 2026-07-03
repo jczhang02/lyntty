@@ -42,6 +42,8 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('pi.registerCommand("remote"');
       expect(source).toContain('/pi-extension/event');
       expect(source).toContain('127.0.0.1');
+      expect(source).toContain('RETRY_DELAY_MS');
+      expect(source).toContain('queuedPayloads');
     } finally {
       await rm(home, { recursive: true, force: true });
     }

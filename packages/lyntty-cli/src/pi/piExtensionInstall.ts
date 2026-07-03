@@ -8,11 +8,13 @@ import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const REQUEST_TIMEOUT_MS = 750;
-const MAX_QUEUED_SENDS = 200;
+const RETRY_DELAY_MS = 1_000;
+const MAX_QUEUED_SENDS = 1_000;
 let enabled = true;
 let lastStatus = "not connected";
-let queuedSends = 0;
-let sendQueue: Promise<unknown> = Promise.resolve();
+let draining = false;
+type QueuedPayload = { session: ReturnType<typeof sessionSnapshot>; event: Record<string, unknown>; timestamp: number; attempts?: number };
+const queuedPayloads: QueuedPayload[] = [];
 
 function lynttyHome(): string {
   return process.env.LYNTTY_HOME_DIR || join(homedir(), ".lyntty");
@@ -59,26 +61,65 @@ function sessionSnapshot(ctx: ExtensionContext) {
   };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    timer.unref?.();
+  });
+}
+
+function enqueuePayload(payload: QueuedPayload): void {
+  if (queuedPayloads.length >= MAX_QUEUED_SENDS) {
+    const removableIndex = queuedPayloads.findIndex((item) => item.event.type === "message_update");
+    if (removableIndex >= 0) {
+      queuedPayloads.splice(removableIndex, 1);
+    } else {
+      lastStatus = "lynttyd event queue full";
+      return;
+    }
+  }
+  queuedPayloads.push(payload);
+}
+
+function drainQueue(): void {
+  if (draining) return;
+  draining = true;
+  void (async () => {
+    try {
+      while (queuedPayloads.length > 0) {
+        const payload = queuedPayloads[0];
+        const ok = await postToDaemon("/pi-extension/event", payload);
+        if (!ok) {
+          payload.attempts = (payload.attempts || 0) + 1;
+          if (payload.attempts >= 5) {
+            queuedPayloads.shift();
+            lastStatus = "dropped event after repeated lynttyd failures";
+            continue;
+          }
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        queuedPayloads.shift();
+      }
+    } finally {
+      draining = false;
+      if (queuedPayloads.length > 0) {
+        drainQueue();
+      }
+    }
+  })();
+}
+
 function send(ctx: ExtensionContext, event: Record<string, unknown>): void {
   if (!enabled) return;
   const session = sessionSnapshot(ctx);
   if (!session.piSessionId) return;
-  if (queuedSends >= MAX_QUEUED_SENDS) {
-    lastStatus = "dropping events while lynttyd is slow";
-    return;
-  }
-  const payload = {
+  enqueuePayload({
     session,
     event,
     timestamp: Date.now(),
-  };
-  queuedSends += 1;
-  sendQueue = sendQueue
-    .then(() => postToDaemon("/pi-extension/event", payload))
-    .catch(() => postToDaemon("/pi-extension/event", payload))
-    .finally(() => {
-      queuedSends = Math.max(0, queuedSends - 1);
-    });
+  });
+  drainQueue();
 }
 
 export default function lynttyRemoteExtension(pi: ExtensionAPI) {

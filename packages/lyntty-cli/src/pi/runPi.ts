@@ -177,7 +177,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       totalMessages: page.totalMessages,
     };
   };
-  const externalMirror = startPiExternalMirror({
+  let externalMirror = startPiExternalMirror({
     sessionFile: piRuntime.session.sessionManager.getSessionFile(),
     initialEntries: piRuntime.session.sessionManager.getEntries(),
     session: () => session,
@@ -204,6 +204,13 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
 
   piRuntime.setRebindSession(async (nextSession) => {
     unsubscribe();
+    await externalMirror?.stop();
+    externalMirror = startPiExternalMirror({
+      sessionFile: nextSession.sessionManager.getSessionFile(),
+      initialEntries: nextSession.sessionManager.getEntries(),
+      session: () => session,
+      isManagedRuntimeActive: () => thinking || nextSession.isStreaming,
+    });
     await bindPiSessionExtensions(piRuntime, {
       onShutdown: () => shutdownRequested?.(),
       onError: (error) => logger.debug('[pi] Extension error', error),
@@ -310,7 +317,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       clearInterval(keepAlive);
       reconnectionHandle?.cancel();
       unsubscribe();
-      externalMirror?.stop();
+      void externalMirror?.stop();
       void piRuntime.dispose();
       session.sendSessionDeath();
       resolve();

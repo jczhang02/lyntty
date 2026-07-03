@@ -218,6 +218,43 @@ describe('discoverLocalPiSessions', () => {
     });
   });
 
+  it('orders missing-local registered sessions by relay update time', async () => {
+    await expect(discoverLocalPiSessionsPage({
+      scope: 'machine',
+      registeredSessions: [
+        { piSessionId: 'pi-missing-old', relaySessionId: 'relay-old', importedMessageCount: 1, updatedAt: new Date('2026-06-30T10:00:00Z') },
+        { piSessionId: 'pi-missing-new', relaySessionId: 'relay-new', importedMessageCount: 1, updatedAt: new Date('2026-06-30T13:10:00Z') },
+      ],
+      limit: 1,
+      now,
+      listSessions: async () => [],
+    })).resolves.toMatchObject({
+      records: [{ piSessionId: 'pi-missing-new' }],
+      total: 2,
+    });
+  });
+
+  it('emits registered relay sessions whose local Pi history is missing', async () => {
+    await expect(discoverLocalPiSessions({
+      scope: 'machine',
+      registeredSessions: [{
+        piSessionId: 'pi-missing',
+        relaySessionId: 'relay-1',
+        importedMessageCount: 42,
+        updatedAt: new Date('2026-06-30T13:10:00Z'),
+      }],
+      now,
+      listSessions: async () => [],
+    })).resolves.toMatchObject([
+      {
+        state: 'missing_local_history',
+        piSessionId: 'pi-missing',
+        relaySessionId: 'relay-1',
+        hasHistoryGap: true,
+      },
+    ]);
+  });
+
   it('supports machine-wide historical Pi discovery without a cwd', async () => {
     await expect(discoverLocalPiSessions({
       scope: 'machine',

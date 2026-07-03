@@ -74,7 +74,60 @@ export function choosePiSpawnDirectory(
   return expandHomeDirectory(directory, homeDir);
 }
 
-async function findPiSessionNearDirectory(sessionId: string, directory?: string): Promise<SessionInfo | undefined> {
+function firstSessionMessageText(entries: ReturnType<typeof readPiSessionEntries>): string | undefined {
+  for (const entry of entries) {
+    if (entry.type !== 'message') continue;
+    const message = entry.message as { content?: unknown } | undefined;
+    if (typeof message?.content === 'string') {
+      return message.content;
+    }
+    if (Array.isArray(message?.content)) {
+      const text = message.content
+        .map((part) => part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : '')
+        .filter(Boolean)
+        .join('\n');
+      if (text) return text;
+    }
+  }
+  return undefined;
+}
+
+async function readPiSessionInfoFromFile(sessionId: string, sessionFile?: string): Promise<SessionInfo | undefined> {
+  if (!sessionFile) return undefined;
+  try {
+    const content = await fs.readFile(sessionFile, 'utf8');
+    const header = JSON.parse(content.split('\n').find((line) => line.trim().length > 0) ?? '{}') as { type?: string; id?: string; cwd?: string; timestamp?: string };
+    if (header.type !== 'session' || header.id !== sessionId) {
+      return undefined;
+    }
+    const stat = await fs.stat(sessionFile);
+    const entries = readPiSessionEntries(sessionFile);
+    const sessionInfoEntries = entries
+      .filter((entry) => entry.type === 'session_info')
+      .map((entry) => entry as { name?: unknown });
+    const name = [...sessionInfoEntries].reverse().find((entry) => typeof entry.name === 'string')?.name as string | undefined;
+    return {
+      path: sessionFile,
+      id: sessionId,
+      cwd: header.cwd ?? os.homedir(),
+      created: header.timestamp ? new Date(header.timestamp) : stat.birthtime,
+      modified: stat.mtime,
+      messageCount: entries.filter((entry) => entry.type === 'message').length,
+      firstMessage: firstSessionMessageText(entries) ?? '',
+      allMessagesText: '',
+      name,
+    } satisfies SessionInfo;
+  } catch (error) {
+    logger.debug(`[DAEMON RUN] Failed exact Pi session file lookup for ${sessionFile}: ${error instanceof Error ? error.message : error}`);
+    return undefined;
+  }
+}
+
+async function findPiSessionNearDirectory(sessionId: string, directory?: string, sessionFile?: string): Promise<SessionInfo | undefined> {
+  const exact = await readPiSessionInfoFromFile(sessionId, sessionFile);
+  if (exact) {
+    return exact;
+  }
   const expandedDirectory = directory ? expandHomeDirectory(directory) : undefined;
   if (expandedDirectory) {
     try {
@@ -742,7 +795,7 @@ export async function startDaemon(): Promise<void> {
         return [{
           piSessionId: metadata.piSessionId,
           relaySessionId: tracked.lynttySessionId,
-          importedMessageCount: 0,
+          importedMessageCount: metadata.piHistoryTotalMessages ?? metadata.piMessageCount ?? 0,
           relayAvailable: !!tracked.lynttySessionId,
           updatedAt: tracked.lynttySessionId ? new Date() : undefined,
         }];
@@ -904,6 +957,19 @@ export async function startDaemon(): Promise<void> {
 
     let onPiExtensionEventHandler: ((payload: LynttyPiExtensionPayload) => Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }>) | null = null;
     const pendingPiExtensionEvents: LynttyPiExtensionPayload[] = [];
+    const MAX_PENDING_PI_EXTENSION_EVENTS = 1_000;
+    let piExtensionEventChain: Promise<unknown> = Promise.resolve();
+
+    const enqueuePiExtensionEvent = (payload: LynttyPiExtensionPayload): Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }> => {
+      const task = piExtensionEventChain.then(async () => {
+        if (!onPiExtensionEventHandler) {
+          return { status: 'error' as const, error: 'Pi extension event handler is not ready' };
+        }
+        return onPiExtensionEventHandler(payload);
+      });
+      piExtensionEventChain = task.catch(() => undefined);
+      return task;
+    };
 
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
@@ -914,12 +980,12 @@ export async function startDaemon(): Promise<void> {
       onLynttySessionWebhook,
       onPiExtensionEvent: async (payload) => {
         if (onPiExtensionEventHandler) {
-          return onPiExtensionEventHandler(payload);
+          return enqueuePiExtensionEvent(payload);
+        }
+        if (pendingPiExtensionEvents.length >= MAX_PENDING_PI_EXTENSION_EVENTS) {
+          return { status: 'error' as const, error: 'Pi extension event queue is full; retry later' };
         }
         pendingPiExtensionEvents.push(payload);
-        if (pendingPiExtensionEvents.length > 100) {
-          pendingPiExtensionEvents.shift();
-        }
         return { status: 'ok' as const };
       },
     });
@@ -972,8 +1038,11 @@ export async function startDaemon(): Promise<void> {
 
     type ExternalPiMirrorState = {
       sessionId: string;
-      stop: () => void;
+      stop: () => void | Promise<void>;
       markCurrentEntriesKnown: () => void;
+      markCurrentEntriesDelivered: () => void;
+      markCurrentEntriesDeliveredSince: (cutoffTimeMs: number) => void;
+      extensionCoveredSince: number | null;
       sessionClient: ApiSessionClient;
       mapper: PiSessionProtocolMapper;
       lastExtensionSeenAt: number;
@@ -982,7 +1051,7 @@ export async function startDaemon(): Promise<void> {
     const externalPiMirrors = new Map<string, ExternalPiMirrorState>();
     const externalPiMirrorStarts = new Map<string, Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }>>();
 
-    const ensurePiSessionMirror = async (options: { piSessionId: string; directory?: string; machineId?: string }): Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }> => {
+    const ensurePiSessionMirror = async (options: { piSessionId: string; directory?: string; machineId?: string; sessionFile?: string }): Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }> => {
       const piSessionId = options.piSessionId;
       const mirrorKey = `${options.machineId ?? machine.id}:${piSessionId}`;
       const existing = externalPiMirrors.get(mirrorKey);
@@ -995,7 +1064,7 @@ export async function startDaemon(): Promise<void> {
       }
 
       const startPromise = (async () => {
-      const local = await findPiSessionNearDirectory(piSessionId, options.directory);
+      const local = await findPiSessionNearDirectory(piSessionId, options.directory, options.sessionFile);
       if (!local) {
         return { type: 'error' as const, errorMessage: `Pi session ${piSessionId} was not found on this node` };
       }
@@ -1088,6 +1157,9 @@ export async function startDaemon(): Promise<void> {
           sessionId: response.id,
           stop: mirror.stop,
           markCurrentEntriesKnown: mirror.markCurrentEntriesKnown,
+          markCurrentEntriesDelivered: mirror.markCurrentEntriesDelivered,
+          markCurrentEntriesDeliveredSince: mirror.markCurrentEntriesDeliveredSince,
+          extensionCoveredSince: null,
           sessionClient,
           mapper: new PiSessionProtocolMapper(),
           lastExtensionSeenAt: 0,
@@ -1111,6 +1183,7 @@ export async function startDaemon(): Promise<void> {
         piSessionId: session.piSessionId,
         directory: session.cwd,
         machineId: machine.id,
+        sessionFile: session.sessionFile,
       });
       if (result.type === 'error') {
         return { status: 'error' as const, error: result.errorMessage };
@@ -1122,8 +1195,26 @@ export async function startDaemon(): Promise<void> {
         return { status: 'ok' as const, sessionId: result.sessionId };
       }
 
+      const eventTime = typeof payload.timestamp === 'number' ? payload.timestamp : Date.now();
       mirror.lastExtensionSeenAt = Date.now();
-      mirror.markCurrentEntriesKnown();
+      if (mirror.extensionCoveredSince === null || event.type === 'session_start') {
+        mirror.extensionCoveredSince = eventTime;
+      }
+      const markDeliveredAgain = () => {
+        const cutoff = mirror.extensionCoveredSince ?? eventTime;
+        try {
+          mirror.markCurrentEntriesDeliveredSince(cutoff);
+        } catch (error) {
+          logger.debug('[pi] Failed to mark Pi extension-delivered entries', error);
+        }
+        setTimeout(() => {
+          try {
+            mirror.markCurrentEntriesDeliveredSince(cutoff);
+          } catch (error) {
+            logger.debug('[pi] Failed delayed Pi extension-delivered mark', error);
+          }
+        }, 2_500).unref?.();
+      };
 
       if (event.type === 'session_start' || event.type === 'session_info_changed') {
         mirror.sessionClient.updateMetadata((currentMetadata) => ({
@@ -1137,11 +1228,13 @@ export async function startDaemon(): Promise<void> {
       }
 
       if (isLifecyclePiExtensionEvent(event)) {
+        markDeliveredAgain();
         return { status: 'ok' as const, sessionId: result.sessionId };
       }
 
       const agentEvent = toPiAgentSessionEvent(event);
       if (!agentEvent) {
+        markDeliveredAgain();
         return { status: 'ok' as const, sessionId: result.sessionId };
       }
 
@@ -1152,11 +1245,12 @@ export async function startDaemon(): Promise<void> {
       if (envelopes.length > 0) {
         await mirror.sessionClient.flush();
       }
+      markDeliveredAgain();
       return { status: 'ok' as const, sessionId: result.sessionId };
     };
 
     for (const payload of pendingPiExtensionEvents.splice(0)) {
-      void onPiExtensionEventHandler(payload).catch((error) => {
+      void enqueuePiExtensionEvent(payload).catch((error) => {
         logger.debug('[pi] Failed to process queued Pi extension event', error);
       });
     }
@@ -1230,9 +1324,7 @@ export async function startDaemon(): Promise<void> {
         // `lyntty daemon start` reads our still-present daemon.state.json, sees
         // isDaemonRunningCurrentlyInstalledLynttyVersion() === true, and exits —
         // leaving nothing running once we also exit.
-        for (const mirror of externalPiMirrors.values()) {
-          mirror.stop();
-        }
+        await Promise.all([...externalPiMirrors.values()].map((mirror) => mirror.stop()));
         externalPiMirrors.clear();
         apiMachine.shutdown();
         await stopControlServer();
@@ -1303,9 +1395,7 @@ export async function startDaemon(): Promise<void> {
       await new Promise(resolve => setTimeout(resolve, 100));
       await api.markMachineOffline(machine.id);
 
-      for (const mirror of externalPiMirrors.values()) {
-        mirror.stop();
-      }
+      await Promise.all([...externalPiMirrors.values()].map((mirror) => mirror.stop()));
       externalPiMirrors.clear();
       apiMachine.shutdown();
       await stopControlServer();

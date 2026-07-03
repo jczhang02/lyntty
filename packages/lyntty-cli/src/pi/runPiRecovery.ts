@@ -28,6 +28,7 @@ export interface PiSessionRecoveryRecord {
   name?: string;
   createdAt?: number;
   modifiedAt?: number;
+  registeredUpdatedAt?: number;
   firstMessage?: string;
   messageCount: number;
   needsRegistration: boolean;
@@ -90,6 +91,7 @@ export function classifyPiSessionRecovery(input: {
     name: truncateRelayText(input.local?.name),
     createdAt: input.local?.created.getTime(),
     modifiedAt: input.local?.modified.getTime(),
+    registeredUpdatedAt: input.registered?.updatedAt?.getTime(),
     firstMessage: truncateRelayText(input.local?.firstMessage),
     messageCount: localMessageCount,
   };
@@ -213,10 +215,18 @@ function compareSessionDiscoveryKeys(a: Omit<PiDiscoveryCursorV1, 'v'>, b: Omit<
   return modifiedDelta !== 0 ? modifiedDelta : a.id.localeCompare(b.id);
 }
 
-function encodeDiscoveryCursor(session: SessionInfo, activePiIds: Set<string>): string {
+function recoveryRecordDiscoveryKey(record: PiSessionRecoveryRecord, activePiIds: Set<string>): Omit<PiDiscoveryCursorV1, 'v'> {
+  return {
+    active: activePiIds.has(record.piSessionId),
+    modified: record.modifiedAt ?? record.registeredUpdatedAt ?? record.createdAt ?? 0,
+    id: record.piSessionId,
+  };
+}
+
+function encodeDiscoveryKey(key: Omit<PiDiscoveryCursorV1, 'v'>): string {
   return Buffer.from(JSON.stringify({
     v: 1,
-    ...sessionDiscoveryKey(session, activePiIds),
+    ...key,
   } satisfies PiDiscoveryCursorV1), 'utf8').toString('base64url');
 }
 
@@ -263,25 +273,40 @@ export async function discoverLocalPiSessionsPage(options: DiscoverPiSessionsOpt
   const registeredByPiId = new Map((options.registeredSessions ?? []).map((entry) => [entry.piSessionId, entry]));
   const activePiIds = new Set(options.activePiSessionIds ?? []);
   const sessions = (await listPiSessionsForScope(options)).sort(compareSessionInfoByDiscoveryOrder(activePiIds));
-  const total = sessions.length;
+  const localPiIds = new Set(sessions.map((session) => session.id));
+  const missingLocalRecords = [...registeredByPiId.values()]
+    .filter((registered) => !localPiIds.has(registered.piSessionId))
+    .map((registered) => classifyPiSessionRecovery({
+      registered,
+      active: activePiIds.has(registered.piSessionId),
+      staleAfterMs: options.staleAfterMs,
+      now: options.now,
+    }));
   const decodedCursor = decodeDiscoveryCursor(options.cursor);
   const limit = resolvePageLimit(options.limit);
-  const candidateSessions = decodedCursor
-    ? sessions.filter((session) => compareSessionDiscoveryKeys(sessionDiscoveryKey(session, activePiIds), decodedCursor) > 0)
-    : sessions;
-  const pageSessions = limit === undefined ? candidateSessions : candidateSessions.slice(0, limit);
-  const hasMore = limit !== undefined && candidateSessions.length > pageSessions.length;
-  const lastSession = pageSessions.at(-1);
-
-  return {
-    records: pageSessions.map((local) => classifyPiSessionRecovery({
+  const records = [
+    ...sessions.map((local) => classifyPiSessionRecovery({
       local,
       registered: registeredByPiId.get(local.id),
       active: activePiIds.has(local.id),
       staleAfterMs: options.staleAfterMs,
       now: options.now,
     })),
-    nextCursor: hasMore && lastSession ? encodeDiscoveryCursor(lastSession, activePiIds) : undefined,
+    ...missingLocalRecords,
+  ].sort((a, b) => compareSessionDiscoveryKeys(recoveryRecordDiscoveryKey(a, activePiIds), recoveryRecordDiscoveryKey(b, activePiIds)));
+  const total = records.length;
+  const candidateRecords = decodedCursor
+    ? records.filter((record) => compareSessionDiscoveryKeys(recoveryRecordDiscoveryKey(record, activePiIds), decodedCursor) > 0)
+    : records;
+  const pageRecords = limit === undefined ? candidateRecords : candidateRecords.slice(0, limit);
+  const hasMore = limit !== undefined && candidateRecords.length > pageRecords.length;
+  const lastRecord = pageRecords.at(-1);
+
+  return {
+    records: pageRecords,
+    nextCursor: hasMore && lastRecord
+      ? encodeDiscoveryKey(recoveryRecordDiscoveryKey(lastRecord, activePiIds))
+      : undefined,
     total,
   };
 }

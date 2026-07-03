@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SessionEntry, SessionHeader } from '@earendil-works/pi-coding-agent';
 
-import { PiExternalMirror, startPiExternalMirror } from './runPiExternalMirror';
+import { PiExternalMirror, readPiSessionEntriesFromOffset, startPiExternalMirror } from './runPiExternalMirror';
 
 function writeJsonl(path: string, entries: Array<SessionHeader | SessionEntry>): void {
   writeFileSync(path, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
@@ -33,28 +33,68 @@ const userEntry = (id: string, text: string): SessionEntry => ({
   } as any,
 });
 
+const assistantEntry = (id: string, text: string): SessionEntry => ({
+  type: 'message',
+  id,
+  parentId: null,
+  timestamp: '2026-07-02T00:00:01.000Z',
+  message: {
+    role: 'assistant',
+    content: [{ type: 'text', text }],
+  } as any,
+});
+
 afterEach(() => {
   vi.useRealTimers();
 });
 
 describe('PiExternalMirror', () => {
-  it('mirrors new JSONL entries only after a quiet window', () => {
+  it('reads appended JSONL entries from a byte offset', () => {
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
       const file = join(dir, 'session.jsonl');
       const first = userEntry('u1', 'hello');
       writeJsonl(file, [header, first]);
-      const sent: SessionEntry[][] = [];
-      const mirror = new PiExternalMirror(file, [first], (entries) => sent.push(entries), 2_000);
-
+      const offset = Buffer.byteLength(`${JSON.stringify(header)}\n${JSON.stringify(first)}\n`);
       appendJsonl(file, userEntry('u2', 'external'));
-      mirror.tick(1_000);
-      expect(sent).toEqual([]);
 
-      mirror.tick(2_000);
-      expect(sent).toEqual([]);
+      const result = readPiSessionEntriesFromOffset(file, offset);
+      expect(result.entries.map((entry) => entry.id)).toEqual(['u2']);
+      expect(result.nextOffset).toBeGreaterThan(offset);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
-      mirror.tick(3_100);
+  it('does not advance the byte cursor past an incomplete JSONL line', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      writeJsonl(file, [header]);
+      const offset = Buffer.byteLength(`${JSON.stringify(header)}\n`);
+      appendFileSync(file, JSON.stringify(userEntry('u2', 'partial')));
+
+      const result = readPiSessionEntriesFromOffset(file, offset);
+      expect(result.entries).toEqual([]);
+      expect(result.nextOffset).toBe(offset);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('mirrors entries already on disk when initialEntries are stale', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first, userEntry('u2', 'startup race')]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      await mirror.tick(1_000);
+      await mirror.tick(3_100);
       expect(sent).toHaveLength(1);
       expect(sent[0].map((entry) => entry.id)).toEqual(['u2']);
     } finally {
@@ -62,19 +102,47 @@ describe('PiExternalMirror', () => {
     }
   });
 
-  it('preserves pending external entries when managed runtime becomes active before quiet', () => {
+  it('mirrors new JSONL entries only after a quiet window', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
       const file = join(dir, 'session.jsonl');
       const first = userEntry('u1', 'hello');
       writeJsonl(file, [header, first]);
       const sent: SessionEntry[][] = [];
-      const mirror = new PiExternalMirror(file, [first], (entries) => sent.push(entries), 2_000);
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
 
       appendJsonl(file, userEntry('u2', 'external'));
-      mirror.tick(1_000);
+      await mirror.tick(1_000);
+      expect(sent).toEqual([]);
+
+      await mirror.tick(2_000);
+      expect(sent).toEqual([]);
+
+      await mirror.tick(3_100);
+      expect(sent).toHaveLength(1);
+      expect(sent[0].map((entry) => entry.id)).toEqual(['u2']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves pending external entries when managed runtime becomes active before quiet', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      appendJsonl(file, userEntry('u2', 'external'));
+      await mirror.tick(1_000);
       mirror.markCurrentEntriesKnown();
-      mirror.tick(3_100);
+      await mirror.tick(3_100);
 
       expect(sent).toHaveLength(1);
       expect(sent[0].map((entry) => entry.id)).toEqual(['u2']);
@@ -119,18 +187,117 @@ describe('PiExternalMirror', () => {
     }
   });
 
-  it('can mark managed runtime writes as already known without emitting them', () => {
+  it('retries pending entries when sending fails', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
       const file = join(dir, 'session.jsonl');
       const first = userEntry('u1', 'hello');
       writeJsonl(file, [header, first]);
       const sent: SessionEntry[][] = [];
-      const mirror = new PiExternalMirror(file, [first], (entries) => sent.push(entries), 2_000);
+      let fail = true;
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        if (fail) {
+          fail = false;
+          throw new Error('relay unavailable');
+        }
+        sent.push(entries);
+      }, 2_000);
+
+      appendJsonl(file, userEntry('u2', 'external'));
+      await mirror.tick(1_000);
+      await expect(mirror.tick(3_100)).rejects.toThrow('relay unavailable');
+      expect(sent).toEqual([]);
+
+      await mirror.tick(3_200);
+      expect(sent).toHaveLength(1);
+      expect(sent[0].map((entry) => entry.id)).toEqual(['u2']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps pending entries older than the live extension coverage window', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      appendJsonl(file, userEntry('u2', 'before extension'));
+      await mirror.tick(1_000);
+      mirror.markCurrentEntriesDeliveredSince(Date.parse('2026-07-02T00:00:02.000Z'));
+      await mirror.tick(3_100);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0].map((entry) => entry.id)).toEqual(['u2']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps pending user entries because the live extension does not deliver user prompts', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      appendJsonl(file, userEntry('u2', 'computer typed prompt'));
+      await mirror.tick(1_000);
+      mirror.markCurrentEntriesDeliveredSince(Date.parse('2026-07-02T00:00:00.000Z'));
+      await mirror.tick(3_100);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0].map((entry) => entry.id)).toEqual(['u2']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('drops pending assistant entries that were already delivered by the live extension path', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      appendJsonl(file, assistantEntry('a2', 'live extension already sent this'));
+      await mirror.tick(1_000);
+      mirror.markCurrentEntriesDeliveredSince(Date.parse('2026-07-02T00:00:00.000Z'));
+      await mirror.tick(3_100);
+
+      expect(sent).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('can mark managed runtime writes as already known without emitting them', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
 
       appendJsonl(file, userEntry('u2', 'managed'));
       mirror.markCurrentEntriesKnown();
-      mirror.tick(5_000);
+      await mirror.tick(5_000);
 
       expect(sent).toEqual([]);
     } finally {
