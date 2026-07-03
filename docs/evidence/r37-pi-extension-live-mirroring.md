@@ -39,6 +39,8 @@ Changed files:
   - installs the Pi extension before `lyntty daemon start` / `start-sync`.
 - `packages/lyntty-cli/scripts/install-local.cjs`
   - local install now runs `lyntty remote install`.
+- `packages/lyntty-app/app.config.js`
+  - development builds disable Expo Updates so local release-style APK validation uses the embedded Lyntty bundle instead of a stale production OTA bundle.
 
 ## Verification
 
@@ -80,32 +82,59 @@ node packages/lyntty-cli/dist/index.mjs remote install
 
 Passed. Installed the current extension to `/home/jc/.pi/agent/extensions/lyntty/index.ts`; existing running Pi processes need `/reload` or restart to load it.
 
-## Additional live-smoke attempt
+## Release APK live-smoke
 
-After commit, the stack was restarted against the local relay on `127.0.0.1:3005` and a normal `pi` process was run directly, not through `lyntty pi`:
+A local development release-style APK was rebuilt with Expo Updates disabled for `APP_ENV=development` and the local relay URL embedded:
 
 ```bash
-node packages/lyntty-cli/dist/index.mjs daemon start
-pi -p --no-tools --name "lyntty plugin live LYNTTY_PLUGIN_LIVE_175209" \
-  "Reply exactly LYNTTY_PLUGIN_LIVE_175209"
+cd packages/lyntty-app/android
+EXPO_PUBLIC_LYNTTY_SERVER_URL=http://10.0.2.2:3005 APP_ENV=development \
+  CCACHE_DISABLE=1 CMAKE_C_COMPILER_LAUNCHER= CMAKE_CXX_COMPILER_LAUNCHER= \
+  ./gradlew :app:assembleRelease --no-daemon
+adb -s emulator-5554 install -r app/build/outputs/apk/release/app-release.apk
+adb -s emulator-5554 shell pm clear dev.jczhang.lyntty.dev
 ```
 
-The ordinary `pi` process replied with `LYNTTY_PLUGIN_LIVE_175209`. The restarted daemon log showed that the extension-created path reached relay session creation:
+Fresh APK validation then passed:
+
+```bash
+scripts/e2e/run-maestro.sh e2e/maestro/01_first_run.yml
+# Passed: first-run account creation
+
+node packages/lyntty-cli/dist/index.mjs auth login --force --method mobile
+adb shell am start -a android.intent.action.VIEW \
+  -c android.intent.category.BROWSABLE \
+  -d 'lyntty://terminal?<redacted-public-key>' dev.jczhang.lyntty.dev
+# Pair Node screen showed Lyntty-branded copy, Accept Connection succeeded.
+
+node packages/lyntty-cli/dist/index.mjs daemon start
+pi -p --no-tools --name "lyntty plugin apk LYNTTY_PLUGIN_APK_185431" \
+  "Reply exactly LYNTTY_PLUGIN_APK_185431"
+```
+
+The ordinary `pi` process replied with `LYNTTY_PLUGIN_APK_185431`. It was not launched through `lyntty pi`. The daemon log showed extension-driven deterministic relay creation:
 
 ```text
-Session created/loaded: cmr4r8ec400lfoven389y01wd (tag: pi:c8d4c0ec292091d2f105c61b2ecac3cb)
+Session created/loaded: cmr4tglbg06qxovenstvl3xvo (tag: pi:6a169eaaad5d1c49d22841d89ef8cbef)
 [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
 ```
 
-This validates ordinary `pi` -> extension -> local `lynttyd` -> deterministic relay session creation at daemon level.
+Phone evidence:
 
-Fresh phone/APK completion is still blocked in this run:
+- `docs/evidence/artifacts/r37-pi-extension-live-mirroring/release-live-home.xml`
+  - Sessions Home shows `lyntty plugin apk LYNTTY_PLUGIN_APK_185431` as a normal Pi session row.
+- `docs/evidence/artifacts/r37-pi-extension-live-mirroring/release-live-session.xml`
+  - Session Remote shows the current ordinary Pi session title and both `Reply exactly LYNTTY_PLUGIN_APK_185431` and assistant reply `LYNTTY_PLUGIN_APK_185431`.
+- `docs/evidence/artifacts/r37-pi-extension-live-mirroring/release-daemon-plugin-tail.log`
+  - Captures relay session creation and socket updates for the extension-mirrored session.
 
-- debug APK entered Expo Dev Launcher and then hit `Error loading app` / `Attempt to invoke interface method 'boolean java.util.Set.addAll(java.util.Collection)' on a null object reference` after attempting to load Metro;
-- the release/debug installed app state was inconsistent during validation after reinstall, so the phone-visible assertion for `LYNTTY_PLUGIN_LIVE_175209` was not completed;
-- terminal pairing succeeded once through the dev-client flow, but later runs were interrupted by Dev Launcher state.
+This validates the full path:
+
+```text
+ordinary pi -> global Lyntty Pi extension -> local lynttyd -> relay -> release APK Sessions Home/Session Remote
+```
 
 ## Remaining risk
 
-- Phone/APK proof for ordinary `pi` -> extension -> `lynttyd` -> relay -> mobile live visibility is still pending.
 - `/remote off` is process-local; durable global/project exclusion can be added later.
+- Physical device validation was not repeated; this run used emulator `emulator-5554` with release-style APK.

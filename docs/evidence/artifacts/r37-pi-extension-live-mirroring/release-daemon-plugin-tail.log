@@ -1,0 +1,56 @@
+[18:54:29.347] [ClaudeSettings] Successfully read Claude settings from /home/jc/.claude/settings.json 
+[18:54:29.347] [ClaudeSettings] includeCoAuthoredBy: undefined 
+[18:54:29.367] Starting lyntty CLI with args:  [ '/usr/bin/node', '/home/jc/dev/lyntty/packages/lyntty-cli/dist/index.mjs', 'daemon', 'start-sync' ]
+[18:54:29.377] [DAEMON RUN] Starting daemon process... 
+[18:54:29.378] In production, skipping message inspection 
+[18:54:29.378] [DAEMON CONTROL] Checking if daemon is running same version 
+[18:54:29.378] [DAEMON CONTROL] No daemon running, returning false 
+[18:54:29.378] [DAEMON RUN] Daemon version mismatch detected, restarting daemon with current CLI version 
+[18:54:29.378] No daemon state found 
+[18:54:29.379] [caffeinate] Not on macOS, skipping caffeinate 
+[18:54:29.379] [AUTH] Starting auth and machine setup... 
+[18:54:29.380] [AUTH] Using existing credentials 
+[18:54:29.381] [AUTH] Machine ID: f66b5865-64ca-4f06-8f89-ba8b432e280f 
+[18:54:29.381] [DAEMON RUN] Auth and machine setup complete 
+[18:54:29.382] [DAEMON RUN] Loaded 26 persisted sessions from disk 
+[18:54:29.410] [CONTROL SERVER] Started on port 42761 
+[18:54:29.411] [DAEMON RUN] Daemon state written 
+[18:54:29.437] [API] Machine f66b5865-64ca-4f06-8f89-ba8b432e280f registered/updated with server 
+[18:54:29.438] [DAEMON RUN] Machine registered: f66b5865-64ca-4f06-8f89-ba8b432e280f 
+[18:54:29.438] [API MACHINE] Connecting to ws://127.0.0.1:3005 
+[18:54:29.441] [DAEMON RUN] Daemon started successfully, waiting for shutdown request 
+[18:54:29.445] [CONTROL SERVER] Listing 0 sessions 
+[18:54:29.452] [API MACHINE] Connected to server 
+[18:54:29.454] [API MACHINE] Keep-alive started (20s interval) 
+[18:54:29.461] [API MACHINE] Received external daemon state update 
+[18:54:29.461] [API MACHINE] Daemon state updated successfully 
+[18:54:40.878] Session created/loaded: cmr4tglbg06qxovenstvl3xvo (tag: pi:6a169eaaad5d1c49d22841d89ef8cbef) 
+[18:54:40.898] Socket connected successfully 
+[18:54:40.902] In production, skipping message inspection 
+[18:54:40.902] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[18:54:40.918] In production, skipping message inspection 
+[18:54:40.919] [RPC] Calling handler { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions' }
+[18:54:40.920] In production, skipping message inspection 
+[18:54:40.921] In production, skipping message inspection 
+[18:54:40.921] In production, skipping message inspection 
+[18:54:40.938] In production, skipping message inspection 
+[18:54:40.956] In production, skipping message inspection 
+[18:54:40.956] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[18:54:41.046] In production, skipping message inspection 
+[18:54:41.046] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[18:54:41.063] In production, skipping message inspection 
+[18:54:41.063] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }
+[18:54:43.698] [RPC] Handler returned { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions', hasResult: true }
+[18:54:43.699] [RPC] Sending encrypted response { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions', responseLength: 105928 }
+[18:54:43.753] In production, skipping message inspection 
+[18:54:43.754] [RPC] Calling handler { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions' }
+[18:54:43.828] [RPC] Handler returned { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions', hasResult: true }
+[18:54:43.829] [RPC] Sending encrypted response { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions', responseLength: 106076 }
+[18:54:43.838] In production, skipping message inspection 
+[18:54:43.838] [RPC] Calling handler { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions' }
+[18:54:43.844] [RPC] Handler returned { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions', hasResult: true }
+[18:54:43.844] [RPC] Sending encrypted response { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions', responseLength: 80972 }
+[18:54:43.851] In production, skipping message inspection 
+[18:54:43.851] [RPC] Calling handler { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions' }
+[18:54:43.852] [RPC] Handler returned { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions', hasResult: true }
+[18:54:43.853] [RPC] Sending encrypted response { method: 'f66b5865-64ca-4f06-8f89-ba8b432e280f:list-pi-sessions', responseLength: 52332 }
