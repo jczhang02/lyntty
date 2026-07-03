@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty-api35" tests="1" failures="0" time="14.0">
+    <testcase id="Open plugin live session" name="Open plugin live session" classname="Open plugin live session" file="/tmp/r38-open-plugin.yml" time="14.0" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

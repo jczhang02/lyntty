@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty-api35" tests="1" failures="0" time="14.0">
+    <testcase id="Lyntty first run creates account" name="Lyntty first run creates account" classname="Lyntty first run creates account" file="/tmp/tmp.AE3Z3A8TGW/01_first_run.yml" time="14.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="core, onboarding"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>
