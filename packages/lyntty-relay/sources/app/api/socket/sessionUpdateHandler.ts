@@ -8,6 +8,17 @@ import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { Socket } from "socket.io";
 
+export function canAccessSession(connection: ClientConnection, sessionId: string): boolean {
+    if (connection.connectionType === 'session-scoped') {
+        return connection.sessionId === sessionId;
+    }
+    return connection.connectionType === 'user-scoped';
+}
+
+function rejectScopedSession(callback?: (response: any) => void) {
+    callback?.({ result: 'error', message: 'Session scope mismatch' });
+}
+
 export function sessionUpdateHandler(userId: string, socket: Socket, connection: ClientConnection) {
     const labels = getMetricsLabelsFromSocket(socket);
     socket.on('update-metadata', async (data: any, callback: (response: any) => void) => {
@@ -19,6 +30,10 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 if (callback) {
                     callback({ result: 'error' });
                 }
+                return;
+            }
+            if (!canAccessSession(connection, sid)) {
+                rejectScopedSession(callback);
                 return;
             }
 
@@ -81,6 +96,10 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 if (callback) {
                     callback({ result: 'error' });
                 }
+                return;
+            }
+            if (!canAccessSession(connection, sid)) {
+                rejectScopedSession(callback);
                 return;
             }
 
@@ -161,6 +180,9 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
             }
 
             const { sid, thinking } = data;
+            if (!canAccessSession(connection, sid)) {
+                return;
+            }
 
             // Check session validity using cache
             const isValid = await activityCache.isSessionValid(sid, userId);
@@ -201,6 +223,9 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 }
                 if (typeof localId === 'string' && localId.length > MAX_SOCKET_MESSAGE_LOCAL_ID_LENGTH) {
                     log({ module: 'websocket', level: 'warn' }, `Rejected socket message with oversized localId: sessionId=${sid}, localIdLength=${localId.length}`);
+                    return;
+                }
+                if (!canAccessSession(connection, sid)) {
                     return;
                 }
 
@@ -273,6 +298,9 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                 t = Date.now();
             }
             if (t < Date.now() - 1000 * 60 * 10) { // Ignore if time is in the past 10 minutes
+                return;
+            }
+            if (!canAccessSession(connection, sid)) {
                 return;
             }
 

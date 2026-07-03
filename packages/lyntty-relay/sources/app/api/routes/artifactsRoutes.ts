@@ -274,6 +274,9 @@ export function artifactsRoutes(app: Fastify) {
                 404: z.object({
                     error: z.literal('Artifact not found')
                 }),
+                400: z.object({
+                    error: z.string()
+                }),
                 500: z.object({
                     error: z.literal('Failed to update artifact')
                 })
@@ -285,6 +288,16 @@ export function artifactsRoutes(app: Fastify) {
         const { header, expectedHeaderVersion, body, expectedBodyVersion } = request.body;
 
         try {
+            const headerPairValid = header !== undefined && expectedHeaderVersion !== undefined;
+            const bodyPairValid = body !== undefined && expectedBodyVersion !== undefined;
+            if ((header !== undefined) !== (expectedHeaderVersion !== undefined)
+                || (body !== undefined) !== (expectedBodyVersion !== undefined)) {
+                return reply.code(400).send({ error: 'Artifact updates require data and expected version together' });
+            }
+            if (!headerPairValid && !bodyPairValid) {
+                return reply.code(400).send({ error: 'Artifact update requires header or body' });
+            }
+
             // Get current artifact for version check
             const currentArtifact = await db.artifact.findFirst({
                 where: {
@@ -344,14 +357,41 @@ export function artifactsRoutes(app: Fastify) {
                 };
             }
 
-            // Increment seq
-            updateData.seq = currentArtifact.seq + 1;
+            // Increment seq atomically to avoid lost updates across disjoint header/body writes.
+            updateData.seq = { increment: 1 };
 
-            // Update artifact
-            await db.artifact.update({
-                where: { id },
+            const versionWhere = {
+                id,
+                accountId: userId,
+                ...(header !== undefined && expectedHeaderVersion !== undefined ? { headerVersion: expectedHeaderVersion } : {}),
+                ...(body !== undefined && expectedBodyVersion !== undefined ? { bodyVersion: expectedBodyVersion } : {})
+            };
+
+            // Update artifact atomically against the expected versions.
+            const updateResult = await db.artifact.updateMany({
+                where: versionWhere,
                 data: updateData
             });
+            if (updateResult.count === 0) {
+                const latest = await db.artifact.findFirst({
+                    where: { id, accountId: userId }
+                });
+                if (!latest) {
+                    return reply.code(404).send({ error: 'Artifact not found' });
+                }
+                return reply.send({
+                    success: false,
+                    error: 'version-mismatch',
+                    ...(header !== undefined && expectedHeaderVersion !== undefined && {
+                        currentHeaderVersion: latest.headerVersion,
+                        currentHeader: privacyKit.encodeBase64(latest.header)
+                    }),
+                    ...(body !== undefined && expectedBodyVersion !== undefined && {
+                        currentBodyVersion: latest.bodyVersion,
+                        currentBody: privacyKit.encodeBase64(latest.body)
+                    })
+                });
+            }
 
             // Emit update-artifact event
             const updSeq = await allocateUserSeq(userId);

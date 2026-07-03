@@ -161,7 +161,7 @@ export function artifactUpdateHandler(userId: string, socket: Socket) {
             // Build update data
             const updateData: any = {
                 updatedAt: new Date(),
-                seq: currentArtifact.seq + 1
+                seq: { increment: 1 }
             };
 
             let headerUpdate: { value: string; version: number } | undefined;

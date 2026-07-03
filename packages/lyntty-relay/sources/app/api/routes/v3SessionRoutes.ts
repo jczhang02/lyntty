@@ -2,6 +2,7 @@ import { buildNewMessageUpdate, eventRouter } from "@/app/events/eventRouter";
 import { db } from "@/storage/db";
 import { allocateSessionSeqBatch, allocateUserSeq } from "@/storage/seq";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { type Fastify } from "../types";
 
@@ -42,6 +43,10 @@ type SelectedMessage = {
     createdAt: Date;
     updatedAt: Date;
 };
+
+function isUniqueConstraintError(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
 
 function toResponseMessage(message: SelectedMessage) {
     return {
@@ -158,7 +163,7 @@ export function v3SessionRoutes(app: Fastify) {
         const uniqueMessages = Array.from(firstMessageByLocalId.values());
         const contentByLocalId = new Map(uniqueMessages.map((message) => [message.localId, message.content]));
 
-        const txResult = await db.$transaction(async (tx) => {
+        const createOrFetchMessages = async () => db.$transaction(async (tx) => {
             const localIds = uniqueMessages.map((message) => message.localId);
             const existing = await tx.sessionMessage.findMany({
                 where: {
@@ -216,6 +221,21 @@ export function v3SessionRoutes(app: Fastify) {
                 createdMessages
             };
         });
+
+        let txResult: { responseMessages: Omit<SelectedMessage, 'content'>[]; createdMessages: Omit<SelectedMessage, 'content'>[] } | null = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            try {
+                txResult = await createOrFetchMessages();
+                break;
+            } catch (error) {
+                if (!isUniqueConstraintError(error) || attempt === 2) {
+                    throw error;
+                }
+            }
+        }
+        if (!txResult) {
+            throw new Error('Failed to create messages');
+        }
 
         for (const message of txResult.createdMessages) {
             const content = message.localId ? contentByLocalId.get(message.localId) : null;

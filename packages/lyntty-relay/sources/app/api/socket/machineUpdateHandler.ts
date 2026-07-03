@@ -6,8 +6,21 @@ import { db } from "@/storage/db";
 import { Socket } from "socket.io";
 import { allocateUserSeq } from "@/storage/seq";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
+import type { ClientConnection } from "@/app/events/eventRouter";
 
-export function machineUpdateHandler(userId: string, socket: Socket) {
+export function canAccessMachine(connection: ClientConnection, machineId: string): boolean {
+    return connection.connectionType === 'machine-scoped' && connection.machineId === machineId;
+}
+
+export function canUpdateMachineMetadata(connection: ClientConnection, machineId: string): boolean {
+    return connection.connectionType === 'user-scoped' || canAccessMachine(connection, machineId);
+}
+
+function rejectScopedMachine(callback?: (response: any) => void) {
+    callback?.({ result: 'error', message: 'Machine scope mismatch' });
+}
+
+export function machineUpdateHandler(userId: string, socket: Socket, connection: ClientConnection) {
     const labels = getMetricsLabelsFromSocket(socket);
 
     socket.on('machine-alive', async (data: {
@@ -21,6 +34,9 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
 
             // Basic validation
             if (!data || typeof data.time !== 'number' || !data.machineId) {
+                return;
+            }
+            if (!canAccessMachine(connection, data.machineId)) {
                 return;
             }
 
@@ -62,6 +78,10 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 if (callback) {
                     callback({ result: 'error', message: 'Invalid parameters' });
                 }
+                return;
+            }
+            if (!canUpdateMachineMetadata(connection, machineId)) {
+                rejectScopedMachine(callback);
                 return;
             }
 
@@ -156,6 +176,10 @@ export function machineUpdateHandler(userId: string, socket: Socket) {
                 if (callback) {
                     callback({ result: 'error', message: 'Invalid parameters' });
                 }
+                return;
+            }
+            if (!canAccessMachine(connection, machineId)) {
+                rejectScopedMachine(callback);
                 return;
             }
 

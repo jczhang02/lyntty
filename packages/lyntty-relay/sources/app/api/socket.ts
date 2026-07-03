@@ -119,6 +119,30 @@ export function startSocket(app: Fastify) {
             return;
         }
 
+        if (effectiveClientType === 'session-scoped' && sessionId) {
+            const session = await db.session.findFirst({
+                where: { id: sessionId, accountId: verified.userId },
+                select: { id: true }
+            });
+            if (!session) {
+                log({ module: 'websocket' }, `Session-scoped client requested invalid session`);
+                next(new Error('Session scope rejected'));
+                return;
+            }
+        }
+
+        if (effectiveClientType === 'machine-scoped' && machineId) {
+            const machine = await db.machine.findFirst({
+                where: { id: machineId, accountId: verified.userId },
+                select: { id: true }
+            });
+            if (!machine) {
+                log({ module: 'websocket' }, `Machine-scoped client requested invalid machine`);
+                next(new Error('Machine scope rejected'));
+                return;
+            }
+        }
+
         socket.data.userId = verified.userId;
         socket.data.clientType = clientType;
         socket.data.authExtras = verified.extras;
@@ -226,9 +250,9 @@ export function startSocket(app: Fastify) {
         usageHandler(userId, socket);
         sessionUpdateHandler(userId, socket, connection);
         pingHandler(socket);
-        machineUpdateHandler(userId, socket);
+        machineUpdateHandler(userId, socket, connection);
         artifactUpdateHandler(userId, socket);
-        accessKeyHandler(userId, socket);
+        accessKeyHandler(userId, socket, connection);
 
         // Ready
         log({ module: 'websocket' }, `User connected: ${userId}`);

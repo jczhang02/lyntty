@@ -156,11 +156,18 @@ export function authRoutes(app: Fastify) {
             log({ module: 'auth-response' }, `Recent auth requests in DB: ${JSON.stringify(allRequests.map(r => ({ id: r.id, publicKey: r.publicKey.substring(0, 20) + '...', hasResponse: !!r.response })))}`);
             return reply.code(404).send({ error: 'Request not found' });
         }
-        if (!authRequest.response) {
-            await db.terminalAuthRequest.update({
-                where: { id: authRequest.id },
-                data: { response: request.body.response, responseAccountId: request.userId }
-            });
+        const updateResult = await db.terminalAuthRequest.updateMany({
+            where: {
+                id: authRequest.id,
+                OR: [
+                    { response: null },
+                    { responseAccountId: request.userId }
+                ]
+            },
+            data: { response: request.body.response, responseAccountId: request.userId }
+        });
+        if (updateResult.count === 0) {
+            return reply.code(409).send({ error: 'Request already authorized' });
         }
         return reply.send({ success: true });
     });
@@ -232,11 +239,18 @@ export function authRoutes(app: Fastify) {
         if (!authRequest) {
             return reply.code(404).send({ error: 'Request not found' });
         }
-        if (!authRequest.response) {
-            await db.accountAuthRequest.update({
-                where: { id: authRequest.id },
-                data: { response: request.body.response, responseAccountId: request.userId }
-            });
+        const updateResult = await db.accountAuthRequest.updateMany({
+            where: {
+                id: authRequest.id,
+                OR: [
+                    { response: null },
+                    { responseAccountId: request.userId }
+                ]
+            },
+            data: { response: request.body.response, responseAccountId: request.userId }
+        });
+        if (updateResult.count === 0) {
+            return reply.code(409).send({ error: 'Request already authorized' });
         }
         return reply.send({ success: true });
     });

@@ -1,9 +1,19 @@
 import { Socket } from "socket.io";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
-import { eventRouter } from "@/app/events/eventRouter";
+import type { ClientConnection } from "@/app/events/eventRouter";
 
-export function accessKeyHandler(userId: string, socket: Socket) {
+export function canAccessKeyScope(connection: ClientConnection, sessionId: string, machineId: string): boolean {
+    if (connection.connectionType === 'session-scoped') {
+        return connection.sessionId === sessionId;
+    }
+    if (connection.connectionType === 'machine-scoped') {
+        return connection.machineId === machineId;
+    }
+    return true;
+}
+
+export function accessKeyHandler(userId: string, socket: Socket, connection: ClientConnection) {
     // Get access key via socket
     socket.on('access-key-get', async (data: { sessionId: string; machineId: string }, callback: (response: any) => void) => {
         try {
@@ -16,6 +26,10 @@ export function accessKeyHandler(userId: string, socket: Socket) {
                         error: 'Invalid parameters: sessionId and machineId are required'
                     });
                 }
+                return;
+            }
+            if (!canAccessKeyScope(connection, sessionId, machineId)) {
+                callback?.({ ok: false, error: 'Scope mismatch' });
                 return;
             }
 

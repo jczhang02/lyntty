@@ -37,7 +37,8 @@ export function connectRoutes(app: Fastify) {
                 (req as any).rawBody = bodyStr;
                 done(null, json);
             } catch (err: any) {
-                log({ module: 'content-parser', level: 'error' }, `JSON parse error on ${req.method} ${req.url}: ${err.message}, body: "${body}"`);
+                const bodyLength = typeof body === 'string' ? body.length : 0;
+                log({ module: 'content-parser', level: 'error' }, `JSON parse error on ${req.method} ${req.url}: ${err.message}, bodyLength=${bodyLength}`);
                 err.statusCode = 400;
                 done(err, undefined);
             }
