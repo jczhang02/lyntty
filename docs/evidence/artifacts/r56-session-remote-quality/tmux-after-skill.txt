@@ -1,0 +1,24 @@
+│                          │ ─────────────────────────────────────────────── │
+│         GPT-5.5          │ Recent sessions                                 │
+│       openai-codex       │ • lyntty (3m ago)                               │
+│                          │                                                 │
+╰──────────────────────────┴─────────────────────────────────────────────────╯
+
+
+ [skill] frontend-design-review (ctrl+o to expand)
+
+
+
+ say R56_SKILL_OK only
+
+
+ R56_SKILL_OK
+
+ TPS 49.1 tok/s · TTFT 2.9s · 4.2s · in 2.2K · out 29 · stall 1.1s×1 · $5.32/M
+
+────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+  GPT-5.5 | think:xhigh |  lyntty |  main ?1 |  0.8%/272k 󰁨 | (sub)
+  say R56_SKILL_OK only [skill:frontend-design-review]
+ MCP: 0/1 servers · 0/0 tools · 11/11 skills

@@ -1,0 +1,196 @@
+
+added 1 package, and audited 2 packages in 4s
+
+found 0 vulnerabilities
+
+added 1 package, and audited 3 packages in 3s
+
+found 0 vulnerabilities
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+
+added 192 packages, and audited 195 packages in 23s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 3 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (preinstall: echo 'preinstall: no-op')
+npm warn allow-scripts   koffi@2.16.2 (install: node src/cnoke/cnoke.js -P . -D src/koffi --prebuild)
+npm warn allow-scripts   protobufjs@7.6.5 (postinstall: node scripts/postinstall)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 196 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (postinstall: node -e "const fs=require('fs'),cp=require('child_process'),p=require('path');const cwd=process.cwd();const normalized=cwd.split(p.sep).join('/');if(!normalized.includes('/.pi/agent/extensions/'))process.exit(0);const s=p.resolve(cwd,'../../scripts/patch-vulnerable-deps.mjs');if(!fs.existsSync(s))process.exit(0);const r=cp.spawnSync(process.execPath,[s,'--target',cwd,'--quiet'],{stdio:'inherit'});process.exit(r.status||0)")
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 197 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 198 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 199 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 200 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 201 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 202 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 203 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 204 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 205 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 1 package, and audited 206 packages in 3s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 4 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+added 66 packages, and audited 272 packages in 15s
+
+80 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 5 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @google/genai@1.52.0 (install: (install scripts present))
+npm warn allow-scripts   koffi@2.16.2 (install: (install scripts present))
+npm warn allow-scripts   pi-rtk-optimizer@0.9.0 (install: (install scripts present))
+npm warn allow-scripts   protobufjs@7.6.5 (install: (install scripts present))
+npm warn allow-scripts   node-pty@1.1.0 (install: node scripts/prebuild.js || node-gyp rebuild; postinstall: node scripts/post-install.js)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+MCP: Failed to connect to paper: SSE error: Unable to connect. Is the computer able to access the url?
+[nowledge-mem] startup context context: Error: bundled Python not found at /usr/lib/Nowledge Mem/_up_/python-standalone/python/bin/python3
+[nowledge-mem] startup context working-memory: Error: bundled Python not found at /usr/lib/Nowledge Mem/_up_/python-standalone/python/bin/python3
+[nowledge-mem] startup context fallback: no Context Bundle or Working Memory available; using guidance only
+R56_KEYBOARD_SESSION
