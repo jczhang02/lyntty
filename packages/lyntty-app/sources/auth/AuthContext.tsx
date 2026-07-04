@@ -44,9 +44,11 @@ export function AuthProvider({ children, initialCredentials }: { children: React
         const newCredentials: AuthCredentials = { token, secret };
         const success = await TokenStorage.setCredentials(newCredentials);
         if (success) {
-            await syncCreate(newCredentials);
             setCredentials(newCredentials);
             setIsAuthenticated(true);
+            void syncCreate(newCredentials).catch((error) => {
+                console.error('Failed to initialize sync after login:', error);
+            });
         } else {
             throw new Error('Failed to save credentials');
         }

@@ -250,6 +250,8 @@ class Sync {
         this.machineDataKeys.clear();
         this.artifactDataKeys.clear();
         this.encryptionCache = new EncryptionCache();
+        this.pendingSettings = {};
+        savePendingSettings(this.pendingSettings);
         this.piSessionsFetchInFlight = null;
         this.clearBackgroundSendWatchdog();
         void this.cancelBackgroundSendTimeoutNotification();
