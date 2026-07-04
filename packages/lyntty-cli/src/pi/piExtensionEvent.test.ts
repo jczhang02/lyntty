@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { installLynttyPiExtension } from './piExtensionInstall';
-import { isLifecyclePiExtensionEvent, toPiAgentSessionEvent } from './piExtensionEvent';
+import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent } from './piExtensionEvent';
 
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -31,6 +31,16 @@ describe('Pi extension event bridge', () => {
     expect(isLifecyclePiExtensionEvent({ type: 'message_update' })).toBe(false);
   });
 
+  it('parses whitelisted remote Pi control commands without raw slash passthrough', () => {
+    expect(parseLynttyPiRemoteCommand('hello', { isStreaming: false })).toEqual({ type: 'send_user_message', text: 'hello' });
+    expect(parseLynttyPiRemoteCommand('hello', { isStreaming: true })).toEqual({ type: 'follow_up', text: 'hello' });
+    expect(parseLynttyPiRemoteCommand('/steer change direction', { isStreaming: true })).toEqual({ type: 'steer', text: 'change direction' });
+    expect(parseLynttyPiRemoteCommand('/compact keep recent work', { isStreaming: false })).toEqual({ type: 'compact', instructions: 'keep recent work' });
+    expect(parseLynttyPiRemoteCommand('/name New title', { isStreaming: false })).toEqual({ type: 'set_session_name', name: 'New title' });
+    expect(parseLynttyPiRemoteCommand('/unknown do thing', { isStreaming: false })).toBeNull();
+    expect(parseLynttyPiRemoteCommand('x'.repeat(50_001), { isStreaming: false })).toBeNull();
+  });
+
   it('installs a global Pi extension that defaults to local lynttyd sync', async () => {
     const home = await mkdtemp(join(tmpdir(), 'lyntty-pi-extension-'));
     try {
@@ -42,6 +52,12 @@ describe('Pi extension event bridge', () => {
       expect(second.changed).toBe(false);
       expect(source).toContain('pi.registerCommand("remote"');
       expect(source).toContain('/pi-extension/event');
+      expect(source).toContain('/pi-extension/commands');
+      expect(source).toContain('/pi-extension/command-ack');
+      expect(source).toContain('X-Lyntty-Extension-Token');
+      expect(source).toContain('deliveryToken');
+      expect(source).toContain('pi.sendUserMessage');
+      expect(source).toContain('deliverAs: "followUp"');
       expect(source).toContain('127.0.0.1');
       expect(source).toContain('RETRY_DELAY_MS');
       expect(source).toContain('HEARTBEAT_MS');

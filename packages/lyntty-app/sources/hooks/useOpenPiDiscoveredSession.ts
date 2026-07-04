@@ -35,9 +35,9 @@ export function useOpenPiDiscoveredSession() {
             }
         };
 
-        const ensureMirror = async () => {
+        const ensureMirror = async (): Promise<boolean> => {
             if (!session.machineId || !session.piSessionId) {
-                return;
+                return false;
             }
             const mirrorResult = await machineEnsurePiSessionMirror({
                 machineId: session.machineId,
@@ -46,14 +46,20 @@ export function useOpenPiDiscoveredSession() {
             });
             if (mirrorResult.type === 'success') {
                 await attachRelaySession(mirrorResult.sessionId);
+                return true;
             }
+            return false;
         };
 
         if (shouldOpenImmediately) {
             navigateToSession(session.id);
             void ensureMirror();
+            return;
         } else if (session.piSynthetic) {
-            await ensureMirror();
+            const attached = await ensureMirror();
+            if (attached) {
+                return;
+            }
         }
 
         const result = await machineSpawnNewSession(request);

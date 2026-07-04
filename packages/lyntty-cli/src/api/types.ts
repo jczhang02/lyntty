@@ -327,6 +327,10 @@ export type Metadata = {
   // Lifecycle state management
   lifecycleState?: 'running' | 'archiveRequested' | 'archived' | string,
   lifecycleStateSince?: number,
+  runtimeOwner?: 'pi-extension' | 'lyntty-sdk' | 'none' | string,
+  controlState?: 'ready' | 'queued' | 'waiting_extension' | 'takeover_required' | 'missing_local_history' | 'computer_offline' | string,
+  sharedControlEnabled?: boolean,
+  remoteCommandAcceptedLocalKeys?: string[],
   archivedBy?: string,
   archiveReason?: string,
   flavor?: string

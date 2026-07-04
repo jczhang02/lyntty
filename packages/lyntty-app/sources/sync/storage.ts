@@ -54,6 +54,21 @@ function isSessionActive(session: { active: boolean; activeAt: number }): boolea
     return session.active;
 }
 
+function normalizePiSharedControlSession<T extends Omit<Session, 'presence'> & { presence?: "online" | number }>(session: T): T {
+    if (session.metadata?.lifecycleState !== 'external_pi') {
+        return session;
+    }
+    return {
+        ...session,
+        metadata: {
+            ...session.metadata,
+            lifecycleState: 'running',
+            runtimeOwner: 'pi-extension',
+            controlState: session.active ? 'ready' : 'waiting_extension',
+        },
+    };
+}
+
 // Known entitlement IDs
 export type KnownEntitlements = 'pro';
 
@@ -422,7 +437,8 @@ export const storage = create<StorageState>()((set, get) => {
             const mergedSessions: Record<string, Session> = options?.replace === true ? {} : { ...state.sessions };
 
             // Update sessions with calculated presence using centralized resolver
-            sessions.forEach(session => {
+            sessions.forEach(rawSession => {
+                const session = normalizePiSharedControlSession(rawSession);
                 // Use centralized resolver for consistent state management
                 const presence = resolveSessionOnlineState(session);
 

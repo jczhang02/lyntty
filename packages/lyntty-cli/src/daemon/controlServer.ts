@@ -11,7 +11,7 @@ import { Metadata } from '@/api/types';
 import { decodeBase64 } from '@/api/encryption';
 import { TrackedSession, SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
-import type { LynttyPiExtensionPayload } from '@/pi/piExtensionEvent';
+import type { LynttyPiExtensionPayload, LynttyPiRemoteCommandAck, LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
 
 export function startDaemonControlServer({
   getChildren,
@@ -20,6 +20,9 @@ export function startDaemonControlServer({
   requestShutdown,
   onLynttySessionWebhook,
   onPiExtensionEvent,
+  pollPiExtensionCommands,
+  onPiExtensionCommandAck,
+  piExtensionToken,
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
@@ -27,6 +30,9 @@ export function startDaemonControlServer({
   requestShutdown: () => void;
   onLynttySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
   onPiExtensionEvent?: (payload: LynttyPiExtensionPayload) => Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }>;
+  pollPiExtensionCommands?: (session: LynttyPiExtensionPayload['session'], afterSeq: number) => Promise<{ status: 'ok'; commands: LynttyPiRemoteCommandEnvelope[] } | { status: 'error'; error: string }>;
+  onPiExtensionCommandAck?: (session: LynttyPiExtensionPayload['session'], ack: LynttyPiRemoteCommandAck) => Promise<{ status: 'ok' } | { status: 'error'; error: string }>;
+  piExtensionToken?: string;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
   return new Promise((resolve) => {
     const app = fastify({
@@ -37,6 +43,15 @@ export function startDaemonControlServer({
     app.setValidatorCompiler(validatorCompiler);
     app.setSerializerCompiler(serializerCompiler);
     const typed = app.withTypeProvider<ZodTypeProvider>();
+
+    const requirePiExtensionAuth = (request: { headers: Record<string, string | string[] | undefined> }, reply: { code: (statusCode: 401) => unknown }): boolean => {
+      if (!piExtensionToken) return true;
+      const raw = request.headers['x-lyntty-extension-token'];
+      const token = Array.isArray(raw) ? raw[0] : raw;
+      if (token === piExtensionToken) return true;
+      reply.code(401);
+      return false;
+    };
 
     // Session reports itself after creation
     typed.post('/session-started', {
@@ -79,38 +94,129 @@ export function startDaemonControlServer({
       return { status: 'ok' as const };
     });
 
+    const PI_EXTENSION_ID_MAX = 512;
+    const PI_EXTENSION_TEXT_MAX = 50_000;
     const PiExtensionPayloadSchema = z.object({
       session: z.object({
-        piSessionId: z.string(),
-        sessionFile: z.string().optional(),
-        cwd: z.string().optional(),
-        name: z.string().optional(),
+        piSessionId: z.string().min(1).max(PI_EXTENSION_ID_MAX),
+        sessionFile: z.string().max(4096).optional(),
+        cwd: z.string().max(4096).optional(),
+        name: z.string().max(512).optional(),
       }),
       event: z.record(z.string(), z.unknown()),
       eventId: z.number().int().positive().optional(),
       timestamp: z.number().optional(),
     });
 
+    const PiExtensionSessionSchema = z.object({
+      piSessionId: z.string().min(1).max(PI_EXTENSION_ID_MAX),
+      sessionFile: z.string().max(4096).optional(),
+      cwd: z.string().max(4096).optional(),
+      name: z.string().max(512).optional(),
+    });
+
+    const PiRemoteCommandSchema = z.discriminatedUnion('type', [
+      z.object({ type: z.literal('send_user_message'), text: z.string().min(1).max(PI_EXTENSION_TEXT_MAX) }),
+      z.object({ type: z.literal('follow_up'), text: z.string().min(1).max(PI_EXTENSION_TEXT_MAX) }),
+      z.object({ type: z.literal('steer'), text: z.string().min(1).max(PI_EXTENSION_TEXT_MAX) }),
+      z.object({ type: z.literal('abort') }),
+      z.object({ type: z.literal('compact'), instructions: z.string().max(PI_EXTENSION_TEXT_MAX).optional() }),
+      z.object({ type: z.literal('reload') }),
+      z.object({ type: z.literal('set_session_name'), name: z.string().min(1).max(512) }),
+      z.object({ type: z.literal('get_commands') }),
+      z.object({ type: z.literal('set_label'), entryId: z.string().min(1).max(PI_EXTENSION_ID_MAX), label: z.string().max(512).optional() }),
+    ]);
+
     typed.post('/pi-extension/status', {
       schema: {
         body: z.object({ session: z.any().optional() }).optional(),
-        response: { 200: z.object({ status: z.literal('ok') }) }
+        response: {
+          200: z.object({ status: z.literal('ok') }),
+          401: z.object({ status: z.literal('error'), error: z.string() }),
+        }
       }
-    }, async () => ({ status: 'ok' as const }));
+    }, async (request, reply) => {
+      if (!requirePiExtensionAuth(request, reply)) return { status: 'error' as const, error: 'unauthorized' };
+      return { status: 'ok' as const };
+    });
 
     typed.post('/pi-extension/event', {
       schema: {
         body: PiExtensionPayloadSchema,
         response: {
           200: z.object({ status: z.literal('ok'), sessionId: z.string().optional() }),
+          401: z.object({ status: z.literal('error'), error: z.string() }),
           500: z.object({ status: z.literal('error'), error: z.string() }),
         }
       }
     }, async (request, reply) => {
+      if (!requirePiExtensionAuth(request, reply)) {
+        return { status: 'error' as const, error: 'unauthorized' };
+      }
       if (!onPiExtensionEvent) {
         return { status: 'ok' as const };
       }
       const result = await onPiExtensionEvent(request.body);
+      if (result.status === 'error') {
+        reply.code(500);
+      }
+      return result;
+    });
+
+    typed.post('/pi-extension/commands', {
+      schema: {
+        body: z.object({
+          session: PiExtensionSessionSchema,
+          afterSeq: z.number().int().nonnegative().optional(),
+        }),
+        response: {
+          200: z.object({
+            status: z.literal('ok'),
+            commands: z.array(z.object({ seq: z.number().int().positive(), deliveryToken: z.string().min(1).max(256), command: PiRemoteCommandSchema })),
+          }),
+          401: z.object({ status: z.literal('error'), error: z.string() }),
+          500: z.object({ status: z.literal('error'), error: z.string() }),
+        }
+      }
+    }, async (request, reply) => {
+      if (!requirePiExtensionAuth(request, reply)) {
+        return { status: 'error' as const, error: 'unauthorized' };
+      }
+      if (!pollPiExtensionCommands) {
+        return { status: 'ok' as const, commands: [] };
+      }
+      const result = await pollPiExtensionCommands(request.body.session, request.body.afterSeq ?? 0);
+      if (result.status === 'error') {
+        reply.code(500);
+      }
+      return result;
+    });
+
+    typed.post('/pi-extension/command-ack', {
+      schema: {
+        body: z.object({
+          session: PiExtensionSessionSchema,
+          ack: z.object({
+            seq: z.number().int().positive(),
+            status: z.enum(['delivered_to_pi_extension', 'accepted_by_pi', 'failed']),
+            deliveryToken: z.string().min(1).max(256).optional(),
+            error: z.string().max(2048).optional(),
+          }),
+        }),
+        response: {
+          200: z.object({ status: z.literal('ok') }),
+          401: z.object({ status: z.literal('error'), error: z.string() }),
+          500: z.object({ status: z.literal('error'), error: z.string() }),
+        }
+      }
+    }, async (request, reply) => {
+      if (!requirePiExtensionAuth(request, reply)) {
+        return { status: 'error' as const, error: 'unauthorized' };
+      }
+      if (!onPiExtensionCommandAck) {
+        return { status: 'ok' as const };
+      }
+      const result = await onPiExtensionCommandAck(request.body.session, request.body.ack);
       if (result.status === 'error') {
         reply.code(500);
       }

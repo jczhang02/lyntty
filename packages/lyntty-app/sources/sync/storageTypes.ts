@@ -67,6 +67,10 @@ export const MetadataSchema = z.object({
     dangerouslySkipPermissions: z.boolean().nullish(), // Claude --dangerously-skip-permissions mode (or null when unknown)
     lifecycleState: z.string().optional(),
     lifecycleStateSince: z.number().optional(),
+    runtimeOwner: z.string().optional(),
+    controlState: z.string().optional(),
+    sharedControlEnabled: z.boolean().optional(),
+    remoteCommandAcceptedLocalKeys: z.array(z.string()).optional(),
     archivedBy: z.string().optional(),
     archiveReason: z.string().optional(),
     /**

@@ -325,7 +325,7 @@ export class ApiSessionClient extends EventEmitter {
                             ? (body as { content: { type: string } }).content.type
                             : 'unknown',
                     });
-                    this.routeIncomingMessage(body);
+                    this.routeIncomingMessage(body, data.body.message.localId ?? undefined);
                     this.lastSeq = messageSeq;
                 } else if (data.body.t === 'update-session') {
                     if (data.body.metadata && data.body.metadata.version > this.metadataVersion) {
@@ -548,13 +548,16 @@ export class ApiSessionClient extends EventEmitter {
         };
     }
 
-    private routeIncomingMessage(message: unknown) {
+    private routeIncomingMessage(message: unknown, relayLocalId?: string) {
         const userResult = UserMessageSchema.safeParse(message);
         if (userResult.success) {
+            const userMessage = relayLocalId && !userResult.data.localKey
+                ? { ...userResult.data, localKey: relayLocalId }
+                : userResult.data;
             if (this.pendingMessageCallback) {
-                this.pendingMessageCallback(userResult.data);
+                this.pendingMessageCallback(userMessage);
             } else {
-                this.pendingMessages.push(userResult.data);
+                this.pendingMessages.push(userMessage);
             }
             return;
         }
@@ -616,7 +619,7 @@ export class ApiSessionClient extends EventEmitter {
 
                 try {
                     const body = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(message.content.c));
-                    this.routeIncomingMessage(body);
+                    this.routeIncomingMessage(body, message.localId ?? undefined);
                 } catch (error) {
                     logger.debug('[API] Failed to decrypt fetched message', {
                         sessionId: this.sessionId,

@@ -19,6 +19,25 @@ function resolvePiSessionTitle(record: PiMachineSessionRecord): string {
     return record.name?.trim() || record.firstMessage?.trim() || record.piSessionId;
 }
 
+function resolvePiRuntimeOwner(record: PiMachineSessionRecord): string {
+    if (record.state === 'missing_local_history') return 'none';
+    if (record.state === 'active_runtime') return 'pi-extension';
+    return 'lyntty-sdk';
+}
+
+function resolvePiControlState(record: PiMachineSessionRecord): string {
+    switch (record.state) {
+        case 'active_runtime':
+            return 'ready';
+        case 'missing_local_history':
+            return 'missing_local_history';
+        case 'stale_local':
+            return 'computer_offline';
+        default:
+            return 'queued';
+    }
+}
+
 function buildPiMetadata(
     record: PiMachineSessionRecord,
     machine: Machine,
@@ -46,8 +65,10 @@ function buildPiMetadata(
             piHistoryTotalMessages: record.messageCount,
         } : {}),
         piSynthetic: synthetic,
-        lifecycleState: record.state,
+        lifecycleState: record.state === 'active_runtime' ? 'running' : record.state,
         lifecycleStateSince: resolvePiActivityTimestamp(record, Date.now()),
+        runtimeOwner: resolvePiRuntimeOwner(record),
+        controlState: resolvePiControlState(record),
     };
 }
 

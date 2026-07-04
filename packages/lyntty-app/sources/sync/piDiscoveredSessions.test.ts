@@ -95,6 +95,8 @@ describe('mergePiDiscoveredSessions', () => {
                 piHistoryHasMore: true,
                 piHistoryTotalMessages: 42,
                 piSynthetic: true,
+                runtimeOwner: 'lyntty-sdk',
+                controlState: 'queued',
             },
         });
     });
@@ -118,6 +120,9 @@ describe('mergePiDiscoveredSessions', () => {
                 piSessionId: 'pi-active',
                 piSynthetic: true,
                 piDiscoveryState: 'active_runtime',
+                lifecycleState: 'running',
+                runtimeOwner: 'pi-extension',
+                controlState: 'ready',
                 name: 'Active Pi',
             },
         });
@@ -164,6 +169,8 @@ describe('mergePiDiscoveredSessions', () => {
                 piSessionId: 'pi-registered',
                 piDiscoveryState: 'active_runtime',
                 piSynthetic: false,
+                runtimeOwner: 'pi-extension',
+                controlState: 'ready',
             },
         });
     });

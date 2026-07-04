@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import os from 'os';
 import * as tmp from 'tmp';
 import axios from 'axios';
+import { randomUUID } from 'node:crypto';
 
 import { ApiClient } from '@/api/api';
 import { ApiSessionClient } from '@/api/apiSession';
@@ -36,7 +37,7 @@ import { mapPiSessionHistoryPageToEnvelopes } from '@/pi/runPiHistory';
 import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalMirror';
 import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
 import { PiSessionProtocolMapper } from '@/pi/runPiSessionProtocol';
-import { isLifecyclePiExtensionEvent, toPiAgentSessionEvent, type LynttyPiExtensionPayload } from '@/pi/piExtensionEvent';
+import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -799,11 +800,102 @@ export async function startDaemon(): Promise<void> {
       pendingTextFlushTimer: ReturnType<typeof setTimeout> | null;
       lastExtensionEventId: number | null;
       extensionHasSeqGap: boolean;
+      isStreaming: boolean;
+      nextCommandSeq: number;
+      commands: Array<{
+        seq: number;
+        localKey: string;
+        command: LynttyPiRemoteCommand;
+        status: 'queued' | 'delivered_to_pi_extension' | 'accepted_by_pi' | 'failed';
+        deliveryToken: string;
+        error?: string;
+      }>;
+      seenCommandLocalKeys: Set<string>;
     };
+
+    let onPiExtensionEventHandler: ((payload: LynttyPiExtensionPayload) => Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }>) | null = null;
+    let pollPiExtensionCommandsHandler: ((session: LynttyPiExtensionPayload['session'], afterSeq: number) => Promise<{ status: 'ok'; commands: LynttyPiRemoteCommandEnvelope[] } | { status: 'error'; error: string }>) | null = null;
+    let onPiExtensionCommandAckHandler: ((session: LynttyPiExtensionPayload['session'], ack: LynttyPiRemoteCommandAck) => Promise<{ status: 'ok' } | { status: 'error'; error: string }>) | null = null;
 
     const externalPiMirrors = new Map<string, ExternalPiMirrorState>();
     const EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS = 1000 * 60 * 2;
     const PI_LIVE_TEXT_FLUSH_DELAY_MS = 750;
+    const MAX_REMOTE_PI_COMMANDS = 200;
+
+    const findExternalPiMirror = (session: { piSessionId: string }): ExternalPiMirrorState | undefined => {
+      return externalPiMirrors.get(`${machine.id}:${session.piSessionId}`);
+    };
+
+    const queueRemotePiCommand = (mirror: ExternalPiMirrorState, message: { localKey?: string; content: { text: string } }): void => {
+      const localKey = message.localKey ?? `remote:${mirror.nextCommandSeq}`;
+      if (mirror.seenCommandLocalKeys.has(localKey) || mirror.commands.some((entry) => entry.localKey === localKey)) return;
+      if (mirror.commands.length >= MAX_REMOTE_PI_COMMANDS) {
+        logger.debug('[pi] Dropping remote Pi command because the extension delivery queue is full', { sessionId: mirror.sessionId, localKey });
+        return;
+      }
+      const command = parseLynttyPiRemoteCommand(message.content.text, { isStreaming: mirror.isStreaming });
+      if (!command) {
+        logger.debug('[pi] Rejected unsupported remote Pi command', { sessionId: mirror.sessionId, localKey });
+        return;
+      }
+      mirror.commands.push({
+        seq: mirror.nextCommandSeq++,
+        localKey,
+        command,
+        status: 'queued',
+        deliveryToken: randomUUID(),
+      });
+      logger.debug('[pi] Queued remote Pi command for extension delivery', { sessionId: mirror.sessionId, localKey, type: command.type });
+    };
+
+    pollPiExtensionCommandsHandler = async (session, afterSeq) => {
+      const mirror = findExternalPiMirror(session);
+      if (!mirror) {
+        return { status: 'ok' as const, commands: [] };
+      }
+      const next = mirror.commands.find((entry) => entry.seq > afterSeq && entry.status === 'queued' && entry.command.type === 'abort')
+        ?? mirror.commands.find((entry) => entry.seq > afterSeq && entry.status === 'queued');
+      if (!next) {
+        return { status: 'ok' as const, commands: [] };
+      }
+      return { status: 'ok' as const, commands: [{ seq: next.seq, deliveryToken: next.deliveryToken, command: next.command }] };
+    };
+
+    onPiExtensionCommandAckHandler = async (session, ack) => {
+      const mirror = findExternalPiMirror(session);
+      if (!mirror) {
+        return { status: 'error' as const, error: 'Pi session is not registered with lynttyd' };
+      }
+      const command = mirror.commands.find((entry) => entry.seq === ack.seq);
+      if (!command) {
+        return { status: 'ok' as const };
+      }
+      if (command.status === 'queued' && ack.status === 'failed' && ack.deliveryToken !== command.deliveryToken) {
+        return { status: 'ok' as const };
+      }
+      if (command.status !== 'queued' || ack.deliveryToken !== command.deliveryToken) {
+        return { status: 'error' as const, error: 'Pi command ack does not match an issued delivery token' };
+      }
+      command.error = ack.error;
+      if (ack.status === 'accepted_by_pi') {
+        command.status = 'accepted_by_pi';
+        mirror.sessionClient.keepAlive(true, 'remote');
+        mirror.seenCommandLocalKeys.add(command.localKey);
+        const acceptedKeys = [...mirror.seenCommandLocalKeys].slice(-500);
+        mirror.sessionClient.updateMetadata((currentMetadata) => ({
+          ...currentMetadata,
+          sharedControlEnabled: true,
+          remoteCommandAcceptedLocalKeys: acceptedKeys,
+        }));
+      } else if (ack.status === 'failed') {
+        command.deliveryToken = randomUUID();
+        logger.debug('[pi] Remote Pi command failed in extension and remains queued for retry', { sessionId: mirror.sessionId, seq: command.seq });
+      }
+      while (mirror.commands.length > 0 && mirror.commands[0].status === 'accepted_by_pi') {
+        mirror.commands.shift();
+      }
+      return { status: 'ok' as const };
+    };
 
     const getRegisteredPiSessions = (): RegisteredPiSessionState[] => {
       const trackedRegistrations = [...pidToTrackedSession.values(), ...sessionIdToFinishedSession.values()].flatMap((tracked) => {
@@ -997,10 +1089,10 @@ export async function startDaemon(): Promise<void> {
       pidToTrackedSession.delete(pid);
     };
 
-    let onPiExtensionEventHandler: ((payload: LynttyPiExtensionPayload) => Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }>) | null = null;
     const pendingPiExtensionEvents: LynttyPiExtensionPayload[] = [];
     const MAX_PENDING_PI_EXTENSION_EVENTS = 1_000;
     let piExtensionEventChain: Promise<unknown> = Promise.resolve();
+    const piExtensionToken = randomUUID();
 
     const enqueuePiExtensionEvent = (payload: LynttyPiExtensionPayload): Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }> => {
       const task = piExtensionEventChain.then(async () => {
@@ -1030,12 +1122,26 @@ export async function startDaemon(): Promise<void> {
         pendingPiExtensionEvents.push(payload);
         return { status: 'ok' as const };
       },
+      pollPiExtensionCommands: async (session, afterSeq) => {
+        if (!pollPiExtensionCommandsHandler) {
+          return { status: 'ok' as const, commands: [] };
+        }
+        return pollPiExtensionCommandsHandler(session, afterSeq);
+      },
+      onPiExtensionCommandAck: async (session, ack) => {
+        if (!onPiExtensionCommandAckHandler) {
+          return { status: 'ok' as const };
+        }
+        return onPiExtensionCommandAckHandler(session, ack);
+      },
+      piExtensionToken,
     });
 
     // Write initial daemon state (no lock needed for state file)
     const fileState: DaemonLocallyPersistedState = {
       pid: process.pid,
       httpPort: controlPort,
+      piExtensionToken,
       startTime: new Date().toLocaleString(),
       startedWithCliVersion: packageJson.version,
       daemonLogPath: logger.logFilePath
@@ -1094,16 +1200,16 @@ export async function startDaemon(): Promise<void> {
 
       const startPromise = (async () => {
       const local = await findPiSessionNearDirectory(piSessionId, options.directory, options.sessionFile);
-      if (!local) {
+      if (!local && !options.sessionFile) {
         return { type: 'error' as const, errorMessage: `Pi session ${piSessionId} was not found on this node` };
       }
 
-      const sessionFile = local.path;
-      const entries = readPiSessionEntries(sessionFile);
+      const sessionFile = local?.path ?? options.sessionFile;
+      const entries = local ? readPiSessionEntries(local.path) : [];
       const page = mapPiSessionHistoryPageToEnvelopes(entries, { limit: 50 });
       const sessionTag = resolvePiRelaySessionTag(machine.id, piSessionId);
       const metadata: Metadata = {
-        path: local.cwd || options.directory || os.homedir(),
+        path: local?.cwd || options.directory || os.homedir(),
         host: initialMachineMetadata.host,
         version: packageJson.version,
         os: os.platform(),
@@ -1115,13 +1221,16 @@ export async function startDaemon(): Promise<void> {
         startedFromDaemon: true,
         hostPid: process.pid,
         startedBy: 'daemon',
-        lifecycleState: 'external_pi',
+        lifecycleState: 'running',
         lifecycleStateSince: Date.now(),
+        runtimeOwner: 'pi-extension',
+        controlState: 'ready',
+        sharedControlEnabled: true,
         flavor: 'pi',
         piSessionId,
-        name: local.name ?? local.firstMessage ?? piSessionId,
-        piMessageCount: local.messageCount,
-        piFirstMessage: local.firstMessage,
+        name: local?.name ?? local?.firstMessage ?? piSessionId,
+        piMessageCount: local?.messageCount ?? 0,
+        piFirstMessage: local?.firstMessage,
         piHistoryCursor: page.nextCursor,
         piHistoryHasMore: page.hasMore,
         piHistoryTotalMessages: page.totalMessages,
@@ -1136,6 +1245,9 @@ export async function startDaemon(): Promise<void> {
       }
 
       const sessionClient = new ApiSessionClient(credentials.token, response);
+      if (!response.metadata.sharedControlEnabled) {
+        sessionClient.skipExistingMessages();
+      }
       for (const envelope of page.envelopes) {
         sessionClient.sendSessionProtocolMessage(envelope);
       }
@@ -1148,6 +1260,15 @@ export async function startDaemon(): Promise<void> {
       }));
 
       sessionClient.rpcHandlerManager.registerHandler('pi-history-page', async (params: unknown) => {
+        if (!sessionFile) {
+          return {
+            type: 'success' as const,
+            sent: 0,
+            nextCursor: undefined,
+            hasMore: false,
+            totalMessages: 0,
+          };
+        }
         const record = params && typeof params === 'object' && !Array.isArray(params)
           ? params as Record<string, unknown>
           : {};
@@ -1211,8 +1332,15 @@ export async function startDaemon(): Promise<void> {
         pendingTextFlushTimer: null,
         lastExtensionEventId: null,
         extensionHasSeqGap: false,
+        isStreaming: false,
+        nextCommandSeq: 1,
+        commands: [],
+        seenCommandLocalKeys: new Set(response.metadata.remoteCommandAcceptedLocalKeys ?? []),
       };
         externalPiMirrors.set(mirrorKey, mirrorState);
+        sessionClient.onUserMessage((message) => {
+          queueRemotePiCommand(mirrorState!, message);
+        });
       }
 
       return { type: 'success' as const, sessionId: response.id, sent: page.envelopes.length };
@@ -1311,6 +1439,7 @@ export async function startDaemon(): Promise<void> {
       const eventTime = typeof payload.timestamp === 'number' ? payload.timestamp : Date.now();
       if (event.type === 'session_shutdown') {
         clearPendingTextFlush(mirror);
+        mirror.isStreaming = false;
         mirror.sessionClient.sendSessionDeath();
         await mirror.sessionClient.flush();
         externalPiMirrors.delete(mirrorKey);
@@ -1319,6 +1448,11 @@ export async function startDaemon(): Promise<void> {
       }
 
       mirror.lastExtensionSeenAt = Date.now();
+      if (event.type === 'agent_start') {
+        mirror.isStreaming = true;
+      } else if (event.type === 'agent_end') {
+        mirror.isStreaming = false;
+      }
       const isThinking = event.type === 'agent_start'
         || event.type === 'message_update'
         || event.type === 'tool_execution_start'
@@ -1332,8 +1466,11 @@ export async function startDaemon(): Promise<void> {
       if (event.type === 'session_start' || event.type === 'session_info_changed') {
         mirror.sessionClient.updateMetadata((currentMetadata) => ({
           ...currentMetadata,
-          lifecycleState: 'external_pi',
+          lifecycleState: 'running',
           lifecycleStateSince: Date.now(),
+          runtimeOwner: 'pi-extension',
+          controlState: 'ready',
+          sharedControlEnabled: true,
           name: session.name ?? currentMetadata.name,
           path: session.cwd ?? currentMetadata.path,
           piSessionId: session.piSessionId,
@@ -1482,6 +1619,7 @@ export async function startDaemon(): Promise<void> {
         const updatedState: DaemonLocallyPersistedState = {
           pid: process.pid,
           httpPort: controlPort,
+          piExtensionToken,
           startTime: fileState.startTime,
           startedWithCliVersion: packageJson.version,
           lastHeartbeat: new Date().toLocaleString(),
