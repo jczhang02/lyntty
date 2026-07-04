@@ -1602,6 +1602,26 @@ describe('Zod Transform - WOLOG Content Normalization', () => {
             }
         });
 
+        it('hides expanded skill markdown behind the original mobile skill command display text', () => {
+            const expanded = '<skill name="frontend-design-review" location="/tmp/SKILL.md">\n# Frontend design review\n</skill>\n\nsay R56_SKILL_OK only';
+            const normalized = normalizeRawMessage('db-skill-user-1', null, 1, {
+                role: 'session',
+                content: {
+                    id: 'env-skill-user-1',
+                    time: 1,
+                    role: 'user',
+                    ev: { t: 'text', text: expanded }
+                }
+            } as any);
+
+            expect(normalized).toBeTruthy();
+            expect(normalized?.role).toBe('user');
+            if (normalized && normalized.role === 'user') {
+                expect(normalized.content.text).toBe(expanded);
+                expect(normalized.meta?.displayText).toBe('/skill:frontend-design-review say R56_SKILL_OK only');
+            }
+        });
+
         it('renders legacy user text messages', () => {
             const normalized = normalizeRawMessage('db-legacy-user-1', null, 1, {
                 role: 'user',

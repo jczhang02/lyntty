@@ -540,6 +540,13 @@ export type NormalizedMessage = ({
     codexItemId?: string,
 };
 
+function skillCommandDisplayText(text: string): string | undefined {
+    const match = text.match(/^<skill\s+name="([^"]+)"\s+location="[^"]*">[\s\S]*?<\/skill>\s*([\s\S]*)$/);
+    if (!match) return undefined;
+    const args = match[2]?.trim();
+    return args ? `/skill:${match[1]} ${args}` : `/skill:${match[1]}`;
+}
+
 function normalizeSessionEnvelope(
     envelope: SessionEnvelope,
     localId: string | null,
@@ -616,7 +623,10 @@ function normalizeSessionEnvelope(
                     type: 'text',
                     text: envelope.ev.text
                 },
-                meta,
+                meta: {
+                    ...meta,
+                    ...(skillCommandDisplayText(envelope.ev.text) ? { displayText: skillCommandDisplayText(envelope.ev.text) } : {}),
+                },
                 claudeUuid: envelope.claudeUuid,
                 codexItemId: envelope.codexItemId,
             } satisfies NormalizedMessage;
@@ -769,7 +779,10 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
             role: 'user',
             content: raw.content,
             isSidechain: false,
-            meta: raw.meta,
+            meta: {
+                ...raw.meta,
+                ...(skillCommandDisplayText(raw.content.text) ? { displayText: skillCommandDisplayText(raw.content.text) } : {}),
+            },
         };
     }
     if (raw.role === 'session') {
@@ -893,6 +906,9 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
                             type: 'text',
                             text: raw.content.data.message.content
                         },
+                        meta: skillCommandDisplayText(raw.content.data.message.content)
+                            ? { displayText: skillCommandDisplayText(raw.content.data.message.content) }
+                            : undefined,
                         claudeUuid: raw.content.data.uuid,
                     };
                 }
