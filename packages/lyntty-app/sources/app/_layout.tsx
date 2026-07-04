@@ -366,7 +366,7 @@ export default function RootLayout() {
 
     let providers = (
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-            <KeyboardProvider preload={false}>
+            <KeyboardProvider preload={true}>
                 <GestureHandlerRootView style={{ flex: 1 }}>
                     <AuthProvider initialCredentials={initState.credentials}>
                         <ThemeProvider value={navigationTheme}>
