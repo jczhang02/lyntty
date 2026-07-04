@@ -4,6 +4,17 @@ import * as privacyKit from "privacy-kit";
 import { db } from "@/storage/db";
 import { auth } from "@/app/auth/auth";
 import { log } from "@/utils/log";
+import { createHash } from "node:crypto";
+
+const AUTH_REQUEST_TTL_MS = 10 * 60 * 1000;
+
+function authRequestExpiry(): Date {
+    return new Date(Date.now() + AUTH_REQUEST_TTL_MS);
+}
+
+function publicKeyFingerprint(publicKeyHex: string): string {
+    return createHash('sha256').update(publicKeyHex).digest('hex').slice(0, 16);
+}
 
 export function authRoutes(app: Fastify) {
     app.post('/v1/auth', {
@@ -54,7 +65,8 @@ export function authRoutes(app: Fastify) {
                 })]),
                 401: z.object({
                     error: z.literal('Invalid public key')
-                })
+                }),
+                409: z.object({ error: z.string() })
             }
         }
     }, async (request, reply) => {
@@ -66,15 +78,31 @@ export function authRoutes(app: Fastify) {
         }
 
         const publicKeyHex = privacyKit.encodeHex(publicKey);
-        log({ module: 'auth-request' }, `Terminal auth request - publicKey hex: ${publicKeyHex}`);
+        log({ module: 'auth-request' }, `Terminal auth request - publicKey fingerprint: ${publicKeyFingerprint(publicKeyHex)}`);
 
-        const answer = await db.terminalAuthRequest.upsert({
-            where: { publicKey: publicKeyHex },
-            update: {},
-            create: { publicKey: publicKeyHex, supportsV2: request.body.supportsV2 ?? false }
-        });
+        const existingAnswer = await db.terminalAuthRequest.findUnique({ where: { publicKey: publicKeyHex } });
+        const answer = existingAnswer?.response
+            ? existingAnswer
+            : existingAnswer
+                ? await db.terminalAuthRequest.update({
+                    where: { id: existingAnswer.id },
+                    data: { consumedAt: null, expiresAt: authRequestExpiry(), supportsV2: request.body.supportsV2 ?? false }
+                })
+                : await db.terminalAuthRequest.create({
+                    data: { publicKey: publicKeyHex, supportsV2: request.body.supportsV2 ?? false, expiresAt: authRequestExpiry() }
+                });
 
         if (answer.response && answer.responseAccountId) {
+            if (answer.consumedAt || !answer.expiresAt || answer.expiresAt.getTime() < Date.now()) {
+                return reply.code(409).send({ error: 'Request already consumed' });
+            }
+            const consumed = await db.terminalAuthRequest.updateMany({
+                where: { id: answer.id, consumedAt: null },
+                data: { consumedAt: new Date() }
+            });
+            if (consumed.count === 0) {
+                return reply.code(409).send({ error: 'Request already consumed' });
+            }
             const token = await auth.createToken(answer.responseAccountId!, { session: answer.id, allowedClientTypes: ['machine-scoped', 'session-scoped'] });
             return reply.send({
                 state: 'authorized',
@@ -116,7 +144,7 @@ export function authRoutes(app: Fastify) {
             return reply.send({ status: 'not_found', supportsV2: false });
         }
 
-        if (authRequest.response && authRequest.responseAccountId) {
+        if (authRequest.response && authRequest.responseAccountId && !authRequest.consumedAt && authRequest.expiresAt && authRequest.expiresAt.getTime() > Date.now()) {
             return reply.send({ status: 'authorized', supportsV2: false });
         }
 
@@ -133,7 +161,7 @@ export function authRoutes(app: Fastify) {
             })
         }
     }, async (request, reply) => {
-        log({ module: 'auth-response' }, `Auth response endpoint hit - user: ${request.userId}, publicKey: ${request.body.publicKey.substring(0, 20)}...`);
+        log({ module: 'auth-response' }, `Auth response endpoint hit - user: ${request.userId}`);
         const tweetnacl = (await import("tweetnacl")).default;
         const publicKey = privacyKit.decodeBase64(request.body.publicKey);
         const isValid = tweetnacl.box.publicKeyLength === publicKey.length;
@@ -142,27 +170,31 @@ export function authRoutes(app: Fastify) {
             return reply.code(401).send({ error: 'Invalid public key' });
         }
         const publicKeyHex = privacyKit.encodeHex(publicKey);
-        log({ module: 'auth-response' }, `Looking for auth request with publicKey hex: ${publicKeyHex}`);
+        log({ module: 'auth-response' }, `Looking for auth request with publicKey fingerprint: ${publicKeyFingerprint(publicKeyHex)}`);
         const authRequest = await db.terminalAuthRequest.findUnique({
             where: { publicKey: publicKeyHex }
         });
         if (!authRequest) {
-            log({ module: 'auth-response' }, `Auth request not found for publicKey: ${publicKeyHex}`);
+            log({ module: 'auth-response' }, `Auth request not found for publicKey fingerprint: ${publicKeyFingerprint(publicKeyHex)}`);
             // Let's also check what auth requests exist
             const allRequests = await db.terminalAuthRequest.findMany({
                 take: 5,
                 orderBy: { createdAt: 'desc' }
             });
-            log({ module: 'auth-response' }, `Recent auth requests in DB: ${JSON.stringify(allRequests.map(r => ({ id: r.id, publicKey: r.publicKey.substring(0, 20) + '...', hasResponse: !!r.response })))}`);
+            log({ module: 'auth-response' }, `Recent auth requests in DB: ${JSON.stringify(allRequests.map(r => ({ id: r.id, publicKeyFingerprint: publicKeyFingerprint(r.publicKey), hasResponse: !!r.response })))}`);
             return reply.code(404).send({ error: 'Request not found' });
         }
         const updateResult = await db.terminalAuthRequest.updateMany({
             where: {
                 id: authRequest.id,
-                OR: [
-                    { response: null },
-                    { responseAccountId: request.userId }
-                ]
+                consumedAt: null,
+                expiresAt: { gt: new Date() },
+                AND: [{
+                    OR: [
+                        { response: null },
+                        { responseAccountId: request.userId }
+                    ]
+                }]
             },
             data: { response: request.body.response, responseAccountId: request.userId }
         });
@@ -188,7 +220,8 @@ export function authRoutes(app: Fastify) {
                 })]),
                 401: z.object({
                     error: z.literal('Invalid public key')
-                })
+                }),
+                409: z.object({ error: z.string() })
             }
         }
     }, async (request, reply) => {
@@ -199,13 +232,30 @@ export function authRoutes(app: Fastify) {
             return reply.code(401).send({ error: 'Invalid public key' });
         }
 
-        const answer = await db.accountAuthRequest.upsert({
-            where: { publicKey: privacyKit.encodeHex(publicKey) },
-            update: {},
-            create: { publicKey: privacyKit.encodeHex(publicKey) }
-        });
+        const publicKeyHex = privacyKit.encodeHex(publicKey);
+        const existingAnswer = await db.accountAuthRequest.findUnique({ where: { publicKey: publicKeyHex } });
+        const answer = existingAnswer?.response
+            ? existingAnswer
+            : existingAnswer
+                ? await db.accountAuthRequest.update({
+                    where: { id: existingAnswer.id },
+                    data: { consumedAt: null, expiresAt: authRequestExpiry() }
+                })
+                : await db.accountAuthRequest.create({
+                    data: { publicKey: publicKeyHex, expiresAt: authRequestExpiry() }
+                });
 
         if (answer.response && answer.responseAccountId) {
+            if (answer.consumedAt || !answer.expiresAt || answer.expiresAt.getTime() < Date.now()) {
+                return reply.code(409).send({ error: 'Request already consumed' });
+            }
+            const consumed = await db.accountAuthRequest.updateMany({
+                where: { id: answer.id, consumedAt: null },
+                data: { consumedAt: new Date() }
+            });
+            if (consumed.count === 0) {
+                return reply.code(409).send({ error: 'Request already consumed' });
+            }
             const token = await auth.createToken(answer.responseAccountId!, { allowedClientTypes: ['user-scoped'] });
             return reply.send({
                 state: 'authorized',
@@ -242,10 +292,14 @@ export function authRoutes(app: Fastify) {
         const updateResult = await db.accountAuthRequest.updateMany({
             where: {
                 id: authRequest.id,
-                OR: [
-                    { response: null },
-                    { responseAccountId: request.userId }
-                ]
+                consumedAt: null,
+                expiresAt: { gt: new Date() },
+                AND: [{
+                    OR: [
+                        { response: null },
+                        { responseAccountId: request.userId }
+                    ]
+                }]
             },
             data: { response: request.body.response, responseAccountId: request.userId }
         });

@@ -14,7 +14,8 @@ const MAX_QUEUED_SENDS = 1_000;
 let enabled = true;
 let lastStatus = "not connected";
 let draining = false;
-type QueuedPayload = { session: ReturnType<typeof sessionSnapshot>; event: Record<string, unknown>; timestamp: number; attempts?: number };
+let nextEventId = 1;
+type QueuedPayload = { session: ReturnType<typeof sessionSnapshot>; event: Record<string, unknown>; eventId: number; timestamp: number; attempts?: number };
 const queuedPayloads: QueuedPayload[] = [];
 const heartbeatTimers = new Map<string, ReturnType<typeof setInterval>>();
 
@@ -122,6 +123,7 @@ function send(ctx: ExtensionContext, event: Record<string, unknown>): void {
   enqueuePayload({
     session,
     event,
+    eventId: nextEventId++,
     timestamp: Date.now(),
   });
   drainQueue();

@@ -797,6 +797,8 @@ export async function startDaemon(): Promise<void> {
       lastExtensionSeenAt: number;
       keepAliveInterval: ReturnType<typeof setInterval> | null;
       pendingTextFlushTimer: ReturnType<typeof setTimeout> | null;
+      lastExtensionEventId: number | null;
+      extensionHasSeqGap: boolean;
     };
 
     const externalPiMirrors = new Map<string, ExternalPiMirrorState>();
@@ -1204,10 +1206,12 @@ export async function startDaemon(): Promise<void> {
           extensionCoveredSince: null,
           sessionClient,
           mapper: new PiSessionProtocolMapper(),
-          lastExtensionSeenAt: 0,
-          keepAliveInterval,
-          pendingTextFlushTimer: null,
-        };
+        lastExtensionSeenAt: 0,
+        keepAliveInterval,
+        pendingTextFlushTimer: null,
+        lastExtensionEventId: null,
+        extensionHasSeqGap: false,
+      };
         externalPiMirrors.set(mirrorKey, mirrorState);
       }
 
@@ -1289,7 +1293,31 @@ export async function startDaemon(): Promise<void> {
         return { status: 'ok' as const, sessionId: result.sessionId };
       }
 
+      const eventId = typeof payload.eventId === 'number' && Number.isFinite(payload.eventId) ? payload.eventId : null;
+      if (eventId === null) {
+        mirror.extensionHasSeqGap = true;
+      } else if (mirror.lastExtensionEventId !== null) {
+        if (eventId <= mirror.lastExtensionEventId) {
+          return { status: 'ok' as const, sessionId: result.sessionId };
+        }
+        if (eventId !== mirror.lastExtensionEventId + 1) {
+          mirror.extensionHasSeqGap = true;
+        }
+        mirror.lastExtensionEventId = eventId;
+      } else {
+        mirror.lastExtensionEventId = eventId;
+      }
+
       const eventTime = typeof payload.timestamp === 'number' ? payload.timestamp : Date.now();
+      if (event.type === 'session_shutdown') {
+        clearPendingTextFlush(mirror);
+        mirror.sessionClient.sendSessionDeath();
+        await mirror.sessionClient.flush();
+        externalPiMirrors.delete(mirrorKey);
+        await mirror.stop();
+        return { status: 'ok' as const, sessionId: result.sessionId };
+      }
+
       mirror.lastExtensionSeenAt = Date.now();
       const isThinking = event.type === 'agent_start'
         || event.type === 'message_update'
@@ -1332,7 +1360,11 @@ export async function startDaemon(): Promise<void> {
         await mirror.sessionClient.flush();
       }
       if (agentEvent.type === 'agent_end' && envelopes.length > 0) {
-        markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: true });
+        markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: !mirror.extensionHasSeqGap });
+        if (eventId !== null) {
+          mirror.extensionHasSeqGap = false;
+          mirror.extensionCoveredSince = eventTime;
+        }
       } else if (hasDeliveredContentEnvelope(envelopes)) {
         markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: agentEvent.type === 'agent_end' });
       }

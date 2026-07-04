@@ -237,18 +237,36 @@ export function startSocket(app: Fastify) {
             // Broadcast daemon offline status
             if (connection.connectionType === 'machine-scoped') {
                 const disconnectedAt = Date.now();
-                db.machine.updateMany({
-                    where: { accountId: userId, id: connection.machineId },
-                    data: { active: false, lastActiveAt: new Date(disconnectedAt) }
-                }).catch((error) => {
-                    log({ module: 'websocket', level: 'error' }, `Error marking machine offline: ${error}`);
-                });
-                const machineActivity = buildMachineActivityEphemeral(connection.machineId, false, disconnectedAt);
-                eventRouter.emitEphemeral({
-                    userId,
-                    payload: machineActivity,
-                    recipientFilter: { type: 'user-scoped-only' }
-                });
+                const offlineCheckTimer = setTimeout(() => {
+                    eventRouter.hasMachineSocket(userId, connection.machineId).then((hasMachineSocket) => {
+                        if (hasMachineSocket) {
+                            return;
+                        }
+                        db.machine.updateMany({
+                            where: {
+                                accountId: userId,
+                                id: connection.machineId,
+                                lastActiveAt: { lte: new Date(disconnectedAt) }
+                            },
+                            data: { active: false, lastActiveAt: new Date(disconnectedAt) }
+                        }).then((result) => {
+                            if (result.count === 0) {
+                                return;
+                            }
+                            const machineActivity = buildMachineActivityEphemeral(connection.machineId, false, disconnectedAt);
+                            eventRouter.emitEphemeral({
+                                userId,
+                                payload: machineActivity,
+                                recipientFilter: { type: 'user-scoped-only' }
+                            });
+                        }).catch((error) => {
+                            log({ module: 'websocket', level: 'error' }, `Error marking machine offline: ${error}`);
+                        });
+                    }).catch((error) => {
+                        log({ module: 'websocket', level: 'error' }, `Error checking machine sockets: ${error}`);
+                    });
+                }, 100);
+                (offlineCheckTimer as unknown as { unref?: () => void }).unref?.();
             }
         });
 

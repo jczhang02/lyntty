@@ -24,7 +24,8 @@
         "e2e:maestro:first-run": "scripts/e2e/run-maestro.sh e2e/maestro/01_first_run.yml",
         "e2e:maestro:pair": "scripts/e2e/run-maestro.sh e2e/maestro/02_pair_node.yml",
         "e2e:maestro:history": "scripts/e2e/run-maestro.sh e2e/maestro/03_history_send_reply.yml",
-        "e2e:maestro:reconnect": "scripts/e2e/run-maestro.sh e2e/maestro/04_reconnect_smoke.yml"
+        "e2e:maestro:reconnect": "scripts/e2e/run-maestro.sh e2e/maestro/04_reconnect_smoke.yml",
+        "e2e:release-matrix": "scripts/e2e/release-matrix.sh"
     },
     "workspaces": {
         "packages": [

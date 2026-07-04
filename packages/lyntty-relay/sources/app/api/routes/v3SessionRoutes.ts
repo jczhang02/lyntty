@@ -155,7 +155,11 @@ export function v3SessionRoutes(app: Fastify) {
 
         const firstMessageByLocalId = new Map<string, { localId: string; content: string }>();
         for (const message of messages) {
-            if (!firstMessageByLocalId.has(message.localId)) {
+            const existing = firstMessageByLocalId.get(message.localId);
+            if (existing && existing.content !== message.content) {
+                return reply.code(409).send({ error: 'localId content conflict' });
+            }
+            if (!existing) {
                 firstMessageByLocalId.set(message.localId, message);
             }
         }
@@ -173,15 +177,21 @@ export function v3SessionRoutes(app: Fastify) {
                 select: {
                     id: true,
                     seq: true,
+                    content: true,
                     localId: true,
                     createdAt: true,
                     updatedAt: true
                 }
             });
 
-            const existingByLocalId = new Map<string, Omit<SelectedMessage, 'content'>>();
+            const existingByLocalId = new Map<string, SelectedMessage>();
             for (const message of existing) {
                 if (message.localId) {
+                    const expectedContent = contentByLocalId.get(message.localId);
+                    const existingContent = message.content as { t?: unknown; c?: unknown };
+                    if (expectedContent !== undefined && existingContent?.c !== expectedContent) {
+                        throw new Error(`localId content conflict: ${message.localId}`);
+                    }
                     existingByLocalId.set(message.localId, message);
                 }
             }
@@ -189,7 +199,7 @@ export function v3SessionRoutes(app: Fastify) {
             const newMessages = uniqueMessages.filter((message) => !existingByLocalId.has(message.localId));
             const seqs = await allocateSessionSeqBatch(sessionId, newMessages.length, tx);
 
-            const createdMessages: Omit<SelectedMessage, 'content'>[] = [];
+            const createdMessages: SelectedMessage[] = [];
             for (let i = 0; i < newMessages.length; i += 1) {
                 const message = newMessages[i];
                 const createdMessage = await tx.sessionMessage.create({
@@ -236,12 +246,15 @@ export function v3SessionRoutes(app: Fastify) {
             };
         });
 
-        let txResult: { responseMessages: Omit<SelectedMessage, 'content'>[]; createdMessages: Omit<SelectedMessage, 'content'>[] } | null = null;
+        let txResult: { responseMessages: SelectedMessage[]; createdMessages: SelectedMessage[] } | null = null;
         for (let attempt = 0; attempt < 3; attempt += 1) {
             try {
                 txResult = await createOrFetchMessages();
                 break;
             } catch (error) {
+                if (error instanceof Error && error.message.startsWith('localId content conflict:')) {
+                    return reply.code(409).send({ error: 'localId content conflict' });
+                }
                 if (!isUniqueConstraintError(error) || attempt === 2) {
                     throw error;
                 }

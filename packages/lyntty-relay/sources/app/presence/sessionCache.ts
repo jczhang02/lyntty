@@ -144,6 +144,16 @@ class ActivityCache {
         return false; // No update needed
     }
 
+    markSessionInactive(sessionId: string, timestamp: number): void {
+        const cached = this.sessionCache.get(sessionId);
+        if (!cached) {
+            return;
+        }
+        cached.pendingUpdate = null;
+        cached.lastUpdateSent = timestamp;
+        cached.active = false;
+    }
+
     queueMachineUpdate(machineId: string, timestamp: number): boolean {
         const cached = this.machineCache.get(machineId);
         if (!cached) {
@@ -193,8 +203,8 @@ class ActivityCache {
         if (sessionUpdates.length > 0) {
             try {
                 await Promise.all(sessionUpdates.map(update =>
-                    db.session.update({
-                        where: { id: update.id },
+                    db.session.updateMany({
+                        where: { id: update.id, lastActiveAt: { lt: new Date(update.timestamp) } },
                         data: { lastActiveAt: new Date(update.timestamp), active: true }
                     })
                 ));

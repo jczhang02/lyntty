@@ -359,6 +359,8 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
 
     const itemContent = (
         <Pressable
+            testID={`lyntty-session-row-${session.id}`}
+            accessibilityLabel={`${session.name}, ${session.subtitle ?? session.state}`}
             style={[
                 styles.sessionRow,
                 showBorder && styles.sessionRowWithBorder,

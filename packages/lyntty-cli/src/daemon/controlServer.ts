@@ -87,6 +87,7 @@ export function startDaemonControlServer({
         name: z.string().optional(),
       }),
       event: z.record(z.string(), z.unknown()),
+      eventId: z.number().int().positive().optional(),
       timestamp: z.number().optional(),
     });
 

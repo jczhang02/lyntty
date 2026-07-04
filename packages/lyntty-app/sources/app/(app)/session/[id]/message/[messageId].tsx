@@ -8,6 +8,7 @@ import { ToolFullView } from '@/components/tools/ToolFullView';
 import { ToolHeader } from '@/components/tools/ToolHeader';
 import { ToolStatusIndicator } from '@/components/tools/ToolStatusIndicator';
 import { Message } from '@/sync/typesMessage';
+import { Metadata } from '@/sync/storageTypes';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Typography } from '@/constants/Typography';
 
@@ -94,18 +95,18 @@ export default React.memo(() => {
                 />
             )}
             <Deferred>
-                <FullView message={message} />
+                <FullView message={message} metadata={session.metadata} />
             </Deferred>
         </>
     );
 });
 
-function FullView(props: { message: Message }) {
+function FullView(props: { message: Message; metadata?: Metadata | null }) {
     const { theme } = useUnistyles();
     const styles = stylesheet;
 
     if (props.message.kind === 'tool-call') {
-        return <ToolFullView tool={props.message.tool} messages={props.message.children} />
+        return <ToolFullView tool={props.message.tool} metadata={props.metadata ?? null} messages={props.message.children} />
     }
     if (props.message.kind === 'agent-text') {
         return (

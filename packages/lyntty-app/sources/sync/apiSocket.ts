@@ -112,6 +112,16 @@ class ApiSocket {
         this.updateStatus('disconnected');
     }
 
+    reset() {
+        this.disconnect();
+        this.config = null;
+        this.encryption = null;
+        this.messageHandlers.clear();
+        this.reconnectedListeners.clear();
+        this.statusListeners.clear();
+        this.currentStatus = 'disconnected';
+    }
+
     //
     // Listener Management
     //

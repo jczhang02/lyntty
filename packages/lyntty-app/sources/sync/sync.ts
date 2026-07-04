@@ -214,6 +214,62 @@ class Sync {
         }
     }
 
+    resetRuntimeState() {
+        for (const sync of [
+            this.sessionsSync,
+            this.settingsSync,
+            this.profileSync,
+            this.purchasesSync,
+            this.machinesSync,
+            this.pushTokenSync,
+            this.nativeUpdateSync,
+            this.artifactsSync,
+            this.friendsSync,
+            this.friendRequestsSync,
+            this.feedSync,
+            ...this.messagesSync.values(),
+            ...this.sendSync.values(),
+        ]) {
+            sync.stop();
+        }
+        for (const controller of this.sendAbortControllers.values()) {
+            controller.abort();
+        }
+        this.messagesSync.clear();
+        this.sendSync.clear();
+        this.sendAbortControllers.clear();
+        this.sessionLastSeq.clear();
+        this.sessionOldestSeq.clear();
+        this.pendingOutbox.clear();
+        this.pendingSyntheticOutbox.clear();
+        this.flushingSyntheticOutbox.clear();
+        this.sessionMessageQueue.clear();
+        this.sessionQueueProcessing.clear();
+        this.sessionMessageLocks.clear();
+        this.sessionDataKeys.clear();
+        this.machineDataKeys.clear();
+        this.artifactDataKeys.clear();
+        this.encryptionCache = new EncryptionCache();
+        this.piSessionsFetchInFlight = null;
+        this.clearBackgroundSendWatchdog();
+        void this.cancelBackgroundSendTimeoutNotification();
+        this.backgroundSendStartedAt = null;
+        this.sessionsSync = new InvalidateSync(this.fetchSessions);
+        this.settingsSync = new InvalidateSync(this.syncSettings);
+        this.profileSync = new InvalidateSync(this.fetchProfile);
+        this.purchasesSync = new InvalidateSync(this.syncPurchases);
+        this.machinesSync = new InvalidateSync(this.fetchMachines);
+        this.nativeUpdateSync = new InvalidateSync(this.fetchNativeUpdate);
+        this.artifactsSync = new InvalidateSync(this.fetchArtifactsList);
+        this.friendsSync = new InvalidateSync(this.fetchFriends);
+        this.friendRequestsSync = new InvalidateSync(this.fetchFriendRequests);
+        this.feedSync = new InvalidateSync(this.fetchFeed);
+        this.pushTokenSync = new InvalidateSync(async () => {
+            await this.registerPushToken();
+        });
+        this.activityAccumulator = new ActivityUpdateAccumulator(this.flushActivityUpdates.bind(this), 2000);
+    }
+
     async create(credentials: AuthCredentials, encryption: Encryption) {
         this.credentials = credentials;
         this.encryption = encryption;
@@ -1124,8 +1180,9 @@ class Sync {
             machinePiSessions,
         );
 
-        // Apply to storage
-        this.applySessions(sessionsWithPiHistory);
+        // Apply to storage. This is a full server/discovery snapshot, so remove
+        // stale rows from a previous account, server, or deleted relay state.
+        this.applySessions(sessionsWithPiHistory, { replace: true });
         log.log(`📥 fetchSessions completed - processed ${decryptedSessions.length} relay sessions + ${sessionsWithPiHistory.length - decryptedSessions.length} local Pi sessions`);
 
     }
@@ -2795,9 +2852,9 @@ class Sync {
 
     private applySessions = (sessions: (Omit<Session, "presence"> & {
         presence?: "online" | number;
-    })[]) => {
+    })[], options?: { replace?: boolean }) => {
         const active = storage.getState().getActiveSessions();
-        storage.getState().applySessions(sessions);
+        storage.getState().applySessions(sessions, options);
         const newActive = storage.getState().getActiveSessions();
         this.applySessionDiff(active, newActive);
     }
@@ -2846,7 +2903,9 @@ export async function syncRestore(credentials: AuthCredentials) {
 }
 
 export function syncReset() {
-    apiSocket.disconnect();
+    sync.resetRuntimeState();
+    apiSocket.reset();
+    storage.getState().resetVolatileState();
     isInitialized = false;
 }
 

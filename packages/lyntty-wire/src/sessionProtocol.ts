@@ -14,34 +14,52 @@
 
 import { createId, isCuid } from '@paralleldrive/cuid2';
 import * as z from 'zod';
+import { MAX_WIRE_FILE_SIZE, MAX_WIRE_TEXT_LENGTH, MAX_WIRE_TOOL_PAYLOAD_LENGTH } from './caps';
+
+const cappedUnknownSchema = z.unknown().refine((value) => {
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized === undefined || serialized.length <= MAX_WIRE_TOOL_PAYLOAD_LENGTH;
+  } catch {
+    return false;
+  }
+}, { message: 'tool payload too large' });
+
+const cappedToolArgsSchema = z.record(z.string(), cappedUnknownSchema).refine((value) => {
+  try {
+    return JSON.stringify(value).length <= MAX_WIRE_TOOL_PAYLOAD_LENGTH;
+  } catch {
+    return false;
+  }
+}, { message: 'tool args too large' });
 
 export const sessionRoleSchema = z.enum(['user', 'agent']);
 export type SessionRole = z.infer<typeof sessionRoleSchema>;
 
 export const sessionTextEventSchema = z.object({
   t: z.literal('text'),
-  text: z.string(),
+  text: z.string().max(MAX_WIRE_TEXT_LENGTH),
   thinking: z.boolean().optional(),
 });
 
 export const sessionServiceMessageEventSchema = z.object({
   t: z.literal('service'),
-  text: z.string(),
+  text: z.string().max(MAX_WIRE_TEXT_LENGTH),
 });
 
 export const sessionToolCallStartEventSchema = z.object({
   t: z.literal('tool-call-start'),
   call: z.string(),
-  name: z.string(),
-  title: z.string(),
-  description: z.string(),
-  args: z.record(z.string(), z.unknown()),
+  name: z.string().max(200),
+  title: z.string().max(500),
+  description: z.string().max(2_000),
+  args: cappedToolArgsSchema,
 });
 
 export const sessionToolCallEndEventSchema = z.object({
   t: z.literal('tool-call-end'),
   call: z.string(),
-  result: z.unknown().optional(),
+  result: cappedUnknownSchema.optional(),
   isError: z.boolean().optional(),
 });
 
@@ -49,12 +67,12 @@ export const sessionFileEventSchema = z.object({
   t: z.literal('file'),
   ref: z.string(),
   name: z.string(),
-  size: z.number(),
+  size: z.number().int().nonnegative().max(MAX_WIRE_FILE_SIZE),
   mimeType: z.string().optional(),
   image: z
     .object({
-      width: z.number(),
-      height: z.number(),
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
       thumbhash: z.string(),
     })
     .optional(),
@@ -98,7 +116,7 @@ export type SessionEvent = z.infer<typeof sessionEventSchema>;
 export const sessionEnvelopeSchema = z
   .object({
     id: z.string(),
-    time: z.number(),
+    time: z.number().finite().nonnegative(),
     role: sessionRoleSchema,
     turn: z.string().optional(),
     subagent: z

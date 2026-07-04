@@ -502,7 +502,7 @@ describe("v3SessionRoutes", () => {
             payload: {
                 messages: [
                     { localId: "new-1", content: "new-content" },
-                    { localId: "existing", content: "ignored" }
+                    { localId: "existing", content: "old" }
                 ]
             }
         });
@@ -513,6 +513,27 @@ describe("v3SessionRoutes", () => {
         expect(body.messages.map((message: any) => message.seq)).toEqual([1, 2]);
         expect(state.messages).toHaveLength(2);
         expect(emitUpdateMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects same localId with different encrypted content", async () => {
+        seedSession({ id: "session-1", accountId: "user-1", seq: 1 });
+        seedMessage({ sessionId: "session-1", seq: 1, localId: "existing", content: { t: "encrypted", c: "old" } });
+
+        app = await createApp();
+        const response = await app.inject({
+            method: "POST",
+            url: "/v3/sessions/session-1/messages",
+            headers: { "x-user-id": "user-1" },
+            payload: {
+                messages: [
+                    { localId: "existing", content: "changed" }
+                ]
+            }
+        });
+
+        expect(response.statusCode).toBe(409);
+        expect(state.messages).toHaveLength(1);
+        expect(emitUpdateMock).not.toHaveBeenCalled();
     });
 
     it("enforces send validation limits and auth/session ownership", async () => {

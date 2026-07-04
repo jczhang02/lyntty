@@ -196,6 +196,8 @@ export default function SessionHistory() {
 
             return (
                 <Pressable
+                    testID={`lyntty-session-row-${session.id}`}
+                    accessibilityLabel={`${sessionName}, ${sessionSubtitle}`}
                     style={[
                         styles.sessionCard,
                         isSingle ? styles.sessionCardSingle :

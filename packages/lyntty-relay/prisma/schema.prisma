@@ -75,6 +75,8 @@ model TerminalAuthRequest {
     response          String?
     responseAccountId String?
     responseAccount   Account? @relation(fields: [responseAccountId], references: [id])
+    expiresAt         DateTime?
+    consumedAt        DateTime?
     createdAt         DateTime @default(now())
     updatedAt         DateTime @updatedAt
 }
@@ -85,6 +87,8 @@ model AccountAuthRequest {
     response          String?
     responseAccountId String?
     responseAccount   Account? @relation(fields: [responseAccountId], references: [id])
+    expiresAt         DateTime?
+    consumedAt        DateTime?
     createdAt         DateTime @default(now())
     updatedAt         DateTime @updatedAt
 }

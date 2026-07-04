@@ -9,6 +9,7 @@ import { layout } from '../layout';
 import { useLocalSetting } from '@/sync/storage';
 import { StyleSheet } from 'react-native-unistyles';
 import { t } from '@/text';
+import { shouldHideGenericToolPayload } from './toolPayloadPolicy';
 
 interface ToolFullViewProps {
     tool: ToolCall;
@@ -21,7 +22,7 @@ export function ToolFullView({ tool, metadata, messages = [] }: ToolFullViewProp
     const SpecializedFullView = getToolFullViewComponent(tool.name);
     const screenWidth = useWindowDimensions().width;
     const devModeEnabled = (useLocalSetting('devModeEnabled') || __DEV__);
-    console.log('ToolFullView', devModeEnabled);
+    const hideGenericPayload = shouldHideGenericToolPayload(metadata || null, !!SpecializedFullView);
 
     return (
         <ScrollView style={[styles.container, { paddingHorizontal: screenWidth > 700 ? 16 : 0 }]}>
@@ -29,6 +30,14 @@ export function ToolFullView({ tool, metadata, messages = [] }: ToolFullViewProp
                 {/* Tool-specific content or generic fallback */}
                 {SpecializedFullView ? (
                     <SpecializedFullView tool={tool} metadata={metadata || null} messages={messages} />
+                ) : hideGenericPayload ? (
+                    <View style={styles.section}>
+                        <View style={styles.emptyOutputContainer}>
+                            <Ionicons name="construct-outline" size={48} color="#8E8E93" />
+                            <Text style={styles.emptyOutputText}>{tool.name}</Text>
+                            <Text style={styles.emptyOutputSubtext}>{t('tools.fullView.completed')}</Text>
+                        </View>
+                    </View>
                 ) : (
                     <>
                     {/* Generic fallback for tools without specialized views */}
@@ -94,7 +103,7 @@ export function ToolFullView({ tool, metadata, messages = [] }: ToolFullViewProp
                 )}
 
                 {/* Raw JSON View (Dev Mode Only) */}
-                {devModeEnabled && (
+                {devModeEnabled && !hideGenericPayload && (
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <Ionicons name="code-slash" size={20} color="#FF9500" />

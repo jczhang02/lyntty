@@ -256,6 +256,10 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                         where: { sessionId: sid, localId: useLocalId }
                     });
                     if (existing) {
+                        const existingContent = existing.content as { t?: unknown; c?: unknown };
+                        if (existingContent?.c !== message) {
+                            return { msg: null, update: null, error: 'localId content conflict' };
+                        }
                         return { msg: existing, update: null };
                     }
                 }
@@ -313,6 +317,7 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
             }
 
             // Update last active at
+            activityCache.markSessionInactive(sid, t);
             await db.session.update({
                 where: { id: sid },
                 data: { lastActiveAt: new Date(t), active: false }

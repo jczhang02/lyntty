@@ -191,7 +191,7 @@ interface StorageState {
     socketLastDisconnectedAt: number | null;
     isDataReady: boolean;
     nativeUpdateStatus: { available: boolean; updateUrl?: string } | null;
-    applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[]) => void;
+    applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[], options?: { replace?: boolean }) => void;
     applyMachines: (machines: Machine[], replace?: boolean) => void;
     deleteMachine: (machineId: string) => void;
     applyLoaded: () => void;
@@ -248,6 +248,7 @@ interface StorageState {
     markSessionRead: (sessionId: string) => void;
     markSessionUnread: (sessionId: string) => void;
     setCurrentViewingSession: (sessionId: string | null) => void;
+    resetVolatileState: () => void;
 }
 
 // Helper function to build unified list view data from sessions and machines
@@ -409,16 +410,16 @@ export const storage = create<StorageState>()((set, get) => {
             const state = get();
             return Object.values(state.sessions).filter(s => s.active);
         },
-        applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[]) => set((state) => {
+        applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[], options?: { replace?: boolean }) => set((state) => {
             // Load drafts and permission modes if sessions are empty (initial load)
-            const isInitialLoad = Object.keys(state.sessions).length === 0;
+            const isInitialLoad = options?.replace === true || Object.keys(state.sessions).length === 0;
             const savedDrafts = isInitialLoad ? sessionDrafts : {};
             const savedPermissionModes = isInitialLoad ? sessionPermissionModes : {};
             const savedModelModes = isInitialLoad ? sessionModelModes : {};
             const savedEffortLevels = isInitialLoad ? sessionEffortLevels : {};
 
             // Merge new sessions with existing ones
-            const mergedSessions: Record<string, Session> = { ...state.sessions };
+            const mergedSessions: Record<string, Session> = options?.replace === true ? {} : { ...state.sessions };
 
             // Update sessions with calculated presence using centralized resolver
             sessions.forEach(session => {
@@ -506,7 +507,9 @@ export const storage = create<StorageState>()((set, get) => {
             // console.log(`📊 Storage: applySessions called with ${sessions.length} sessions, active: ${activeSessions.length}, inactive: ${inactiveSessions.length}`);
 
             // Process AgentState updates for sessions that already have messages loaded
-            const updatedSessionMessages = { ...state.sessionMessages };
+            const updatedSessionMessages = options?.replace === true
+                ? Object.fromEntries(Object.entries(state.sessionMessages).filter(([sessionId]) => mergedSessions[sessionId]))
+                : { ...state.sessionMessages };
 
             sessions.forEach(session => {
                 const oldSession = state.sessions[session.id];
@@ -626,6 +629,36 @@ export const storage = create<StorageState>()((set, get) => {
                 unreadSessionIds,
             };
         }),
+        resetVolatileState: () => set((state) => ({
+            ...state,
+            sessions: {},
+            machines: {},
+            artifacts: {},
+            friends: {},
+            users: {},
+            feedItems: [],
+            feedHead: null,
+            feedTail: null,
+            feedHasMore: false,
+            feedLoaded: false,
+            friendsLoaded: false,
+            sessionsData: null,
+            sessionListViewData: null,
+            sessionMessages: {},
+            pathGitStatus: {},
+            pathGitStatusFiles: {},
+            pathProjectFiles: {},
+            sessionFileCache: {},
+            realtimeStatus: 'disconnected',
+            realtimeMode: 'idle',
+            socketStatus: 'disconnected',
+            socketLastConnectedAt: null,
+            socketLastDisconnectedAt: null,
+            isDataReady: false,
+            nativeUpdateStatus: null,
+            unreadSessionIds: new Set<string>(),
+            currentViewingSessionId: null,
+        })),
         applyLoaded: () => set((state) => {
             const result = {
                 ...state,

@@ -297,6 +297,11 @@ class EventRouter {
         });
     }
 
+    async hasMachineSocket(userId: string, machineId: string): Promise<boolean> {
+        const sockets = await this.io.in(`user:${userId}:machine:${machineId}`).fetchSockets();
+        return sockets.length > 0;
+    }
+
     // === PRIVATE ROUTING LOGIC ===
 
     private getRoomsForFilter(userId: string, filter: RecipientFilter): string[] {

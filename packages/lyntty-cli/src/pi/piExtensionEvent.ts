@@ -10,6 +10,7 @@ export type LynttyPiExtensionSession = {
 export type LynttyPiExtensionPayload = {
   session: LynttyPiExtensionSession;
   event: Record<string, unknown>;
+  eventId?: number;
   timestamp?: number;
 };
 
