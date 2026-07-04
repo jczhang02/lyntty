@@ -309,5 +309,17 @@ describe('Api server error handling', () => {
 
             consoleSpy.mockRestore();
         });
+
+        it('throws an actionable re-authentication error when machine registration returns 401', async () => {
+            mockPost.mockRejectedValue({
+                response: { status: 401, data: { error: 'Invalid token' } },
+                isAxiosError: true
+            });
+
+            await expect(api.getOrCreateMachine({
+                machineId: 'test-machine',
+                metadata: testMachineMetadata
+            })).rejects.toThrow('lyntty auth login --force --method mobile');
+        });
     });
 });

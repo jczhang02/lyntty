@@ -199,15 +199,15 @@ export async function startDaemon(): Promise<void> {
   });
 
   process.on('uncaughtException', (error) => {
-    logger.debug('[DAEMON RUN] FATAL: Uncaught exception', error);
+    logger.debug(`[DAEMON RUN] FATAL: Uncaught exception: ${error.message}`);
     logger.debug(`[DAEMON RUN] Stack trace: ${error.stack}`);
     requestShutdown('exception', error.message);
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    logger.debug('[DAEMON RUN] FATAL: Unhandled promise rejection', reason);
-    logger.debug(`[DAEMON RUN] Rejected promise:`, promise);
     const error = reason instanceof Error ? reason : new Error(`Unhandled promise rejection: ${reason}`);
+    logger.debug(`[DAEMON RUN] FATAL: Unhandled promise rejection: ${error.message}`);
+    logger.debug(`[DAEMON RUN] Rejected promise:`, promise);
     logger.debug(`[DAEMON RUN] Stack trace: ${error.stack}`);
     requestShutdown('exception', error.message);
   });

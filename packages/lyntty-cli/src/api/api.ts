@@ -264,6 +264,10 @@ export class ApiClient {
           return createMinimalMachine();
         }
 
+        if (status === 401) {
+          throw new Error('Lyntty authentication expired or the relay data was reset. Run `lyntty auth login --force --method mobile`, then `lyntty daemon start`.');
+        }
+
         // Handle 5xx - server error, use offline mode with auto-reconnect
         if (status >= 500) {
           connectionState.fail({

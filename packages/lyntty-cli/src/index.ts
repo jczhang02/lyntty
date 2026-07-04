@@ -14,7 +14,7 @@ import { readCredentials, readSettings } from './persistence'
 import { authAndSetupMachineIfNeeded } from './ui/auth'
 import packageJson from '../package.json'
 import { z } from 'zod'
-import { startDaemon } from './daemon/run'
+import { initialMachineMetadata, startDaemon } from './daemon/run'
 import { checkIfDaemonRunningAndCleanupStaleState, isDaemonRunningCurrentlyInstalledLynttyVersion, stopDaemon } from './daemon/controlClient'
 import { getLatestDaemonLog } from './ui/logger'
 import { killRunawayLynttyProcesses } from './daemon/doctor'
@@ -588,6 +588,22 @@ ${chalk.bold('Usage:')}
       await installLynttyPiExtension().catch((error) => {
         logger.warn(`Failed to install Lyntty Pi extension: ${error instanceof Error ? error.message : error}`);
       });
+      try {
+        const { credentials, machineId } = await authAndSetupMachineIfNeeded();
+        const api = await ApiClient.create(credentials);
+        await api.getOrCreateMachine({
+          machineId,
+          metadata: initialMachineMetadata,
+          daemonState: {
+            status: 'offline',
+            pid: process.pid,
+            startedAt: Date.now(),
+          },
+        });
+      } catch (error) {
+        console.error(chalk.red('Failed to start daemon:'), error instanceof Error ? error.message : 'Unknown error');
+        process.exit(1);
+      }
       // Spawn detached daemon process
       const child = spawnLynttyCLI(['daemon', 'start-sync'], {
         detached: true,
