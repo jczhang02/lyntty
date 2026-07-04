@@ -49,7 +49,7 @@ export async function doAuth(preferredMethod?: AuthMethod): Promise<Credentials 
         if (process.env.DEBUG) {
             console.log(`[AUTH DEBUG] Failed to send auth request:`, error);
         }
-        console.log('Failed to create authentication request, please try again later.');
+        console.log(formatAuthRequestFailure(error, configuration.serverUrl));
         return null;
     }
 
@@ -214,7 +214,7 @@ async function waitForAuthentication(keypair: tweetnacl.BoxKeyPair): Promise<Cre
                     }
                 }
             } catch (error) {
-                console.log('\n\nFailed to check authentication status. Please try again.');
+                console.log('\n\n' + formatAuthRequestFailure(error, configuration.serverUrl));
                 return null;
             }
 
@@ -229,6 +229,33 @@ async function waitForAuthentication(keypair: tweetnacl.BoxKeyPair): Promise<Cre
     }
 
     return null;
+}
+
+export function formatAuthRequestFailure(error: unknown, serverUrl: string): string {
+    const base = `Failed to create authentication request against ${serverUrl}.`;
+    if (axios.isAxiosError(error)) {
+        const code = error.code;
+        const status = error.response?.status;
+        if (code === 'ECONNREFUSED') {
+            return `${base}\nLyntty relay is not running or is not reachable at that address. Start your self-hosted relay, then retry:\n  lyntty server --host 0.0.0.0 --port 3005\n  lyntty auth login --force --method mobile`;
+        }
+        if (code === 'ENOTFOUND' || code === 'EHOSTUNREACH' || code === 'ENETUNREACH' || code === 'ETIMEDOUT' || code === 'ECONNRESET') {
+            return `${base}\nNetwork error ${code}. Check LYNTTY_SERVER_URL / saved serverUrl and relay connectivity, then retry auth.`;
+        }
+        if (status === 404) {
+            return `${base}\nThe server responded 404 for /v1/auth/request. This URL is not a compatible Lyntty relay or the relay route set is incomplete.`;
+        }
+        if (status === 401) {
+            return `${base}\nThe relay rejected the auth request as unauthorized. Check relay/auth configuration, then retry.`;
+        }
+        if (status && status >= 500) {
+            return `${base}\nThe relay returned HTTP ${status}. Check relay logs and restart the relay if needed.`;
+        }
+        if (status) {
+            return `${base}\nThe relay returned HTTP ${status}. Check the server URL and relay logs.`;
+        }
+    }
+    return `${base}\nPlease check that the Lyntty relay is running and reachable, then retry.`;
 }
 
 export function decryptWithEphemeralKey(encryptedBundle: Uint8Array, recipientSecretKey: Uint8Array): Uint8Array | null {
