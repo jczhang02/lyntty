@@ -37,7 +37,8 @@ import { mapPiSessionHistoryPageToEnvelopes } from '@/pi/runPiHistory';
 import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalMirror';
 import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
 import { PiSessionProtocolMapper } from '@/pi/runPiSessionProtocol';
-import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
+import { createEnvelope } from 'lyntty-wire';
+import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiCommandInfo, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -826,6 +827,21 @@ export async function startDaemon(): Promise<void> {
       return externalPiMirrors.get(`${machine.id}:${session.piSessionId}`);
     };
 
+    const sendRemoteCommandNotice = (mirror: ExternalPiMirrorState, text: string): void => {
+      mirror.sessionClient.sendSessionProtocolMessage(createEnvelope('agent', {
+        t: 'text',
+        text,
+      }, { turn: 'pi-system', time: Date.now() }));
+      void mirror.sessionClient.flush().catch((error) => {
+        logger.debug('[pi] Failed to send remote Pi command notice', error);
+      });
+    };
+
+    const sendRemoteCommandRejection = (mirror: ExternalPiMirrorState, text: string): void => {
+      const firstToken = text.trim().split(/\s+/, 1)[0] || 'command';
+      sendRemoteCommandNotice(mirror, `Unsupported Pi command ${firstToken}. Lyntty currently supports /goal, /context, and /skill:* from mobile.`);
+    };
+
     const queueRemotePiCommand = (mirror: ExternalPiMirrorState, message: { localKey?: string; content: { text: string } }): void => {
       const localKey = message.localKey ?? `remote:${mirror.nextCommandSeq}`;
       if (mirror.seenCommandLocalKeys.has(localKey) || mirror.commands.some((entry) => entry.localKey === localKey)) return;
@@ -836,6 +852,9 @@ export async function startDaemon(): Promise<void> {
       const command = parseLynttyPiRemoteCommand(message.content.text, { isStreaming: mirror.isStreaming });
       if (!command) {
         logger.debug('[pi] Rejected unsupported remote Pi command', { sessionId: mirror.sessionId, localKey });
+        if (message.content.text.trim().startsWith('/')) {
+          sendRemoteCommandRejection(mirror, message.content.text);
+        }
         return;
       }
       mirror.commands.push({
@@ -846,6 +865,24 @@ export async function startDaemon(): Promise<void> {
         deliveryToken: randomUUID(),
       });
       logger.debug('[pi] Queued remote Pi command for extension delivery', { sessionId: mirror.sessionId, localKey, type: command.type });
+    };
+
+    const applyPiCommandMetadata = (mirror: ExternalPiMirrorState, commands: LynttyPiCommandInfo[]): void => {
+      const supported = commands.filter((command) => {
+        return (command.source === 'extension' && (command.name === 'goal' || command.name === 'context'))
+          || (command.source === 'skill' && command.name.startsWith('skill:'));
+      });
+      const slashCommands = supported
+        .filter((command) => command.source === 'extension')
+        .map((command) => command.name);
+      const skills = supported
+        .filter((command) => command.source === 'skill')
+        .map((command) => command.name);
+      mirror.sessionClient.updateMetadata((currentMetadata) => ({
+        ...currentMetadata,
+        slashCommands,
+        skills,
+      }));
     };
 
     pollPiExtensionCommandsHandler = async (session, afterSeq) => {
@@ -879,8 +916,14 @@ export async function startDaemon(): Promise<void> {
       command.error = ack.error;
       if (ack.status === 'accepted_by_pi') {
         command.status = 'accepted_by_pi';
+        if (ack.resultText) {
+          sendRemoteCommandNotice(mirror, ack.resultText);
+        }
         mirror.sessionClient.keepAlive(true, 'remote');
         mirror.seenCommandLocalKeys.add(command.localKey);
+        if (command.command.type === 'get_commands' && ack.commands) {
+          applyPiCommandMetadata(mirror, ack.commands);
+        }
         const acceptedKeys = [...mirror.seenCommandLocalKeys].slice(-500);
         mirror.sessionClient.updateMetadata((currentMetadata) => ({
           ...currentMetadata,
@@ -888,8 +931,14 @@ export async function startDaemon(): Promise<void> {
           remoteCommandAcceptedLocalKeys: acceptedKeys,
         }));
       } else if (ack.status === 'failed') {
-        command.deliveryToken = randomUUID();
-        logger.debug('[pi] Remote Pi command failed in extension and remains queued for retry', { sessionId: mirror.sessionId, seq: command.seq });
+        if (command.command.type === 'invoke_pi_command') {
+          command.status = 'accepted_by_pi';
+          mirror.seenCommandLocalKeys.add(command.localKey);
+          sendRemoteCommandNotice(mirror, ack.error ? `Pi command failed: ${ack.error}` : 'Pi command failed.');
+        } else {
+          command.deliveryToken = randomUUID();
+          logger.debug('[pi] Remote Pi command failed in extension and remains queued for retry', { sessionId: mirror.sessionId, seq: command.seq });
+        }
       }
       while (mirror.commands.length > 0 && mirror.commands[0].status === 'accepted_by_pi') {
         mirror.commands.shift();
@@ -1462,6 +1511,10 @@ export async function startDaemon(): Promise<void> {
         mirror.extensionCoveredSince = eventTime;
       }
       const deliveredCutoff = mirror.extensionCoveredSince ?? eventTime;
+
+      if (event.type === 'command_list' && Array.isArray(event.commands)) {
+        applyPiCommandMetadata(mirror, event.commands as LynttyPiCommandInfo[]);
+      }
 
       if (event.type === 'session_start' || event.type === 'session_info_changed') {
         mirror.sessionClient.updateMetadata((currentMetadata) => ({

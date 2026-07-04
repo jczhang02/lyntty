@@ -2,7 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import { join } from 'node:path';
 
-const LYNTTY_PI_EXTENSION_SOURCE = String.raw`import { readFile } from "node:fs/promises";
+const LYNTTY_PI_EXTENSION_SOURCE = String.raw`import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -17,6 +18,7 @@ let lastStatus = "not connected";
 let draining = false;
 let nextEventId = 1;
 type QueuedPayload = { session: ReturnType<typeof sessionSnapshot>; event: Record<string, unknown>; eventId: number; timestamp: number; attempts?: number };
+type PiCommandInfo = { name: string; description?: string; source: string; sourceInfo?: Record<string, unknown> };
 type RemotePiCommand =
   | { type: "send_user_message"; text: string }
   | { type: "follow_up"; text: string }
@@ -26,9 +28,11 @@ type RemotePiCommand =
   | { type: "reload" }
   | { type: "set_session_name"; name: string }
   | { type: "get_commands" }
+  | { type: "invoke_pi_command"; commandLine: string; deliverAs?: "followUp" }
   | { type: "set_label"; entryId: string; label?: string };
 type RemotePiCommandEnvelope = { seq: number; deliveryToken: string; command: RemotePiCommand };
-type CommandAck = { seq: number; deliveryToken: string; status: "accepted_by_pi" | "failed"; error?: string };
+type CommandAck = { seq: number; deliveryToken: string; status: "accepted_by_pi" | "failed"; error?: string; resultText?: string; commands?: PiCommandInfo[] };
+type GoalState = { goalId: string; objective: string; status: string; tokenBudget: number | null; usage: { tokensUsed: number; activeSeconds: number }; createdAt: number; updatedAt: number };
 const queuedPayloads: QueuedPayload[] = [];
 const heartbeatTimers = new Map<string, ReturnType<typeof setInterval>>();
 const commandPollTimers = new Map<string, ReturnType<typeof setInterval>>();
@@ -192,7 +196,125 @@ function lynttyLabel(text: string): string {
   return text.startsWith("[lyntty]") ? text : "[lyntty] " + text;
 }
 
-async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, command: RemotePiCommand): Promise<void> {
+function stripFrontmatter(content: string): string {
+  if (!content.startsWith("---")) return content;
+  const nl = String.fromCharCode(10);
+  const end = content.indexOf(nl + "---", 3);
+  return end >= 0 ? content.slice(end + 4) : content;
+}
+
+function splitCommandLine(commandLine: string): { name: string; args: string } {
+  const trimmed = commandLine.trim();
+  const spaceIndex = trimmed.indexOf(" ");
+  const rawName = spaceIndex === -1 ? trimmed : trimmed.slice(0, spaceIndex);
+  return {
+    name: rawName.startsWith("/") ? rawName.slice(1) : rawName,
+    args: spaceIndex === -1 ? "" : trimmed.slice(spaceIndex + 1).trim(),
+  };
+}
+
+function currentGoal(ctx: ExtensionContext): GoalState | null {
+  let goal: GoalState | null = null;
+  for (const entry of ctx.sessionManager.getEntries() as Array<{ type?: string; customType?: string; data?: any }>) {
+    if (entry.type !== "custom" || entry.customType !== "pi-codex-goal" || !entry.data || entry.data.version !== 1) continue;
+    if (entry.data.kind === "clear") goal = null;
+    if (entry.data.kind === "set" && entry.data.goal) goal = entry.data.goal;
+    if (entry.data.kind === "usage" && goal?.goalId === entry.data.goalId) {
+      goal = { ...goal, status: entry.data.status, usage: entry.data.usage, updatedAt: entry.data.updatedAt };
+    }
+  }
+  return goal;
+}
+
+function formatGoal(goal: ReturnType<typeof currentGoal>): string {
+  if (!goal) return "No active Pi goal.";
+  const budget = goal.tokenBudget === null ? "none" : String(goal.tokenBudget);
+  return "Pi goal (" + goal.status + ", budget " + budget + "): " + goal.objective;
+}
+
+function appendGoalEntry(pi: ExtensionAPI, goal: GoalState, kind: "set" | "clear"): void {
+  const at = Math.floor(Date.now() / 1000);
+  pi.appendEntry("pi-codex-goal", kind === "clear"
+    ? { version: 1, kind: "clear", source: "command", clearedGoalId: goal.goalId, at }
+    : { version: 1, kind: "set", source: "command", goal, at });
+}
+
+function handleGoalCommand(pi: ExtensionAPI, ctx: ExtensionContext, args: string): string {
+  const trimmed = args.trim();
+  const existing = currentGoal(ctx);
+  if (!trimmed || trimmed === "status" || trimmed === "show") return formatGoal(existing);
+  if (trimmed === "clear") {
+    if (!existing) return "No active Pi goal.";
+    appendGoalEntry(pi, existing, "clear");
+    return "Pi goal cleared.";
+  }
+  if (trimmed === "pause" || trimmed === "resume") {
+    if (!existing) return "No active Pi goal.";
+    const next = { ...existing, status: trimmed === "pause" ? "paused" : "active", updatedAt: Math.floor(Date.now() / 1000) };
+    appendGoalEntry(pi, next, "set");
+    return "Pi goal " + next.status + ".";
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const next = {
+    goalId: randomUUID(),
+    objective: trimmed.slice(0, 8000),
+    status: "active",
+    tokenBudget: null,
+    usage: { tokensUsed: 0, activeSeconds: 0 },
+    createdAt: now,
+    updatedAt: now,
+  };
+  appendGoalEntry(pi, next, "set");
+  return "Pi goal set.";
+}
+
+function handleContextCommand(ctx: ExtensionContext): string {
+  const usage = ctx.getContextUsage();
+  if (!usage) return "Pi context usage unavailable.";
+  return "Pi context usage:" + String.fromCharCode(10) + JSON.stringify(usage, null, 2);
+}
+
+async function expandSkillCommand(pi: ExtensionAPI, commandLine: string): Promise<string> {
+  const { name, args } = splitCommandLine(commandLine);
+  const skill = safePiCommands(pi).find((command) => command.name === name && command.source === "skill");
+  const path = typeof skill?.sourceInfo?.path === "string" ? skill.sourceInfo.path : undefined;
+  if (!skill || !path) throw new Error("Skill " + name + " is not available in this Pi session");
+  const content = stripFrontmatter(await readFile(path, "utf8")).trim();
+  const slashIndex = path.lastIndexOf("/");
+  const baseDir = typeof skill.sourceInfo?.baseDir === "string" ? skill.sourceInfo.baseDir : slashIndex >= 0 ? path.slice(0, slashIndex) : path;
+  const skillName = name.slice("skill:".length);
+  const nl = String.fromCharCode(10);
+  const block = '<skill name="' + skillName + '" location="' + path + '">' + nl + 'References are relative to ' + baseDir + '.' + nl + nl + content + nl + '</skill>';
+  return args ? block + nl + nl + args : block;
+}
+
+function isSupportedPiCommand(command: { name?: unknown; source?: unknown }): boolean {
+  if (typeof command.name !== "string") return false;
+  if (command.source === "skill") return command.name.startsWith("skill:");
+  return command.source === "extension" && (command.name === "goal" || command.name === "context");
+}
+
+function safePiCommands(pi: ExtensionAPI): PiCommandInfo[] {
+  return pi.getCommands()
+    .filter(isSupportedPiCommand)
+    .map((command) => ({
+      name: command.name,
+      description: command.description,
+      source: command.source,
+      sourceInfo: command.sourceInfo as Record<string, unknown> | undefined,
+    }));
+}
+
+function isSupportedPiCommandLine(pi: ExtensionAPI, commandLine: string): boolean {
+  const trimmed = commandLine.trim();
+  const spaceIndex = trimmed.indexOf(" ");
+  const rawName = spaceIndex === -1 ? trimmed : trimmed.slice(0, spaceIndex);
+  const commandName = rawName.startsWith("/") ? rawName.slice(1) : rawName;
+  if (!commandName) return false;
+  return safePiCommands(pi).some((command) => command.name === commandName);
+}
+
+async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, command: RemotePiCommand): Promise<Partial<CommandAck> | undefined> {
   switch (command.type) {
     case "send_user_message":
       await pi.sendUserMessage(lynttyLabel(command.text));
@@ -219,9 +341,26 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, com
       pi.setSessionName(command.name);
       return;
     case "get_commands":
-      // The command list is returned only as an ack side effect for now; lynttyd owns UI policy.
-      pi.getCommands();
-      return;
+      return { commands: safePiCommands(pi) };
+    case "invoke_pi_command": {
+      if (!isSupportedPiCommandLine(pi, command.commandLine)) {
+        throw new Error("Pi command is not allowed by Lyntty remote control");
+      }
+      const { name, args } = splitCommandLine(command.commandLine);
+      if (name === "goal") {
+        return { resultText: handleGoalCommand(pi, ctx, args) };
+      }
+      if (name === "context") {
+        return { resultText: handleContextCommand(ctx) };
+      }
+      const expanded = await expandSkillCommand(pi, command.commandLine);
+      if (command.deliverAs) {
+        await pi.sendUserMessage(expanded, { deliverAs: command.deliverAs });
+      } else {
+        await pi.sendUserMessage(expanded);
+      }
+      return { resultText: "Queued /" + name + "." };
+    }
     case "set_label":
       pi.setLabel(command.entryId, command.label);
       return;
@@ -264,8 +403,8 @@ async function pollCommands(pi: ExtensionAPI, ctx: ExtensionContext): Promise<vo
     executingCommand = true;
     let ack: CommandAck;
     try {
-      await executeRemoteCommand(pi, ctx, envelope.command);
-      ack = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "accepted_by_pi" };
+      const result = await executeRemoteCommand(pi, ctx, envelope.command);
+      ack = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "accepted_by_pi", ...result };
     } catch (error) {
       ack = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "failed", error: error instanceof Error ? error.message : "Pi command failed" };
     } finally {
@@ -317,6 +456,7 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
       if (action === "on" || action === "enable") {
         enabled = true;
         startCommandPolling(pi, ctx);
+        send(ctx, { type: "command_list", commands: safePiCommands(pi) });
         send(ctx, { type: "session_start", reason: "remote-command" });
         ctx.ui.notify("Lyntty remote sync enabled", "info");
         return;
@@ -342,6 +482,7 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
       if (action === "on" || action === "remote on") {
         enabled = true;
         startCommandPolling(pi, ctx);
+        send(ctx, { type: "command_list", commands: safePiCommands(pi) });
         send(ctx, { type: "session_start", reason: "lyntty-command" });
         ctx.ui.notify("Lyntty remote sync enabled", "info");
         return;
@@ -356,6 +497,7 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
   pi.on("session_start", async (event, ctx) => {
     startHeartbeat(ctx);
     startCommandPolling(pi, ctx);
+    send(ctx, { type: "command_list", commands: safePiCommands(pi) });
     send(ctx, { type: "session_start", reason: event.reason });
   });
 

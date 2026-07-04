@@ -53,18 +53,16 @@ export const IGNORED_COMMANDS = [
 
 // Default commands always available
 const DEFAULT_COMMANDS: CommandItem[] = [
-    { command: 'compact', description: 'Compact the conversation history' },
-    { command: 'clear', description: 'Clear the conversation' },
-    { command: 'goal', description: 'Set a session goal' },
-    { command: 'mcp', description: 'Show connected MCP servers' },
-    { command: 'skills', description: 'Show available skills' },
+    { command: 'goal', description: 'Show or manage the current Pi goal' },
+    { command: 'context', description: 'Show Pi context usage' },
 ];
 
 // Command descriptions for known tools/commands
 const COMMAND_DESCRIPTIONS: Record<string, string> = {
     // Default commands
     compact: 'Compact the conversation history',
-    goal: 'Set a session goal',
+    goal: 'Show or manage the current Pi goal',
+    context: 'Show Pi context usage',
 
     // Common tool commands
     help: 'Show available commands',
@@ -80,6 +78,15 @@ const COMMAND_DESCRIPTIONS: Record<string, string> = {
     // Add more descriptions as needed
 };
 
+function normalizeCommandName(command: string, source: 'slash' | 'skill'): string | null {
+    const withoutSlash = command.trim().replace(/^\//, '');
+    if (!withoutSlash) return null;
+    if (source === 'skill') {
+        return withoutSlash.startsWith('skill:') ? withoutSlash : `skill:${withoutSlash}`;
+    }
+    return withoutSlash;
+}
+
 // Get commands from session metadata
 function getCommandsFromSession(sessionId: string): CommandItem[] {
     const state = storage.getState();
@@ -91,9 +98,9 @@ function getCommandsFromSession(sessionId: string): CommandItem[] {
     const commands: CommandItem[] = [...DEFAULT_COMMANDS];
 
     const metadataCommands = [
-        ...(session.metadata.slashCommands ?? []),
-        ...(session.metadata.skills ?? []),
-    ];
+        ...(session.metadata.slashCommands ?? []).map((command) => normalizeCommandName(command, 'slash')),
+        ...(session.metadata.skills ?? []).map((command) => normalizeCommandName(command, 'skill')),
+    ].filter((command): command is string => Boolean(command));
 
     for (const cmd of metadataCommands) {
         // Skip if in ignore list

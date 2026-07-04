@@ -12,14 +12,20 @@ vi.mock('./storage', () => ({
 import { getAllCommands } from './suggestionCommands';
 
 describe('suggestionCommands', () => {
-    it('includes /goal in the default slash command suggestions', () => {
+    it('includes supported Pi commands in the default slash command suggestions', () => {
         const commands = getAllCommands('missing-session');
 
         expect(commands).toEqual(expect.arrayContaining([
             expect.objectContaining({
                 command: 'goal',
-                description: 'Set a session goal',
+                description: 'Show or manage the current Pi goal',
             }),
+            expect.objectContaining({ command: 'context' }),
+        ]));
+        expect(commands).not.toEqual(expect.arrayContaining([
+            expect.objectContaining({ command: 'compact' }),
+            expect.objectContaining({ command: 'mcp' }),
+            expect.objectContaining({ command: 'skills' }),
         ]));
     });
 
@@ -35,8 +41,8 @@ describe('suggestionCommands', () => {
         const commands = getAllCommands('codex-session');
 
         expect(commands).toEqual(expect.arrayContaining([
-            expect.objectContaining({ command: 'plan-to-beads' }),
-            expect.objectContaining({ command: 'superpowers:brainstorming' }),
+            expect.objectContaining({ command: 'skill:plan-to-beads' }),
+            expect.objectContaining({ command: 'skill:superpowers:brainstorming' }),
         ]));
     });
 });

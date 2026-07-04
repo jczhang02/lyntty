@@ -14,6 +14,13 @@ export type LynttyPiExtensionPayload = {
   timestamp?: number;
 };
 
+export type LynttyPiCommandInfo = {
+  name: string;
+  description?: string;
+  source: 'extension' | 'prompt' | 'skill' | string;
+  sourceInfo?: Record<string, unknown>;
+};
+
 export type LynttyPiRemoteCommand =
   | { type: 'send_user_message'; text: string }
   | { type: 'follow_up'; text: string }
@@ -23,6 +30,7 @@ export type LynttyPiRemoteCommand =
   | { type: 'reload' }
   | { type: 'set_session_name'; name: string }
   | { type: 'get_commands' }
+  | { type: 'invoke_pi_command'; commandLine: string; deliverAs?: 'followUp' }
   | { type: 'set_label'; entryId: string; label?: string };
 
 export type LynttyPiRemoteCommandEnvelope = {
@@ -36,6 +44,8 @@ export type LynttyPiRemoteCommandAck = {
   status: 'delivered_to_pi_extension' | 'accepted_by_pi' | 'failed';
   deliveryToken?: string;
   error?: string;
+  resultText?: string;
+  commands?: LynttyPiCommandInfo[];
 };
 
 const REMOTE_PI_TEXT_MAX = 50_000;
@@ -79,6 +89,13 @@ export function parseLynttyPiRemoteCommand(text: string, options: { isStreaming:
   }
   if (command === '/commands') {
     return { type: 'get_commands' };
+  }
+  if (command === '/goal' || command === '/context' || command.startsWith('/skill:')) {
+    const commandLine = capText(trimmed);
+    if (!commandLine) return null;
+    return options.isStreaming
+      ? { type: 'invoke_pi_command', commandLine, deliverAs: 'followUp' }
+      : { type: 'invoke_pi_command', commandLine };
   }
   if (command === '/label') {
     const [entryId = '', ...labelParts] = rest.split(/\s+/);
@@ -132,5 +149,6 @@ export function isLifecyclePiExtensionEvent(event: Record<string, unknown>): boo
   return event.type === 'session_start'
     || event.type === 'session_info_changed'
     || event.type === 'session_shutdown'
-    || event.type === 'remote_heartbeat';
+    || event.type === 'remote_heartbeat'
+    || event.type === 'command_list';
 }

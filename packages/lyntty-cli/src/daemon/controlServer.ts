@@ -11,7 +11,7 @@ import { Metadata } from '@/api/types';
 import { decodeBase64 } from '@/api/encryption';
 import { TrackedSession, SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
-import type { LynttyPiExtensionPayload, LynttyPiRemoteCommandAck, LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
+import type { LynttyPiCommandInfo, LynttyPiExtensionPayload, LynttyPiRemoteCommandAck, LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
 
 export function startDaemonControlServer({
   getChildren,
@@ -115,6 +115,13 @@ export function startDaemonControlServer({
       name: z.string().max(512).optional(),
     });
 
+    const PiCommandInfoSchema: z.ZodType<LynttyPiCommandInfo> = z.object({
+      name: z.string().min(1).max(256),
+      description: z.string().max(1024).optional(),
+      source: z.string().min(1).max(64),
+      sourceInfo: z.record(z.string(), z.unknown()).optional(),
+    });
+
     const PiRemoteCommandSchema = z.discriminatedUnion('type', [
       z.object({ type: z.literal('send_user_message'), text: z.string().min(1).max(PI_EXTENSION_TEXT_MAX) }),
       z.object({ type: z.literal('follow_up'), text: z.string().min(1).max(PI_EXTENSION_TEXT_MAX) }),
@@ -124,6 +131,7 @@ export function startDaemonControlServer({
       z.object({ type: z.literal('reload') }),
       z.object({ type: z.literal('set_session_name'), name: z.string().min(1).max(512) }),
       z.object({ type: z.literal('get_commands') }),
+      z.object({ type: z.literal('invoke_pi_command'), commandLine: z.string().min(1).max(PI_EXTENSION_TEXT_MAX), deliverAs: z.enum(['followUp']).optional() }),
       z.object({ type: z.literal('set_label'), entryId: z.string().min(1).max(PI_EXTENSION_ID_MAX), label: z.string().max(512).optional() }),
     ]);
 
@@ -201,6 +209,8 @@ export function startDaemonControlServer({
             status: z.enum(['delivered_to_pi_extension', 'accepted_by_pi', 'failed']),
             deliveryToken: z.string().min(1).max(256).optional(),
             error: z.string().max(2048).optional(),
+            resultText: z.string().max(20_000).optional(),
+            commands: z.array(PiCommandInfoSchema).max(500).optional(),
           }),
         }),
         response: {

@@ -37,6 +37,9 @@ describe('Pi extension event bridge', () => {
     expect(parseLynttyPiRemoteCommand('/steer change direction', { isStreaming: true })).toEqual({ type: 'steer', text: 'change direction' });
     expect(parseLynttyPiRemoteCommand('/compact keep recent work', { isStreaming: false })).toEqual({ type: 'compact', instructions: 'keep recent work' });
     expect(parseLynttyPiRemoteCommand('/name New title', { isStreaming: false })).toEqual({ type: 'set_session_name', name: 'New title' });
+    expect(parseLynttyPiRemoteCommand('/goal status', { isStreaming: false })).toEqual({ type: 'invoke_pi_command', commandLine: '/goal status' });
+    expect(parseLynttyPiRemoteCommand('/context details', { isStreaming: true })).toEqual({ type: 'invoke_pi_command', commandLine: '/context details', deliverAs: 'followUp' });
+    expect(parseLynttyPiRemoteCommand('/skill:coding-standards', { isStreaming: false })).toEqual({ type: 'invoke_pi_command', commandLine: '/skill:coding-standards' });
     expect(parseLynttyPiRemoteCommand('/unknown do thing', { isStreaming: false })).toBeNull();
     expect(parseLynttyPiRemoteCommand('x'.repeat(50_001), { isStreaming: false })).toBeNull();
   });
@@ -57,6 +60,8 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('X-Lyntty-Extension-Token');
       expect(source).toContain('deliveryToken');
       expect(source).toContain('pi.sendUserMessage');
+      expect(source).toContain('safePiCommands');
+      expect(source).toContain('invoke_pi_command');
       expect(source).toContain('deliverAs: "followUp"');
       expect(source).toContain('127.0.0.1');
       expect(source).toContain('RETRY_DELAY_MS');

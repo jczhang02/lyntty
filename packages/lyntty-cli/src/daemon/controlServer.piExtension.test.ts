@@ -56,7 +56,7 @@ describe('daemon control server Pi extension endpoints', () => {
       pollPiExtensionCommands: async (session, afterSeq) => ({
         status: 'ok',
         commands: session.piSessionId === 'pi-1' && afterSeq < 7
-          ? [{ seq: 7, deliveryToken: 'lease-7', command: { type: 'follow_up', text: 'from phone' } }]
+          ? [{ seq: 7, deliveryToken: 'lease-7', command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }]
           : [],
       }),
       onPiExtensionCommandAck: async (session, ack) => {
@@ -75,17 +75,25 @@ describe('daemon control server Pi extension endpoints', () => {
       expect(commandResponse.status).toBe(200);
       expect(await commandResponse.json()).toEqual({
         status: 'ok',
-        commands: [{ seq: 7, deliveryToken: 'lease-7', command: { type: 'follow_up', text: 'from phone' } }],
+        commands: [{ seq: 7, deliveryToken: 'lease-7', command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }],
       });
 
       const ackResponse = await fetch(`http://127.0.0.1:${server.port}/pi-extension/command-ack`, {
         method: 'POST',
         headers: authHeaders,
-        body: JSON.stringify({ session: { piSessionId: 'pi-1' }, ack: { seq: 7, deliveryToken: 'lease-7', status: 'accepted_by_pi' } }),
+        body: JSON.stringify({
+          session: { piSessionId: 'pi-1' },
+          ack: {
+            seq: 7,
+            deliveryToken: 'lease-7',
+            status: 'accepted_by_pi',
+            commands: [{ name: 'skill:coding-standards', source: 'skill', description: 'coding standards' }],
+          },
+        }),
       });
       expect(ackResponse.status).toBe(200);
       expect(await ackResponse.json()).toEqual({ status: 'ok' });
-      expect(acked).toEqual([{ session: { piSessionId: 'pi-1' }, ack: { seq: 7, deliveryToken: 'lease-7', status: 'accepted_by_pi' } }]);
+      expect(acked).toEqual([{ session: { piSessionId: 'pi-1' }, ack: { seq: 7, deliveryToken: 'lease-7', status: 'accepted_by_pi', commands: [{ name: 'skill:coding-standards', source: 'skill', description: 'coding standards' }] } }]);
     } finally {
       await server.stop();
     }
