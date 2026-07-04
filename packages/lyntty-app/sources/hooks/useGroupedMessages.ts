@@ -283,9 +283,9 @@ function collectAgentWorkGroups(messages: Message[], turnOf: number[], collapseC
         if (hiddenIndexes.length === 0) continue;
 
         const oldestIdx = Math.max(...hiddenIndexes);
-        const hiddenMessages = hiddenIndexes.map((index) => messages[index]);
-        const startedAt = Math.min(...hiddenMessages.map((msg) => msg.createdAt));
         const completedAt = messages[finalTextIndex].createdAt;
+        const hiddenMessages = hiddenIndexes.map((index) => completeRunningToolForDisplay(messages[index], completedAt));
+        const startedAt = Math.min(...hiddenMessages.map((msg) => msg.createdAt));
         const hasRunning = hiddenMessages.some((msg) => msg.kind === 'tool-call' && msg.tool.state === 'running');
 
         groups.push({
@@ -304,6 +304,19 @@ function collectAgentWorkGroups(messages: Message[], turnOf: number[], collapseC
     }
 
     return groups;
+}
+
+function completeRunningToolForDisplay(msg: Message, completedAt: number): Message {
+    if (msg.kind !== 'tool-call' || msg.tool.state !== 'running') return msg;
+    if (completedAt < msg.createdAt) return msg;
+    return {
+        ...msg,
+        tool: {
+            ...msg.tool,
+            state: 'completed',
+            completedAt,
+        },
+    };
 }
 
 /** Returns true for messages that render as null and should be excluded entirely */

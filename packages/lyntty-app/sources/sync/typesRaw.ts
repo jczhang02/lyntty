@@ -527,6 +527,7 @@ export type NormalizedMessage = ({
     id: string,
     localId: string | null,
     createdAt: number,
+    serverSeq?: number | null,
     isSidechain: boolean,
     meta?: MessageMeta,
     usage?: UsageData,
@@ -544,6 +545,7 @@ function normalizeSessionEnvelope(
     localId: string | null,
     createdAt: number,
     meta: MessageMeta | undefined,
+    serverSeq?: number | null,
 ): NormalizedMessage | null {
     // Session protocol requires turn id on all agent-originated envelopes.
     // Drop malformed agent events without turn to avoid attaching stray messages.
@@ -571,6 +573,7 @@ function normalizeSessionEnvelope(
             id: messageId,
             localId,
             createdAt: messageCreatedAt,
+            serverSeq,
             role: 'event',
             isSidechain: false,
             content: { type: 'ready' },
@@ -587,6 +590,7 @@ function normalizeSessionEnvelope(
             id: messageId,
             localId,
             createdAt: messageCreatedAt,
+            serverSeq,
             role: 'agent',
             isSidechain,
             content: [{
@@ -605,6 +609,7 @@ function normalizeSessionEnvelope(
                 id: messageId,
                 localId,
                 createdAt: messageCreatedAt,
+                serverSeq,
                 role: 'user',
                 isSidechain: false,
                 content: {
@@ -625,6 +630,7 @@ function normalizeSessionEnvelope(
             id: messageId,
             localId,
             createdAt: messageCreatedAt,
+            serverSeq,
             role: 'agent',
             isSidechain,
             content: [
@@ -651,6 +657,7 @@ function normalizeSessionEnvelope(
             id: messageId,
             localId,
             createdAt: messageCreatedAt,
+            serverSeq,
             role: 'agent',
             isSidechain,
             content: [{
@@ -671,6 +678,7 @@ function normalizeSessionEnvelope(
             id: messageId,
             localId,
             createdAt: messageCreatedAt,
+            serverSeq,
             role: 'agent',
             isSidechain,
             content: [{
@@ -706,6 +714,7 @@ function normalizeSessionEnvelope(
             id: messageId,
             localId,
             createdAt: messageCreatedAt,
+            serverSeq,
             role: 'agent',
             isSidechain,
             content: [
@@ -741,7 +750,7 @@ function normalizeSessionEnvelope(
     return null;
 }
 
-export function normalizeRawMessage(id: string, localId: string | null, createdAt: number, raw: RawRecord): NormalizedMessage | null {
+export function normalizeRawMessage(id: string, localId: string | null, createdAt: number, raw: RawRecord, serverSeq?: number | null): NormalizedMessage | null {
     // Zod transform handles normalization during validation
     let parsed = rawRecordSchema.safeParse(raw);
     if (!parsed.success) {
@@ -756,6 +765,7 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
             id,
             localId,
             createdAt,
+            serverSeq,
             role: 'user',
             content: raw.content,
             isSidechain: false,
@@ -768,6 +778,7 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
             localId,
             createdAt,
             raw.meta,
+            serverSeq,
         );
     }
     if (raw.role === 'agent') {

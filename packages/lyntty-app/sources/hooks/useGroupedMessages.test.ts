@@ -12,7 +12,7 @@ vi.mock('@/text', () => ({
     t: (key: string, params?: { count?: number }) => `${key}:${params?.count ?? ''}`,
 }));
 
-function toolMessage(id: string, createdAt: number, options: { pendingPermission?: boolean } = {}): ToolCallMessage {
+function toolMessage(id: string, createdAt: number, options: { pendingPermission?: boolean; running?: boolean } = {}): ToolCallMessage {
     return {
         kind: 'tool-call',
         id,
@@ -20,11 +20,11 @@ function toolMessage(id: string, createdAt: number, options: { pendingPermission
         createdAt,
         tool: {
             name: 'CodexBash',
-            state: 'completed',
+            state: options.running ? 'running' : 'completed',
             input: { command: id },
             createdAt,
             startedAt: createdAt,
-            completedAt: createdAt + 1,
+            completedAt: options.running ? null : createdAt + 1,
             description: id,
             ...(options.pendingPermission
                 ? {
@@ -285,6 +285,40 @@ describe('useGroupedMessages', () => {
             'agent-progress',
             'tool-earliest',
         ]);
+    });
+
+    it('freezes running tool timers once a final answer completes the work group', () => {
+        const messages: Message[] = [
+            {
+                kind: 'agent-text',
+                id: 'agent-final',
+                localId: null,
+                createdAt: 5_000,
+                text: 'done',
+            },
+            toolMessage('tool-running-in-history', 2_000, { running: true }),
+            {
+                kind: 'user-text',
+                id: 'user',
+                localId: null,
+                createdAt: 1_000,
+                text: 'read files',
+            },
+        ];
+
+        const items = groupMessagesForDisplay(messages, true);
+        const group = items.find((item) => item.type === 'agent-work-group');
+        expect(group).toBeDefined();
+        if (group?.type !== 'agent-work-group') throw new Error('Expected agent work group');
+        expect(group.hasRunning).toBe(false);
+        expect(group.completedAt).toBe(5_000);
+        expect(group.messages[0]).toMatchObject({
+            kind: 'tool-call',
+            tool: {
+                state: 'completed',
+                completedAt: 5_000,
+            },
+        });
     });
 
     it('shows current thinking but folds completed thinking into agent work', () => {
