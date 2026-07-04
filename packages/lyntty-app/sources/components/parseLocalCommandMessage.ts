@@ -25,6 +25,10 @@ export type LocalCommandMessage =
     | { kind: 'goal-confirmation'; goal: string }
     | { kind: 'text'; text: string };
 
+export interface ParseLocalCommandMessageOptions {
+    parseRawSlashCommands?: boolean;
+}
+
 const CAVEAT_RE = /^\s*<local-command-caveat>[\s\S]*?<\/local-command-caveat>\s*$/;
 const STDOUT_RE = /^\s*<local-command-stdout>\s*([\s\S]*?)\s*<\/local-command-stdout>\s*$/;
 const COMMAND_NAME_RE = /<command-name>\s*\/?([^<]+?)\s*<\/command-name>/;
@@ -68,7 +72,7 @@ function goalFromStdout(text: string): string | undefined {
     return goal && goal.length > 0 ? goal : undefined;
 }
 
-export function parseLocalCommandMessage(text: string): LocalCommandMessage {
+export function parseLocalCommandMessage(text: string, options: ParseLocalCommandMessageOptions = {}): LocalCommandMessage {
     if (CAVEAT_RE.test(text)) {
         return { kind: 'caveat' };
     }
@@ -83,7 +87,7 @@ export function parseLocalCommandMessage(text: string): LocalCommandMessage {
         return { kind: 'text', text: stdout };
     }
 
-    const rawCommand = rawSlashCommand(text);
+    const rawCommand = options.parseRawSlashCommands !== false ? rawSlashCommand(text) : undefined;
     if (rawCommand) {
         if (rawCommand.commandName.toLowerCase() === 'goal' && rawCommand.args) {
             return { kind: 'goal-run', goal: rawCommand.args };

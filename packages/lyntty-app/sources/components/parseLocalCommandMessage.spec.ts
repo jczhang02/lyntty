@@ -109,6 +109,11 @@ describe('parseLocalCommandMessage', () => {
         const text = 'just a normal message';
         expect(parseLocalCommandMessage(text)).toEqual({ kind: 'text', text });
     });
+
+    it('does not reinterpret computer-origin prose containing /goal as a goal bubble when raw slash parsing is disabled', () => {
+        const text = 'Allowed mobile commands include /goal, /context, and skills: /skill:*.';
+        expect(parseLocalCommandMessage(text, { parseRawSlashCommands: false })).toEqual({ kind: 'text', text });
+    });
 });
 
 describe('isUserSlashCommandEcho', () => {
