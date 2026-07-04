@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { existsSync, rmSync, mkdirSync, readFileSync, writeFileSync, chmodSync, statSync } from 'node:fs';
+import { existsSync, rmSync, mkdirSync, readFileSync, writeFileSync, chmodSync, statSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -138,7 +138,7 @@ export async function handleServerCommand(args: string[]): Promise<void> {
     }
 
     console.log(chalk.gray('Running migrations...'));
-    await spawnAndWait(artifacts, env, ['migrate']);
+    await runMigrationsWithRecovery(artifacts, env, pgliteDir);
 
     if (opts.persistServerUrl) {
         // The bundled server serves the webapp at its own origin, so webappUrl === serverUrl.
@@ -446,16 +446,83 @@ function findTsxBinary(cwd: string): string {
     }
 }
 
-async function spawnAndWait(art: ServerArtifacts, env: NodeJS.ProcessEnv, args: string[]): Promise<void> {
+class SpawnExitError extends Error {
+    constructor(message: string, readonly output: string) {
+        super(message);
+        this.name = 'SpawnExitError';
+    }
+}
+
+async function spawnAndWaitWithOutput(art: ServerArtifacts, env: NodeJS.ProcessEnv, args: string[]): Promise<string> {
     const cmdArgs = [...art.prefixArgs, ...args];
-    await new Promise<void>((resolve, reject) => {
-        const child = spawn(art.command, cmdArgs, { cwd: art.cwd, env, stdio: 'inherit' });
+    return new Promise<string>((resolve, reject) => {
+        const child = spawn(art.command, cmdArgs, { cwd: art.cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+        const chunks: string[] = [];
+        const collect = (chunk: Buffer) => {
+            const text = chunk.toString('utf8');
+            chunks.push(text);
+            return text;
+        };
+        child.stdout?.on('data', (chunk: Buffer) => process.stdout.write(collect(chunk)));
+        child.stderr?.on('data', (chunk: Buffer) => process.stderr.write(collect(chunk)));
         child.on('error', reject);
         child.on('exit', code => {
-            if (code === 0) resolve();
-            else reject(new Error(`lyntty-relay ${args[0]} exited with code ${code}`));
+            const output = chunks.join('');
+            if (code === 0) resolve(output);
+            else reject(new SpawnExitError(`lyntty-relay ${args[0]} exited with code ${code}`, output));
         });
     });
+}
+
+export function isPgliteOpenAbort(output: string): boolean {
+    return output.includes('RuntimeError: Aborted()') && output.includes('_checkReady');
+}
+
+function backupPgliteDir(pgliteDir: string): string {
+    const suffix = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupDir = `${pgliteDir}.unopenable-${suffix}`;
+    renameSync(pgliteDir, backupDir);
+    return backupDir;
+}
+
+async function confirmPgliteRecovery(pgliteDir: string): Promise<boolean> {
+    if (!process.stdin.isTTY || !process.stderr.isTTY) {
+        console.error(chalk.red('PGlite database could not be opened.'));
+        console.error(chalk.gray(`  Database: ${pgliteDir}`));
+        console.error(chalk.gray('  Run `lyntty server --reset` to wipe local relay data, or move the pglite directory aside and retry.'));
+        return false;
+    }
+
+    const rl = createInterface({ input: process.stdin, output: process.stderr });
+    try {
+        const answer = await rl.question(
+            chalk.yellow(`PGlite database at ${pgliteDir} could not be opened. Move it aside and create a fresh local relay database? `) +
+            chalk.gray('[y/N] '),
+        );
+        const normalized = answer.trim().toLowerCase();
+        return normalized === 'y' || normalized === 'yes';
+    } finally {
+        rl.close();
+    }
+}
+
+async function runMigrationsWithRecovery(artifacts: ServerArtifacts, env: NodeJS.ProcessEnv, pgliteDir: string): Promise<void> {
+    try {
+        await spawnAndWaitWithOutput(artifacts, env, ['migrate']);
+        return;
+    } catch (error) {
+        if (!(error instanceof SpawnExitError) || !isPgliteOpenAbort(error.output) || !existsSync(pgliteDir)) {
+            throw error;
+        }
+        const shouldRecover = await confirmPgliteRecovery(pgliteDir);
+        if (!shouldRecover) {
+            throw error;
+        }
+        const backupDir = backupPgliteDir(pgliteDir);
+        console.error(chalk.yellow(`Moved unopenable PGlite database to ${backupDir}`));
+        mkdirSync(pgliteDir, { recursive: true });
+        await spawnAndWaitWithOutput(artifacts, env, ['migrate']);
+    }
 }
 
 function spawnBackground(art: ServerArtifacts, env: NodeJS.ProcessEnv, args: string[]): ChildProcess {
