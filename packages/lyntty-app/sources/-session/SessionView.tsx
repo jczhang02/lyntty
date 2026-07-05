@@ -21,7 +21,7 @@ import { useDraft } from '@/hooks/useDraft';
 import { useImagePicker } from '@/hooks/useImagePicker';
 import { Modal } from '@/modal';
 import { gitStatusSync } from '@/sync/gitStatusSync';
-import { sessionAbort, sessionGoalAction } from '@/sync/ops';
+import { sessionGoalAction } from '@/sync/ops';
 import { storage, useIsDataReady, useLocalSetting, useMachine, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
 import { useSession } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
@@ -50,6 +50,7 @@ import { useUnistyles } from 'react-native-unistyles';
 import type { ModelMode, PermissionMode } from '@/components/PermissionModeSelector';
 import { resolveAgentDefaultConfig } from '@/sync/agentDefaults';
 import { performAgentGoalAction } from './agentGoalActionHandler';
+import { abortSessionFromMobile } from './sessionAbortAction';
 
 export const SessionView = React.memo((props: { id: string }) => {
     const sessionId = props.id;
@@ -541,10 +542,10 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         }
     }, [sessionId, expImageUpload, selectedImages, clearImages]);
 
-    const handleAbort = React.useCallback(() => {
+    const handleAbort = React.useCallback(async () => {
         storage.getState().resetSessionAgentOverrides(sessionId);
-        sessionAbort(sessionId);
-    }, [sessionId]);
+        await abortSessionFromMobile(sessionId, session.metadata);
+    }, [sessionId, session.metadata]);
 
     const handleFileViewerPress = React.useCallback(() => {
         router.push(`/session/${sessionId}/files`);

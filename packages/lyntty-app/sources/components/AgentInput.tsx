@@ -25,6 +25,7 @@ import { hackMode, hackModes } from '@/sync/modeHacks';
 import { Theme } from '@/theme';
 import { t } from '@/text';
 import { Metadata } from '@/sync/storageTypes';
+import { shouldShowAbortControl } from './agentInputControls';
 
 interface AgentInputProps {
     // `initialValue` seeds the uncontrolled textarea once; keystrokes never
@@ -568,6 +569,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     ), [props.availableModes]);
     const availableModels = props.availableModels ?? [];
     const availableEffortLevels = props.availableEffortLevels ?? [];
+    const showAbortControl = shouldShowAbortControl(props.showAbortButton, !!props.onAbort);
     const isSandboxEnabled = React.useMemo(() => {
         const sandbox = props.metadata?.sandbox as unknown;
         if (!sandbox) {
@@ -847,7 +849,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
         }
 
         // Handle Escape for abort when no suggestions are visible
-        if (event.key === 'Escape' && props.showAbortButton && props.onAbort && !isAborting) {
+        if (event.key === 'Escape' && showAbortControl && !isAborting) {
             handleAbortPress();
             return true;
         }
@@ -883,7 +885,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
         }
         return false; // Key was not handled
-    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, props.showAbortButton, props.onAbort, isAborting, handleAbortPress, agentInputEnterToSend, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, isSendBlocked, handleBlockedSendAttempt, props.isSendDisabled]);
+    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, showAbortControl, isAborting, handleAbortPress, agentInputEnterToSend, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, isSendBlocked, handleBlockedSendAttempt, props.isSendDisabled]);
 
 
 
@@ -1285,7 +1287,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                 )}
 
                                 {/* Abort button */}
-                                {props.onAbort && (
+                                {showAbortControl && (
                                     <Shaker ref={shakerRef}>
                                         <Pressable
                                             style={(p) => ({
@@ -1301,6 +1303,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                                             onPress={handleAbortPress}
                                             disabled={isAborting}
+                                            testID="lyntty-session-stop"
+                                            accessibilityLabel="Stop current Pi turn"
                                         >
                                             {isAborting ? (
                                                 <ActivityIndicator

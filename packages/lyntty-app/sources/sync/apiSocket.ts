@@ -5,6 +5,7 @@ import { TokenStorage } from '@/auth/tokenStorage';
 import { Encryption } from './encryption/encryption';
 import { isAuthInvalidationMessage, requestAuthInvalidation } from '@/auth/authInvalidation';
 import { storage } from './storage';
+import { formatSessionRpcFailure } from './apiSocketErrors';
 
 export function getLynttyClientId(): string {
     let platform: string = Platform.OS; // 'ios' | 'android' | 'web'
@@ -168,7 +169,7 @@ class ApiSocket {
         if (result.ok) {
             return await sessionEncryption.decryptRaw(result.result) as R;
         }
-        throw new Error('RPC call failed');
+        throw new Error(formatSessionRpcFailure(method, result));
     }
 
     /**
