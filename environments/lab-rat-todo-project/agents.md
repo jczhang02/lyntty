@@ -1,8 +1,8 @@
 # Lab Rat Todo Project — Agent Instructions
 
-This is a **test fixture**, not a real product. It exists so we can exercise
-coding agents (Claude Code, OpenCode, Codex, Lyntty, etc.) against a small but
-realistic codebase and observe their protocol behavior end to end.
+This is a **test fixture**, not a Lyntty product surface. It exists so we can
+exercise coding-agent protocol behavior against a small but realistic codebase.
+The Pi-only Lyntty product rules do not apply inside this fixture.
 
 ## What this project is
 
