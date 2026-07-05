@@ -312,14 +312,29 @@ function collectAgentWorkGroups(messages: Message[], turnOf: number[], collapseC
             return true;
         });
 
-        const finalTextIndex = visibleAgentIndexes.find((index) => messages[index].kind === 'agent-text');
-        if (finalTextIndex === undefined) continue;
+        const finalTextPosition = visibleAgentIndexes.findIndex((index) => messages[index].kind === 'agent-text');
+        if (finalTextPosition === -1) continue;
 
-        const hiddenIndexes = visibleAgentIndexes.filter((index) => index > finalTextIndex);
+        const finalTextIndex = visibleAgentIndexes[finalTextPosition];
+        const finalText = messages[finalTextIndex];
+        let finalTextBoundaryPosition = finalTextPosition;
+        if (finalText.kind === 'agent-text' && finalText.isThinking !== true) {
+            while (finalTextBoundaryPosition + 1 < visibleAgentIndexes.length) {
+                const nextIndex = visibleAgentIndexes[finalTextBoundaryPosition + 1];
+                const nextMessage = messages[nextIndex];
+                if (nextMessage.kind !== 'agent-text' || nextMessage.isThinking === true) {
+                    break;
+                }
+                finalTextBoundaryPosition++;
+            }
+        }
+        const finalTextBoundaryIndex = visibleAgentIndexes[finalTextBoundaryPosition];
+
+        const hiddenIndexes = visibleAgentIndexes.filter((index) => index > finalTextBoundaryIndex);
         if (hiddenIndexes.length === 0) continue;
 
         const oldestIdx = Math.max(...hiddenIndexes);
-        const completedAt = messages[finalTextIndex].createdAt;
+        const completedAt = finalText.createdAt;
         const hiddenMessages = hiddenIndexes.map((index) => completeRunningToolForDisplay(messages[index], completedAt));
         const startedAt = Math.min(...hiddenMessages.map((msg) => msg.createdAt));
         const hasRunning = hiddenMessages.some((msg) => msg.kind === 'tool-call' && msg.tool.state === 'running');

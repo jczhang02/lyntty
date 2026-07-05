@@ -300,6 +300,56 @@ describe('useGroupedMessages', () => {
         ]);
     });
 
+    it('keeps split final agent replies visible outside the work group', () => {
+        const messages: Message[] = [
+            {
+                kind: 'agent-text',
+                id: 'agent-final-part-2',
+                localId: null,
+                createdAt: 6,
+                text: 'second final paragraph',
+            },
+            {
+                kind: 'agent-text',
+                id: 'agent-final-part-1',
+                localId: null,
+                createdAt: 5,
+                text: 'first final paragraph',
+            },
+            toolMessage('tool-latest', 4),
+            {
+                kind: 'agent-text',
+                id: 'agent-progress',
+                localId: null,
+                createdAt: 3,
+                text: 'checking',
+            },
+            toolMessage('tool-earliest', 2),
+            {
+                kind: 'user-text',
+                id: 'user',
+                localId: null,
+                createdAt: 1,
+                text: 'run tools',
+            },
+        ];
+
+        const items = groupMessagesForDisplay(messages, true);
+
+        expect(items.map((item) => item.type)).toEqual(['message', 'message', 'agent-work-group', 'message']);
+        expect(items[0]).toMatchObject({ type: 'message', id: 'agent-final-part-2' });
+        expect(items[1]).toMatchObject({ type: 'message', id: 'agent-final-part-1' });
+        expect(items[2]).toMatchObject({ type: 'agent-work-group', id: 'work-tool-earliest' });
+        if (items[2].type !== 'agent-work-group') {
+            throw new Error('Expected an agent work group');
+        }
+        expect(items[2].messages.map((message) => message.id)).toEqual([
+            'tool-latest',
+            'agent-progress',
+            'tool-earliest',
+        ]);
+    });
+
     it('freezes running tool timers once a final answer completes the work group', () => {
         const messages: Message[] = [
             {
