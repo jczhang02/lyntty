@@ -97,7 +97,7 @@ export const settingsDefaults: Settings = {
     experiments: false,
     alwaysShowContextSize: false,
     agentInputEnterToSend: true,
-    avatarStyle: 'brutalist',
+    avatarStyle: 'gradient',
     showFlavorIcons: false,
 
     hideInactiveSessions: false,

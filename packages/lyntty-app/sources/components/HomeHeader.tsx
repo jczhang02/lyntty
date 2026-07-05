@@ -155,7 +155,7 @@ function HeaderLeft() {
             <Image
                 source={require('@/assets/images/logo-black.png')}
                 contentFit="contain"
-                style={[{ width: 24, height: 24 }]}
+                style={[{ width: 32, height: 32 }]}
                 tintColor={theme.colors.header.tint}
             />
         </View>

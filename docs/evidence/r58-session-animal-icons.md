@@ -24,7 +24,9 @@ Prototype decision recorded in Beads:
 - Preserved existing `avatarStyle` selection logic:
   - `pixelated` still uses `AvatarSkia`.
   - `brutalist` still uses `AvatarBrutalist`.
-  - default style now uses the pet avatar renderer.
+  - stored compatibility style `gradient` now renders the pet avatar renderer.
+- Changed the default `avatarStyle` from `brutalist` to `gradient`, making pet avatars the actual default for fresh installs.
+- Updated the Appearance setting label for the compatibility `gradient` value to “Pet” (localized equivalents where available) so the UI no longer calls the pet renderer “Gradient”.
 - Preserved existing status/flavor overlay behavior.
 
 ## Verification
@@ -39,10 +41,11 @@ Results:
 - `packages/lyntty-app` Vitest: 76 files, 767 tests passed.
 - `packages/lyntty-app` typecheck passed.
 
-## Not run
+## Final R58 APK validation
 
-- Release-style APK screenshot validation not run in this per-task slice. Final R58 E2E/visual matrix will capture app screenshots after remaining visual tasks land.
+Final release-style APK artifacts:
 
-## Residual risk
+- `docs/evidence/artifacts/r58-visual-polish/final-review/settings.png`
+- `docs/evidence/artifacts/r58-visual-polish/final-review/settings.xml`
 
-`react-native-svg` rendering is covered by TypeScript compile but not by a device screenshot in this slice. Final E2E should visually inspect Sessions Home and Session Remote at 24/48/80px-equivalent contexts.
+The Settings overview account row uses the shared `Avatar` component and shows the pet renderer in the release-style APK, validating the renderer at compact row size after the default change. Session-list specific 48/80px pet-avatar contexts remain covered by deterministic unit tests and TypeScript; no physical phone screenshot was captured.

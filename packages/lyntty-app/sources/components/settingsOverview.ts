@@ -1,3 +1,15 @@
+export type SettingsNodeSubtitleLabels = {
+    noNodesPaired: string;
+    oneNodeOnline: string;
+    nodesOnline: (onlineCount: number, totalCount: number) => string;
+};
+
+const defaultNodeLabels: SettingsNodeSubtitleLabels = {
+    noNodesPaired: 'No nodes paired',
+    oneNodeOnline: '1 node online',
+    nodesOnline: (onlineCount, totalCount) => `${onlineCount}/${totalCount} nodes online`,
+};
+
 export function formatSettingsServerSubtitle(serverUrl: string): string {
     try {
         const url = new URL(serverUrl);
@@ -7,12 +19,16 @@ export function formatSettingsServerSubtitle(serverUrl: string): string {
     }
 }
 
-export function formatSettingsNodeSubtitle(onlineCount: number, totalCount: number): string {
+export function formatSettingsNodeSubtitle(
+    onlineCount: number,
+    totalCount: number,
+    labels: SettingsNodeSubtitleLabels = defaultNodeLabels,
+): string {
     if (totalCount === 0) {
-        return 'No nodes paired';
+        return labels.noNodesPaired;
     }
     if (onlineCount === 1 && totalCount === 1) {
-        return '1 node online';
+        return labels.oneNodeOnline;
     }
-    return `${onlineCount}/${totalCount} nodes online`;
+    return labels.nodesOnline(onlineCount, totalCount);
 }

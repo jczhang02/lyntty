@@ -134,7 +134,6 @@ async function loadFonts() {
                 'SourceSerif4-SemiBold': require('@/assets/fonts/SourceSerif4-Semibold.ttf'),
                 'SourceSans3-Regular': require('@/assets/fonts/SourceSans3-Regular.ttf'),
                 'SourceSans3-SemiBold': require('@/assets/fonts/SourceSans3-Semibold.ttf'),
-                'LXGWNeoZhiSongScreenFull-Regular': require('@/assets/fonts/LXGWNeoZhiSongScreenFull.ttf'),
 
                 // Bricolage Grotesque
                 'BricolageGrotesque-Bold': require('@/assets/fonts/BricolageGrotesque-Bold.ttf'),
@@ -165,7 +164,6 @@ async function loadFonts() {
                         'SourceSerif4-SemiBold': require('@/assets/fonts/SourceSerif4-Semibold.ttf'),
                         'SourceSans3-Regular': require('@/assets/fonts/SourceSans3-Regular.ttf'),
                         'SourceSans3-SemiBold': require('@/assets/fonts/SourceSans3-Semibold.ttf'),
-                        'LXGWNeoZhiSongScreenFull-Regular': require('@/assets/fonts/LXGWNeoZhiSongScreenFull.ttf'),
 
                         // Bricolage Grotesque
                         'BricolageGrotesque-Bold': require('@/assets/fonts/BricolageGrotesque-Bold.ttf'),

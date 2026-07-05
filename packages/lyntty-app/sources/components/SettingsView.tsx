@@ -24,59 +24,10 @@ import { t } from '@/text';
 import { getServerUrl } from '@/sync/serverConfig';
 import { formatSettingsNodeSubtitle, formatSettingsServerSubtitle } from './settingsOverview';
 
-type BuildConfig = {
-    buildCommitSha?: unknown;
-    buildCommitTimestamp?: unknown;
-};
-
-function getBuildConfig(): BuildConfig {
-    const appConfig = Constants.expoConfig?.extra?.app;
-    return appConfig && typeof appConfig === 'object' ? appConfig as BuildConfig : {};
-}
-
-function formatUtcTimestamp(value: string): string {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return date.toISOString()
-        .replace(/\.\d{3}Z$/, 'Z')
-        .replace(/:\d{2}Z$/, 'Z')
-        .replace('T', ' ')
-        .replace('Z', ' UTC');
-}
-
-function formatBuildSubtitle(buildConfig: BuildConfig): string | undefined {
-    const commitTimestamp = typeof buildConfig.buildCommitTimestamp === 'string'
-        ? formatUtcTimestamp(buildConfig.buildCommitTimestamp)
-        : undefined;
-    const commitSha = typeof buildConfig.buildCommitSha === 'string'
-        ? buildConfig.buildCommitSha.slice(0, 7)
-        : undefined;
-
-    if (!commitTimestamp && !commitSha) {
-        return undefined;
-    }
-
-    return [
-        commitTimestamp ? `Commit ${commitTimestamp}` : 'Commit',
-        commitSha,
-    ].filter(Boolean).join(' / ');
-}
-
 export const SettingsView = React.memo(function SettingsView() {
     const { theme } = useUnistyles();
     const router = useRouter();
     const appVersion = Constants.expoConfig?.version || '1.0.0';
-    const runtimeVersion = typeof Constants.expoConfig?.runtimeVersion === 'string'
-        ? Constants.expoConfig.runtimeVersion
-        : undefined;
-    const versionDetail = [
-        appVersion,
-        runtimeVersion ? `runtime ${runtimeVersion}` : undefined,
-    ].filter(Boolean).join(' / ');
-    const versionSubtitle = formatBuildSubtitle(getBuildConfig());
     const [devModeEnabled, setDevModeEnabled] = useLocalSettingMutable('devModeEnabled');
     const [showOfflineMachines, setShowOfflineMachines] = React.useState(false);
     const allMachinesWithOffline = useAllMachines({ includeOffline: true });
@@ -97,8 +48,12 @@ export const SettingsView = React.memo(function SettingsView() {
     const bio = getBio(profile);
     const serverUrl = getServerUrl();
     const serverSubtitle = formatSettingsServerSubtitle(serverUrl);
-    const nodeSubtitle = formatSettingsNodeSubtitle(onlineMachineCount, allMachinesWithOffline.length);
-    const accountSubtitle = profile.firstName ? (bio || displayName || 'Signed in') : 'Signed in';
+    const nodeSubtitle = formatSettingsNodeSubtitle(onlineMachineCount, allMachinesWithOffline.length, {
+        noNodesPaired: t('settings.noNodesPaired'),
+        oneNodeOnline: t('settings.oneNodeOnline'),
+        nodesOnline: (onlineCount, totalCount) => t('settings.nodesOnline', { onlineCount, totalCount }),
+    });
+    const accountSubtitle = bio || displayName || t('settings.signedIn');
 
     const { connectTerminal, connectWithUrl, isLoading } = useConnectTerminal();
 
@@ -124,7 +79,7 @@ export const SettingsView = React.memo(function SettingsView() {
             {/* Compact app overview */}
             <ItemGroup>
                 <Item
-                    title="Relay"
+                    title={t('settings.relay')}
                     subtitle={serverSubtitle}
                     icon={<Ionicons name="cloud-outline" size={29} color="#007AFF" />}
                     onPress={() => router.push('/server')}
@@ -150,9 +105,7 @@ export const SettingsView = React.memo(function SettingsView() {
                 />
                 <Item
                     title={t('common.version')}
-                    subtitle={versionSubtitle}
-                    subtitleLines={2}
-                    detail={versionDetail}
+                    subtitle={appVersion}
                     icon={<Ionicons name="information-circle-outline" size={29} color={theme.colors.textSecondary} />}
                     onPress={handleVersionClick}
                     showChevron={false}

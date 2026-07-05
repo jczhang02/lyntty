@@ -86,15 +86,15 @@ cd packages/lyntty-app && APP_ENV=preview EXPO_PUBLIC_LYNTTY_SERVER_URL=http://1
 
 Artifacts:
 
-- `docs/evidence/artifacts/r58-visual-polish/launch.png` — release APK launched with updated app branding.
-- `docs/evidence/artifacts/r58-visual-polish/after-first-run.png` — release APK first-run / onboarding state.
-- `docs/evidence/artifacts/r58-visual-polish/settings.png` — Settings with updated brand marks and compact overview.
-- `docs/evidence/artifacts/r58-visual-polish/web-export.log` — web export completed and included new brand/font assets.
+- `docs/evidence/artifacts/r58-visual-polish/final-review/launch.png` — release APK launched with updated app branding.
+- `docs/evidence/artifacts/r58-visual-polish/final-review/after-first-run.png` — release APK first-run / onboarding state.
+- `docs/evidence/artifacts/r58-visual-polish/final-review/settings.png` — Settings with updated brand marks, larger optical header mark, pet avatar, and compact overview.
+- `docs/evidence/artifacts/r58-visual-polish/final-review/web-export.log` — web export completed and included new brand/font assets.
 
 Results:
 
 - Release-style APK `assembleRelease` passed.
 - APK installed and launched on emulator `emulator-5554`.
-- Maestro first-run account creation passed against isolated local relay.
+- Maestro first-run account creation passed against a fresh local relay on `:3005`; `relay.log` shows server startup without `EADDRINUSE`.
 - Web export passed.
-- Artifact sensitive-string scan found no `lyntty://terminal`, `dataEncryptionKey`, `Authorization`, or bearer-token strings.
+- Artifact sensitive-string scan found no actual pairing URLs, data-encryption keys, authorization headers, bearer tokens, public keys, or secrets. Generic stale-token log lines were summarized out of `relay.log`.

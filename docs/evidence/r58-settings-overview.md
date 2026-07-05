@@ -14,9 +14,11 @@ Updated `packages/lyntty-app/sources/components/SettingsView.tsx`:
 - Rows:
   - Relay: compact server host, opens existing server settings route.
   - Account: account summary, opens existing account settings route.
-  - Nodes: paired/online node count, no debug drilldown.
-  - Version: app/runtime/build info and existing dev-mode multi-click affordance.
-- Left existing connect-terminal, machines, features, and about sections intact.
+  - Node Management: paired/online node count, no debug drilldown.
+  - Version: app version only plus the existing hidden multi-click developer-mode affordance.
+- Localized the new overview strings through the existing text system.
+- Removed commit/runtime/build detail from the main Settings UI after review because those are developer/runtime details, not ordinary APK surface content.
+- Left existing connect-terminal, machine list, features, and about sections intact.
 
 Added pure helpers and tests in `settingsOverview.ts` / `settingsOverview.test.ts`.
 
@@ -30,24 +32,26 @@ git diff --check
 
 Results:
 
-- `packages/lyntty-app` Vitest: 77 files, 769 tests passed.
+- `packages/lyntty-app` Vitest: 77 files, 769 tests passed for the initial slice; post-review focused app verification passed 78 files / 773 tests.
 - `packages/lyntty-app` typecheck passed.
 - `git diff --check` passed.
 
 ## Final R58 APK validation
 
-Release-style APK validation was run after icon and typography changes landed.
+Release-style APK validation was rerun after icon, typography, and post-review Settings fixes landed.
 
 Artifacts:
 
-- `docs/evidence/artifacts/r58-visual-polish/settings.png`
-- `docs/evidence/artifacts/r58-visual-polish/settings.xml`
+- `docs/evidence/artifacts/r58-visual-polish/final-review/settings.png`
+- `docs/evidence/artifacts/r58-visual-polish/final-review/settings.xml`
+- `docs/evidence/artifacts/r58-visual-polish/final-review/ui-assertions.txt`
 
-Evidence from `settings.xml`:
+Evidence from final `settings.xml` / assertions:
 
 - `Relay` visible with `10.0.2.2:3005`.
 - `Account` visible with `Signed in`.
 - `Node Management` visible with `No nodes paired`.
-- `Version` visible with commit `188222a` and runtime details.
+- `Version` visible with app version `1.7.0`.
+- `Commit` and `runtime` strings are absent from the Settings overview.
 
 This validates that the large low-information logo/profile header was replaced by a compact overview and that no Review Evidence, Diagnostics, or Pi runtime debug surface was added.

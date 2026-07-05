@@ -12,4 +12,17 @@ describe('settings overview helpers', () => {
         expect(formatSettingsNodeSubtitle(1, 1)).toBe('1 node online');
         expect(formatSettingsNodeSubtitle(1, 3)).toBe('1/3 nodes online');
     });
+
+    it('accepts localized node labels', () => {
+        expect(formatSettingsNodeSubtitle(0, 0, {
+            noNodesPaired: '未配对节点',
+            oneNodeOnline: '1 个节点在线',
+            nodesOnline: (onlineCount, totalCount) => `${onlineCount}/${totalCount} 个节点在线`,
+        })).toBe('未配对节点');
+        expect(formatSettingsNodeSubtitle(2, 5, {
+            noNodesPaired: '未配对节点',
+            oneNodeOnline: '1 个节点在线',
+            nodesOnline: (onlineCount, totalCount) => `${onlineCount}/${totalCount} 个节点在线`,
+        })).toBe('2/5 个节点在线');
+    });
 });

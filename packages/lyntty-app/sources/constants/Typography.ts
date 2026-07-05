@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
  * Direction: Anthropic-like editorial warmth without using proprietary fonts.
  * - Display/body serif: Source Serif 4
  * - UI sans: Source Sans 3
- * - Chinese fallback: LXGW Neo ZhiSong Screen Full
+ * - Chinese fallback: platform CJK fonts (full LXGW payload is documented but not boot-loaded)
  * - Monospace: IBM Plex Mono, retained for code/tool output density
  */
 
@@ -22,8 +22,8 @@ export const FontFamilies = {
     semiBold: 'SourceSerif4-SemiBold',
   },
   cjk: {
-    regular: 'LXGWNeoZhiSongScreenFull-Regular',
-    semiBold: 'LXGWNeoZhiSongScreenFull-Regular',
+    regular: Platform.OS === 'ios' ? 'Songti SC' : 'serif',
+    semiBold: Platform.OS === 'ios' ? 'Songti SC' : 'serif',
   },
   mono: {
     regular: 'IBMPlexMono-Regular',
@@ -92,7 +92,7 @@ export const Typography = {
     fontFamily: getSerifFont('semiBold'),
   }),
   body: () => ({
-    fontFamily: getCjkFont('regular'),
+    fontFamily: getSerifFont('regular'),
   }),
   legacy: {
     spaceMono: () => ({

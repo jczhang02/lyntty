@@ -117,6 +117,11 @@ export const pl: TranslationStructure = {
         connectAccount: 'Połącz konto',
         github: 'GitHub',
         machines: 'Maszyny',
+        relay: 'Relay',
+        signedIn: 'Signed in',
+        noNodesPaired: 'No nodes paired',
+        oneNodeOnline: '1 node online',
+        nodesOnline: ({ onlineCount, totalCount }: { onlineCount: number; totalCount: number }) => `${onlineCount}/${totalCount} nodes online`,
         showOfflineMachines: ({ count }: { count: number }) => {
             const mod10 = count % 10;
             const mod100 = count % 100;
@@ -202,7 +207,7 @@ export const pl: TranslationStructure = {
         avatarStyleDescription: 'Wybierz wygląd awatara sesji',
         avatarOptions: {
             pixelated: 'Pikselowy',
-            gradient: 'Gradientowy',
+            gradient: 'Zwierzak',
             brutalist: 'Brutalistyczny',
         },
         showFlavorIcons: 'Pokaż ikony dostawcy AI',

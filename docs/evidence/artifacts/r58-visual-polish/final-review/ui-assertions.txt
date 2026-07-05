@@ -1,0 +1,11 @@
+first_run_sessions_visible=True
+first_run_install_cli_visible=True
+settings_relay_visible=True
+settings_server_visible=True
+settings_account_visible=True
+settings_signed_in_visible=True
+settings_node_management_visible=True
+settings_no_nodes_visible=True
+settings_version_visible=True
+settings_commit_hidden=True
+settings_runtime_hidden=True

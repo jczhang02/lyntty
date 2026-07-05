@@ -86,6 +86,11 @@ export const ru: TranslationStructure = {
         connectAccount: 'Подключить аккаунт',
         github: 'GitHub',
         machines: 'Машины',
+        relay: 'Relay',
+        signedIn: 'Signed in',
+        noNodesPaired: 'No nodes paired',
+        oneNodeOnline: '1 node online',
+        nodesOnline: ({ onlineCount, totalCount }: { onlineCount: number; totalCount: number }) => `${onlineCount}/${totalCount} nodes online`,
         showOfflineMachines: ({ count }: { count: number }) => {
             const lastTwo = count % 100;
             const lastOne = count % 10;
@@ -171,7 +176,7 @@ export const ru: TranslationStructure = {
         avatarStyleDescription: 'Выберите внешний вид аватара сессии',
         avatarOptions: {
             pixelated: 'Пиксельная',
-            gradient: 'Градиентная',
+            gradient: 'Питомец',
             brutalist: 'Бруталистская',
         },
         showFlavorIcons: 'Показывать иконки провайдеров ИИ',

@@ -396,11 +396,11 @@ const style = StyleSheet.create((theme) => ({
         fontStyle: 'italic',
     },
     bold: {
-        ...Typography.cjk('semiBold'),
+        ...Typography.serif('semiBold'),
         fontWeight: '700',
     },
     semibold: {
-        ...Typography.cjk('semiBold'),
+        ...Typography.serif('semiBold'),
         fontWeight: '600',
     },
     code: {
@@ -424,24 +424,24 @@ const style = StyleSheet.create((theme) => ({
         color: theme.colors.text,
     },
     header1: {
-        fontSize: 16,
-        lineHeight: 24,  // Reduced from 36 to 24
-        fontWeight: '900',
-        marginTop: 16,
-        marginBottom: 8
+        fontSize: 24,
+        lineHeight: 32,
+        fontWeight: '700',
+        marginTop: 18,
+        marginBottom: 10
     },
     header2: {
         fontSize: 20,
-        lineHeight: 24,  // Reduced from 36 to 32
+        lineHeight: 28,
         fontWeight: '600',
         marginTop: 16,
         marginBottom: 8
     },
     header3: {
-        fontSize: 16,
-        lineHeight: 28,  // Reduced from 32 to 28
+        fontSize: 18,
+        lineHeight: 26,
         fontWeight: '600',
-        marginTop: 16,
+        marginTop: 14,
         marginBottom: 8,
     },
     header4: {
