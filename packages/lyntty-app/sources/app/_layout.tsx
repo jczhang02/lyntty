@@ -129,6 +129,13 @@ async function loadFonts() {
                 'IBMPlexMono-Italic': require('@/assets/fonts/IBMPlexMono-Italic.ttf'),
                 'IBMPlexMono-SemiBold': require('@/assets/fonts/IBMPlexMono-SemiBold.ttf'),
 
+                // Anthropic-leaning editorial typography
+                'SourceSerif4-Regular': require('@/assets/fonts/SourceSerif4-Regular.ttf'),
+                'SourceSerif4-SemiBold': require('@/assets/fonts/SourceSerif4-Semibold.ttf'),
+                'SourceSans3-Regular': require('@/assets/fonts/SourceSans3-Regular.ttf'),
+                'SourceSans3-SemiBold': require('@/assets/fonts/SourceSans3-Semibold.ttf'),
+                'LXGWNeoZhiSongScreenFull-Regular': require('@/assets/fonts/LXGWNeoZhiSongScreenFull.ttf'),
+
                 // Bricolage Grotesque
                 'BricolageGrotesque-Bold': require('@/assets/fonts/BricolageGrotesque-Bold.ttf'),
 
@@ -152,6 +159,13 @@ async function loadFonts() {
                         'IBMPlexMono-Regular': require('@/assets/fonts/IBMPlexMono-Regular.ttf'),
                         'IBMPlexMono-Italic': require('@/assets/fonts/IBMPlexMono-Italic.ttf'),
                         'IBMPlexMono-SemiBold': require('@/assets/fonts/IBMPlexMono-SemiBold.ttf'),
+
+                        // Anthropic-leaning editorial typography
+                        'SourceSerif4-Regular': require('@/assets/fonts/SourceSerif4-Regular.ttf'),
+                        'SourceSerif4-SemiBold': require('@/assets/fonts/SourceSerif4-Semibold.ttf'),
+                        'SourceSans3-Regular': require('@/assets/fonts/SourceSans3-Regular.ttf'),
+                        'SourceSans3-SemiBold': require('@/assets/fonts/SourceSans3-Semibold.ttf'),
+                        'LXGWNeoZhiSongScreenFull-Regular': require('@/assets/fonts/LXGWNeoZhiSongScreenFull.ttf'),
 
                         // Bricolage Grotesque
                         'BricolageGrotesque-Bold': require('@/assets/fonts/BricolageGrotesque-Bold.ttf'),

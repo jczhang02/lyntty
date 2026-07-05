@@ -1,68 +1,61 @@
 import { Platform } from 'react-native';
 
 /**
- * Typography system for Lyntty Coder app
+ * Typography system for Lyntty.
  *
- * Default typography: IBM Plex Sans
- * Monospace typography: IBM Plex Mono
- * Logo typography: Bricolage Grotesque (specific use only)
- *
- * Usage Examples:
- *
- * // Default typography (IBM Plex Sans)
- * <Text style={{ fontSize: 16, ...Typography.default() }}>Regular text</Text>
- * <Text style={{ fontSize: 16, ...Typography.default('italic') }}>Italic text</Text>
- * <Text style={{ fontSize: 16, ...Typography.default('semiBold') }}>Semi-bold text</Text>
- *
- * // Monospace typography (IBM Plex Mono)
- * <Text style={{ fontSize: 14, ...Typography.mono() }}>Code text</Text>
- * <Text style={{ fontSize: 14, ...Typography.mono('italic') }}>Italic code</Text>
- * <Text style={{ fontSize: 14, ...Typography.mono('semiBold') }}>Bold code</Text>
- *
- * // Logo typography (Bricolage Grotesque - use sparingly!)
- * // Note: Don't add fontWeight as this font is already bold
- * <Text style={{ fontSize: 28, ...Typography.logo() }}>Logo Text</Text>
- *
- * // Alternative direct usage
- * <Text style={{ fontSize: 16, fontFamily: getDefaultFont('semiBold') }}>Direct usage</Text>
- * <Text style={{ fontSize: 14, fontFamily: getMonoFont() }}>Direct mono usage</Text>
- * <Text style={{ fontSize: 28, fontFamily: getLogoFont() }}>Direct logo usage</Text>
+ * Direction: Anthropic-like editorial warmth without using proprietary fonts.
+ * - Display/body serif: Source Serif 4
+ * - UI sans: Source Sans 3
+ * - Chinese fallback: LXGW Neo ZhiSong Screen Full
+ * - Monospace: IBM Plex Mono, retained for code/tool output density
  */
 
-// Font family constants
 export const FontFamilies = {
-  // IBM Plex Sans (default typography)
   default: {
-    regular: 'IBMPlexSans-Regular',
-    italic: 'IBMPlexSans-Italic',
-    semiBold: 'IBMPlexSans-SemiBold',
+    regular: 'SourceSans3-Regular',
+    italic: 'SourceSans3-Regular',
+    semiBold: 'SourceSans3-SemiBold',
   },
-
-  // IBM Plex Mono (default monospace)
+  serif: {
+    regular: 'SourceSerif4-Regular',
+    italic: 'SourceSerif4-Regular',
+    semiBold: 'SourceSerif4-SemiBold',
+  },
+  cjk: {
+    regular: 'LXGWNeoZhiSongScreenFull-Regular',
+    semiBold: 'LXGWNeoZhiSongScreenFull-Regular',
+  },
   mono: {
     regular: 'IBMPlexMono-Regular',
     italic: 'IBMPlexMono-Italic',
     semiBold: 'IBMPlexMono-SemiBold',
   },
-
-  // Bricolage Grotesque (logo/special use only)
   logo: {
     bold: 'BricolageGrotesque-Bold',
   },
-
-  // Legacy fonts (keep for backward compatibility)
   legacy: {
     spaceMono: 'SpaceMono',
     systemMono: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    ibmPlexSansRegular: 'IBMPlexSans-Regular',
+    ibmPlexSansSemiBold: 'IBMPlexSans-SemiBold',
   }
 };
 
-// Helper functions for easy access to font families
-export const getDefaultFont = (weight: 'regular' | 'italic' | 'semiBold' = 'regular') => {
+export type TextWeight = 'regular' | 'italic' | 'semiBold';
+
+export const getDefaultFont = (weight: TextWeight = 'regular') => {
   return FontFamilies.default[weight];
 };
 
-export const getMonoFont = (weight: 'regular' | 'italic' | 'semiBold' = 'regular') => {
+export const getSerifFont = (weight: TextWeight = 'regular') => {
+  return FontFamilies.serif[weight];
+};
+
+export const getCjkFont = (weight: 'regular' | 'semiBold' = 'regular') => {
+  return FontFamilies.cjk[weight];
+};
+
+export const getMonoFont = (weight: TextWeight = 'regular') => {
   return FontFamilies.mono[weight];
 };
 
@@ -70,47 +63,46 @@ export const getLogoFont = () => {
   return FontFamilies.logo.bold;
 };
 
-// Font weight mappings for the font families
 export const FontWeights = {
   regular: '400',
   semiBold: '600',
   bold: '700',
 } as const;
 
-// Style utilities for easy inline usage
 export const Typography = {
-  // Default font styles (IBM Plex Sans)
-  default: (weight: 'regular' | 'italic' | 'semiBold' = 'regular') => ({
+  default: (weight: TextWeight = 'regular') => ({
     fontFamily: getDefaultFont(weight),
   }),
-
-  // Monospace font styles (IBM Plex Mono)
-  mono: (weight: 'regular' | 'italic' | 'semiBold' = 'regular') => ({
+  ui: (weight: TextWeight = 'regular') => ({
+    fontFamily: getDefaultFont(weight),
+  }),
+  serif: (weight: TextWeight = 'regular') => ({
+    fontFamily: getSerifFont(weight),
+  }),
+  cjk: (weight: 'regular' | 'semiBold' = 'regular') => ({
+    fontFamily: getCjkFont(weight),
+  }),
+  mono: (weight: TextWeight = 'regular') => ({
     fontFamily: getMonoFont(weight),
   }),
-
-  // Logo font style (Bricolage Grotesque)
   logo: () => ({
     fontFamily: getLogoFont(),
   }),
-
-  // Header text style
   header: () => ({
-    fontFamily: getDefaultFont('semiBold'),
+    fontFamily: getSerifFont('semiBold'),
   }),
-
-  // Body text style
   body: () => ({
-    fontFamily: getDefaultFont('regular'),
+    fontFamily: getCjkFont('regular'),
   }),
-
-  // Legacy font styles (for backward compatibility)
   legacy: {
     spaceMono: () => ({
       fontFamily: FontFamilies.legacy.spaceMono,
     }),
     systemMono: () => ({
       fontFamily: FontFamilies.legacy.systemMono,
+    }),
+    ibmPlexSans: () => ({
+      fontFamily: FontFamilies.legacy.ibmPlexSansRegular,
     }),
   }
 };

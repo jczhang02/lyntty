@@ -383,7 +383,7 @@ const style = StyleSheet.create((theme) => ({
     // Plain text
 
     text: {
-        ...Typography.default(),
+        ...Typography.body(),
         fontSize: 16,
         lineHeight: 24, // Reduced from 28 to 24
         marginTop: 8,
@@ -396,11 +396,11 @@ const style = StyleSheet.create((theme) => ({
         fontStyle: 'italic',
     },
     bold: {
-        ...Typography.default('semiBold'),
+        ...Typography.cjk('semiBold'),
         fontWeight: '700',
     },
     semibold: {
-        ...Typography.default('semiBold'),
+        ...Typography.cjk('semiBold'),
         fontWeight: '600',
     },
     code: {
@@ -410,7 +410,7 @@ const style = StyleSheet.create((theme) => ({
         color: theme.colors.text,
     },
     link: {
-        ...Typography.default(),
+        ...Typography.body(),
         color: theme.colors.text,
         fontWeight: '400',
         textDecorationLine: 'underline',
@@ -420,7 +420,7 @@ const style = StyleSheet.create((theme) => ({
     // Headers
 
     header: {
-        ...Typography.default('semiBold'),
+        ...Typography.header(),
         color: theme.colors.text,
     },
     header1: {
@@ -467,7 +467,7 @@ const style = StyleSheet.create((theme) => ({
     //
 
     list: {
-        ...Typography.default(),
+        ...Typography.body(),
         color: theme.colors.text,
         marginTop: 0,
         marginBottom: 0,
@@ -576,7 +576,7 @@ const style = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surfaceHighest,
     },
     imageCaption: {
-        ...Typography.default(),
+        ...Typography.body(),
         fontSize: 14,
         lineHeight: 20,
         color: theme.colors.textSecondary,
@@ -682,13 +682,13 @@ const style = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surfaceHigh,
     },
     tableHeaderText: {
-        ...Typography.default('semiBold'),
+        ...Typography.header(),
         color: theme.colors.text,
         fontSize: 16,
         lineHeight: 24,
     },
     tableCellText: {
-        ...Typography.default(),
+        ...Typography.body(),
         color: theme.colors.text,
         fontSize: 16,
         lineHeight: 24,
