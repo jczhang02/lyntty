@@ -138,6 +138,16 @@ export class PiExternalMirror {
     this.markDeliveredIds(deliveredIds, entries);
   }
 
+  markAssistantTextDeliveredSince(text: string, cutoffTimeMs: number): void {
+    const normalizedText = text.trim();
+    if (!normalizedText) return;
+    const entries = readPiSessionEntries(this.sessionFile);
+    const deliveredIds = new Set(entries
+      .filter((entry) => this.isAssistantTextEntry(entry, cutoffTimeMs, normalizedText))
+      .map((entry) => entry.id));
+    this.markDeliveredIds(deliveredIds, entries);
+  }
+
   private markDeliveredIds(deliveredIds: Set<string>, entries: SessionEntry[]): void {
     this.pendingEntries = this.pendingEntries.filter((entry) => !deliveredIds.has(entry.id));
     for (const entry of entries.filter((entry) => deliveredIds.has(entry.id))) {
@@ -153,6 +163,17 @@ export class PiExternalMirror {
     if (entry.type !== 'message') return false;
     const message = entry.message as { role?: unknown; content?: unknown };
     if (message.role !== 'user') return false;
+    return extractMessageText(message.content).trim() === text;
+  }
+
+  private isAssistantTextEntry(entry: SessionEntry, cutoffTimeMs: number, text: string): boolean {
+    const entryTime = Date.parse(entry.timestamp);
+    if (!Number.isFinite(entryTime) || entryTime < cutoffTimeMs) {
+      return false;
+    }
+    if (entry.type !== 'message') return false;
+    const message = entry.message as { role?: unknown; content?: unknown };
+    if (message.role !== 'assistant') return false;
     return extractMessageText(message.content).trim() === text;
   }
 
@@ -209,7 +230,7 @@ export function startPiExternalMirror(options: {
   session: () => ApiSessionClient;
   isManagedRuntimeActive?: () => boolean;
   pollMs?: number;
-}): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void } | null {
+}): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void; markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number) => void } | null {
   if (!options.sessionFile) {
     return null;
   }
@@ -277,5 +298,6 @@ export function startPiExternalMirror(options: {
     markCurrentEntriesDelivered: () => mirror.markCurrentEntriesDelivered(),
     markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options),
     markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => mirror.markUserTextDeliveredSince(text, cutoffTimeMs),
+    markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number) => mirror.markAssistantTextDeliveredSince(text, cutoffTimeMs),
   };
 }

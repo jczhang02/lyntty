@@ -259,7 +259,7 @@ describe('PiExternalMirror', () => {
 
       appendJsonl(file, assistantEntry('a2', 'already delivered completed turn'));
       await vi.advanceTimersByTimeAsync(100);
-      mirror?.markCurrentEntriesDeliveredSince(Date.parse('2026-07-02T00:00:00.000Z'), { includeAssistantMessages: true });
+      mirror?.markAssistantTextDeliveredSince('already delivered completed turn', Date.parse('2026-07-02T00:00:00.000Z'));
       await vi.advanceTimersByTimeAsync(2_200);
 
       expect(sendSessionProtocolMessage).not.toHaveBeenCalled();
@@ -413,7 +413,7 @@ describe('PiExternalMirror', () => {
     }
   });
 
-  it('drops pending assistant entries only when the completed live turn was delivered', async () => {
+  it('drops pending assistant entries when the live extension delivered the same assistant text', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
       const file = join(dir, 'session.jsonl');
@@ -426,10 +426,33 @@ describe('PiExternalMirror', () => {
 
       appendJsonl(file, assistantEntry('a2', 'live extension already sent this'));
       await mirror.tick(1_000);
-      mirror.markCurrentEntriesDeliveredSince(Date.parse('2026-07-02T00:00:00.000Z'), { includeAssistantMessages: true });
+      mirror.markAssistantTextDeliveredSince('live extension already sent this', Date.parse('2026-07-02T00:00:00.000Z'));
       await mirror.tick(3_100);
 
       expect(sent).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps pending assistant entries when the live extension delivered different text', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      appendJsonl(file, assistantEntry('a2', 'fallback must recover this tail'));
+      await mirror.tick(1_000);
+      mirror.markAssistantTextDeliveredSince('different live text', Date.parse('2026-07-02T00:00:00.000Z'));
+      await mirror.tick(3_100);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0].map((entry) => entry.id)).toEqual(['a2']);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

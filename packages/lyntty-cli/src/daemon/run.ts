@@ -794,7 +794,9 @@ export async function startDaemon(): Promise<void> {
       markCurrentEntriesDelivered: () => void;
       markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void;
       markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void;
+      markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number) => void;
       extensionCoveredSince: number | null;
+      deliveredAssistantTextInTurn: string;
       sessionClient: ApiSessionClient;
       mapper: PiSessionProtocolMapper;
       lastExtensionSeenAt: number;
@@ -1375,7 +1377,9 @@ export async function startDaemon(): Promise<void> {
           markCurrentEntriesDelivered: mirror.markCurrentEntriesDelivered,
           markCurrentEntriesDeliveredSince: mirror.markCurrentEntriesDeliveredSince,
           markUserTextDeliveredSince: mirror.markUserTextDeliveredSince,
+          markAssistantTextDeliveredSince: mirror.markAssistantTextDeliveredSince,
           extensionCoveredSince: null,
+          deliveredAssistantTextInTurn: '',
           sessionClient,
           mapper: new PiSessionProtocolMapper(),
         lastExtensionSeenAt: 0,
@@ -1434,6 +1438,9 @@ export async function startDaemon(): Promise<void> {
       const envelopes = mirror.mapper.flushPendingText();
       if (envelopes.length === 0) return;
       for (const envelope of envelopes) {
+        if (envelope.role === 'agent' && envelope.ev.t === 'text' && !envelope.ev.thinking) {
+          mirror.deliveredAssistantTextInTurn += envelope.ev.text;
+        }
         mirror.sessionClient.sendSessionProtocolMessage(envelope);
       }
       await mirror.sessionClient.flush();
@@ -1451,6 +1458,23 @@ export async function startDaemon(): Promise<void> {
           mirror.markUserTextDeliveredSince(text, cutoffTimeMs);
         } catch (error) {
           logger.debug('[pi] Failed delayed Pi extension-delivered user input mark', error);
+        }
+      }, 2_500).unref?.();
+    };
+
+    const markAssistantTextDelivered = (mirror: ExternalPiMirrorState, text: string, cutoffTimeMs: number): void => {
+      const normalizedText = text.trim();
+      if (!normalizedText) return;
+      try {
+        mirror.markAssistantTextDeliveredSince(normalizedText, cutoffTimeMs);
+      } catch (error) {
+        logger.debug('[pi] Failed to mark Pi extension-delivered assistant text', error);
+      }
+      setTimeout(() => {
+        try {
+          mirror.markAssistantTextDeliveredSince(normalizedText, cutoffTimeMs);
+        } catch (error) {
+          logger.debug('[pi] Failed delayed Pi extension-delivered assistant text mark', error);
         }
       }, 2_500).unref?.();
     };
@@ -1575,6 +1599,9 @@ export async function startDaemon(): Promise<void> {
         clearPendingTextFlush(mirror);
       }
       for (const envelope of envelopes) {
+        if (envelope.role === 'agent' && envelope.ev.t === 'text' && !envelope.ev.thinking) {
+          mirror.deliveredAssistantTextInTurn += envelope.ev.text;
+        }
         mirror.sessionClient.sendSessionProtocolMessage(envelope);
       }
       if (envelopes.length > 0) {
@@ -1584,6 +1611,10 @@ export async function startDaemon(): Promise<void> {
         if (hasDeliveredContentEnvelope(envelopes)) {
           markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: !mirror.extensionHasSeqGap });
         }
+        if (!mirror.extensionHasSeqGap) {
+          markAssistantTextDelivered(mirror, mirror.deliveredAssistantTextInTurn, deliveredCutoff);
+        }
+        mirror.deliveredAssistantTextInTurn = '';
         if (eventId !== null) {
           mirror.extensionHasSeqGap = false;
           mirror.extensionCoveredSince = eventTime;
