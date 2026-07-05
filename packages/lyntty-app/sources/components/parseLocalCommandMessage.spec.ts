@@ -54,20 +54,14 @@ describe('parseLocalCommandMessage', () => {
         });
     });
 
-    it('collapses a trailing raw skill slash command to a command display with preceding args', () => {
-        expect(parseLocalCommandMessage('  привет давай /maintain  ')).toEqual({
-            kind: 'command-run',
-            commandName: 'maintain',
-            args: 'привет давай',
-        });
+    it('preserves trailing raw slash tokens as ordinary prose', () => {
+        const text = 'привет давай /maintain';
+        expect(parseLocalCommandMessage(text)).toEqual({ kind: 'text', text });
     });
 
-    it('collapses a middle raw skill slash command and preserves surrounding args', () => {
-        expect(parseLocalCommandMessage('  привет /maintain давай  ')).toEqual({
-            kind: 'command-run',
-            commandName: 'maintain',
-            args: 'привет давай',
-        });
+    it('preserves middle raw slash tokens as ordinary prose', () => {
+        const text = 'привет /maintain давай';
+        expect(parseLocalCommandMessage(text)).toEqual({ kind: 'text', text });
     });
 
     it('hides Claude local-command stdout for a successful /goal command', () => {
@@ -114,6 +108,11 @@ describe('parseLocalCommandMessage', () => {
         const text = 'Allowed mobile commands include /goal, /context, and skills: /skill:*.';
         expect(parseLocalCommandMessage(text, { parseRawSlashCommands: false })).toEqual({ kind: 'text', text });
     });
+
+    it('preserves computer-origin numbered text that mentions a skill command when raw slash parsing is disabled', () => {
+        const text = '1. first visible body\n2. second visible body\n/skill:jc-writing-style';
+        expect(parseLocalCommandMessage(text, { parseRawSlashCommands: false })).toEqual({ kind: 'text', text });
+    });
 });
 
 describe('isUserSlashCommandEcho', () => {
@@ -133,8 +132,8 @@ describe('isUserSlashCommandEcho', () => {
         expect(isUserSlashCommandEcho('/compact', false)).toBe(false);
     });
 
-    it('detects a trailing command echo with a localId', () => {
-        expect(isUserSlashCommandEcho('привет давай /maintain', true)).toBe(true);
+    it('does not detect a trailing slash token as a command echo', () => {
+        expect(isUserSlashCommandEcho('привет давай /maintain', true)).toBe(false);
     });
 
     it('does not treat the SDK wrapper itself as a raw echo', () => {

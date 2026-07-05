@@ -12,6 +12,7 @@ import { sync } from '@/sync/sync';
 import { Option } from './markdown/MarkdownView';
 import { layout } from "./layout";
 import { parseLocalCommandMessage, isUserSlashCommandEcho } from './parseLocalCommandMessage';
+import { getUserMessagePresentation } from './userMessagePresentation';
 
 
 export const MessageView = React.memo((props: {
@@ -115,14 +116,24 @@ function UserTextBlock(props: {
   // Codex/Gemini don't reliably emit the <command-*> wrapper, so hiding the
   // echo there would drop the command with nothing to replace it. (Absent
   // flavor == Claude, matching the convention used elsewhere.)
+  const presentation = getUserMessagePresentation(props.message);
   const isClaudeFlavor = !props.metadata?.flavor || props.metadata.flavor === 'claude';
-  if (isClaudeFlavor && isUserSlashCommandEcho(props.message.text, props.message.localId != null)) {
+  if (isClaudeFlavor && isUserSlashCommandEcho(props.message.text, presentation.parseRawSlashCommands)) {
     return null;
   }
 
   const parsed = parseLocalCommandMessage(props.message.displayText || props.message.text, {
-    parseRawSlashCommands: props.message.localId != null,
+    parseRawSlashCommands: presentation.parseRawSlashCommands,
   });
+  const containerStyle = [
+    styles.userMessageContainer,
+    presentation.frame === 'computerPromptCard' && styles.computerMessageContainer,
+  ];
+  const bubbleStyle = [
+    styles.userMessageBubble,
+    presentation.frame === 'phonePromptCard' && styles.userPromptCard,
+    presentation.frame === 'computerPromptCard' && styles.computerPromptCard,
+  ];
   if (parsed.kind === 'caveat') {
     return null;
   }
@@ -131,11 +142,12 @@ function UserTextBlock(props: {
   }
   if (parsed.kind === 'goal-run') {
     return (
-      <View style={styles.userMessageContainer}>
+      <View style={containerStyle}>
+        {presentation.sourceLabel ? <Text style={styles.userSourceLabel}>{presentation.sourceLabel}</Text> : null}
         <Pressable
           onLongPress={canFork ? handleLongPress : undefined}
           delayLongPress={400}
-          style={[styles.userMessageBubble, styles.goalMessageBubble]}
+          style={[...bubbleStyle, styles.goalMessageBubble]}
         >
           <MarkdownView markdown={parsed.goal} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
         </Pressable>
@@ -148,12 +160,13 @@ function UserTextBlock(props: {
   }
   if (parsed.kind === 'command-run') {
     return (
-      <View style={styles.userMessageContainer}>
+      <View style={containerStyle}>
+        {presentation.sourceLabel ? <Text style={styles.userSourceLabel}>{presentation.sourceLabel}</Text> : null}
         {parsed.args ? (
           <Pressable
             onLongPress={canFork ? handleLongPress : undefined}
             delayLongPress={400}
-            style={[styles.userMessageBubble, styles.commandMessageBubble]}
+            style={[...bubbleStyle, styles.commandMessageBubble]}
           >
             <MarkdownView markdown={parsed.args} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
           </Pressable>
@@ -166,11 +179,12 @@ function UserTextBlock(props: {
   }
 
   return (
-    <View style={styles.userMessageContainer}>
+    <View style={containerStyle}>
+      {presentation.sourceLabel ? <Text style={styles.userSourceLabel}>{presentation.sourceLabel}</Text> : null}
       <Pressable
         onLongPress={canFork ? handleLongPress : undefined}
         delayLongPress={400}
-        style={styles.userMessageBubble}
+        style={bubbleStyle}
       >
         <MarkdownView markdown={parsed.text} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
       </Pressable>
@@ -278,13 +292,38 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
   },
+  computerMessageContainer: {
+    alignItems: 'stretch',
+  },
   userMessageBubble: {
     backgroundColor: theme.colors.userMessageBackground,
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
     marginBottom: 12,
     maxWidth: '100%',
+  },
+  userPromptCard: {
+    width: '88%',
+    minWidth: '56%',
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.divider,
+  },
+  computerPromptCard: {
+    width: '100%',
+    alignSelf: 'stretch',
+    backgroundColor: theme.colors.surfaceHigh,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.divider,
+  },
+  userSourceLabel: {
+    color: theme.colors.agentEventText,
+    fontSize: 12,
+    marginBottom: 4,
+    marginHorizontal: 4,
+    opacity: 0.72,
   },
   goalMessageBubble: {
     marginBottom: 6,

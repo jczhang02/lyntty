@@ -136,11 +136,11 @@ const BULLETS = ['•', '◦', '▪'] as const;
 function RenderListBlock(props: { items: { depth: number, spans: MarkdownSpan[] }[], first: boolean, last: boolean, selectable: boolean, onLinkPress: (url: string) => void }) {
     const listStyle = [style.text, style.list];
     return (
-        <View style={{ flexDirection: 'column', marginBottom: 8, gap: 6 }}>
+        <View style={style.listContainer}>
             {props.items.map((item, index) => (
-                <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', paddingLeft: item.depth * 16 }}>
-                    <Text selectable={false} style={[listStyle, { marginRight: 8, marginTop: 1 }]}>{BULLETS[Math.min(item.depth, BULLETS.length - 1)]}</Text>
-                    <Text selectable={props.selectable} style={[listStyle, { flex: 1 }]}><RenderSpans spans={item.spans} baseStyle={listStyle} selectable={props.selectable} onLinkPress={props.onLinkPress} /></Text>
+                <View key={index} style={[style.listRow, { paddingLeft: item.depth * 16 }]}>
+                    <Text selectable={false} style={[listStyle, style.listMarker]}>{BULLETS[Math.min(item.depth, BULLETS.length - 1)]}</Text>
+                    <Text selectable={props.selectable} style={[listStyle, style.listBody]}><RenderSpans spans={item.spans} baseStyle={listStyle} selectable={props.selectable} onLinkPress={props.onLinkPress} /></Text>
                 </View>
             ))}
         </View>
@@ -150,11 +150,11 @@ function RenderListBlock(props: { items: { depth: number, spans: MarkdownSpan[] 
 function RenderNumberedListBlock(props: { items: { number: number, depth: number, spans: MarkdownSpan[] }[], first: boolean, last: boolean, selectable: boolean, onLinkPress: (url: string) => void }) {
     const listStyle = [style.text, style.list];
     return (
-        <View style={{ flexDirection: 'column', marginBottom: 8, gap: 6 }}>
+        <View style={style.listContainer}>
             {props.items.map((item, index) => (
-                <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', paddingLeft: item.depth * 16 }}>
-                    <Text selectable={false} style={[listStyle, { marginRight: 8, marginTop: 1 }]}>{item.number}.</Text>
-                    <Text selectable={props.selectable} style={[listStyle, { flex: 1 }]}><RenderSpans spans={item.spans} baseStyle={listStyle} selectable={props.selectable} onLinkPress={props.onLinkPress} /></Text>
+                <View key={index} style={[style.listRow, { paddingLeft: item.depth * 16 }]}>
+                    <Text selectable={false} style={[listStyle, style.numberedListMarker]}>{item.number}.</Text>
+                    <Text selectable={props.selectable} style={[listStyle, style.listBody]}><RenderSpans spans={item.spans} baseStyle={listStyle} selectable={props.selectable} onLinkPress={props.onLinkPress} /></Text>
                 </View>
             ))}
         </View>
@@ -471,6 +471,38 @@ const style = StyleSheet.create((theme) => ({
         color: theme.colors.text,
         marginTop: 0,
         marginBottom: 0,
+    },
+    listContainer: {
+        width: '100%',
+        flexDirection: 'column',
+        marginBottom: 8,
+        gap: 6,
+    },
+    listRow: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        minWidth: 0,
+    },
+    listMarker: {
+        width: 28,
+        minWidth: 28,
+        marginRight: 8,
+        marginTop: 1,
+        textAlign: 'right',
+    },
+    numberedListMarker: {
+        width: 34,
+        minWidth: 34,
+        marginRight: 8,
+        marginTop: 1,
+        textAlign: 'right',
+        fontVariant: ['tabular-nums'],
+    },
+    listBody: {
+        flex: 1,
+        flexShrink: 1,
+        minWidth: 0,
     },
 
     //

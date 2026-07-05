@@ -1,0 +1,15 @@
+  bash arg: -p
+  bash arg: dev.jczhang.lyntty.dev
+  bash arg: -c
+  bash arg: android.intent.category.LAUNCHER
+  bash arg: 1
+args: [-p, dev.jczhang.lyntty.dev, -c, android.intent.category.LAUNCHER, 1]
+ arg: "-p"
+ arg: "dev.jczhang.lyntty.dev"
+ arg: "-c"
+ arg: "android.intent.category.LAUNCHER"
+ arg: "1"
+data="dev.jczhang.lyntty.dev"
+data="android.intent.category.LAUNCHER"
+Events injected: 1
+## Network stats: elapsed time=59ms (0ms mobile, 0ms wifi, 59ms not connected)
