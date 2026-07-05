@@ -42,12 +42,25 @@ function toRecord(value: unknown): Record<string, unknown> {
   return {};
 }
 
+function extractTextContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .flatMap((part) => {
+      if (!part || typeof part !== 'object') return [];
+      const record = part as { type?: unknown; text?: unknown };
+      return record.type === 'text' && typeof record.text === 'string' ? [record.text] : [];
+    })
+    .join('');
+}
+
 export class PiSessionProtocolMapper {
   private currentTurnId: string | null = null;
   private readonly piCallToSessionCall = new Map<string, string>();
   private lastTime = 0;
   private pendingText = '';
   private pendingType: PendingTextType | null = null;
+  private emittedText = '';
 
   private nextTime(): number {
     this.lastTime = Math.max(this.lastTime + 1, Date.now());
@@ -65,6 +78,7 @@ export class PiSessionProtocolMapper {
 
     this.currentTurnId = createId();
     this.piCallToSessionCall.clear();
+    this.emittedText = '';
     return [createEnvelope('agent', { t: 'turn-start' }, this.turnOptions())];
   }
 
@@ -91,6 +105,10 @@ export class PiSessionProtocolMapper {
 
     if (!text) {
       return [];
+    }
+
+    if (type === 'text') {
+      this.emittedText += text;
     }
 
     return [createEnvelope('agent', {
@@ -135,7 +153,25 @@ export class PiSessionProtocolMapper {
     const turnId = this.currentTurnId;
     this.currentTurnId = null;
     this.piCallToSessionCall.clear();
+    this.emittedText = '';
     envelopes.push(createEnvelope('agent', { t: 'turn-end', status }, { turn: turnId, time: this.nextTime() }));
+    return envelopes;
+  }
+
+  private completeAssistantMessage(message: unknown): SessionEnvelope[] {
+    const role = message && typeof message === 'object' ? (message as { role?: unknown }).role : undefined;
+    if (role !== 'assistant') return [];
+    const finalText = extractTextContent((message as { content?: unknown }).content).replace(/^\n+|\n+$/g, '');
+    if (!finalText) return [];
+    const envelopes = this.ensureTurn();
+    envelopes.push(...this.flush());
+    if (!finalText.startsWith(this.emittedText)) {
+      return envelopes;
+    }
+    const suffix = finalText.slice(this.emittedText.length).replace(/^\n+|\n+$/g, '');
+    if (!suffix) return envelopes;
+    this.emittedText += suffix;
+    envelopes.push(createEnvelope('agent', { t: 'text', text: suffix }, this.turnOptions()));
     return envelopes;
   }
 
@@ -153,6 +189,8 @@ export class PiSessionProtocolMapper {
           return this.appendText('thinking', event.assistantMessageEvent.delta);
         }
         return [];
+      case 'message_end':
+        return this.completeAssistantMessage((event as unknown as { message?: unknown }).message);
       case 'tool_execution_start': {
         const envelopes = [...this.ensureTurn(), ...this.flush()];
         const call = this.ensureSessionCallId(event.toolCallId);

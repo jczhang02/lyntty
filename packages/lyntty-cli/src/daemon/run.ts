@@ -793,6 +793,7 @@ export async function startDaemon(): Promise<void> {
       markCurrentEntriesKnown: () => void;
       markCurrentEntriesDelivered: () => void;
       markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void;
+      markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void;
       extensionCoveredSince: number | null;
       sessionClient: ApiSessionClient;
       mapper: PiSessionProtocolMapper;
@@ -1373,6 +1374,7 @@ export async function startDaemon(): Promise<void> {
           markCurrentEntriesKnown: mirror.markCurrentEntriesKnown,
           markCurrentEntriesDelivered: mirror.markCurrentEntriesDelivered,
           markCurrentEntriesDeliveredSince: mirror.markCurrentEntriesDeliveredSince,
+          markUserTextDeliveredSince: mirror.markUserTextDeliveredSince,
           extensionCoveredSince: null,
           sessionClient,
           mapper: new PiSessionProtocolMapper(),
@@ -1436,6 +1438,21 @@ export async function startDaemon(): Promise<void> {
       }
       await mirror.sessionClient.flush();
       markExtensionDelivered(mirror, cutoffTimeMs);
+    };
+
+    const markUserInputDelivered = (mirror: ExternalPiMirrorState, text: string, cutoffTimeMs: number): void => {
+      try {
+        mirror.markUserTextDeliveredSince(text, cutoffTimeMs);
+      } catch (error) {
+        logger.debug('[pi] Failed to mark Pi extension-delivered user input', error);
+      }
+      setTimeout(() => {
+        try {
+          mirror.markUserTextDeliveredSince(text, cutoffTimeMs);
+        } catch (error) {
+          logger.debug('[pi] Failed delayed Pi extension-delivered user input mark', error);
+        }
+      }, 2_500).unref?.();
     };
 
     const schedulePendingLiveTextFlush = (mirrorKey: string, mirror: ExternalPiMirrorState, cutoffTimeMs: number): void => {
@@ -1530,6 +1547,20 @@ export async function startDaemon(): Promise<void> {
         }));
       }
 
+      if (event.type === 'input') {
+        const text = typeof event.text === 'string' ? event.text.trim() : '';
+        const source = typeof event.source === 'string' ? event.source : undefined;
+        if (text && source !== 'extension') {
+          mirror.sessionClient.sendSessionProtocolMessage(createEnvelope('user', { t: 'text', text }, {
+            id: `pi-live-input-${session.piSessionId}-${eventId ?? eventTime}`,
+            time: eventTime,
+          }));
+          await mirror.sessionClient.flush();
+          markUserInputDelivered(mirror, text, eventTime - 1_000);
+        }
+        return { status: 'ok' as const, sessionId: result.sessionId };
+      }
+
       if (isLifecyclePiExtensionEvent(event)) {
         return { status: 'ok' as const, sessionId: result.sessionId };
       }
@@ -1549,14 +1580,16 @@ export async function startDaemon(): Promise<void> {
       if (envelopes.length > 0) {
         await mirror.sessionClient.flush();
       }
-      if (agentEvent.type === 'agent_end' && envelopes.length > 0) {
-        markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: !mirror.extensionHasSeqGap });
+      if (agentEvent.type === 'agent_end') {
+        if (hasDeliveredContentEnvelope(envelopes)) {
+          markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: !mirror.extensionHasSeqGap });
+        }
         if (eventId !== null) {
           mirror.extensionHasSeqGap = false;
           mirror.extensionCoveredSince = eventTime;
         }
       } else if (hasDeliveredContentEnvelope(envelopes)) {
-        markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: agentEvent.type === 'agent_end' });
+        markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: false });
       }
       if (mirror.mapper.hasPendingText()) {
         schedulePendingLiveTextFlush(mirrorKey, mirror, deliveredCutoff);

@@ -1,0 +1,38 @@
+[16:44:58.944] [ClaudeSettings] No Claude settings file found at /tmp/lyntty-r57-home-uNUbrv/.claude/settings.json 
+[16:44:58.972] Starting lyntty CLI with args:  [ '/usr/bin/node', '/home/jc/dev/lyntty/packages/lyntty-cli/dist/index.mjs', 'daemon', 'start-sync' ]
+[16:44:58.975] [DAEMON RUN] Starting daemon process... 
+[16:44:58.975] In production, skipping message inspection 
+[16:44:58.975] [DAEMON CONTROL] Checking if daemon is running same version 
+[16:44:58.975] [DAEMON CONTROL] No daemon running, returning false 
+[16:44:58.975] [DAEMON RUN] Daemon version mismatch detected, restarting daemon with current CLI version 
+[16:44:58.975] No daemon state found 
+[16:44:58.976] [caffeinate] Not on macOS, skipping caffeinate 
+[16:44:58.976] [AUTH] Starting auth and machine setup... 
+[16:44:58.977] [AUTH] Using existing credentials 
+[16:44:58.978] [AUTH] Machine ID: 7b51fc78-38b7-4e83-b780-e8326987aaf3 
+[16:44:58.978] [DAEMON RUN] Auth and machine setup complete 
+[16:44:59.010] [CONTROL SERVER] Started on port 38743 
+[16:44:59.011] [DAEMON RUN] Daemon state written 
+[16:44:59.033] [CONTROL SERVER] Listing 0 sessions 
+[16:44:59.037] [API] Machine 7b51fc78-38b7-4e83-b780-e8326987aaf3 registered/updated with server 
+[16:44:59.037] [DAEMON RUN] Machine registered: 7b51fc78-38b7-4e83-b780-e8326987aaf3 
+[16:44:59.038] [API MACHINE] Connecting to ws://127.0.0.1:3006 
+[16:44:59.041] [DAEMON RUN] Daemon started successfully, waiting for shutdown request 
+[16:44:59.051] [API MACHINE] Connected to server 
+[16:44:59.053] [API MACHINE] Keep-alive started (20s interval) 
+[16:44:59.059] [API MACHINE] Received external daemon state update 
+[16:44:59.060] [API MACHINE] Daemon state updated successfully 
+[16:45:19.086] [API MACHINE] Received external metadata update 
+[16:45:19.087] [API MACHINE] Metadata updated successfully 
+[16:45:19.226] [DAEMON RUN] Failed exact Pi session file lookup for /tmp/lyntty-r57-home-uNUbrv/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-05T08-45-19-030Z_019f3174-1536-7aab-9f92-f7b41432a80d.jsonl: ENOENT: no such file or directory, open '/tmp/lyntty-r57-home-uNUbrv/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-05T08-45-19-030Z_019f3174-1536-7aab-9f92-f7b41432a80d.jsonl' 
+[16:45:19.251] Session created/loaded: cmr7jpxqn010aovp0xpcn7ehk (tag: pi:974b609fdc40baac0ce7aac659953f29) 
+[16:45:19.265] Socket connected successfully 
+[16:45:19.277] In production, skipping message inspection 
+[16:45:19.284] In production, skipping message inspection 
+[16:45:19.285] [RPC] Calling handler { method: '7b51fc78-38b7-4e83-b780-e8326987aaf3:list-pi-sessions' }
+[16:45:19.287] [RPC] Handler returned { method: '7b51fc78-38b7-4e83-b780-e8326987aaf3:list-pi-sessions', hasResult: true }
+[16:45:19.288] [RPC] Sending encrypted response { method: '7b51fc78-38b7-4e83-b780-e8326987aaf3:list-pi-sessions', responseLength: 520 }
+[16:45:19.292] In production, skipping message inspection 
+[16:45:19.300] In production, skipping message inspection 
+[16:45:28.604] In production, skipping message inspection 
+[16:45:28.605] [SOCKET] [UPDATE] Decrypted message { role: 'session', contentType: 'unknown' }

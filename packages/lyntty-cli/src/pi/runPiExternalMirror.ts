@@ -17,7 +17,14 @@ function isSessionEntry(entry: unknown): entry is SessionEntry {
 }
 
 export function readPiSessionEntries(file: string): SessionEntry[] {
-  return parseJsonlSessionEntries(readFileSync(file, 'utf8'));
+  try {
+    return parseJsonlSessionEntries(readFileSync(file, 'utf8'));
+  } catch (error) {
+    if (error && typeof error === 'object' && (error as { code?: unknown }).code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
 }
 
 function parseJsonlSessionEntries(content: string): SessionEntry[] {
@@ -32,6 +39,18 @@ function parseJsonlSessionEntries(content: string): SessionEntry[] {
         return [];
       }
     });
+}
+
+function extractMessageText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .flatMap((part) => {
+      if (!part || typeof part !== 'object') return [];
+      const record = part as { type?: unknown; text?: unknown };
+      return record.type === 'text' && typeof record.text === 'string' ? [record.text] : [];
+    })
+    .join('');
 }
 
 export function readPiSessionEntriesFromOffset(file: string, offset: number): { entries: SessionEntry[]; nextOffset: number } {
@@ -106,13 +125,35 @@ export class PiExternalMirror {
     const deliveredIds = new Set(entries
       .filter((entry) => this.isExtensionDeliveredEntry(entry, cutoffTimeMs, options.includeAssistantMessages === true))
       .map((entry) => entry.id));
-    this.pendingEntries = this.pendingEntries.filter((entry) => {
-      if (!deliveredIds.has(entry.id)) return true;
-      return false;
-    });
+    this.markDeliveredIds(deliveredIds, entries);
+  }
+
+  markUserTextDeliveredSince(text: string, cutoffTimeMs: number): void {
+    const normalizedText = text.trim();
+    if (!normalizedText) return;
+    const entries = readPiSessionEntries(this.sessionFile);
+    const deliveredIds = new Set(entries
+      .filter((entry) => this.isUserTextEntry(entry, cutoffTimeMs, normalizedText))
+      .map((entry) => entry.id));
+    this.markDeliveredIds(deliveredIds, entries);
+  }
+
+  private markDeliveredIds(deliveredIds: Set<string>, entries: SessionEntry[]): void {
+    this.pendingEntries = this.pendingEntries.filter((entry) => !deliveredIds.has(entry.id));
     for (const entry of entries.filter((entry) => deliveredIds.has(entry.id))) {
       this.knownEntryIds.add(entry.id);
     }
+  }
+
+  private isUserTextEntry(entry: SessionEntry, cutoffTimeMs: number, text: string): boolean {
+    const entryTime = Date.parse(entry.timestamp);
+    if (!Number.isFinite(entryTime) || entryTime < cutoffTimeMs) {
+      return false;
+    }
+    if (entry.type !== 'message') return false;
+    const message = entry.message as { role?: unknown; content?: unknown };
+    if (message.role !== 'user') return false;
+    return extractMessageText(message.content).trim() === text;
   }
 
   private isExtensionDeliveredEntry(entry: SessionEntry, cutoffTimeMs: number, includeAssistantMessages: boolean): boolean {
@@ -168,7 +209,7 @@ export function startPiExternalMirror(options: {
   session: () => ApiSessionClient;
   isManagedRuntimeActive?: () => boolean;
   pollMs?: number;
-}): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void } | null {
+}): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void } | null {
   if (!options.sessionFile) {
     return null;
   }
@@ -235,5 +276,6 @@ export function startPiExternalMirror(options: {
     markCurrentEntriesKnown: () => mirror.markCurrentEntriesKnown(),
     markCurrentEntriesDelivered: () => mirror.markCurrentEntriesDelivered(),
     markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options),
+    markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => mirror.markUserTextDeliveredSince(text, cutoffTimeMs),
   };
 }

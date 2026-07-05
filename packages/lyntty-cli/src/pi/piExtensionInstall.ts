@@ -505,12 +505,28 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
     send(ctx, { type: "session_info_changed", name: event.name });
   });
 
+  pi.on("input", async (event, ctx) => {
+    if (event.source === "extension") return;
+    if (typeof event.text !== "string" || event.text.trim().length === 0) return;
+    send(ctx, {
+      type: "input",
+      text: event.text,
+      source: event.source,
+      streamingBehavior: event.streamingBehavior,
+    });
+  });
+
   pi.on("agent_start", async (_event, ctx) => {
     send(ctx, { type: "agent_start" });
   });
 
   pi.on("message_update", async (event, ctx) => {
     send(ctx, { type: "message_update", assistantMessageEvent: event.assistantMessageEvent });
+  });
+
+  pi.on("message_end", async (event, ctx) => {
+    if (event.message?.role !== "assistant") return;
+    send(ctx, { type: "message_end", message: event.message });
   });
 
   pi.on("tool_execution_start", async (event, ctx) => {

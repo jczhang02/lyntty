@@ -8,6 +8,15 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 describe('Pi extension event bridge', () => {
+  it('accepts assistant message_end as a live fallback event', () => {
+    const event = toPiAgentSessionEvent({
+      type: 'message_end',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'final answer' }] },
+    });
+
+    expect(event?.type).toBe('message_end');
+  });
+
   it('accepts live Pi tool events for the shared session protocol mapper', () => {
     const event = toPiAgentSessionEvent({
       type: 'tool_execution_end',
@@ -60,6 +69,9 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('X-Lyntty-Extension-Token');
       expect(source).toContain('deliveryToken');
       expect(source).toContain('pi.sendUserMessage');
+      expect(source).toContain('pi.on("input"');
+      expect(source).toContain('event.source === "extension"');
+      expect(source).toContain('pi.on("message_end"');
       expect(source).toContain('safePiCommands');
       expect(source).toContain('invoke_pi_command');
       expect(source).toContain('deliverAs: "followUp"');

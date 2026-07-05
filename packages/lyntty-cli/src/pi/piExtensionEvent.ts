@@ -125,6 +125,11 @@ export function toPiAgentSessionEvent(event: Record<string, unknown>): AgentSess
         return event as unknown as AgentSessionEvent;
       }
       return null;
+    case 'message_end':
+      if (event.message && typeof event.message === 'object') {
+        return event as unknown as AgentSessionEvent;
+      }
+      return null;
     case 'tool_execution_start':
       if (typeof event.toolCallId === 'string' && typeof event.toolName === 'string') {
         return event as unknown as AgentSessionEvent;

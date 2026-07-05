@@ -49,6 +49,20 @@ afterEach(() => {
 });
 
 describe('PiExternalMirror', () => {
+  it('treats a not-yet-created Pi JSONL file as empty during live-delivery dedupe', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'missing.jsonl');
+      const mirror = new PiExternalMirror(file, [], () => {}, 2_000);
+
+      expect(() => mirror.markUserTextDeliveredSince('early input', 0)).not.toThrow();
+      expect(() => mirror.markCurrentEntriesDeliveredSince(0, { includeAssistantMessages: true })).not.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+
   it('reads appended JSONL entries from a byte offset', () => {
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
@@ -308,7 +322,52 @@ describe('PiExternalMirror', () => {
     }
   });
 
-  it('keeps pending user entries because the live extension does not deliver user prompts', async () => {
+  it('drops a pending user entry only when the live extension delivered the same user text', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      appendJsonl(file, userEntry('u2', 'computer typed prompt'));
+      await mirror.tick(1_000);
+      mirror.markUserTextDeliveredSince('computer typed prompt', Date.parse('2026-07-02T00:00:00.000Z'));
+      await mirror.tick(3_100);
+
+      expect(sent).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps pending user entries that do not match a live extension input', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      appendJsonl(file, userEntry('u2', 'computer typed prompt'));
+      await mirror.tick(1_000);
+      mirror.markUserTextDeliveredSince('different prompt', Date.parse('2026-07-02T00:00:00.000Z'));
+      await mirror.tick(3_100);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0].map((entry) => entry.id)).toEqual(['u2']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps pending user entries when only non-user extension delivery was marked', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
       const file = join(dir, 'session.jsonl');

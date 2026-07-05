@@ -55,6 +55,41 @@ describe('PiSessionProtocolMapper', () => {
     expect(end[1].turn).toBe(liveFlush[0].turn);
   });
 
+  it('uses assistant message_end as a final text fallback without duplicating flushed text', () => {
+    const mapper = new PiSessionProtocolMapper();
+    mapper.mapEvent(event({ type: 'agent_start' }));
+    mapper.mapEvent(event({
+      type: 'message_update',
+      assistantMessageEvent: { type: 'text_delta', delta: 'partial ' },
+    }));
+
+    const liveFlush = mapper.flushPendingText();
+    expect(liveFlush.map((envelope) => envelope.ev)).toEqual([{ t: 'text', text: 'partial ' }]);
+
+    const final = mapper.mapEvent(event({
+      type: 'message_end',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'partial final' }] },
+    }));
+    expect(final.map((envelope) => envelope.ev)).toEqual([{ t: 'text', text: 'final' }]);
+
+    const duplicateEnd = mapper.mapEvent(event({
+      type: 'message_end',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'partial final' }] },
+    }));
+    expect(duplicateEnd).toEqual([]);
+  });
+
+  it('uses assistant message_end when message_update events were dropped', () => {
+    const mapper = new PiSessionProtocolMapper();
+    mapper.mapEvent(event({ type: 'agent_start' }));
+
+    const final = mapper.mapEvent(event({
+      type: 'message_end',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'full answer' }] },
+    }));
+    expect(final.map((envelope) => envelope.ev)).toEqual([{ t: 'text', text: 'full answer' }]);
+  });
+
   it('flushes text before tool envelopes and never emits ACP messages', () => {
     const mapper = new PiSessionProtocolMapper();
     mapper.mapEvent(event({ type: 'agent_start' }));
