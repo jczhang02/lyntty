@@ -50,6 +50,27 @@ Results:
 - App typecheck passed.
 - `git diff --check` passed.
 
-## Pending final R58 matrix
+## Final R58 APK/web validation
 
-Release-style APK build/screenshot validation and web/dev visual validation will be run after the remaining R58 visual changes land, so typography is checked in the final combined UI state.
+Additional commands:
+
+```bash
+cd packages/lyntty-app/android && APP_ENV=preview EXPO_PUBLIC_LYNTTY_SERVER_URL=http://10.0.2.2:3005 CCACHE_DISABLE=1 CMAKE_C_COMPILER_LAUNCHER= CMAKE_CXX_COMPILER_LAUNCHER= ./gradlew assembleRelease --no-daemon
+adb -s emulator-5554 install -r packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk
+cd packages/lyntty-app && APP_ENV=preview EXPO_PUBLIC_LYNTTY_SERVER_URL=http://127.0.0.1:3005 npx expo export --platform web --output-dir /tmp/lyntty-r58-web-export
+```
+
+Artifacts:
+
+- `docs/evidence/artifacts/r58-visual-polish/settings.png` — release-style APK visual check of updated UI font stack.
+- `docs/evidence/artifacts/r58-visual-polish/apk-size-before.txt` / `apk-size-after.txt` — APK size moved from 291 MiB to 302 MiB after full Chinese font bundling.
+- `docs/evidence/artifacts/r58-visual-polish/web-export.log` — web export includes `LXGWNeoZhiSongScreenFull` (22MB), Source Sans 3, and Source Serif 4 assets.
+
+Results:
+
+- Release-style APK build/install/launch passed.
+- Maestro first-run account creation passed after the typography update.
+- Web export passed.
+- No artifact secrets found by sensitive-string scan.
+
+Residual risk: the full LXGW font is intentionally large. If production APK size becomes a release blocker, subset the font before distribution.

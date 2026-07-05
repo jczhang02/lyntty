@@ -34,6 +34,20 @@ Results:
 - `packages/lyntty-app` typecheck passed.
 - `git diff --check` passed.
 
-## Pending final R58 matrix
+## Final R58 APK validation
 
-Release-style APK screenshot validation will be captured after typography and remaining visual changes land, so Settings is visually reviewed in the final combined state.
+Release-style APK validation was run after icon and typography changes landed.
+
+Artifacts:
+
+- `docs/evidence/artifacts/r58-visual-polish/settings.png`
+- `docs/evidence/artifacts/r58-visual-polish/settings.xml`
+
+Evidence from `settings.xml`:
+
+- `Relay` visible with `10.0.2.2:3005`.
+- `Account` visible with `Signed in`.
+- `Node Management` visible with `No nodes paired`.
+- `Version` visible with commit `188222a` and runtime details.
+
+This validates that the large low-information logo/profile header was replaced by a compact overview and that no Review Evidence, Diagnostics, or Pi runtime debug surface was added.

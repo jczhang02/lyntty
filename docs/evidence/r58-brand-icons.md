@@ -75,6 +75,26 @@ Results:
 - `packages/lyntty-app` typecheck passed
 - `git diff --check` passed
 
-## Pending final R58 matrix
+## Final R58 APK/web validation
 
-Release-style APK launcher/splash/onboarding/settings screenshots will be captured after the remaining visual tasks land, so the final APK build validates the combined visual state once instead of rebuilding after every visual slice.
+```bash
+cd packages/lyntty-app/android && APP_ENV=preview EXPO_PUBLIC_LYNTTY_SERVER_URL=http://10.0.2.2:3005 CCACHE_DISABLE=1 CMAKE_C_COMPILER_LAUNCHER= CMAKE_CXX_COMPILER_LAUNCHER= ./gradlew assembleRelease --no-daemon
+adb -s emulator-5554 install -r packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk
+LYNTTY_MAESTRO_DEVICE=emulator-5554 LYNTTY_MAESTRO_SERVER_URL=http://10.0.2.2:3005 scripts/e2e/run-maestro.sh e2e/maestro/01_first_run.yml
+cd packages/lyntty-app && APP_ENV=preview EXPO_PUBLIC_LYNTTY_SERVER_URL=http://127.0.0.1:3005 npx expo export --platform web --output-dir /tmp/lyntty-r58-web-export
+```
+
+Artifacts:
+
+- `docs/evidence/artifacts/r58-visual-polish/launch.png` — release APK launched with updated app branding.
+- `docs/evidence/artifacts/r58-visual-polish/after-first-run.png` — release APK first-run / onboarding state.
+- `docs/evidence/artifacts/r58-visual-polish/settings.png` — Settings with updated brand marks and compact overview.
+- `docs/evidence/artifacts/r58-visual-polish/web-export.log` — web export completed and included new brand/font assets.
+
+Results:
+
+- Release-style APK `assembleRelease` passed.
+- APK installed and launched on emulator `emulator-5554`.
+- Maestro first-run account creation passed against isolated local relay.
+- Web export passed.
+- Artifact sensitive-string scan found no `lyntty://terminal`, `dataEncryptionKey`, `Authorization`, or bearer-token strings.
