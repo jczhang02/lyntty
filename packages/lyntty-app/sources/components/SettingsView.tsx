@@ -1,5 +1,4 @@
 import { View, ScrollView, Pressable, Platform } from 'react-native';
-import { Image } from 'expo-image';
 import * as React from 'react';
 import { Text } from '@/components/StyledText';
 import { useRouter } from 'expo-router';
@@ -22,6 +21,8 @@ import { useProfile } from '@/sync/storage';
 import { getDisplayName, getAvatarUrl, getBio } from '@/sync/profile';
 import { Avatar } from '@/components/Avatar';
 import { t } from '@/text';
+import { getServerUrl } from '@/sync/serverConfig';
+import { formatSettingsNodeSubtitle, formatSettingsServerSubtitle } from './settingsOverview';
 
 type BuildConfig = {
     buildCommitSha?: unknown;
@@ -79,10 +80,11 @@ export const SettingsView = React.memo(function SettingsView() {
     const [devModeEnabled, setDevModeEnabled] = useLocalSettingMutable('devModeEnabled');
     const [showOfflineMachines, setShowOfflineMachines] = React.useState(false);
     const allMachinesWithOffline = useAllMachines({ includeOffline: true });
-    const offlineMachineCount = React.useMemo(
-        () => allMachinesWithOffline.filter(m => !isMachineOnline(m)).length,
+    const onlineMachineCount = React.useMemo(
+        () => allMachinesWithOffline.filter(isMachineOnline).length,
         [allMachinesWithOffline]
     );
+    const offlineMachineCount = allMachinesWithOffline.length - onlineMachineCount;
     const visibleMachines = React.useMemo(
         () => showOfflineMachines
             ? allMachinesWithOffline
@@ -93,6 +95,10 @@ export const SettingsView = React.memo(function SettingsView() {
     const displayName = getDisplayName(profile);
     const avatarUrl = getAvatarUrl(profile);
     const bio = getBio(profile);
+    const serverUrl = getServerUrl();
+    const serverSubtitle = formatSettingsServerSubtitle(serverUrl);
+    const nodeSubtitle = formatSettingsNodeSubtitle(onlineMachineCount, allMachinesWithOffline.length);
+    const accountSubtitle = profile.firstName ? (bio || displayName || 'Signed in') : 'Signed in';
 
     const { connectTerminal, connectWithUrl, isLoading } = useConnectTerminal();
 
@@ -115,41 +121,43 @@ export const SettingsView = React.memo(function SettingsView() {
     return (
 
         <ItemList style={{ paddingTop: 0 }}>
-            {/* App Info Header */}
-            <View style={{ maxWidth: layout.maxWidth, alignSelf: 'center', width: '100%' }}>
-                <View style={{ alignItems: 'center', paddingVertical: 24, backgroundColor: theme.colors.surface, marginTop: 16, borderRadius: 12, marginHorizontal: 16 }}>
-                    {profile.firstName ? (
-                        // Profile view: Avatar + name + version
-                        <>
-                            <View style={{ marginBottom: 12 }}>
-                                <Avatar
-                                    id={profile.id}
-                                    size={90}
-                                    imageUrl={avatarUrl}
-                                    thumbhash={profile.avatar?.thumbhash}
-                                />
-                            </View>
-                            <Text style={{ fontSize: 20, fontWeight: '600', color: theme.colors.text, marginBottom: bio ? 4 : 8 }}>
-                                {displayName}
-                            </Text>
-                            {bio && (
-                                <Text style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 8, paddingHorizontal: 16 }}>
-                                    {bio}
-                                </Text>
-                            )}
-                        </>
-                    ) : (
-                        // Logo view: Original logo + version
-                        <>
-                            <Image
-                                source={theme.dark ? require('@/assets/images/logotype-light.png') : require('@/assets/images/logotype-dark.png')}
-                                contentFit="contain"
-                                style={{ width: 300, height: 90, marginBottom: 12 }}
-                            />
-                        </>
+            {/* Compact app overview */}
+            <ItemGroup>
+                <Item
+                    title="Relay"
+                    subtitle={serverSubtitle}
+                    icon={<Ionicons name="cloud-outline" size={29} color="#007AFF" />}
+                    onPress={() => router.push('/server')}
+                />
+                <Item
+                    title={t('settings.account')}
+                    subtitle={accountSubtitle}
+                    icon={(
+                        <Avatar
+                            id={profile.id || 'lyntty-account'}
+                            size={29}
+                            imageUrl={avatarUrl}
+                            thumbhash={profile.avatar?.thumbhash ?? undefined}
+                        />
                     )}
-                </View>
-            </View>
+                    onPress={() => router.push('/settings/account')}
+                />
+                <Item
+                    title={t('settings.machines')}
+                    subtitle={nodeSubtitle}
+                    icon={<Ionicons name="desktop-outline" size={29} color={onlineMachineCount > 0 ? theme.colors.status.connected : theme.colors.status.disconnected} />}
+                    showChevron={false}
+                />
+                <Item
+                    title={t('common.version')}
+                    subtitle={versionSubtitle}
+                    subtitleLines={2}
+                    detail={versionDetail}
+                    icon={<Ionicons name="information-circle-outline" size={29} color={theme.colors.textSecondary} />}
+                    onPress={handleVersionClick}
+                    showChevron={false}
+                />
+            </ItemGroup>
 
             {/* Connect Terminal - Only show on native platforms */}
             {Platform.OS !== 'web' && (
@@ -268,15 +276,6 @@ export const SettingsView = React.memo(function SettingsView() {
                         trackWhatsNewClicked();
                         router.push('/changelog');
                     }}
-                />
-                <Item
-                    title={t('common.version')}
-                    subtitle={versionSubtitle}
-                    subtitleLines={2}
-                    detail={versionDetail}
-                    icon={<Ionicons name="information-circle-outline" size={29} color={theme.colors.textSecondary} />}
-                    onPress={handleVersionClick}
-                    showChevron={false}
                 />
             </ItemGroup>
 
