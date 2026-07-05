@@ -23,6 +23,7 @@ import { useLynttyAction } from '@/hooks/useLynttyAction';
 import { useSessionQuickActions } from '@/hooks/useSessionQuickActions';
 import { copySessionMetadataToClipboard, copySessionMetadataAndLogsToClipboard } from '@/utils/copySessionMetadataToClipboard';
 import { LynttyError } from '@/utils/errors';
+import { navigateAfterSessionArchive } from '@/utils/archiveNavigation';
 
 // Animated status dot component
 function StatusDot({ color, isPulsing, size = 8 }: { color: string; isPulsing?: boolean; size?: number }) {
@@ -159,9 +160,7 @@ function SessionInfoContent({ session }: { session: Session }) {
         if (!killResult.success) {
             await sessionArchive(session.id);
         }
-        // Success - navigate back
-        router.back();
-        router.back();
+        navigateAfterSessionArchive(router);
     });
 
     const handleArchiveSession = useCallback(() => {
