@@ -55,15 +55,17 @@ export function groupMessagesForDisplay(
     enabled: boolean = true,
     options: { collapseCurrentTurn?: boolean } = {},
 ): DisplayItem[] {
+    const collapseCurrentTurn = options.collapseCurrentTurn ?? true;
+    const turnOf = getTurnAssignments(messages);
+    const displayMessages = completeFinishedTurnRunningTools(messages, turnOf, collapseCurrentTurn);
+
     if (!enabled) {
-        return messages
+        return displayMessages
             .filter((msg) => !isInvisibleMessage(msg))
             .map((msg) => ({ type: 'message', id: msg.id, message: msg } as TextItem));
     }
 
-    const collapseCurrentTurn = options.collapseCurrentTurn ?? true;
-    const turnOf = getTurnAssignments(messages);
-    const workGroups = collectAgentWorkGroups(messages, turnOf, collapseCurrentTurn);
+    const workGroups = collectAgentWorkGroups(displayMessages, turnOf, collapseCurrentTurn);
     const hiddenWorkIndexes = new Set<number>();
     const workGroupByOldestIndex = new Map<number, AgentWorkGroupItem>();
 
@@ -80,13 +82,13 @@ export function groupMessagesForDisplay(
         return msg.kind === 'tool-call';
     };
 
-    const toolRuns = collectToolRuns(messages, visibleForToolGrouping);
+    const toolRuns = collectToolRuns(displayMessages, visibleForToolGrouping);
 
     // Build display items — groups are emitted at their oldest hidden member
     // so the visual order remains user message → collapsed work → final answer.
     const result: DisplayItem[] = [];
-    for (let i = 0; i < messages.length; i++) {
-        const msg = messages[i];
+    for (let i = 0; i < displayMessages.length; i++) {
+        const msg = displayMessages[i];
 
         if (isInvisibleMessage(msg)) continue;
 
@@ -242,6 +244,39 @@ function collectToolRuns(
     flush();
 
     return runsByIndex;
+}
+
+function completeFinishedTurnRunningTools(messages: Message[], turnOf: number[], collapseCurrentTurn: boolean): Message[] {
+    const finalTextIndexByTurn = new Map<number, number>();
+    for (let index = 0; index < messages.length; index++) {
+        const msg = messages[index];
+        if (msg.kind !== 'agent-text') {
+            continue;
+        }
+        const turn = turnOf[index];
+        if (turn === 0 && !collapseCurrentTurn) {
+            continue;
+        }
+        if (!finalTextIndexByTurn.has(turn)) {
+            finalTextIndexByTurn.set(turn, index);
+        }
+    }
+
+    let changed = false;
+    const completed = messages.map((msg, index) => {
+        const finalTextIndex = finalTextIndexByTurn.get(turnOf[index]);
+        if (finalTextIndex === undefined || index <= finalTextIndex) {
+            return msg;
+        }
+        const finalText = messages[finalTextIndex];
+        const next = completeRunningToolForDisplay(msg, finalText.createdAt);
+        if (next !== msg) {
+            changed = true;
+        }
+        return next;
+    });
+
+    return changed ? completed : messages;
 }
 
 function collectAgentWorkGroups(messages: Message[], turnOf: number[], collapseCurrentTurn: boolean): Array<{

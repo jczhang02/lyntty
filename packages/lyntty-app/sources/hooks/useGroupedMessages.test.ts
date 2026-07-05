@@ -321,6 +321,35 @@ describe('useGroupedMessages', () => {
         });
     });
 
+    it('freezes completed-turn running tools even when tool grouping is disabled', () => {
+        const messages: Message[] = [
+            {
+                kind: 'agent-text',
+                id: 'agent-final',
+                localId: null,
+                createdAt: 5_000,
+                text: 'done',
+            },
+            toolMessage('tool-running-persisted', 2_000, { running: true }),
+            {
+                kind: 'user-text',
+                id: 'user',
+                localId: null,
+                createdAt: 1_000,
+                text: 'read files',
+            },
+        ];
+
+        const items = groupMessagesForDisplay(messages, false);
+        const toolItem = items.find((item) => item.type === 'message' && item.message.id === 'tool-running-persisted');
+        expect(toolItem).toBeDefined();
+        if (toolItem?.type !== 'message' || toolItem.message.kind !== 'tool-call') {
+            throw new Error('Expected visible tool-call message');
+        }
+        expect(toolItem.message.tool.state).toBe('completed');
+        expect(toolItem.message.tool.completedAt).toBe(5_000);
+    });
+
     it('shows current thinking but folds completed thinking into agent work', () => {
         const messages: Message[] = [
             {
