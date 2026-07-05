@@ -1,6 +1,8 @@
-# Integration Tests
+# Lyntty Relay Integration Tests
 
 Stress tests that run against a real multi-replica Lyntty relay on minikube.
+
+Follow `packages/lyntty-relay/AGENTS.md` first. These tests are destructive when pod-kill scenarios run; never point them at a shared or production relay.
 
 ## Prerequisites
 
@@ -20,13 +22,13 @@ This builds the server image, applies the kustomize overlay (2-replica server + 
 After it finishes, open a tunnel to the service:
 
 ```bash
-minikube service handy-server --url
+minikube service lyntty-relay --url
 ```
 
 Use the printed URL as `SERVER_URL` for the tests below. If port-forwarding instead:
 
 ```bash
-kubectl port-forward svc/handy-server 3005:3000
+kubectl port-forward svc/lyntty-relay 3005:3000
 # SERVER_URL=http://127.0.0.1:3005
 ```
 
@@ -99,13 +101,13 @@ Scenarios: `full-server-outage`, `reconnect-connect-err`, `rpc-after-reconnect`,
 kubectl get pods -w
 
 # Tail server logs
-kubectl logs -l app=handy-server --all-containers -f
+kubectl logs -l app=lyntty-relay --all-containers -f
 
 # Kill a specific pod (for pod-kill scenarios)
 kubectl delete pod <pod-name> --grace-period=0
 
 # Restart deployment
-kubectl rollout restart deployment/handy-server
+kubectl rollout restart deployment/lyntty-relay
 
 # Access Redis CLI
 kubectl exec -it lyntty-redis-0 -- redis-cli
