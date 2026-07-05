@@ -56,7 +56,7 @@ describe('daemon control server Pi extension endpoints', () => {
       pollPiExtensionCommands: async (session, afterSeq) => ({
         status: 'ok',
         commands: session.piSessionId === 'pi-1' && afterSeq < 7
-          ? [{ seq: 7, deliveryToken: 'lease-7', command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }]
+          ? [{ seq: 7, deliveryToken: 'lease-7', localKey: 'mobile-local-7', mobileContext: true, command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }]
           : [],
       }),
       onPiExtensionCommandAck: async (session, ack) => {
@@ -75,7 +75,7 @@ describe('daemon control server Pi extension endpoints', () => {
       expect(commandResponse.status).toBe(200);
       expect(await commandResponse.json()).toEqual({
         status: 'ok',
-        commands: [{ seq: 7, deliveryToken: 'lease-7', command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }],
+        commands: [{ seq: 7, deliveryToken: 'lease-7', localKey: 'mobile-local-7', mobileContext: true, command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }],
       });
 
       const ackResponse = await fetch(`http://127.0.0.1:${server.port}/pi-extension/command-ack`, {

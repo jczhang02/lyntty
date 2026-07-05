@@ -30,7 +30,7 @@ type RemotePiCommand =
   | { type: "get_commands" }
   | { type: "invoke_pi_command"; commandLine: string; deliverAs?: "followUp" }
   | { type: "set_label"; entryId: string; label?: string };
-type RemotePiCommandEnvelope = { seq: number; deliveryToken: string; command: RemotePiCommand };
+type RemotePiCommandEnvelope = { seq: number; deliveryToken: string; localKey?: string; mobileContext?: boolean; command: RemotePiCommand };
 type CommandAck = { seq: number; deliveryToken: string; status: "accepted_by_pi" | "failed"; error?: string; resultText?: string; commands?: PiCommandInfo[] };
 type GoalState = { goalId: string; objective: string; status: string; tokenBudget: number | null; usage: { tokensUsed: number; activeSeconds: number }; createdAt: number; updatedAt: number };
 const queuedPayloads: QueuedPayload[] = [];
@@ -192,8 +192,21 @@ function stopHeartbeat(ctx: ExtensionContext): void {
   heartbeatTimers.delete(sessionId);
 }
 
-function lynttyLabel(text: string): string {
-  return text.startsWith("[lyntty]") ? text : "[lyntty] " + text;
+function mobileContextText(): string {
+  return "Lyntty mobile context: the user is operating from Lyntty mobile. Prefer concise, phone-friendly replies when useful.";
+}
+
+async function injectMobileContext(pi: ExtensionAPI, envelope: RemotePiCommandEnvelope, deliverAs?: "followUp" | "steer"): Promise<void> {
+  if (envelope.mobileContext === false) return;
+  await pi.sendMessage({
+    customType: "lyntty-mobile-context",
+    content: mobileContextText(),
+    display: false,
+    details: {
+      source: "mobile",
+      localKey: envelope.localKey,
+    },
+  }, deliverAs ? { deliverAs } : undefined);
 }
 
 function stripFrontmatter(content: string): string {
@@ -314,16 +327,20 @@ function isSupportedPiCommandLine(pi: ExtensionAPI, commandLine: string): boolea
   return safePiCommands(pi).some((command) => command.name === commandName);
 }
 
-async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, command: RemotePiCommand): Promise<Partial<CommandAck> | undefined> {
+async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, envelope: RemotePiCommandEnvelope): Promise<Partial<CommandAck> | undefined> {
+  const command = envelope.command;
   switch (command.type) {
     case "send_user_message":
-      await pi.sendUserMessage(lynttyLabel(command.text));
+      await injectMobileContext(pi, envelope);
+      await pi.sendUserMessage(command.text);
       return;
     case "follow_up":
-      await pi.sendUserMessage(lynttyLabel(command.text), { deliverAs: "followUp" });
+      await injectMobileContext(pi, envelope, "followUp");
+      await pi.sendUserMessage(command.text, { deliverAs: "followUp" });
       return;
     case "steer":
-      await pi.sendUserMessage(lynttyLabel(command.text), { deliverAs: "steer" });
+      await injectMobileContext(pi, envelope, "steer");
+      await pi.sendUserMessage(command.text, { deliverAs: "steer" });
       return;
     case "abort":
       ctx.abort();
@@ -354,6 +371,7 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, com
         return { resultText: handleContextCommand(ctx) };
       }
       const expanded = await expandSkillCommand(pi, command.commandLine);
+      await injectMobileContext(pi, envelope, command.deliverAs);
       if (command.deliverAs) {
         await pi.sendUserMessage(expanded, { deliverAs: command.deliverAs });
       } else {
@@ -403,7 +421,7 @@ async function pollCommands(pi: ExtensionAPI, ctx: ExtensionContext): Promise<vo
     executingCommand = true;
     let ack: CommandAck;
     try {
-      const result = await executeRemoteCommand(pi, ctx, envelope.command);
+      const result = await executeRemoteCommand(pi, ctx, envelope);
       ack = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "accepted_by_pi", ...result };
     } catch (error) {
       ack = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "failed", error: error instanceof Error ? error.message : "Pi command failed" };

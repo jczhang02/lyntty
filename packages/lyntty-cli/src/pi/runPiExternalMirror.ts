@@ -228,6 +228,7 @@ export function startPiExternalMirror(options: {
   sessionFile: string | undefined;
   initialEntries: SessionEntry[];
   session: () => ApiSessionClient;
+  metaForEnvelope?: (envelope: ReturnType<typeof mapPiSessionHistoryToEnvelopes>[number]) => Record<string, unknown> | undefined;
   isManagedRuntimeActive?: () => boolean;
   pollMs?: number;
 }): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void; markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number) => void } | null {
@@ -251,7 +252,7 @@ export function startPiExternalMirror(options: {
     const session = options.session();
     for (const envelope of envelopes) {
       if (stopped) return;
-      session.sendSessionProtocolMessage(envelope);
+      session.sendSessionProtocolMessage(envelope, options.metaForEnvelope?.(envelope));
     }
     if (stopped) return;
     await session.flush();

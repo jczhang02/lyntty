@@ -782,30 +782,31 @@ export class ApiSessionClient extends EventEmitter {
         this.enqueueMessage(content);
     }
 
-    private enqueueSessionProtocolEnvelope(envelope: SessionEnvelope, invalidate: boolean = true) {
+    private enqueueSessionProtocolEnvelope(envelope: SessionEnvelope, invalidate: boolean = true, meta?: Record<string, unknown>) {
         const content = {
             role: 'session',
             content: envelope,
             meta: {
-                sentFrom: 'cli'
+                sentFrom: 'cli',
+                ...meta,
             }
         };
 
         this.enqueueMessage(content, invalidate, `session:${envelope.id}`);
     }
 
-    sendSessionProtocolMessage(envelope: SessionEnvelope) {
+    sendSessionProtocolMessage(envelope: SessionEnvelope, meta?: Record<string, unknown>) {
         if (envelope.role !== 'user') {
-            this.enqueueSessionProtocolEnvelope(envelope);
+            this.enqueueSessionProtocolEnvelope(envelope, true, meta);
             return;
         }
 
         if (envelope.ev.t !== 'text') {
-            this.enqueueSessionProtocolEnvelope(envelope);
+            this.enqueueSessionProtocolEnvelope(envelope, true, meta);
             return;
         }
 
-        this.enqueueSessionProtocolEnvelope(envelope);
+        this.enqueueSessionProtocolEnvelope(envelope, true, meta);
     }
 
     /**

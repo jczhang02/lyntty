@@ -23,9 +23,9 @@ describe('userMessagePresentation', () => {
 
         expect(isLocalOptimisticUserMessage(message)).toBe(false);
         expect(getUserMessagePresentation(message)).toEqual({
-            frame: 'computerPromptCard',
+            frame: 'phonePromptCard',
             parseRawSlashCommands: false,
-            sourceLabel: 'Computer Pi',
+            sourceLabel: 'Computer',
         });
     });
 
@@ -33,11 +33,23 @@ describe('userMessagePresentation', () => {
         const message = userMessage({
             localId: 'phone-local-1',
             text: '/skill:jc-writing-style polish this paragraph',
-            meta: { sentFrom: 'android' },
+            meta: { sentFrom: 'android', remoteCommandState: 'queued' },
         });
 
         expect(isLocalOptimisticUserMessage(message)).toBe(true);
         expect(getUserMessagePresentation(message)).toEqual({
+            frame: 'phoneBubble',
+            parseRawSlashCommands: true,
+            sourceLabel: 'Sending…',
+        });
+    });
+
+    it('removes the sending label once a mobile command is accepted by Pi', () => {
+        expect(getUserMessagePresentation(userMessage({
+            localId: 'phone-local-1',
+            text: 'hello',
+            meta: { sentFrom: 'android', remoteCommandState: 'accepted_by_pi' },
+        }))).toEqual({
             frame: 'phoneBubble',
             parseRawSlashCommands: true,
             sourceLabel: null,

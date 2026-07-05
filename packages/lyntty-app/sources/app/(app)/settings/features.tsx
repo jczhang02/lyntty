@@ -15,6 +15,7 @@ export default function FeaturesSettingsScreen() {
     const [fileDiffsSidebar, setFileDiffsSidebar] = useSettingMutable('fileDiffsSidebar');
     const [groupToolCalls, setGroupToolCalls] = useSettingMutable('groupToolCalls');
     const [expImageUpload, setExpImageUpload] = useSettingMutable('expImageUpload');
+    const [sendMobileContextToPi, setSendMobileContextToPi] = useSettingMutable('sendMobileContextToPi');
 
     return (
         <ItemList style={{ paddingTop: 0 }}>
@@ -128,6 +129,18 @@ export default function FeaturesSettingsScreen() {
                         <Switch
                             value={commandPaletteEnabled}
                             onValueChange={setCommandPaletteEnabled}
+                        />
+                    }
+                    showChevron={false}
+                />
+                <Item
+                    title="Send mobile context to pi"
+                    subtitle="Let pi know messages come from Lyntty mobile for phone-friendly replies."
+                    icon={<Ionicons name="phone-portrait-outline" size={29} color="#34C759" />}
+                    rightElement={
+                        <Switch
+                            value={sendMobileContextToPi}
+                            onValueChange={setSendMobileContextToPi}
                         />
                     }
                     showChevron={false}

@@ -180,7 +180,13 @@ export function startDaemonControlServer({
         response: {
           200: z.object({
             status: z.literal('ok'),
-            commands: z.array(z.object({ seq: z.number().int().positive(), deliveryToken: z.string().min(1).max(256), command: PiRemoteCommandSchema })),
+            commands: z.array(z.object({
+              seq: z.number().int().positive(),
+              deliveryToken: z.string().min(1).max(256),
+              localKey: z.string().min(1).max(256).optional(),
+              mobileContext: z.boolean().optional(),
+              command: PiRemoteCommandSchema,
+            })),
           }),
           401: z.object({ status: z.literal('error'), error: z.string() }),
           500: z.object({ status: z.literal('error'), error: z.string() }),

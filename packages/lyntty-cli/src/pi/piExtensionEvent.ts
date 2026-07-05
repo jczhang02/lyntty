@@ -36,6 +36,8 @@ export type LynttyPiRemoteCommand =
 export type LynttyPiRemoteCommandEnvelope = {
   seq: number;
   deliveryToken: string;
+  localKey?: string;
+  mobileContext?: boolean;
   command: LynttyPiRemoteCommand;
 };
 

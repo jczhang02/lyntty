@@ -231,7 +231,7 @@ describe('PiExternalMirror', () => {
       expect(sendSessionProtocolMessage).toHaveBeenCalledWith(expect.objectContaining({
         id: 'pi-history-u2-user',
         ev: { t: 'text', text: 'fallback must recover this tail' },
-      }));
+      }), undefined);
       expect(flush).toHaveBeenCalledTimes(1);
       await mirror?.stop();
     } finally {
@@ -264,6 +264,41 @@ describe('PiExternalMirror', () => {
 
       expect(sendSessionProtocolMessage).not.toHaveBeenCalled();
       expect(flush).not.toHaveBeenCalled();
+      await mirror?.stop();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('can attach remote command metadata to mirrored Pi user echoes', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sendSessionProtocolMessage = vi.fn();
+      const flush = vi.fn().mockResolvedValue(undefined);
+      const mirror = startPiExternalMirror({
+        sessionFile: file,
+        initialEntries: [first],
+        session: () => ({ sendSessionProtocolMessage, flush }) as any,
+        metaForEnvelope: (envelope) => envelope.role === 'user'
+          ? { remoteCommandLocalKey: 'mobile-local-1', remoteCommandState: 'accepted_by_pi' }
+          : undefined,
+        pollMs: 100,
+      });
+      expect(mirror).not.toBeNull();
+
+      appendJsonl(file, userEntry('u2', 'phone echo'));
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(2_200);
+
+      expect(sendSessionProtocolMessage).toHaveBeenCalledWith(expect.objectContaining({
+        id: 'pi-history-u2-user',
+        ev: { t: 'text', text: 'phone echo' },
+      }), { remoteCommandLocalKey: 'mobile-local-1', remoteCommandState: 'accepted_by_pi' });
       await mirror?.stop();
     } finally {
       rmSync(dir, { recursive: true, force: true });

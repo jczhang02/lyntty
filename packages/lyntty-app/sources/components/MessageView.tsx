@@ -127,12 +127,10 @@ function UserTextBlock(props: {
   });
   const containerStyle = [
     styles.userMessageContainer,
-    presentation.frame === 'computerPromptCard' && styles.computerMessageContainer,
   ];
   const bubbleStyle = [
     styles.userMessageBubble,
     presentation.frame === 'phonePromptCard' && styles.userPromptCard,
-    presentation.frame === 'computerPromptCard' && styles.computerPromptCard,
   ];
   if (parsed.kind === 'caveat') {
     return null;

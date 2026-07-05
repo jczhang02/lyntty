@@ -69,6 +69,8 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('X-Lyntty-Extension-Token');
       expect(source).toContain('deliveryToken');
       expect(source).toContain('pi.sendUserMessage');
+      expect(source).toContain('lyntty-mobile-context');
+      expect(source).not.toContain('[lyntty] ');
       expect(source).toContain('pi.on("input"');
       expect(source).toContain('event.source === "extension"');
       expect(source).toContain('pi.on("message_end"');

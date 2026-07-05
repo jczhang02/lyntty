@@ -812,9 +812,19 @@ export async function startDaemon(): Promise<void> {
         command: LynttyPiRemoteCommand;
         status: 'queued' | 'delivered_to_pi_extension' | 'accepted_by_pi' | 'failed';
         deliveryToken: string;
+        mobileContext: boolean;
+        sentFrom?: string;
         error?: string;
       }>;
       seenCommandLocalKeys: Set<string>;
+      recentAcceptedRemoteCommands: Array<{
+        localKey: string;
+        text: string;
+        acceptedAt: number;
+        sentFrom?: string;
+        commandType: LynttyPiRemoteCommand['type'];
+        matched?: boolean;
+      }>;
     };
 
     let onPiExtensionEventHandler: ((payload: LynttyPiExtensionPayload) => Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }>) | null = null;
@@ -845,7 +855,52 @@ export async function startDaemon(): Promise<void> {
       sendRemoteCommandNotice(mirror, `Unsupported Pi command ${firstToken}. Lyntty currently supports /goal, /context, and /skill:* from mobile.`);
     };
 
-    const queueRemotePiCommand = (mirror: ExternalPiMirrorState, message: { localKey?: string; content: { text: string } }): void => {
+    const commandUserText = (command: LynttyPiRemoteCommand): string | null => {
+      switch (command.type) {
+        case 'send_user_message':
+        case 'follow_up':
+        case 'steer':
+          return command.text.trim();
+        case 'invoke_pi_command':
+          return command.commandLine.trim().startsWith('/skill:') ? command.commandLine.trim() : null;
+        default:
+          return null;
+      }
+    };
+
+    const commandMatchesPiEcho = (command: ExternalPiMirrorState['recentAcceptedRemoteCommands'][number], text: string, eventTime: number): boolean => {
+      if (command.matched || eventTime < command.acceptedAt - 5_000 || eventTime > command.acceptedAt + 120_000) {
+        return false;
+      }
+      const normalized = text.trim();
+      if (!normalized) return false;
+      if (normalized === command.text || normalized === `[lyntty] ${command.text}`) {
+        return true;
+      }
+      if (command.commandType === 'invoke_pi_command' && command.text.startsWith('/skill:')) {
+        return /^<skill\s+name="[^"]+"\s+location="[^"]*">/.test(normalized);
+      }
+      return false;
+    };
+
+    const remoteMetaForPiEcho = (mirror: ExternalPiMirrorState, envelope: { role: string; ev: { t: string; text?: unknown }; time: number }): Record<string, unknown> | undefined => {
+      if (envelope.role !== 'user' || envelope.ev.t !== 'text' || typeof envelope.ev.text !== 'string') {
+        return undefined;
+      }
+      const match = mirror.recentAcceptedRemoteCommands.find((command) => commandMatchesPiEcho(command, envelope.ev.text as string, envelope.time));
+      if (!match) {
+        return undefined;
+      }
+      match.matched = true;
+      return {
+        sentFrom: match.sentFrom ?? 'lyntty-mobile',
+        remoteCommandLocalKey: match.localKey,
+        remoteCommandState: 'accepted_by_pi',
+        displayText: match.text,
+      };
+    };
+
+    const queueRemotePiCommand = (mirror: ExternalPiMirrorState, message: { localKey?: string; content: { text: string }; meta?: { sentFrom?: string; sendMobileContextToPi?: boolean } }): void => {
       const localKey = message.localKey ?? `remote:${mirror.nextCommandSeq}`;
       if (mirror.seenCommandLocalKeys.has(localKey) || mirror.commands.some((entry) => entry.localKey === localKey)) return;
       if (mirror.commands.length >= MAX_REMOTE_PI_COMMANDS) {
@@ -866,6 +921,8 @@ export async function startDaemon(): Promise<void> {
         command,
         status: 'queued',
         deliveryToken: randomUUID(),
+        mobileContext: message.meta?.sendMobileContextToPi !== false,
+        sentFrom: message.meta?.sentFrom,
       });
       logger.debug('[pi] Queued remote Pi command for extension delivery', { sessionId: mirror.sessionId, localKey, type: command.type });
     };
@@ -898,7 +955,13 @@ export async function startDaemon(): Promise<void> {
       if (!next) {
         return { status: 'ok' as const, commands: [] };
       }
-      return { status: 'ok' as const, commands: [{ seq: next.seq, deliveryToken: next.deliveryToken, command: next.command }] };
+      return { status: 'ok' as const, commands: [{
+        seq: next.seq,
+        deliveryToken: next.deliveryToken,
+        localKey: next.localKey,
+        mobileContext: next.mobileContext,
+        command: next.command,
+      }] };
     };
 
     onPiExtensionCommandAckHandler = async (session, ack) => {
@@ -924,6 +987,17 @@ export async function startDaemon(): Promise<void> {
         }
         mirror.sessionClient.keepAlive(true, 'remote');
         mirror.seenCommandLocalKeys.add(command.localKey);
+        const acceptedText = commandUserText(command.command);
+        if (acceptedText) {
+          mirror.recentAcceptedRemoteCommands.push({
+            localKey: command.localKey,
+            text: acceptedText,
+            acceptedAt: Date.now(),
+            sentFrom: command.sentFrom,
+            commandType: command.command.type,
+          });
+          mirror.recentAcceptedRemoteCommands = mirror.recentAcceptedRemoteCommands.slice(-100);
+        }
         if (command.command.type === 'get_commands' && ack.commands) {
           applyPiCommandMetadata(mirror, ack.commands);
         }
@@ -1351,6 +1425,7 @@ export async function startDaemon(): Promise<void> {
         sessionFile,
         initialEntries: entries,
         session: () => sessionClient,
+        metaForEnvelope: (envelope) => remoteMetaForPiEcho(mirrorState!, envelope),
         isManagedRuntimeActive: () => !!resolveActivePiSessionReuse(piSessionId, getCurrentChildren(), machine.id)
           || (!!mirrorState && Date.now() - mirrorState.lastExtensionSeenAt < 5_000),
       });
@@ -1391,6 +1466,7 @@ export async function startDaemon(): Promise<void> {
         nextCommandSeq: 1,
         commands: [],
         seenCommandLocalKeys: new Set(response.metadata.remoteCommandAcceptedLocalKeys ?? []),
+        recentAcceptedRemoteCommands: [],
       };
         externalPiMirrors.set(mirrorKey, mirrorState);
         sessionClient.onUserMessage((message) => {

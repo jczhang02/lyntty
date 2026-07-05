@@ -339,6 +339,34 @@ function updateLatestTodos(state: ReducerState, value: unknown, timestamp: numbe
     }
 }
 
+function remoteCommandLocalKey(meta: MessageMeta | undefined): string | null {
+    const value = meta?.remoteCommandLocalKey;
+    return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function mergeRemoteCommandEcho(state: ReducerState, msg: NormalizedMessage, changed: Set<string>): boolean {
+    if (msg.role !== 'user') return false;
+    const localKey = remoteCommandLocalKey(msg.meta);
+    if (!localKey) return false;
+    const existingId = state.localIds.get(localKey);
+    if (!existingId) return false;
+    const existing = state.messages.get(existingId);
+    if (!existing || existing.role !== 'user') return false;
+
+    existing.meta = {
+        ...existing.meta,
+        ...msg.meta,
+        remoteCommandLocalKey: localKey,
+        remoteCommandState: 'accepted_by_pi',
+    };
+    if (!existing.realID) {
+        existing.realID = msg.id;
+    }
+    state.messageIds.set(msg.id, existingId);
+    changed.add(existingId);
+    return true;
+}
+
 export function reducer(state: ReducerState, messages: NormalizedMessage[], agentState?: AgentState | null): ReducerResult {
     if (ENABLE_LOGGING) {
         console.log(`[REDUCER] Called with ${messages.length} messages, agentState: ${agentState ? 'YES' : 'NO'}`);
@@ -374,6 +402,11 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
     const convertedEvents: { message: NormalizedMessage, event: AgentEvent }[] = [];
 
     for (const msg of nonSidechainMessages) {
+        // Canonical Pi echoes for mobile remote commands should confirm the
+        // optimistic phone bubble, not create a second user message.
+        if (mergeRemoteCommandEcho(state, msg, changed)) {
+            continue;
+        }
         // Check if we've already processed this message
         if (msg.role === 'user' && msg.localId && state.localIds.has(msg.localId)) {
             continue;

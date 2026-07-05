@@ -38,6 +38,7 @@ import {
 } from '@/track';
 import type { MessageSentSource } from '@/track';
 import { parseToken } from '@/utils/parseToken';
+import { expectsRemotePiEcho } from './remoteCommandEcho';
 import { RevenueCat, LogLevel, PaywallResult } from './revenueCat';
 import { getServerUrl } from './serverConfig';
 import { config } from '@/config';
@@ -716,7 +717,8 @@ class Sync {
             }
         }
 
-        const modeMeta = resolveMessageModeMeta(session, storage.getState().settings);
+        const settings = storage.getState().settings;
+        const modeMeta = resolveMessageModeMeta(session, settings);
         const { displayText, source = 'chat', attachments } = options ?? {};
 
         const flavor = session.metadata?.flavor;
@@ -821,6 +823,8 @@ class Sync {
             sentFrom = 'web'; // fallback
         }
 
+        const expectsPiEcho = expectsRemotePiEcho(text);
+
         // Create user message content with metadata
         const content: RawRecord = {
             role: 'user',
@@ -834,7 +838,10 @@ class Sync {
                 ...(modeMeta.permissionMode !== undefined ? { permissionMode: modeMeta.permissionMode } : {}),
                 ...(modeMeta.model !== undefined ? { model: modeMeta.model } : {}),
                 ...(modeMeta.effort !== undefined ? { effort: modeMeta.effort } : {}),
-                ...(displayText && { displayText }) // Add displayText if provided
+                ...(displayText && { displayText }),
+                remoteCommandLocalKey: localId,
+                sendMobileContextToPi: settings.sendMobileContextToPi !== false,
+                ...(expectsPiEcho ? { remoteCommandState: 'queued' as const } : {}),
             }
         };
         const encryptedRawRecord = await encryption.encryptRawRecord(content);

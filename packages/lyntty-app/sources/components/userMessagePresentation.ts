@@ -1,6 +1,6 @@
 import type { UserTextMessage } from '@/sync/typesMessage';
 
-export type UserMessageFrame = 'phoneBubble' | 'phonePromptCard' | 'computerPromptCard';
+export type UserMessageFrame = 'phoneBubble' | 'phonePromptCard';
 
 export type UserMessagePresentation = {
     frame: UserMessageFrame;
@@ -47,18 +47,19 @@ export function getUserMessagePresentation(message: UserTextMessage): UserMessag
     const computerOrigin = isComputerOriginUserMessage(message);
     const displayText = message.displayText || message.text;
     const block = isBlockUserMessageText(displayText);
+    const remoteCommandState = message.meta?.remoteCommandState;
 
     if (computerOrigin) {
         return {
-            frame: 'computerPromptCard',
+            frame: block ? 'phonePromptCard' : 'phoneBubble',
             parseRawSlashCommands: false,
-            sourceLabel: 'Computer Pi',
+            sourceLabel: 'Computer',
         };
     }
 
     return {
         frame: block ? 'phonePromptCard' : 'phoneBubble',
         parseRawSlashCommands: localOptimistic,
-        sourceLabel: null,
+        sourceLabel: remoteCommandState === 'queued' ? 'Sending…' : null,
     };
 }

@@ -123,6 +123,50 @@ describe('reducer', () => {
             expect(result2.messages).toHaveLength(0);
         });
 
+        it('merges canonical Pi echoes into optimistic mobile user messages by remote command key', () => {
+            const state = createReducer();
+            const optimistic: NormalizedMessage = {
+                id: 'phone-msg',
+                localId: 'mobile-local-1',
+                createdAt: 1000,
+                role: 'user',
+                content: { type: 'text', text: '测试使用' },
+                isSidechain: false,
+                meta: { sentFrom: 'android', remoteCommandLocalKey: 'mobile-local-1', remoteCommandState: 'queued' },
+            };
+
+            const first = reducer(state, [optimistic]);
+            expect(first.messages).toHaveLength(1);
+
+            const canonical: NormalizedMessage = {
+                id: 'pi-history-entry-user',
+                localId: null,
+                createdAt: 2000,
+                role: 'user',
+                content: { type: 'text', text: '[lyntty] 测试使用' },
+                isSidechain: false,
+                meta: {
+                    sentFrom: 'android',
+                    displayText: '测试使用',
+                    remoteCommandLocalKey: 'mobile-local-1',
+                    remoteCommandState: 'accepted_by_pi',
+                },
+            };
+
+            const second = reducer(state, [canonical]);
+            expect(second.messages).toHaveLength(1);
+            expect(state.messageIds.get('pi-history-entry-user')).toBe(state.localIds.get('mobile-local-1'));
+            expect(second.messages[0]).toMatchObject({
+                kind: 'user-text',
+                localId: 'mobile-local-1',
+                text: '测试使用',
+                meta: {
+                    remoteCommandLocalKey: 'mobile-local-1',
+                    remoteCommandState: 'accepted_by_pi',
+                },
+            });
+        });
+
         it('should process multiple user messages with different localIds', () => {
             const state = createReducer();
             const messages: NormalizedMessage[] = [
