@@ -15,7 +15,7 @@ import { PermissionFooter } from './PermissionFooter';
 import { parseToolUseError } from '@/utils/toolErrorParser';
 import { formatMCPTitle } from './views/MCPToolView';
 import { t } from '@/text';
-import { getTerminalToolCommand, shouldRenderToolCardHeader } from '@/utils/toolDisplay';
+import { getToolDisplayName, getToolStateText, getToolSummaryCategory, getToolSummaryDetail, shouldRenderToolCardHeader, ToolSummaryCategory } from '@/utils/toolDisplay';
 
 interface ToolViewProps {
     metadata: Metadata | null;
@@ -50,7 +50,8 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     // Enable pressable if either onPress is provided or we have navigation params
     const isPressable = !!(onPress || (sessionId && filePath) || (sessionId && messageId));
 
-    let knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
+    const knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
+    const SpecificToolView = getToolViewComponent(tool.name);
 
     // Internal Claude Code tools (e.g. ToolSearch) are completely hidden from the UI
     if (knownTool?.hidden) {
@@ -69,7 +70,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     // custom project tools), and their large structured outputs must stay folded.
     const isGemini = props.metadata?.flavor === 'gemini';
     const isPi = props.metadata?.flavor === 'pi';
-    if (!knownTool && (isGemini || isPi)) {
+    if (!knownTool && !SpecificToolView && (isGemini || isPi)) {
         minimal = true;
     }
 
@@ -82,7 +83,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     }
 
     // Handle optional title and function type
-    let toolTitle = tool.name;
+    let toolTitle = getToolDisplayName(tool.name);
 
     // Special handling for MCP tools
     if (tool.name.startsWith('mcp__')) {
@@ -111,6 +112,8 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         }
     }
 
+    const category = getToolSummaryCategory(tool.name);
+
     // Special handling for CodexBash to determine icon based on parsed_cmd
     if (tool.name === 'CodexBash' && tool.input?.parsed_cmd && Array.isArray(tool.input.parsed_cmd) && tool.input.parsed_cmd.length > 0) {
         const parsedCmd = tool.input.parsed_cmd[0];
@@ -123,6 +126,8 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         }
     } else if (knownTool && typeof knownTool.icon === 'function') {
         icon = knownTool.icon(18, theme.colors.text);
+    } else {
+        icon = <ToolCategoryIcon category={category} size={18} color={theme.colors.textSecondary} />;
     }
 
     if (knownTool && typeof knownTool.noStatus === 'boolean') {
@@ -165,9 +170,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         }
     }
 
-    const terminalCommand = getTerminalToolCommand(tool);
-    const isCompactTerminalTool = terminalCommand !== null;
+    const summaryDetail = getToolSummaryDetail(tool);
+    const presentationStatus = status || (noStatus ? null : getToolStateText(tool));
     const isInlineCodexPatch = Platform.OS === 'web' && tool.name === 'CodexPatch';
+    const needsInlineAction = tool.name === 'AskUserQuestion' || tool.permission?.status === 'pending' || isInlineCodexPatch;
+    const isCompactTool = tool.name !== 'file' && !needsInlineAction;
     const renderCardHeader = shouldRenderToolCardHeader(tool.name, Platform.OS);
     const renderPermissionFooter = () => (
         tool.permission && sessionId && tool.name !== 'AskUserQuestion'
@@ -176,17 +183,19 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     );
 
     const renderHeaderContent = () => {
-        if (isCompactTerminalTool) {
+        if (isCompactTool) {
             return (
                 <View style={styles.compactHeaderLeft}>
                     <View style={styles.compactIconContainer}>
                         {icon}
                     </View>
                     <Text style={styles.compactToolName} numberOfLines={1}>{toolTitle}</Text>
-                    {status ? <Text style={styles.compactStatus} numberOfLines={1}>{status}</Text> : null}
-                    <Text style={styles.compactCommandText} numberOfLines={1}>
-                        {terminalCommand}
-                    </Text>
+                    {presentationStatus ? <Text style={styles.compactStatus} numberOfLines={1}>{presentationStatus}</Text> : null}
+                    {summaryDetail ? (
+                        <Text style={styles.compactCommandText} numberOfLines={1}>
+                            {summaryDetail}
+                        </Text>
+                    ) : null}
                     {tool.state === 'running' && (
                         <View style={styles.elapsedContainer}>
                             <ElapsedView from={tool.createdAt} />
@@ -203,7 +212,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                     {icon}
                 </View>
                 <View style={styles.titleContainer}>
-                    <Text style={styles.toolName} numberOfLines={1}>{toolTitle}{status ? <Text style={styles.status}>{` ${status}`}</Text> : null}</Text>
+                    <Text style={styles.toolName} numberOfLines={1}>{toolTitle}{presentationStatus ? <Text style={styles.status}>{` ${presentationStatus}`}</Text> : null}</Text>
                     {description && (
                         <Text style={styles.toolDescription} numberOfLines={1}>
                             {description}
@@ -221,14 +230,14 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     };
 
     return (
-        <View style={isCompactTerminalTool ? styles.compactContainer : isInlineCodexPatch ? styles.inlineContainer : styles.container}>
+        <View style={isCompactTool ? styles.compactContainer : isInlineCodexPatch ? styles.inlineContainer : styles.container}>
             {renderCardHeader ? (
                 isPressable ? (
-                    <TouchableOpacity style={isCompactTerminalTool ? styles.compactHeader : styles.header} onPress={handlePress} activeOpacity={0.8}>
+                    <TouchableOpacity style={isCompactTool ? styles.compactHeader : styles.header} onPress={handlePress} activeOpacity={0.8}>
                         {renderHeaderContent()}
                     </TouchableOpacity>
                 ) : (
-                    <View style={isCompactTerminalTool ? styles.compactHeader : styles.header}>
+                    <View style={isCompactTool ? styles.compactHeader : styles.header}>
                         {renderHeaderContent()}
                     </View>
                 )
@@ -237,12 +246,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
             {/* Content area - either custom children or tool-specific view */}
             {(() => {
                 // Check if minimal first - minimal tools don't show content
-                if (minimal || isCompactTerminalTool) {
+                if (minimal || isCompactTool) {
                     return null;
                 }
 
                 // Try to use a specific tool view component first
-                const SpecificToolView = getToolViewComponent(tool.name);
                 if (SpecificToolView) {
                     return (
                         <View style={styles.content}>
@@ -300,6 +308,26 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
         </View>
     );
 });
+
+function ToolCategoryIcon(props: { category: ToolSummaryCategory; size: number; color: string }) {
+    const { category, size, color } = props;
+    switch (category) {
+        case 'terminal':
+            return <Octicons name="terminal" size={size} color={color} />;
+        case 'edit':
+            return <Octicons name="file-diff" size={size} color={color} />;
+        case 'read':
+            return <Octicons name="eye" size={size} color={color} />;
+        case 'search':
+            return <Octicons name="search" size={size} color={color} />;
+        case 'web':
+            return <Ionicons name="globe-outline" size={size} color={color} />;
+        case 'task':
+            return <Octicons name="rocket" size={size} color={color} />;
+        default:
+            return <Ionicons name="construct-outline" size={size} color={color} />;
+    }
+}
 
 function ElapsedView(props: { from: number }) {
     const { from } = props;

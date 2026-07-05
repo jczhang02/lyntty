@@ -10,6 +10,8 @@ import { useLocalSetting } from '@/sync/storage';
 import { StyleSheet } from 'react-native-unistyles';
 import { t } from '@/text';
 import { shouldHideGenericToolPayload } from './toolPayloadPolicy';
+import { knownTools } from './knownTools';
+import { getToolDisplayName, getToolStateText, getToolSummaryCategory, getToolSummaryDetail } from '@/utils/toolDisplay';
 
 interface ToolFullViewProps {
     tool: ToolCall;
@@ -23,10 +25,22 @@ export function ToolFullView({ tool, metadata, messages = [] }: ToolFullViewProp
     const screenWidth = useWindowDimensions().width;
     const devModeEnabled = (useLocalSetting('devModeEnabled') || __DEV__);
     const hideGenericPayload = shouldHideGenericToolPayload(metadata || null, !!SpecializedFullView);
+    const displayName = getToolDisplayName(tool.name);
+    const category = getToolSummaryCategory(tool.name);
+    const summary = getToolSummaryDetail(tool);
+    const knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
+    const stateText = knownTool?.noStatus === true ? null : getToolStateText(tool);
 
     return (
         <ScrollView style={[styles.container, { paddingHorizontal: screenWidth > 700 ? 16 : 0 }]}>
             <View style={styles.contentWrapper}>
+                <View style={styles.summaryCard}>
+                    <Text style={styles.toolKicker}>{category}</Text>
+                    <Text style={styles.summaryTitle}>{displayName}</Text>
+                    {stateText ? <Text style={styles.summaryState}>{stateText}</Text> : null}
+                    {summary ? <Text style={styles.summaryText} numberOfLines={3}>{summary}</Text> : null}
+                </View>
+
                 {/* Tool-specific content or generic fallback */}
                 {SpecializedFullView ? (
                     <SpecializedFullView tool={tool} metadata={metadata || null} messages={messages} />
@@ -140,6 +154,38 @@ const styles = StyleSheet.create((theme) => ({
         maxWidth: layout.maxWidth,
         alignSelf: 'center',
         width: '100%',
+    },
+    summaryCard: {
+        marginBottom: 20,
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        backgroundColor: theme.colors.surfaceHigh,
+        gap: 4,
+    },
+    toolKicker: {
+        color: theme.colors.textSecondary,
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+    },
+    summaryTitle: {
+        color: theme.colors.text,
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    summaryState: {
+        color: theme.colors.textSecondary,
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    summaryText: {
+        color: theme.colors.textSecondary,
+        fontSize: 13,
+        lineHeight: 18,
+        fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
     },
     section: {
         marginBottom: 28,

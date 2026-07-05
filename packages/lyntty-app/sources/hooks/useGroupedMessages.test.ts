@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { groupMessagesForDisplay, groupToolCallsForDisplay } from './useGroupedMessages';
+import { generateGroupSummary, groupMessagesForDisplay, groupToolCallsForDisplay } from './useGroupedMessages';
 import { Message, ToolCallMessage } from '@/sync/typesMessage';
 
 vi.mock('@/components/tools/knownTools', () => ({
@@ -51,6 +51,19 @@ function namedToolMessage(id: string, name: string, createdAt: number): ToolCall
 }
 
 describe('useGroupedMessages', () => {
+    it('summarizes lowercase Pi tool names with the shared categories', () => {
+        const messages: Message[] = [
+            namedToolMessage('tool-find', 'find', 3),
+            namedToolMessage('tool-bash', 'bash', 2),
+        ];
+
+        const group = groupToolCallsForDisplay(messages, true).find((item) => item.type === 'tool-group');
+        expect(group?.type).toBe('tool-group');
+        if (group?.type !== 'tool-group') throw new Error('Expected tool group');
+        expect(group.messages.map((message) => message.id)).toEqual(['tool-bash', 'tool-find']);
+        expect(generateGroupSummary(group.messages)).toBe('toolGroup.ranCommands:1, toolGroup.searched:1');
+    });
+
     it('stores grouped tools in chronological render order', () => {
         const messages: Message[] = [
             {

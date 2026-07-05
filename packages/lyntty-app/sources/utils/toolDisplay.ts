@@ -50,6 +50,42 @@ const TASK_TOOL_NAMES = new Set([
 
 export type ToolSummaryCategory = 'terminal' | 'edit' | 'read' | 'search' | 'web' | 'task' | 'other';
 
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+    Bash: 'Bash',
+    CodexBash: 'Bash',
+    GeminiBash: 'Bash',
+    bash: 'Bash',
+    shell: 'Shell',
+    execute: 'Bash',
+    Read: 'Read',
+    read: 'Read',
+    NotebookRead: 'Read',
+    LS: 'List files',
+    ls: 'List files',
+    Edit: 'Edit',
+    MultiEdit: 'Edit',
+    Write: 'Write',
+    CodexPatch: 'Edit',
+    GeminiPatch: 'Edit',
+    edit: 'Edit',
+    NotebookEdit: 'Edit',
+    Grep: 'Grep',
+    grep: 'Grep',
+    Glob: 'Find',
+    find: 'Find',
+    search: 'Search',
+    WebSearch: 'Web search',
+    web_search: 'Web search',
+    WebFetch: 'Fetch',
+    fetch_content: 'Fetch',
+    Task: 'Task',
+    Agent: 'Task',
+};
+
+export function getToolDisplayName(name: string): string {
+    return TOOL_DISPLAY_NAMES[name] || name;
+}
+
 export function isTerminalToolName(name: string): boolean {
     return TERMINAL_TOOL_NAMES.has(name);
 }
@@ -78,6 +114,51 @@ export function getToolSummaryCategory(toolName: string): ToolSummaryCategory {
         return 'task';
     }
     return 'other';
+}
+
+export function getToolDurationMs(tool: Pick<ToolCall, 'startedAt' | 'createdAt' | 'completedAt' | 'state'>): number | null {
+    if (tool.state === 'running' || tool.completedAt === null || tool.completedAt === undefined) {
+        return null;
+    }
+    const startedAt = tool.startedAt ?? tool.createdAt;
+    if (tool.completedAt < startedAt) {
+        return null;
+    }
+    return tool.completedAt - startedAt;
+}
+
+export function formatToolDuration(durationMs: number): string {
+    if (durationMs < 1000) {
+        return `${Math.max(0, Math.round(durationMs))}ms`;
+    }
+    const seconds = durationMs / 1000;
+    if (seconds < 60) {
+        return `${seconds.toFixed(1)}s`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remaining = Math.round(seconds % 60).toString().padStart(2, '0');
+    return `${minutes}:${remaining}`;
+}
+
+export function getToolStateText(tool: Pick<ToolCall, 'state' | 'completedAt' | 'startedAt' | 'createdAt' | 'permission'>): string | null {
+    if (tool.permission?.status === 'pending') {
+        return 'Needs approval';
+    }
+    if (tool.permission?.status === 'denied') {
+        return 'Denied';
+    }
+    if (tool.permission?.status === 'canceled') {
+        return 'Canceled';
+    }
+    if (tool.state === 'running') {
+        return 'Running';
+    }
+    if (tool.state === 'error') {
+        const duration = getToolDurationMs(tool);
+        return duration === null ? 'Failed' : `Failed · ${formatToolDuration(duration)}`;
+    }
+    const duration = getToolDurationMs(tool);
+    return duration === null ? 'Completed' : `Completed · ${formatToolDuration(duration)}`;
 }
 
 export function getToolSummaryDetail(tool: Pick<ToolCall, 'name' | 'input' | 'description'>): string | null {

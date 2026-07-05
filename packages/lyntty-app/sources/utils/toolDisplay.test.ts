@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ToolCall } from '@/sync/typesMessage';
 import {
+    formatToolDuration,
     getTerminalToolCommand,
+    getToolDisplayName,
+    getToolDurationMs,
+    getToolStateText,
     getToolSummaryCategory,
     getToolSummaryDetail,
     isTerminalToolName,
@@ -55,6 +59,22 @@ describe('terminal tool display helpers', () => {
         expect(shouldRenderToolCardHeader('CodexPatch', 'ios')).toBe(true);
         expect(shouldRenderToolCardHeader('CodexPatch', 'android')).toBe(true);
         expect(shouldRenderToolCardHeader('CodexBash', 'web')).toBe(true);
+    });
+
+    it('normalizes display names without changing raw tool names', () => {
+        expect(getToolDisplayName('bash')).toBe('Bash');
+        expect(getToolDisplayName('CodexBash')).toBe('Bash');
+        expect(getToolDisplayName('web_search')).toBe('Web search');
+        expect(getToolDisplayName('fetch_content')).toBe('Fetch');
+        expect(getToolDisplayName('custom_pi_tool')).toBe('custom_pi_tool');
+    });
+
+    it('formats fixed durations only for completed or failed tools', () => {
+        expect(getToolDurationMs(tool('bash', { command: 'echo ok' }))).toBe(1);
+        expect(formatToolDuration(1250)).toBe('1.3s');
+        expect(formatToolDuration(65_000)).toBe('1:05');
+        expect(getToolStateText(tool('bash', { command: 'echo ok' }))).toBe('Completed · 1ms');
+        expect(getToolStateText({ ...tool('bash', { command: 'sleep 1' }), state: 'running', completedAt: null })).toBe('Running');
     });
 
     it('classifies tools for compact transcript rows', () => {

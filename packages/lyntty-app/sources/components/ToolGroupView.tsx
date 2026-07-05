@@ -35,7 +35,11 @@ export const ToolGroupView = React.memo<ToolGroupViewProps>((props) => {
     const router = useRouter();
     const summary = React.useMemo(() => generateGroupSummary(group.messages), [group.messages]);
     const summaryCategory = React.useMemo(() => getGroupSummaryCategory(group.messages), [group.messages]);
-    const suppressChildren = hideSingleToolChildren && group.messages.length === 1 && group.messages[0]?.kind === 'tool-call';
+    const firstMessage = group.messages[0];
+    const canHideSingleToolChildren = firstMessage?.kind === 'tool-call'
+        && firstMessage.tool.name !== 'AskUserQuestion'
+        && firstMessage.tool.permission?.status !== 'pending';
+    const suppressChildren = hideSingleToolChildren && group.messages.length === 1 && canHideSingleToolChildren;
     const singleToolMessage = suppressChildren && group.messages[0]?.kind === 'tool-call'
         ? group.messages[0]
         : null;

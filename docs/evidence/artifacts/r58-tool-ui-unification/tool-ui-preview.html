@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lyntty tool UI preview</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d10;
+    --surface: #11151b;
+    --surface2: #171d25;
+    --border: #26303c;
+    --text: #eef2f7;
+    --muted: #9aa6b2;
+    --subtle: #6f7a86;
+    --green: #35c759;
+    --yellow: #f5c451;
+    --red: #ff5c5c;
+    --blue: #7bb7ff;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  main { max-width: 860px; margin: 0 auto; padding: 28px 18px 64px; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  h2 { font-size: 15px; margin: 28px 0 12px; color: var(--muted); font-weight: 650; letter-spacing: .02em; }
+  p { margin: 0 0 18px; color: var(--muted); line-height: 1.55; }
+  .grid { display: grid; gap: 12px; }
+  .tool-card { border: 1px solid var(--border); background: linear-gradient(180deg, var(--surface), #0f1318); border-radius: 14px; overflow: hidden; box-shadow: 0 10px 28px rgba(0,0,0,.22); }
+  .tool-header { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 12px 14px; }
+  .icon { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--surface2); color: var(--blue); font-size: 15px; }
+  .title { min-width: 0; }
+  .name { font-weight: 700; font-size: 14px; line-height: 1.25; display: flex; gap: 8px; align-items: center; }
+  .summary { color: var(--muted); font-family: var(--mono); font-size: 12px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--muted); }
+  .completed .dot { background: var(--green); }
+  .running .dot { background: var(--yellow); box-shadow: 0 0 0 3px rgba(245,196,81,.16); }
+  .error .dot { background: var(--red); }
+  .body { border-top: 1px solid rgba(255,255,255,.06); padding: 12px 14px 14px; background: rgba(255,255,255,.015); }
+  .code { font-family: var(--mono); background: #090c10; border: 1px solid #202833; border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #d8e0ea; white-space: pre-wrap; }
+  .diff { font-family: var(--mono); font-size: 12px; border-radius: 10px; overflow: hidden; border: 1px solid #202833; }
+  .diff div { padding: 6px 10px; }
+  .minus { background: rgba(255,92,92,.12); color: #ffb8b8; }
+  .plus { background: rgba(53,199,89,.13); color: #bdf2cc; }
+  .collapsed { color: var(--subtle); font-size: 12px; }
+  .work-group { border: 1px dashed var(--border); border-radius: 14px; padding: 10px; background: rgba(255,255,255,.02); }
+  .work-header { display:flex; align-items:center; justify-content:space-between; color: var(--muted); font-size: 13px; padding: 2px 4px 10px; }
+  .note { background: #0e151d; border: 1px solid #233243; border-radius: 12px; padding: 12px 14px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Lyntty 工具调用 UI 统一化预览</h1>
+  <p>静态预览，复用当前代码里的分类思路：terminal / read / edit / search / web / task / other。重点不是重写 BashView、EditView、FileView 这些内容视图，而是统一工具卡外壳、状态、时长、摘要、折叠策略。</p>
+
+  <h2>统一外壳：所有工具都用同一套 header/status/duration</h2>
+  <div class="grid">
+    <section class="tool-card completed">
+      <div class="tool-header">
+        <div class="icon">$</div>
+        <div class="title"><div class="name">bash <span class="collapsed">completed</span></div><div class="summary">pnpm --filter ./packages/lyntty-app test</div></div>
+        <div class="status"><span class="dot"></span><span>fixed 12.4s</span></div>
+      </div>
+      <div class="body"><div class="code">stdout folded · 742 tests passed · tap to expand</div></div>
+    </section>
+
+    <section class="tool-card running">
+      <div class="tool-header">
+        <div class="icon">⌕</div>
+        <div class="title"><div class="name">grep <span class="collapsed">running</span></div><div class="summary">pattern: tool-call-end · packages/lyntty-app</div></div>
+        <div class="status"><span class="dot"></span><span>running 3.8s</span></div>
+      </div>
+    </section>
+
+    <section class="tool-card error">
+      <div class="tool-header">
+        <div class="icon">✕</div>
+        <div class="title"><div class="name">web_search <span class="collapsed">error</span></div><div class="summary">query: pi getCommands sourceInfo</div></div>
+        <div class="status"><span class="dot"></span><span>failed 1.1s</span></div>
+      </div>
+      <div class="body"><div class="code">Network unavailable · output folded</div></div>
+    </section>
+  </div>
+
+  <h2>内容视图：保留每个工具自己的主体展示</h2>
+  <div class="grid">
+    <section class="tool-card completed">
+      <div class="tool-header"><div class="icon">$</div><div class="title"><div class="name">BashView</div><div class="summary">显示命令；输出默认折叠</div></div><div class="status"><span class="dot"></span><span>fixed 0.8s</span></div></div>
+      <div class="body"><div class="code">$ git diff --check
+(no output)</div></div>
+    </section>
+    <section class="tool-card completed">
+      <div class="tool-header"><div class="icon">±</div><div class="title"><div class="name">EditView</div><div class="summary">显示 diff，而不是 JSON input</div></div><div class="status"><span class="dot"></span><span>fixed 2.0s</span></div></div>
+      <div class="body"><div class="diff"><div class="minus">- Review Evidence as main APK panel</div><div class="plus">+ Runtime details go to logs/evidence only</div></div></div>
+    </section>
+    <section class="tool-card completed">
+      <div class="tool-header"><div class="icon">?</div><div class="title"><div class="name">unknown Pi tool</div><div class="summary">安全 fallback：不直接铺 JSON</div></div><div class="status"><span class="dot"></span><span>fixed 0.4s</span></div></div>
+      <div class="body"><div class="code">Custom Pi tool · payload hidden by default · tap for safe detail</div></div>
+    </section>
+  </div>
+
+  <h2>折叠组：work group 使用同一套完成状态</h2>
+  <div class="work-group">
+    <div class="work-header"><span>Worked for 48.2s · 5 tools</span><span>completed</span></div>
+    <div class="grid">
+      <section class="tool-card completed"><div class="tool-header"><div class="icon">R</div><div class="title"><div class="name">read</div><div class="summary">packages/lyntty-app/sources/components/tools/ToolView.tsx</div></div><div class="status"><span class="dot"></span><span>fixed 0.3s</span></div></div></section>
+      <section class="tool-card completed"><div class="tool-header"><div class="icon">$</div><div class="title"><div class="name">bash</div><div class="summary">pnpm --filter ./packages/lyntty-app typecheck</div></div><div class="status"><span class="dot"></span><span>fixed 16.9s</span></div></div></section>
+    </div>
+  </div>
+
+  <h2>方案含义</h2>
+  <div class="note">“内容视图”指 BashView 里的命令展示、EditView 里的 diff、FileView 里的图片预览、MCPToolView 的 MCP 摘要等工具专属主体。我的建议是保留这些主体，只抽出统一的 ToolShell/ToolPresentation 管住外壳、状态、时长、摘要、折叠和 fallback。这样能修 timer，也能统一风格，同时避免重写几十个工具视图。</div>
+</main>
+</body>
+</html>

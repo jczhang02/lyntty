@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Octicons } from '@expo/vector-icons';
 import { ToolCall } from '@/sync/typesMessage';
-import { knownTools } from '@/components/tools/knownTools';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { getToolDisplayName, getToolSummaryCategory, getToolSummaryDetail, ToolSummaryCategory } from '@/utils/toolDisplay';
 
 interface ToolHeaderProps {
     tool: ToolCall;
@@ -11,37 +11,10 @@ interface ToolHeaderProps {
 
 export function ToolHeader({ tool }: ToolHeaderProps) {
     const { theme } = useUnistyles();
-    const knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
-
-    // Extract status first for Bash tool to potentially use as title
-    let status: string | null = null;
-    if (knownTool && typeof knownTool.extractStatus === 'function') {
-        const extractedStatus = knownTool.extractStatus({ tool, metadata: null });
-        if (typeof extractedStatus === 'string' && extractedStatus) {
-            status = extractedStatus;
-        }
-    }
-
-    // Handle optional title and function type
-    let toolTitle = tool.name;
-    if (knownTool?.title) {
-        if (typeof knownTool.title === 'function') {
-            toolTitle = knownTool.title({ tool, metadata: null });
-        } else {
-            toolTitle = knownTool.title;
-        }
-    }
-
-    const icon = knownTool?.icon ? knownTool.icon(18, theme.colors.header.tint) : <Ionicons name="construct-outline" size={18} color={theme.colors.header.tint} />;
-
-    // Extract subtitle using the same logic as ToolView
-    let subtitle = null;
-    if (knownTool && typeof knownTool.extractSubtitle === 'function') {
-        const extractedSubtitle = knownTool.extractSubtitle({ tool, metadata: null });
-        if (typeof extractedSubtitle === 'string' && extractedSubtitle) {
-            subtitle = extractedSubtitle;
-        }
-    }
+    const toolTitle = getToolDisplayName(tool.name);
+    const category = getToolSummaryCategory(tool.name);
+    const subtitle = getToolSummaryDetail(tool);
+    const icon = <ToolHeaderIcon category={category} size={18} color={theme.colors.header.tint} />;
 
     return (
         <View style={styles.container}>
@@ -56,6 +29,26 @@ export function ToolHeader({ tool }: ToolHeaderProps) {
             </View>
         </View>
     );
+}
+
+function ToolHeaderIcon(props: { category: ToolSummaryCategory; size: number; color: string }) {
+    const { category, size, color } = props;
+    switch (category) {
+        case 'terminal':
+            return <Octicons name="terminal" size={size} color={color} />;
+        case 'edit':
+            return <Octicons name="file-diff" size={size} color={color} />;
+        case 'read':
+            return <Octicons name="eye" size={size} color={color} />;
+        case 'search':
+            return <Octicons name="search" size={size} color={color} />;
+        case 'web':
+            return <Ionicons name="globe-outline" size={size} color={color} />;
+        case 'task':
+            return <Octicons name="rocket" size={size} color={color} />;
+        default:
+            return <Ionicons name="construct-outline" size={size} color={color} />;
+    }
 }
 
 const styles = StyleSheet.create((theme) => ({
