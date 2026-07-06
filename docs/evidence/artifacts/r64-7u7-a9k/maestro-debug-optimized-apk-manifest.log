@@ -1,0 +1,11 @@
+    A: android:compileSdkVersion(0x01010572)=(type 0x10)0x24
+    A: android:compileSdkVersionCodename(0x01010573)="16" (Raw: "16")
+    A: package="dev.jczhang.lyntty.dev" (Raw: "dev.jczhang.lyntty.dev")
+    A: platformBuildVersionCode=(type 0x10)0x24
+    A: platformBuildVersionName=(type 0x10)0x10
+--
+      A: android:extractNativeLibs(0x010104ea)=(type 0x12)0x0
+      A: android:fullBackupContent(0x010104eb)=@0x7f16000d
+      A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0xffffffff
+      A: android:roundIcon(0x0101052c)=@0x7f100003
+      A: android:appComponentFactory(0x0101057a)="androidx.core.app.CoreComponentFactory" (Raw: "androidx.core.app.CoreComponentFactory")
