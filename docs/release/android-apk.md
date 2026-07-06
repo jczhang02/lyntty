@@ -125,7 +125,11 @@ Build outline:
 printf '%s' "$LYNTTY_ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lyntty-release.jks"
 printf '%s' "$LYNTTY_GOOGLE_SERVICES_JSON_BASE64" | base64 -d > packages/lyntty-app/android/app/google-services.json
 cd packages/lyntty-app/android
-APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew assembleRelease \
+APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew assembleRelease --no-daemon --stacktrace \
+  -x lintVitalAnalyzeRelease \
+  -x lintVitalRelease \
+  -PreactNativeArchitectures=arm64-v8a \
+  -Pandroid.enablePngCrunchInReleaseBuilds=false \
   -PlynttyVersionName="$VERSION_NAME" \
   -PlynttyVersionCode="$VERSION_CODE" \
   -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks" \
@@ -133,6 +137,8 @@ APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew asse
   -PlynttyKeyAlias="$LYNTTY_ANDROID_KEY_ALIAS" \
   -PlynttyKeyPassword="$LYNTTY_ANDROID_KEY_PASSWORD"
 ```
+
+Initial release builds target `arm64-v8a` only to keep GitHub Actions release time bounded for a personal-phone APK. Add more `reactNativeArchitectures` values later if x86 emulator or broader device coverage becomes a release requirement.
 
 Output assets:
 

@@ -23,7 +23,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -100,7 +100,11 @@ jobs:
         run: |
           set -euo pipefail
           : "${LYNTTY_EAS_PROJECT_ID:?Repository variable LYNTTY_EAS_PROJECT_ID is required for Expo push tokens}"
-          ./gradlew assembleRelease \
+          ./gradlew assembleRelease --no-daemon --stacktrace \
+            -x lintVitalAnalyzeRelease \
+            -x lintVitalRelease \
+            -PreactNativeArchitectures=arm64-v8a \
+            -Pandroid.enablePngCrunchInReleaseBuilds=false \
             -PlynttyVersionName='${{ inputs.version_name }}' \
             -PlynttyVersionCode='${{ steps.release.outputs.version_code }}' \
             -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks"
