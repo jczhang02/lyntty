@@ -1,0 +1,87 @@
+@import "@fontsource/poppins/400.css";
+@import "@fontsource/poppins/500.css";
+@import "@fontsource/poppins/600.css";
+@import "@fontsource/poppins/700.css";
+@import "@fontsource/lora/400.css";
+@import "@fontsource/lora/500.css";
+@import "@fontsource/lora/600.css";
+@import "@fontsource/lora/700.css";
+@import "tailwindcss";
+
+@utility -inset-s-4 {
+  inset-inline-start: calc(var(--spacing) * -4);
+}
+
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+@source "../node_modules/fumadocs-ui/dist/**/*.js";
+
+:root {
+  --font-heading: Poppins, Arial, Helvetica, sans-serif;
+  --font-body: Lora, Georgia, "Times New Roman", serif;
+}
+
+@theme {
+  --color-fd-background: #faf9f5;
+  --color-fd-foreground: #141413;
+  --color-fd-muted: #f4f1e8;
+  --color-fd-muted-foreground: #66635b;
+  --color-fd-popover: #faf9f5;
+  --color-fd-popover-foreground: #141413;
+  --color-fd-card: #f4f1e8;
+  --color-fd-card-foreground: #141413;
+  --color-fd-border: #e8e6dc;
+  --color-fd-primary: #d97757;
+  --color-fd-primary-foreground: #faf9f5;
+  --color-fd-secondary: #e8e6dc;
+  --color-fd-secondary-foreground: #141413;
+  --color-fd-accent: #f4dfd6;
+  --color-fd-accent-foreground: #8f3f28;
+  --color-fd-ring: #d97757;
+}
+
+.dark {
+  --color-fd-background: #141413;
+  --color-fd-foreground: #e8e6dc;
+  --color-fd-muted: #1f1f1d;
+  --color-fd-muted-foreground: #b0aea5;
+  --color-fd-popover: #1f1f1d;
+  --color-fd-popover-foreground: #e8e6dc;
+  --color-fd-card: #1f1f1d;
+  --color-fd-card-foreground: #e8e6dc;
+  --color-fd-border: #2a2925;
+  --color-fd-primary: #d97757;
+  --color-fd-primary-foreground: #141413;
+  --color-fd-secondary: #2a2925;
+  --color-fd-secondary-foreground: #e8e6dc;
+  --color-fd-accent: #5f2f22;
+  --color-fd-accent-foreground: #f0b39e;
+  --color-fd-ring: #d97757;
+}
+
+body {
+  font-family: var(--font-body);
+  letter-spacing: -0.006em;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+[data-radix-scroll-area-viewport] [data-active],
+aside,
+header,
+nav,
+button,
+input {
+  font-family: var(--font-heading);
+  letter-spacing: -0.025em;
+}
+
+.prose a {
+  text-decoration-color: color-mix(in srgb, #d97757 45%, transparent);
+  text-underline-offset: 0.18em;
+}

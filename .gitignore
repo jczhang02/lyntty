@@ -41,6 +41,7 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+tsconfig.tsbuildinfo
 
 .claude/settings.local.json
 .claude/*.lock
@@ -83,3 +84,28 @@ lyntty-workspaces/
 .claude/
 .codex/
 .mcp.json
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+
+# JavaScript docs tooling
+out/
+.next/
+.astro/
+.source/
+
+# Generated Fumadocs pages; source docs stay in Markdown.
+content/docs/
+docs/.site/content/docs/
+
+# Retired Starlight generated pages.
+src/content/docs/
+
+# Retired Tangly mirrors.
+.tangly/
+tangly-site/
+AGENTS.mdx
+CONTEXT-MAP.mdx
+docs/**/*.mdx
