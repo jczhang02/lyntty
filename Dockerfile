@@ -2,7 +2,7 @@
 # Uses PGlite (embedded Postgres), local filesystem storage, no Redis
 
 # Stage 1: install dependencies
-FROM node:20 AS deps
+FROM node:26 AS deps
 
 RUN apt-get update && apt-get install -y python3 make g++ build-essential && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.11.0 --activate
@@ -34,12 +34,13 @@ FROM deps AS builder
 
 COPY packages/lyntty-wire ./packages/lyntty-wire
 COPY packages/lyntty-relay ./packages/lyntty-relay
+COPY packages/lyntty-app/sources/sync ./packages/lyntty-app/sources/sync
 
 RUN pnpm --filter lyntty-wire build
 RUN pnpm --filter lyntty-relay build
 
 # Stage 3: runtime
-FROM node:20-slim AS runner
+FROM node:26-slim AS runner
 
 WORKDIR /repo
 
