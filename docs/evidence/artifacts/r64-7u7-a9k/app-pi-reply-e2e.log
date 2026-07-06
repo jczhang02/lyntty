@@ -1,0 +1,15 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+> lyntty-app@1.0.0 test:e2e:pi-reply /home/jc/dev/lyntty/packages/lyntty-app
+> vitest run sources/sync/piReplyVisibility.e2e.test.ts
+
+
+ RUN  v3.2.4 /home/jc/dev/lyntty/packages/lyntty-app
+
+ ✓ sources/sync/piReplyVisibility.e2e.test.ts (4 tests) 9ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  02:35:04
+   Duration  433ms (transform 99ms, setup 0ms, collect 181ms, tests 9ms, environment 0ms, prepare 70ms)
+

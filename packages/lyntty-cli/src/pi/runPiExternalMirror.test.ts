@@ -33,11 +33,11 @@ const userEntry = (id: string, text: string): SessionEntry => ({
   } as any,
 });
 
-const assistantEntry = (id: string, text: string): SessionEntry => ({
+const assistantEntry = (id: string, text: string, timestamp = '2026-07-02T00:00:01.000Z'): SessionEntry => ({
   type: 'message',
   id,
   parentId: null,
-  timestamp: '2026-07-02T00:00:01.000Z',
+  timestamp,
   message: {
     role: 'assistant',
     content: [{ type: 'text', text }],
@@ -509,6 +509,57 @@ describe('PiExternalMirror', () => {
       await mirror.tick(3_100);
 
       expect(sent).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves intentional repeated assistant text after the delivered turn window', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      mirror.markAssistantTextDeliveredSince(
+        'OK',
+        Date.parse('2026-07-02T00:00:00.000Z'),
+        Date.parse('2026-07-02T00:00:02.000Z'),
+      );
+      appendJsonl(file, assistantEntry('a2', 'OK', '2026-07-02T00:00:03.000Z'));
+      await mirror.tick(1_000);
+      await mirror.tick(3_100);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0].map((entry) => entry.id)).toEqual(['a2']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('caps open assistant delivery marks at the next live turn boundary', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      mirror.markAssistantTextDeliveredSince('OK', Date.parse('2026-07-02T00:00:00.000Z'));
+      mirror.capAssistantTextDeliveryWindow(Date.parse('2026-07-02T00:00:02.000Z'));
+      appendJsonl(file, assistantEntry('a2', 'OK', '2026-07-02T00:00:03.000Z'));
+      await mirror.tick(1_000);
+      await mirror.tick(3_100);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0].map((entry) => entry.id)).toEqual(['a2']);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

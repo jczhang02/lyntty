@@ -88,6 +88,7 @@ export function readPiSessionEntriesFromOffset(file: string, offset: number): { 
 type DeliveredText = {
   text: string;
   cutoffTimeMs: number;
+  untilTimeMs: number;
   expiresAtMs: number;
 };
 
@@ -145,7 +146,7 @@ export class PiExternalMirror {
     const now = Date.now();
     this.deliveredUserTexts = [
       ...this.deliveredUserTexts.filter((item) => item.expiresAtMs > now),
-      { text: normalizedText, cutoffTimeMs, expiresAtMs: now + DELIVERED_TEXT_TTL_MS },
+      { text: normalizedText, cutoffTimeMs, untilTimeMs: Number.POSITIVE_INFINITY, expiresAtMs: now + DELIVERED_TEXT_TTL_MS },
     ].slice(-MAX_DELIVERED_TEXTS);
     const entries = readPiSessionEntries(this.sessionFile);
     const deliveredIds = new Set(entries
@@ -154,19 +155,27 @@ export class PiExternalMirror {
     this.markDeliveredIds(deliveredIds, entries);
   }
 
-  markAssistantTextDeliveredSince(text: string, cutoffTimeMs: number): void {
+  markAssistantTextDeliveredSince(text: string, cutoffTimeMs: number, untilTimeMs = Number.POSITIVE_INFINITY): void {
     const normalizedText = text.trim();
     if (!normalizedText) return;
     const now = Date.now();
     this.deliveredAssistantTexts = [
       ...this.deliveredAssistantTexts.filter((item) => item.expiresAtMs > now),
-      { text: normalizedText, cutoffTimeMs, expiresAtMs: now + DELIVERED_TEXT_TTL_MS },
+      { text: normalizedText, cutoffTimeMs, untilTimeMs, expiresAtMs: now + DELIVERED_TEXT_TTL_MS },
     ].slice(-MAX_DELIVERED_TEXTS);
     const entries = readPiSessionEntries(this.sessionFile);
     const deliveredIds = new Set(entries
-      .filter((entry) => this.isAssistantTextEntry(entry, cutoffTimeMs, normalizedText))
+      .filter((entry) => this.isAssistantTextEntry(entry, cutoffTimeMs, normalizedText, untilTimeMs))
       .map((entry) => entry.id));
     this.markDeliveredIds(deliveredIds, entries);
+  }
+
+  capAssistantTextDeliveryWindow(untilTimeMs: number): void {
+    if (!Number.isFinite(untilTimeMs)) return;
+    this.deliveredAssistantTexts = this.deliveredAssistantTexts.map((item) => ({
+      ...item,
+      untilTimeMs: Math.min(item.untilTimeMs, untilTimeMs),
+    }));
   }
 
   private markDeliveredIds(deliveredIds: Set<string>, entries: SessionEntry[]): void {
@@ -187,9 +196,9 @@ export class PiExternalMirror {
     return extractMessageText(message.content).trim() === text;
   }
 
-  private isAssistantTextEntry(entry: SessionEntry, cutoffTimeMs: number, text: string): boolean {
+  private isAssistantTextEntry(entry: SessionEntry, cutoffTimeMs: number, text: string, untilTimeMs = Number.POSITIVE_INFINITY): boolean {
     const entryTime = Date.parse(entry.timestamp);
-    if (!Number.isFinite(entryTime) || entryTime < cutoffTimeMs) {
+    if (!Number.isFinite(entryTime) || entryTime < cutoffTimeMs || entryTime > untilTimeMs) {
       return false;
     }
     if (entry.type !== 'message') return false;
@@ -225,7 +234,7 @@ export class PiExternalMirror {
     if (this.deliveredAssistantTexts.length === 0) {
       return false;
     }
-    return this.deliveredAssistantTexts.some((item) => this.isAssistantTextEntry(entry, item.cutoffTimeMs, item.text));
+    return this.deliveredAssistantTexts.some((item) => this.isAssistantTextEntry(entry, item.cutoffTimeMs, item.text, item.untilTimeMs));
   }
 
   async tick(now = Date.now()): Promise<void> {
@@ -276,7 +285,7 @@ export function startPiExternalMirror(options: {
   metaForEnvelope?: (envelope: ReturnType<typeof mapPiSessionHistoryToEnvelopes>[number]) => Record<string, unknown> | undefined;
   isManagedRuntimeActive?: () => boolean;
   pollMs?: number;
-}): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void; markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number) => void } | null {
+}): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void; markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => void; capAssistantTextDeliveryWindow: (untilTimeMs: number) => void } | null {
   if (!options.sessionFile) {
     return null;
   }
@@ -344,6 +353,7 @@ export function startPiExternalMirror(options: {
     markCurrentEntriesDelivered: () => mirror.markCurrentEntriesDelivered(),
     markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options),
     markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => mirror.markUserTextDeliveredSince(text, cutoffTimeMs),
-    markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number) => mirror.markAssistantTextDeliveredSince(text, cutoffTimeMs),
+    markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => mirror.markAssistantTextDeliveredSince(text, cutoffTimeMs, untilTimeMs),
+    capAssistantTextDeliveryWindow: (untilTimeMs: number) => mirror.capAssistantTextDeliveryWindow(untilTimeMs),
   };
 }

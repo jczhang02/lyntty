@@ -37,7 +37,7 @@ import { mapPiSessionHistoryPageToEnvelopes } from '@/pi/runPiHistory';
 import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalMirror';
 import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
 import { PiSessionProtocolMapper } from '@/pi/runPiSessionProtocol';
-import { createEnvelope } from 'lyntty-wire';
+import { createEnvelope, type SessionEnvelope } from 'lyntty-wire';
 import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiCommandInfo, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
@@ -157,6 +157,116 @@ export const initialMachineMetadata: MachineMetadata = {
   cliAvailability: detectCLIAvailability(),
   resumeSupport: { ...detectResumeSupport(), rpcAvailable: true },
 };
+
+const PI_ASSISTANT_JSONL_DELIVERY_GRACE_MS = 30_000;
+
+type PiExtensionDeliveryMirror = {
+  markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void;
+  markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void;
+  markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => void;
+  capAssistantTextDeliveryWindow: (untilTimeMs: number) => void;
+  deliveredAssistantTextInTurn: string;
+  pendingTextFlushTimer: ReturnType<typeof setTimeout> | null;
+  sessionClient: Pick<ApiSessionClient, 'sendSessionProtocolMessage' | 'flush'>;
+  mapper: Pick<PiSessionProtocolMapper, 'flushPendingText'>;
+};
+
+export const hasDeliveredContentEnvelope = (envelopes: readonly SessionEnvelope[]): boolean => envelopes.some((envelope) => {
+  return envelope.ev.t === 'text' || envelope.ev.t === 'tool-call-start' || envelope.ev.t === 'tool-call-end';
+});
+
+function appendDeliveredAssistantText(mirror: Pick<PiExtensionDeliveryMirror, 'deliveredAssistantTextInTurn'>, envelopes: readonly SessionEnvelope[]): boolean {
+  const previousText = mirror.deliveredAssistantTextInTurn;
+  for (const envelope of envelopes) {
+    if (envelope.role === 'agent' && envelope.ev.t === 'text' && !envelope.ev.thinking) {
+      mirror.deliveredAssistantTextInTurn += envelope.ev.text;
+    }
+  }
+  return mirror.deliveredAssistantTextInTurn !== previousText;
+}
+
+export function clearPendingPiLiveTextFlush(mirror: Pick<PiExtensionDeliveryMirror, 'pendingTextFlushTimer'>): void {
+  if (!mirror.pendingTextFlushTimer) return;
+  clearTimeout(mirror.pendingTextFlushTimer);
+  mirror.pendingTextFlushTimer = null;
+}
+
+export function markPiExtensionDelivered(mirror: Pick<PiExtensionDeliveryMirror, 'markCurrentEntriesDeliveredSince'>, cutoffTimeMs: number, options: { includeAssistantMessages?: boolean } = {}): void {
+  try {
+    mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options);
+  } catch (error) {
+    logger.debug('[pi] Failed to mark Pi extension-delivered entries', error);
+  }
+  setTimeout(() => {
+    try {
+      mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options);
+    } catch (error) {
+      logger.debug('[pi] Failed delayed Pi extension-delivered mark', error);
+    }
+  }, 2_500).unref?.();
+}
+
+export function markPiExtensionUserInputDelivered(mirror: Pick<PiExtensionDeliveryMirror, 'markUserTextDeliveredSince'>, text: string, cutoffTimeMs: number): void {
+  try {
+    mirror.markUserTextDeliveredSince(text, cutoffTimeMs);
+  } catch (error) {
+    logger.debug('[pi] Failed to mark Pi extension-delivered user input', error);
+  }
+  setTimeout(() => {
+    try {
+      mirror.markUserTextDeliveredSince(text, cutoffTimeMs);
+    } catch (error) {
+      logger.debug('[pi] Failed delayed Pi extension-delivered user input mark', error);
+    }
+  }, 2_500).unref?.();
+}
+
+export function markPiExtensionAssistantTextDelivered(mirror: Pick<PiExtensionDeliveryMirror, 'markAssistantTextDeliveredSince'>, text: string, cutoffTimeMs: number, untilTimeMs?: number): void {
+  const normalizedText = text.trim();
+  if (!normalizedText) return;
+  const mark = (): void => {
+    if (untilTimeMs === undefined) {
+      mirror.markAssistantTextDeliveredSince(normalizedText, cutoffTimeMs);
+      return;
+    }
+    mirror.markAssistantTextDeliveredSince(normalizedText, cutoffTimeMs, untilTimeMs);
+  };
+  try {
+    mark();
+  } catch (error) {
+    logger.debug('[pi] Failed to mark Pi extension-delivered assistant text', error);
+  }
+  setTimeout(() => {
+    try {
+      mark();
+    } catch (error) {
+      logger.debug('[pi] Failed delayed Pi extension-delivered assistant text mark', error);
+    }
+  }, 2_500).unref?.();
+}
+
+function capPiExtensionAssistantTextDeliveryWindow(mirror: Pick<PiExtensionDeliveryMirror, 'capAssistantTextDeliveryWindow'>, untilTimeMs: number): void {
+  try {
+    mirror.capAssistantTextDeliveryWindow(untilTimeMs);
+  } catch (error) {
+    logger.debug('[pi] Failed to cap Pi extension-delivered assistant text window', error);
+  }
+}
+
+export async function flushPendingPiLiveText(mirror: PiExtensionDeliveryMirror, cutoffTimeMs: number): Promise<void> {
+  clearPendingPiLiveTextFlush(mirror);
+  const envelopes = mirror.mapper.flushPendingText();
+  if (envelopes.length === 0) return;
+  const deliveredAssistantTextChanged = appendDeliveredAssistantText(mirror, envelopes);
+  for (const envelope of envelopes) {
+    mirror.sessionClient.sendSessionProtocolMessage(envelope);
+  }
+  await mirror.sessionClient.flush();
+  markPiExtensionDelivered(mirror, cutoffTimeMs);
+  if (deliveredAssistantTextChanged) {
+    markPiExtensionAssistantTextDelivered(mirror, mirror.deliveredAssistantTextInTurn, cutoffTimeMs);
+  }
+}
 
 export async function startDaemon(): Promise<void> {
   // We don't have cleanup function at the time of server construction
@@ -794,7 +904,8 @@ export async function startDaemon(): Promise<void> {
       markCurrentEntriesDelivered: () => void;
       markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void;
       markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void;
-      markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number) => void;
+      markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => void;
+      capAssistantTextDeliveryWindow: (untilTimeMs: number) => void;
       extensionCoveredSince: number | null;
       deliveredAssistantTextInTurn: string;
       sessionClient: ApiSessionClient;
@@ -1492,21 +1603,22 @@ export async function startDaemon(): Promise<void> {
           markCurrentEntriesDeliveredSince: mirror.markCurrentEntriesDeliveredSince,
           markUserTextDeliveredSince: mirror.markUserTextDeliveredSince,
           markAssistantTextDeliveredSince: mirror.markAssistantTextDeliveredSince,
+          capAssistantTextDeliveryWindow: mirror.capAssistantTextDeliveryWindow,
           extensionCoveredSince: null,
           deliveredAssistantTextInTurn: '',
           sessionClient,
           mapper: new PiSessionProtocolMapper(),
-        lastExtensionSeenAt: 0,
-        keepAliveInterval,
-        pendingTextFlushTimer: null,
-        lastExtensionEventId: null,
-        extensionHasSeqGap: false,
-        isStreaming: false,
-        nextCommandSeq: 1,
-        commands: [],
-        seenCommandLocalKeys: new Set(response.metadata.remoteCommandAcceptedLocalKeys ?? []),
-        recentAcceptedRemoteCommands: [],
-      };
+          lastExtensionSeenAt: 0,
+          keepAliveInterval,
+          pendingTextFlushTimer: null,
+          lastExtensionEventId: null,
+          extensionHasSeqGap: false,
+          isStreaming: false,
+          nextCommandSeq: 1,
+          commands: [],
+          seenCommandLocalKeys: new Set(response.metadata.remoteCommandAcceptedLocalKeys ?? []),
+          recentAcceptedRemoteCommands: [],
+        };
         externalPiMirrors.set(mirrorKey, mirrorState);
         sessionClient.onUserMessage((message) => {
           queueRemotePiCommand(mirrorState!, message);
@@ -1548,76 +1660,12 @@ export async function startDaemon(): Promise<void> {
       }
     };
 
-    const clearPendingTextFlush = (mirror: ExternalPiMirrorState): void => {
-      if (!mirror.pendingTextFlushTimer) return;
-      clearTimeout(mirror.pendingTextFlushTimer);
-      mirror.pendingTextFlushTimer = null;
-    };
-
-    const hasDeliveredContentEnvelope = (envelopes: ReturnType<PiSessionProtocolMapper['mapEvent']>): boolean => envelopes.some((envelope) => {
-      return envelope.ev.t === 'text' || envelope.ev.t === 'tool-call-start' || envelope.ev.t === 'tool-call-end';
-    });
-
-    const markExtensionDelivered = (mirror: ExternalPiMirrorState, cutoffTimeMs: number, options: { includeAssistantMessages?: boolean } = {}): void => {
-      try {
-        mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options);
-      } catch (error) {
-        logger.debug('[pi] Failed to mark Pi extension-delivered entries', error);
-      }
-      setTimeout(() => {
-        try {
-          mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options);
-        } catch (error) {
-          logger.debug('[pi] Failed delayed Pi extension-delivered mark', error);
-        }
-      }, 2_500).unref?.();
-    };
-
-    const flushPendingLiveText = async (mirror: ExternalPiMirrorState, cutoffTimeMs: number): Promise<void> => {
-      clearPendingTextFlush(mirror);
-      const envelopes = mirror.mapper.flushPendingText();
-      if (envelopes.length === 0) return;
-      for (const envelope of envelopes) {
-        if (envelope.role === 'agent' && envelope.ev.t === 'text' && !envelope.ev.thinking) {
-          mirror.deliveredAssistantTextInTurn += envelope.ev.text;
-        }
-        mirror.sessionClient.sendSessionProtocolMessage(envelope);
-      }
-      await mirror.sessionClient.flush();
-      markExtensionDelivered(mirror, cutoffTimeMs);
-    };
-
-    const markUserInputDelivered = (mirror: ExternalPiMirrorState, text: string, cutoffTimeMs: number): void => {
-      try {
-        mirror.markUserTextDeliveredSince(text, cutoffTimeMs);
-      } catch (error) {
-        logger.debug('[pi] Failed to mark Pi extension-delivered user input', error);
-      }
-      setTimeout(() => {
-        try {
-          mirror.markUserTextDeliveredSince(text, cutoffTimeMs);
-        } catch (error) {
-          logger.debug('[pi] Failed delayed Pi extension-delivered user input mark', error);
-        }
-      }, 2_500).unref?.();
-    };
-
-    const markAssistantTextDelivered = (mirror: ExternalPiMirrorState, text: string, cutoffTimeMs: number): void => {
-      const normalizedText = text.trim();
-      if (!normalizedText) return;
-      try {
-        mirror.markAssistantTextDeliveredSince(normalizedText, cutoffTimeMs);
-      } catch (error) {
-        logger.debug('[pi] Failed to mark Pi extension-delivered assistant text', error);
-      }
-      setTimeout(() => {
-        try {
-          mirror.markAssistantTextDeliveredSince(normalizedText, cutoffTimeMs);
-        } catch (error) {
-          logger.debug('[pi] Failed delayed Pi extension-delivered assistant text mark', error);
-        }
-      }, 2_500).unref?.();
-    };
+    const clearPendingTextFlush = clearPendingPiLiveTextFlush;
+    const markExtensionDelivered = markPiExtensionDelivered;
+    const flushPendingLiveText = flushPendingPiLiveText;
+    const markUserInputDelivered = markPiExtensionUserInputDelivered;
+    const markAssistantTextDelivered = markPiExtensionAssistantTextDelivered;
+    const capAssistantTextDeliveryWindow = capPiExtensionAssistantTextDeliveryWindow;
 
     const schedulePendingLiveTextFlush = (mirrorKey: string, mirror: ExternalPiMirrorState, cutoffTimeMs: number): void => {
       clearPendingTextFlush(mirror);
@@ -1679,6 +1727,8 @@ export async function startDaemon(): Promise<void> {
 
       mirror.lastExtensionSeenAt = Date.now();
       if (event.type === 'agent_start') {
+        capAssistantTextDeliveryWindow(mirror, eventTime);
+        mirror.deliveredAssistantTextInTurn = '';
         mirror.isStreaming = true;
       } else if (event.type === 'agent_end') {
         mirror.isStreaming = false;
@@ -1738,12 +1788,14 @@ export async function startDaemon(): Promise<void> {
       if (agentEvent.type !== 'message_update') {
         clearPendingTextFlush(mirror);
       }
+      const deliveredAssistantTextBefore = mirror.deliveredAssistantTextInTurn;
       for (const envelope of envelopes) {
         if (envelope.role === 'agent' && envelope.ev.t === 'text' && !envelope.ev.thinking) {
           mirror.deliveredAssistantTextInTurn += envelope.ev.text;
         }
         mirror.sessionClient.sendSessionProtocolMessage(envelope);
       }
+      const deliveredAssistantTextChanged = mirror.deliveredAssistantTextInTurn !== deliveredAssistantTextBefore;
       if (envelopes.length > 0) {
         await mirror.sessionClient.flush();
       }
@@ -1751,17 +1803,24 @@ export async function startDaemon(): Promise<void> {
         if (hasDeliveredContentEnvelope(envelopes)) {
           markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: !mirror.extensionHasSeqGap });
         }
+        const assistantDeliveryUntil = eventTime + PI_ASSISTANT_JSONL_DELIVERY_GRACE_MS;
+        capAssistantTextDeliveryWindow(mirror, assistantDeliveryUntil);
         // Even if extension event ids have a gap, this exact assistant text was
         // already flushed to relay from live events. Mark only exact text so the
         // JSONL fallback can still recover a longer/different final message.
-        markAssistantTextDelivered(mirror, mirror.deliveredAssistantTextInTurn, deliveredCutoff);
+        markAssistantTextDelivered(mirror, mirror.deliveredAssistantTextInTurn, deliveredCutoff, assistantDeliveryUntil);
         mirror.deliveredAssistantTextInTurn = '';
         if (eventId !== null) {
           mirror.extensionHasSeqGap = false;
           mirror.extensionCoveredSince = eventTime;
         }
-      } else if (hasDeliveredContentEnvelope(envelopes)) {
-        markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: false });
+      } else {
+        if (deliveredAssistantTextChanged) {
+          markAssistantTextDelivered(mirror, mirror.deliveredAssistantTextInTurn, deliveredCutoff);
+        }
+        if (hasDeliveredContentEnvelope(envelopes)) {
+          markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: false });
+        }
       }
       if (mirror.mapper.hasPendingText()) {
         schedulePendingLiveTextFlush(mirrorKey, mirror, deliveredCutoff);

@@ -13,12 +13,13 @@ describe('Typography', () => {
         expect(Typography.default()).toEqual({ fontFamily: 'SourceSans3-Regular' });
     });
 
-    it('uses Source Serif for editorial reading surfaces with platform CJK fallback available', () => {
+    it('uses Source Serif for headers and LXGW WenKai for Chinese reading surfaces', () => {
         expect(getSerifFont()).toBe('SourceSerif4-Regular');
         expect(getSerifFont('semiBold')).toBe('SourceSerif4-SemiBold');
-        expect(getCjkFont()).toBe('serif');
+        expect(getCjkFont()).toBe('LXGWWenKai-Regular');
+        expect(Typography.cjk()).toEqual({ fontFamily: 'LXGWWenKai-Regular' });
         expect(Typography.header()).toEqual({ fontFamily: 'SourceSerif4-SemiBold' });
-        expect(Typography.body()).toEqual({ fontFamily: 'SourceSerif4-Regular' });
+        expect(Typography.body()).toEqual({ fontFamily: 'LXGWWenKai-Regular' });
     });
 
     it('keeps IBM Plex Mono for dense tool and code output', () => {
