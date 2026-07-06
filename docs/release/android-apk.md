@@ -125,7 +125,7 @@ Build outline:
 printf '%s' "$LYNTTY_ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lyntty-release.jks"
 printf '%s' "$LYNTTY_GOOGLE_SERVICES_JSON_BASE64" | base64 -d > packages/lyntty-app/android/app/google-services.json
 cd packages/lyntty-app/android
-APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew assembleRelease --no-daemon --stacktrace \
+APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
   -x lintVitalAnalyzeRelease \
   -x lintVitalRelease \
   -PreactNativeArchitectures=arm64-v8a \

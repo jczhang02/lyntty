@@ -97,7 +97,7 @@ Docs/evidence:
 - Production Android release requires release signing props when building `dev.jczhang.lyntty` release.
 - Local debug Android builds use `dev.jczhang.lyntty.dev` through a debug `applicationIdSuffix`.
 - Native Android release builds use literal package id `dev.jczhang.lyntty`, so EAS credentials reads the correct application identifier instead of the old Gradle variable name.
-- Android release workflow uses Node 26, skips release lint-vital tasks, disables PNG crunching, and targets `arm64-v8a` for the first personal-phone APK to keep GitHub Actions release time bounded.
+- Android release workflow uses Node 26, higher Gradle/Kotlin heap settings, `--max-workers=2`, skips release lint-vital tasks, disables PNG crunching, and targets `arm64-v8a` for the first personal-phone APK to keep GitHub Actions release time bounded.
 - `REQUEST_INSTALL_PACKAGES` permission added to app config and checked-in Android manifest.
 - `google-services.json` removed from git; production release requires `LYNTTY_GOOGLE_SERVICES_JSON_BASE64` so Android background push notifications can use Firebase/FCM.
 - App config no longer hardcodes inherited Happy EAS project id or Expo owner; production builds use `LYNTTY_EAS_PROJECT_ID` for Expo push token registration and optional Expo update URL.

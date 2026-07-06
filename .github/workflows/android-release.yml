@@ -100,7 +100,7 @@ jobs:
         run: |
           set -euo pipefail
           : "${LYNTTY_EAS_PROJECT_ID:?Repository variable LYNTTY_EAS_PROJECT_ID is required for Expo push tokens}"
-          ./gradlew assembleRelease --no-daemon --stacktrace \
+          ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
             -x lintVitalAnalyzeRelease \
             -x lintVitalRelease \
             -PreactNativeArchitectures=arm64-v8a \
