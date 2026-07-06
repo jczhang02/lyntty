@@ -59,7 +59,6 @@ type ControlState =
   | "queued"
   | "waiting_extension"
   | "takeover_required"
-  | "missing_local_history"
   | "computer_offline";
 ```
 
@@ -97,7 +96,7 @@ Rules:
 - preserve `activation lock` semantics;
 - load latest tail quickly and older history progressively;
 - queued mobile sends flush once runtime is ready;
-- missing local JSONL remains `missing_local_history` and cannot send.
+- relay-only Pi ids without a real local Pi session record are not product-visible sessions; skip them from session discovery and keep only dev-log/evidence traces.
 
 ### Extension missing or stale
 
@@ -145,7 +144,7 @@ The Pi extension must not own:
 
 Use a strict enum. Reject unknown command types. Do not pass raw slash commands or arbitrary strings through as privileged commands.
 
-Supported P0/P1 commands:
+Supported P0/P1 user-visible commands:
 
 ```ts
 type RemotePiCommand =
@@ -172,19 +171,21 @@ Mapping:
 - command list: `pi.getCommands()` as read-only metadata
 - label: `pi.setLabel(entryId, label)`
 
+`lynttyd` may also enqueue a local-only `internal_shutdown` maintenance command for Stop & Archive after the user confirms hiding a running ordinary Pi session. This command is not parsed from mobile text, is not surfaced as a slash command, requires the authenticated local Pi-extension channel, and `lynttyd` must wait for `session_shutdown`/mirror removal before reporting stop success to the app.
+
 Explicitly out of scope for first version:
 
 - `new_session`
 - `switch_session`
 - `fork`
 - `navigate_tree`
-- `shutdown`
+- user-visible `shutdown`
 - arbitrary Pi slash command execution
 - `setActiveTools`
 - model/thinking-level changes
 - arbitrary `pi.sendMessage(...)`
 
-Rationale: first version controls the current session without changing session identity, branch/tree, runtime ownership, model/tool permission surface, or process lifecycle.
+Rationale: first version controls the current session without changing session identity, branch/tree, runtime ownership, model/tool permission surface, or user-visible process lifecycle. Stop & Archive's `internal_shutdown` is a separate local maintenance path for an explicit archive/hide action, not a general remote command.
 
 ## Delivery state model
 

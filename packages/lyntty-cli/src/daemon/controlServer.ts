@@ -129,6 +129,7 @@ export function startDaemonControlServer({
       z.object({ type: z.literal('abort') }),
       z.object({ type: z.literal('compact'), instructions: z.string().max(PI_EXTENSION_TEXT_MAX).optional() }),
       z.object({ type: z.literal('reload') }),
+      z.object({ type: z.literal('internal_shutdown') }),
       z.object({ type: z.literal('set_session_name'), name: z.string().min(1).max(512) }),
       z.object({ type: z.literal('get_commands') }),
       z.object({ type: z.literal('invoke_pi_command'), commandLine: z.string().min(1).max(PI_EXTENSION_TEXT_MAX), deliverAs: z.enum(['followUp']).optional() }),

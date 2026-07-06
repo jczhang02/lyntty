@@ -18,7 +18,7 @@ import { useLynttyAction } from '@/hooks/useLynttyAction';
 import { LynttyError } from '@/utils/errors';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
 import { useSessionActionAlert } from '@/hooks/useSessionQuickActions';
-import { sessionKill } from '@/sync/ops';
+import { stopAndArchiveSession } from '@/sync/archiveSessionAction';
 import { isWorktreePath, getRepoPath, getWorktreeName } from '@/utils/worktree';
 import { compareSessionsByRecencyDesc } from '@/sync/sessionRecency';
 import { useNewSessionDraft } from '@/hooks/useNewSessionDraft';
@@ -289,7 +289,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     const [isOpeningPiSession, setIsOpeningPiSession] = React.useState(false);
 
     const [archivingSession, performArchive] = useLynttyAction(async () => {
-        const result = await sessionKill(session.id);
+        const result = await stopAndArchiveSession(session);
         if (!result.success) {
             throw new LynttyError(result.message || t('sessionInfo.failedToArchiveSession'), false);
         }
@@ -410,7 +410,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
         >
             <Ionicons name="archive-outline" size={20} color="#FFFFFF" />
             <Text style={styles.swipeActionText} numberOfLines={2}>
-                {t('sessionInfo.archiveSession')}
+                {t('sessionInfo.stopAndArchiveSession')}
             </Text>
         </Pressable>
     );

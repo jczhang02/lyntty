@@ -132,11 +132,11 @@ export function classifyPiSessionRecovery(input: {
   if (localMessageCount < importedMessageCount) {
     return {
       ...base,
-      state: 'history_gap',
+      state: 'registered',
       needsRegistration: false,
       needsBackfill: false,
-      hasHistoryGap: true,
-      reason: `local Pi history has ${localMessageCount} messages but relay/import ledger expects ${importedMessageCount}`,
+      hasHistoryGap: false,
+      reason: `local Pi history exists with ${localMessageCount} messages; relay import ledger expects ${importedMessageCount}`,
     };
   }
 
@@ -273,27 +273,18 @@ export async function discoverLocalPiSessionsPage(options: DiscoverPiSessionsOpt
   const registeredByPiId = new Map((options.registeredSessions ?? []).map((entry) => [entry.piSessionId, entry]));
   const activePiIds = new Set(options.activePiSessionIds ?? []);
   const sessions = (await listPiSessionsForScope(options)).sort(compareSessionInfoByDiscoveryOrder(activePiIds));
-  const localPiIds = new Set(sessions.map((session) => session.id));
-  const missingLocalRecords = [...registeredByPiId.values()]
-    .filter((registered) => !localPiIds.has(registered.piSessionId))
-    .map((registered) => classifyPiSessionRecovery({
-      registered,
-      active: activePiIds.has(registered.piSessionId),
-      staleAfterMs: options.staleAfterMs,
-      now: options.now,
-    }));
   const decodedCursor = decodeDiscoveryCursor(options.cursor);
   const limit = resolvePageLimit(options.limit);
-  const records = [
-    ...sessions.map((local) => classifyPiSessionRecovery({
-      local,
-      registered: registeredByPiId.get(local.id),
-      active: activePiIds.has(local.id),
-      staleAfterMs: options.staleAfterMs,
-      now: options.now,
-    })),
-    ...missingLocalRecords,
-  ].sort((a, b) => compareSessionDiscoveryKeys(recoveryRecordDiscoveryKey(a, activePiIds), recoveryRecordDiscoveryKey(b, activePiIds)));
+  // Product-visible discovery only exposes real local/live Pi sessions. Relay-only
+  // registrations without a local Pi JSONL/session record are diagnostic noise,
+  // not user-visible sessions.
+  const records = sessions.map((local) => classifyPiSessionRecovery({
+    local,
+    registered: registeredByPiId.get(local.id),
+    active: activePiIds.has(local.id),
+    staleAfterMs: options.staleAfterMs,
+    now: options.now,
+  })).sort((a, b) => compareSessionDiscoveryKeys(recoveryRecordDiscoveryKey(a, activePiIds), recoveryRecordDiscoveryKey(b, activePiIds)));
   const total = records.length;
   const candidateRecords = decodedCursor
     ? records.filter((record) => compareSessionDiscoveryKeys(recoveryRecordDiscoveryKey(record, activePiIds), decodedCursor) > 0)

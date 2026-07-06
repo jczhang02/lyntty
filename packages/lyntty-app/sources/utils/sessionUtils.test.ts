@@ -48,6 +48,23 @@ describe('getSessionSubtitle', () => {
             },
         }))).toBe('~/dev/lyntty • 42 messages • discovered_local');
     });
+
+    it('does not show missing-history or history-gap states in user subtitles', async () => {
+        const { getSessionSubtitle } = await import('./sessionUtils');
+
+        expect(getSessionSubtitle(session({
+            metadata: {
+                path: '/home/jc/dev/lyntty',
+                host: 'thinkpad',
+                homeDir: '/home/jc',
+                piSessionId: 'pi-1',
+                flavor: 'pi',
+                piDiscoveryState: 'missing_local_history',
+                piMessageCount: 0,
+                piHasHistoryGap: true,
+            },
+        }))).toBe('~/dev/lyntty • 0 messages');
+    });
 });
 
 describe('shouldShowPiHistoryLoading', () => {

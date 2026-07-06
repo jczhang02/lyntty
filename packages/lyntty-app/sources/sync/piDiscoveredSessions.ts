@@ -15,6 +15,27 @@ function resolvePiActivityTimestamp(record: PiMachineSessionRecord, fallback: nu
     return resolveTimestamp(record.modifiedAt, resolveTimestamp(record.registeredUpdatedAt, fallback));
 }
 
+export function shouldShowPiDiscoveredRecord(record: PiMachineSessionRecord): boolean {
+    if (record.state === 'missing_local_history') {
+        return false;
+    }
+    if (record.state !== 'active_runtime' && (record.messageCount ?? 0) <= 0) {
+        return false;
+    }
+    return true;
+}
+
+function shouldShowRelaySession(session: Omit<Session, 'presence'> & { presence?: Session['presence'] }): boolean {
+    const state = session.metadata?.piDiscoveryState;
+    if (state === 'missing_local_history') {
+        return false;
+    }
+    if (state === 'history_gap' && session.seq <= 0) {
+        return false;
+    }
+    return true;
+}
+
 function resolvePiSessionTitle(record: PiMachineSessionRecord): string {
     return record.name?.trim() || record.firstMessage?.trim() || record.piSessionId;
 }
@@ -127,7 +148,7 @@ export function mergePiDiscoveredSessions(
     relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
     machineSessions: Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }>,
 ): Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }> {
-    const merged = [...relaySessions];
+    const merged = relaySessions.filter(shouldShowRelaySession);
     const byRelayId = new Map(merged.map((session, index) => [session.id, index]));
     const byPiId = new Map<string, number>();
 
@@ -141,6 +162,10 @@ export function mergePiDiscoveredSessions(
 
     for (const { machine, sessions } of machineSessions) {
         for (const record of sessions) {
+            if (!shouldShowPiDiscoveredRecord(record)) {
+                continue;
+            }
+
             const existingIndex = record.relaySessionId
                 ? byRelayId.get(record.relaySessionId)
                 : byPiId.get(`${machine.id}:${record.piSessionId}`);

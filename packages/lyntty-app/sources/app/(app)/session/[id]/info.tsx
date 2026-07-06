@@ -11,7 +11,8 @@ import { useSession, useIsDataReady } from '@/sync/storage';
 import { getSessionName, useSessionStatus, formatOSPlatform, formatPathRelativeToHome, getSessionAvatarId, getResumeCommand } from '@/utils/sessionUtils';
 import * as Clipboard from 'expo-clipboard';
 import { Modal } from '@/modal';
-import { sessionArchive, sessionKill, sessionDelete } from '@/sync/ops';
+import { sessionKill, sessionDelete } from '@/sync/ops';
+import { stopAndArchiveSession } from '@/sync/archiveSessionAction';
 import { maybeCleanupWorktree } from '@/hooks/useWorktreeCleanup';
 import { useUnistyles } from 'react-native-unistyles';
 import { layout } from '@/components/layout';
@@ -155,10 +156,9 @@ function SessionInfoContent({ session }: { session: Session }) {
         // Prompt for worktree cleanup before killing (needs an active machine connection)
         await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
 
-        // Try to kill the CLI process; if it's already dead, force-archive via server
-        const killResult = await sessionKill(session.id);
-        if (!killResult.success) {
-            await sessionArchive(session.id);
+        const result = await stopAndArchiveSession(session);
+        if (!result.success) {
+            throw new LynttyError(result.message || t('sessionInfo.failedToArchiveSession'), false);
         }
         navigateAfterSessionArchive(router);
     });
@@ -330,7 +330,7 @@ function SessionInfoContent({ session }: { session: Session }) {
                         />
                     )}
                     <Item
-                        title={t('sessionInfo.archiveSession')}
+                        title={t('sessionInfo.stopAndArchiveSession')}
                         subtitle={t('sessionInfo.archiveSessionSubtitle')}
                         icon={<Ionicons name="archive-outline" size={29} color="#FF3B30" />}
                         onPress={handleArchiveSession}

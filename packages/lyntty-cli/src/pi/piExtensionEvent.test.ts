@@ -76,6 +76,7 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('pi.on("message_end"');
       expect(source).toContain('safePiCommands');
       expect(source).toContain('invoke_pi_command');
+      expect(source).toContain('case "internal_shutdown"');
       expect(source).toContain('deliverAs: "followUp"');
       expect(source).toContain('127.0.0.1');
       expect(source).toContain('RETRY_DELAY_MS');

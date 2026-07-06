@@ -101,6 +101,38 @@ describe('mergePiDiscoveredSessions', () => {
         });
     });
 
+    it('hides old empty relay rows that only represent missing Pi history', () => {
+        const sessions = mergePiDiscoveredSessions([
+            relaySession({
+                seq: 0,
+                active: true,
+                metadata: {
+                    path: '/repo',
+                    host: 'thinkpad',
+                    machineId: 'machine-1',
+                    flavor: 'pi',
+                    piSessionId: 'pi-missing',
+                    piDiscoveryState: 'missing_local_history',
+                    piHasHistoryGap: true,
+                },
+            }),
+        ], []);
+
+        expect(sessions).toEqual([]);
+    });
+
+    it('hides missing-local and inactive zero-message Pi discovery rows', () => {
+        const sessions = mergePiDiscoveredSessions([], [{
+            machine,
+            sessions: [
+                piRecord({ state: 'missing_local_history', piSessionId: 'pi-missing', messageCount: 0, hasHistoryGap: true }),
+                piRecord({ piSessionId: 'pi-empty', messageCount: 0, firstMessage: undefined }),
+            ],
+        }]);
+
+        expect(sessions).toEqual([]);
+    });
+
     it('marks active runtime synthetic Pi rows as online active sessions', () => {
         const sessions = mergePiDiscoveredSessions([], [{
             machine,
@@ -108,6 +140,7 @@ describe('mergePiDiscoveredSessions', () => {
                 state: 'active_runtime',
                 piSessionId: 'pi-active',
                 name: 'Active Pi',
+                messageCount: 0,
             })],
         }]);
 

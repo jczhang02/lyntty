@@ -352,6 +352,7 @@ export const zhHans: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: '终止会话',
         killSessionConfirm: '您确定要终止此会话吗？',
+        stopAndArchiveSession: '停止并归档',
         archiveSession: '归档会话',
         archiveSessionConfirm: '您确定要归档此会话吗？',
         lynttySessionIdCopied: 'Lyntty 会话 ID 已复制到剪贴板',

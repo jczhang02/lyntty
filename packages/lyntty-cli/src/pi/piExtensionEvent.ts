@@ -28,6 +28,9 @@ export type LynttyPiRemoteCommand =
   | { type: 'abort' }
   | { type: 'compact'; instructions?: string }
   | { type: 'reload' }
+  // Local-only lynttyd maintenance command used by Stop & Archive.
+  // This is never parsed from mobile text and is not part of the public phone command whitelist.
+  | { type: 'internal_shutdown' }
   | { type: 'set_session_name'; name: string }
   | { type: 'get_commands' }
   | { type: 'invoke_pi_command'; commandLine: string; deliverAs?: 'followUp' }

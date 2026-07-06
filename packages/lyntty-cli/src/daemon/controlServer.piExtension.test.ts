@@ -57,7 +57,9 @@ describe('daemon control server Pi extension endpoints', () => {
         status: 'ok',
         commands: session.piSessionId === 'pi-1' && afterSeq < 7
           ? [{ seq: 7, deliveryToken: 'lease-7', localKey: 'mobile-local-7', mobileContext: true, command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }]
-          : [],
+          : session.piSessionId === 'pi-stop' && afterSeq < 9
+            ? [{ seq: 9, deliveryToken: 'lease-9', localKey: 'archive-stop-9', mobileContext: false, command: { type: 'internal_shutdown' } }]
+            : [],
       }),
       onPiExtensionCommandAck: async (session, ack) => {
         acked.push({ session, ack });
@@ -76,6 +78,17 @@ describe('daemon control server Pi extension endpoints', () => {
       expect(await commandResponse.json()).toEqual({
         status: 'ok',
         commands: [{ seq: 7, deliveryToken: 'lease-7', localKey: 'mobile-local-7', mobileContext: true, command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }],
+      });
+
+      const shutdownResponse = await fetch(`http://127.0.0.1:${server.port}/pi-extension/commands`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ session: { piSessionId: 'pi-stop' }, afterSeq: 0 }),
+      });
+      expect(shutdownResponse.status).toBe(200);
+      expect(await shutdownResponse.json()).toEqual({
+        status: 'ok',
+        commands: [{ seq: 9, deliveryToken: 'lease-9', localKey: 'archive-stop-9', mobileContext: false, command: { type: 'internal_shutdown' } }],
       });
 
       const ackResponse = await fetch(`http://127.0.0.1:${server.port}/pi-extension/command-ack`, {

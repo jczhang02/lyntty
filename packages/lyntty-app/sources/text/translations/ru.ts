@@ -306,6 +306,7 @@ export const ru: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: 'Завершить сессию',
         killSessionConfirm: 'Вы уверены, что хотите завершить эту сессию?',
+        stopAndArchiveSession: 'Остановить и архивировать',
         archiveSession: 'Архивировать сессию',
         archiveSessionConfirm: 'Вы уверены, что хотите архивировать эту сессию?',
         lynttySessionIdCopied: 'ID сессии Lyntty скопирован в буфер обмена',

@@ -141,8 +141,8 @@ Lyntty should distinguish:
 | `registered` | Has a relay session id and encrypted metadata. |
 | `active_runtime` | Currently attached to a live Pi runtime lease. |
 | `stale_local` | Local file exists but no active runtime/presence. |
-| `missing_local_history` | Relay knows session, but node cannot find/prove local source. |
-| `history_gap` | Local/relay sequence continuity cannot be proven. |
+| relay-only missing local history | Not a product-visible session; skip from Sessions Home and keep only dev-log/evidence trace. |
+| relay import gap | Local Pi session remains visible; older history loads progressively from local JSONL when available. |
 | `import_failed` | Local JSONL exists but cannot be parsed/imported safely. |
 
 ### Required metadata
@@ -170,9 +170,9 @@ For each discovered Pi session, `lynttyd` should derive and persist:
 2. For each local session file, compute stable fingerprint from path + Pi session id + header + file metadata + optional content hash.
 3. Match existing Lyntty session registry by `piSessionFile` or `piSessionId` + `cwd`.
 4. If no match, create `discovered_local` record in node-local registry.
-5. Mobile `Sessions Home` shows discovered sessions even before relay registration.
+5. Mobile `Sessions Home` shows discovered sessions only when a real local Pi session record or live runtime evidence exists.
 6. On open/send, register or attach to relay session with encrypted metadata.
-7. If relay session exists but node-local history is missing, show `missing_local_history` and require explicit user action.
+7. If relay session exists but node-local history is missing, skip it from product-visible discovery and log the diagnostic reason.
 
 ### Backfill flow
 
@@ -213,7 +213,7 @@ For Lyntty-registered sessions, Lyntty can still use existing encrypted metadata
 ### Product changes
 
 - `Sessions Home` must include local discovered sessions, not only server sessions.
-- Show state labels: active, disconnected, discovered local, missing local history, `history_gap`.
+- Show product state labels: active, disconnected, discovered local, registered, stale local. Do not show `missing_local_history` or `history_gap` as session-list states.
 - Give user actions: open, attach/register, import, hide/archive, reveal local file on computer.
 
 ## Answer to the user's concern

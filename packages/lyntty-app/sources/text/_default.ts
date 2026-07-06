@@ -366,6 +366,7 @@ export const en = {
         killSession: 'Kill Session',
         killSessionConfirm: 'Are you sure you want to terminate this session?',
         archiveSession: 'Archive Session',
+stopAndArchiveSession: 'Stop & Archive',
         archiveSessionConfirm: 'Are you sure you want to archive this session?',
         lynttySessionIdCopied: 'Lyntty Session ID copied to clipboard',
         failedToCopySessionId: 'Failed to copy Lyntty Session ID',

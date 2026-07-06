@@ -165,7 +165,9 @@ export function getSessionSubtitle(session: Session): string {
                 typeof session.metadata.piMessageCount === 'number'
                     ? `${session.metadata.piMessageCount} messages`
                     : undefined,
-                session.metadata.piHasHistoryGap ? 'history_gap' : session.metadata.piDiscoveryState,
+                session.metadata.piDiscoveryState === 'history_gap' || session.metadata.piDiscoveryState === 'missing_local_history'
+                    ? undefined
+                    : session.metadata.piDiscoveryState,
             ];
             return details.filter(Boolean).join(' • ');
         }

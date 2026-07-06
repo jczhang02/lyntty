@@ -2,7 +2,8 @@ import * as React from 'react';
 import { useLynttyAction } from '@/hooks/useLynttyAction';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { Modal } from '@/modal';
-import { machineResumeSession, sessionArchive, sessionKill, forkAndSpawn, type ForkSource } from '@/sync/ops';
+import { machineResumeSession, forkAndSpawn, type ForkSource } from '@/sync/ops';
+import { stopAndArchiveSession } from '@/sync/archiveSessionAction';
 import { maybeCleanupWorktree } from '@/hooks/useWorktreeCleanup';
 import { storage, useLocalSetting, useMachine, useSetting } from '@/sync/storage';
 import { Machine, Session } from '@/sync/storageTypes';
@@ -202,10 +203,9 @@ export function useSessionQuickActions(
     const [archivingSession, performArchive] = useLynttyAction(async () => {
         await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
 
-        // Try to kill the CLI process; if it's already dead, force-archive via server
-        const killResult = await sessionKill(session.id);
-        if (!killResult.success) {
-            await sessionArchive(session.id);
+        const result = await stopAndArchiveSession(session);
+        if (!result.success) {
+            throw new LynttyError(result.message || t('sessionInfo.failedToArchiveSession'), false);
         }
         onAfterArchive?.();
     });
@@ -268,7 +268,7 @@ export function useSessionQuickActions(
             items.push({ id: 'copy-metadata-and-logs', icon: 'document-text-outline', label: t('sessionInfo.copyMetadata') + ' & Client Logs', onPress: copySessionMetadataAndLogs });
         }
 
-        items.push({ id: 'archive', icon: 'archive-outline', label: 'Archive', onPress: archiveSession, destructive: true });
+        items.push({ id: 'archive', icon: 'archive-outline', label: t('sessionInfo.stopAndArchiveSession'), onPress: archiveSession, destructive: true });
 
         return items;
     }, [

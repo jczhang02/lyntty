@@ -927,6 +927,35 @@ export async function startDaemon(): Promise<void> {
       logger.debug('[pi] Queued remote Pi command for extension delivery', { sessionId: mirror.sessionId, localKey, type: command.type });
     };
 
+    const queueInternalPiCommand = (mirror: ExternalPiMirrorState, command: LynttyPiRemoteCommand, localKey: string): boolean => {
+      if (mirror.seenCommandLocalKeys.has(localKey) || mirror.commands.some((entry) => entry.localKey === localKey)) return false;
+      if (mirror.commands.length >= MAX_REMOTE_PI_COMMANDS) {
+        logger.debug('[pi] Dropping internal remote Pi command because the extension delivery queue is full', { sessionId: mirror.sessionId, localKey });
+        return false;
+      }
+      mirror.commands.push({
+        seq: mirror.nextCommandSeq++,
+        localKey,
+        command,
+        status: 'queued',
+        deliveryToken: randomUUID(),
+        mobileContext: false,
+        sentFrom: 'lyntty-app',
+      });
+      return true;
+    };
+
+    const waitForRemotePiCommandAccepted = async (mirror: ExternalPiMirrorState, localKey: string, timeoutMs = 8_000): Promise<boolean> => {
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < timeoutMs) {
+        if (mirror.seenCommandLocalKeys.has(localKey)) return true;
+        const command = mirror.commands.find((entry) => entry.localKey === localKey);
+        if (command?.status === 'accepted_by_pi') return true;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return mirror.seenCommandLocalKeys.has(localKey);
+    };
+
     const applyPiCommandMetadata = (mirror: ExternalPiMirrorState, commands: LynttyPiCommandInfo[]): void => {
       const supported = commands.filter((command) => {
         return (command.source === 'extension' && (command.name === 'goal' || command.name === 'context'))
@@ -951,6 +980,7 @@ export async function startDaemon(): Promise<void> {
         return { status: 'ok' as const, commands: [] };
       }
       const next = mirror.commands.find((entry) => entry.seq > afterSeq && entry.status === 'queued' && entry.command.type === 'abort')
+        ?? mirror.commands.find((entry) => entry.seq > afterSeq && entry.status === 'queued' && entry.command.type === 'internal_shutdown')
         ?? mirror.commands.find((entry) => entry.seq > afterSeq && entry.status === 'queued');
       if (!next) {
         return { status: 'ok' as const, commands: [] };
@@ -1021,6 +1051,15 @@ export async function startDaemon(): Promise<void> {
         mirror.commands.shift();
       }
       return { status: 'ok' as const };
+    };
+
+    const waitForExternalPiMirrorStopped = async (mirrorKey: string, timeoutMs = 12_000): Promise<boolean> => {
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < timeoutMs) {
+        if (!externalPiMirrors.has(mirrorKey)) return true;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return !externalPiMirrors.has(mirrorKey);
     };
 
     const getRegisteredPiSessions = (): RegisteredPiSessionState[] => {
@@ -1471,6 +1510,31 @@ export async function startDaemon(): Promise<void> {
         externalPiMirrors.set(mirrorKey, mirrorState);
         sessionClient.onUserMessage((message) => {
           queueRemotePiCommand(mirrorState!, message);
+        });
+        sessionClient.rpcHandlerManager.registerHandler('killSession', async () => {
+          const state = mirrorState;
+          if (!state || Date.now() - state.lastExtensionSeenAt > EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS) {
+            return {
+              success: false,
+              message: 'Pi extension is not currently connected for this session',
+            };
+          }
+          const localKey = `archive-shutdown:${Date.now()}:${randomUUID()}`;
+          const queued = queueInternalPiCommand(state, { type: 'internal_shutdown' }, localKey);
+          if (!queued) {
+            return {
+              success: false,
+              message: 'Unable to queue Pi shutdown command',
+            };
+          }
+          const accepted = await waitForRemotePiCommandAccepted(state, localKey);
+          if (!accepted) {
+            return { success: false, message: 'Timed out waiting for Pi extension to accept the stop command' };
+          }
+          const stopped = await waitForExternalPiMirrorStopped(mirrorKey);
+          return stopped
+            ? { success: true, message: 'Pi session stopped' }
+            : { success: false, message: 'Pi accepted the stop command but did not shut down. Try again or reload the Pi extension.' };
         });
       }
 

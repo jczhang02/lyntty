@@ -62,15 +62,15 @@ describe('classifyPiSessionRecovery', () => {
     });
   });
 
-  it('marks history_gap when local Pi JSONL has fewer messages than import ledger expects', () => {
+  it('keeps local Pi sessions visible when relay import ledger is ahead', () => {
     expect(classifyPiSessionRecovery({
       local: sessionInfo({ messageCount: 2 }),
       registered: { piSessionId: 'pi-1', importedMessageCount: 5 },
       now,
     })).toMatchObject({
-      state: 'history_gap',
+      state: 'registered',
       needsBackfill: false,
-      hasHistoryGap: true,
+      hasHistoryGap: false,
     });
   });
 
@@ -218,7 +218,7 @@ describe('discoverLocalPiSessions', () => {
     });
   });
 
-  it('orders missing-local registered sessions by relay update time', async () => {
+  it('does not emit registered relay sessions whose local Pi history is missing', async () => {
     await expect(discoverLocalPiSessionsPage({
       scope: 'machine',
       registeredSessions: [
@@ -229,12 +229,10 @@ describe('discoverLocalPiSessions', () => {
       now,
       listSessions: async () => [],
     })).resolves.toMatchObject({
-      records: [{ piSessionId: 'pi-missing-new' }],
-      total: 2,
+      records: [],
+      total: 0,
     });
-  });
 
-  it('emits registered relay sessions whose local Pi history is missing', async () => {
     await expect(discoverLocalPiSessions({
       scope: 'machine',
       registeredSessions: [{
@@ -245,14 +243,7 @@ describe('discoverLocalPiSessions', () => {
       }],
       now,
       listSessions: async () => [],
-    })).resolves.toMatchObject([
-      {
-        state: 'missing_local_history',
-        piSessionId: 'pi-missing',
-        relaySessionId: 'relay-1',
-        hasHistoryGap: true,
-      },
-    ]);
+    })).resolves.toEqual([]);
   });
 
   it('supports machine-wide historical Pi discovery without a cwd', async () => {

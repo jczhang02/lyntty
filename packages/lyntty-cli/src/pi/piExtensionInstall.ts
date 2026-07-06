@@ -26,6 +26,7 @@ type RemotePiCommand =
   | { type: "abort" }
   | { type: "compact"; instructions?: string }
   | { type: "reload" }
+  | { type: "internal_shutdown" }
   | { type: "set_session_name"; name: string }
   | { type: "get_commands" }
   | { type: "invoke_pi_command"; commandLine: string; deliverAs?: "followUp" }
@@ -352,6 +353,14 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
       const maybeReload = (ctx as unknown as { reload?: () => Promise<void> }).reload;
       if (!maybeReload) throw new Error("reload is not available in this Pi context");
       await maybeReload.call(ctx);
+      return;
+    }
+    case "internal_shutdown": {
+      const maybeShutdown = (ctx as unknown as { shutdown?: () => Promise<void> | void }).shutdown;
+      if (!maybeShutdown) throw new Error("shutdown is not available in this Pi context");
+      setTimeout(() => {
+        void Promise.resolve(maybeShutdown.call(ctx)).catch(() => undefined);
+      }, 100);
       return;
     }
     case "set_session_name":

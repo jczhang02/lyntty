@@ -351,6 +351,7 @@ export const zhHant: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: '終止工作階段',
         killSessionConfirm: '您確定要終止此工作階段嗎？',
+        stopAndArchiveSession: '停止並封存',
         archiveSession: '封存工作階段',
         archiveSessionConfirm: '您確定要封存此工作階段嗎？',
         lynttySessionIdCopied: 'Lyntty 工作階段 ID 已複製到剪貼簿',

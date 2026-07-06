@@ -38,7 +38,7 @@ export function SessionActionsNativeMenu({
                 </DropdownMenuItem>
                 {canArchive && (
                     <DropdownMenuItem onClick={archiveSession}>
-                        <DropdownMenuItem.Text>Archive</DropdownMenuItem.Text>
+                        <DropdownMenuItem.Text>{t('sessionInfo.stopAndArchiveSession')}</DropdownMenuItem.Text>
                     </DropdownMenuItem>
                 )}
                 {canShowResume && (

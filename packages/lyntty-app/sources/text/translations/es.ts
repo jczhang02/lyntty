@@ -351,6 +351,7 @@ export const es: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: 'Terminar sesión',
         killSessionConfirm: '¿Seguro que quieres terminar esta sesión?',
+        stopAndArchiveSession: 'Detener y archivar',
         archiveSession: 'Archivar sesión',
         archiveSessionConfirm: '¿Seguro que quieres archivar esta sesión?',
         lynttySessionIdCopied: 'ID de sesión de Lyntty copiado al portapapeles',

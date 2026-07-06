@@ -352,6 +352,7 @@ export const ja: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: 'セッションを終了',
         killSessionConfirm: 'このセッションを終了してもよろしいですか？',
+        stopAndArchiveSession: '停止してアーカイブ',
         archiveSession: 'セッションをアーカイブ',
         archiveSessionConfirm: 'このセッションをアーカイブしてもよろしいですか？',
         lynttySessionIdCopied: 'Lyntty Session IDがクリップボードにコピーされました',

@@ -10,6 +10,7 @@ import { Ionicons, Octicons } from '@expo/vector-icons';
 import type { Session } from '@/sync/storageTypes';
 import { machineStopDaemon, machineUpdateMetadata, machineDelete, machineListPiSessions, type PiMachineSessionRecord } from '@/sync/ops';
 import { Modal } from '@/modal';
+import { shouldShowPiDiscoveredRecord } from '@/sync/piDiscoveredSessions';
 import { formatPathRelativeToHome, getSessionName, getSessionSubtitle } from '@/utils/sessionUtils';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { sync } from '@/sync/sync';
@@ -177,7 +178,7 @@ export default function MachineDetailScreen() {
                 errorMessage = result.errorMessage;
                 break;
             }
-            sessions.push(...result.sessions);
+            sessions.push(...result.sessions.filter(shouldShowPiDiscoveredRecord));
             cursor = result.nextCursor;
         } while (cursor && sessions.length < 5000);
 
@@ -348,10 +349,9 @@ export default function MachineDetailScreen() {
 
     const piSessionSubtitle = useCallback((piSession: PiMachineSessionRecord) => {
         const bits = [
-            piSession.state,
+            piSession.state === 'history_gap' || piSession.state === 'missing_local_history' ? undefined : piSession.state,
             piSession.cwd ? formatPathRelativeToHome(piSession.cwd, machine?.metadata?.homeDir) : undefined,
             `${piSession.messageCount} messages`,
-            piSession.hasHistoryGap ? 'history_gap' : undefined,
         ];
         return bits.filter(Boolean).join(' • ');
     }, [machine?.metadata?.homeDir]);
