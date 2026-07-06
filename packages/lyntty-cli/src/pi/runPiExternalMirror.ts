@@ -85,9 +85,19 @@ export function readPiSessionEntriesFromOffset(file: string, offset: number): { 
   }
 }
 
+type DeliveredAssistantText = {
+  text: string;
+  cutoffTimeMs: number;
+  expiresAtMs: number;
+};
+
+const DELIVERED_ASSISTANT_TEXT_TTL_MS = 5 * 60_000;
+const MAX_DELIVERED_ASSISTANT_TEXTS = 100;
+
 export class PiExternalMirror {
   private readonly knownEntryIds = new Set<string>();
   private pendingEntries: SessionEntry[] = [];
+  private deliveredAssistantTexts: DeliveredAssistantText[] = [];
   private lastObservedChangeAt = 0;
   private lastMtimeMs = 0;
   private lastSize = 0;
@@ -141,6 +151,11 @@ export class PiExternalMirror {
   markAssistantTextDeliveredSince(text: string, cutoffTimeMs: number): void {
     const normalizedText = text.trim();
     if (!normalizedText) return;
+    const now = Date.now();
+    this.deliveredAssistantTexts = [
+      ...this.deliveredAssistantTexts.filter((item) => item.expiresAtMs > now),
+      { text: normalizedText, cutoffTimeMs, expiresAtMs: now + DELIVERED_ASSISTANT_TEXT_TTL_MS },
+    ].slice(-MAX_DELIVERED_ASSISTANT_TEXTS);
     const entries = readPiSessionEntries(this.sessionFile);
     const deliveredIds = new Set(entries
       .filter((entry) => this.isAssistantTextEntry(entry, cutoffTimeMs, normalizedText))
@@ -191,6 +206,14 @@ export class PiExternalMirror {
     return true;
   }
 
+  private isRecentlyDeliveredAssistantEntry(entry: SessionEntry, now: number): boolean {
+    this.deliveredAssistantTexts = this.deliveredAssistantTexts.filter((item) => item.expiresAtMs > now);
+    if (this.deliveredAssistantTexts.length === 0) {
+      return false;
+    }
+    return this.deliveredAssistantTexts.some((item) => this.isAssistantTextEntry(entry, item.cutoffTimeMs, item.text));
+  }
+
   async tick(now = Date.now()): Promise<void> {
     const stat = statSync(this.sessionFile, { throwIfNoEntry: false });
     if (!stat) {
@@ -204,6 +227,11 @@ export class PiExternalMirror {
 
     const { entries, nextOffset } = readPiSessionEntriesFromOffset(this.sessionFile, this.lastReadOffset);
     this.lastReadOffset = nextOffset;
+    for (const entry of entries) {
+      if (!this.knownEntryIds.has(entry.id) && this.isRecentlyDeliveredAssistantEntry(entry, now)) {
+        this.knownEntryIds.add(entry.id);
+      }
+    }
     const pendingIds = new Set(this.pendingEntries.map((entry) => entry.id));
     const newEntries = entries.filter((entry: SessionEntry) => !this.knownEntryIds.has(entry.id) && !pendingIds.has(entry.id));
     if (newEntries.length > 0) {

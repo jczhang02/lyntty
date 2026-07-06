@@ -51,6 +51,81 @@ function namedToolMessage(id: string, name: string, createdAt: number): ToolCall
 }
 
 describe('useGroupedMessages', () => {
+    it('hides duplicate agent replies from live plus JSONL fallback in the same turn', () => {
+        const messages: Message[] = [
+            {
+                kind: 'agent-text',
+                id: 'pi-history-assistant-final',
+                localId: 'session:pi-history-assistant-final',
+                createdAt: 2_000,
+                text: 'same answer from Pi',
+            },
+            {
+                kind: 'agent-text',
+                id: 'pi-live-assistant-final',
+                localId: 'session:pi-live-assistant-final',
+                createdAt: 1_500,
+                text: 'same answer from Pi',
+            },
+            {
+                kind: 'user-text',
+                id: 'user',
+                localId: null,
+                createdAt: 1_000,
+                text: 'reply once',
+            },
+        ];
+
+        expect(groupMessagesForDisplay(messages, false).map((item) => item.id)).toEqual([
+            'pi-history-assistant-final',
+            'user',
+        ]);
+        expect(groupMessagesForDisplay(messages, true).map((item) => item.id)).toEqual([
+            'pi-history-assistant-final',
+            'user',
+        ]);
+    });
+
+    it('keeps identical agent text in different turns', () => {
+        const messages: Message[] = [
+            {
+                kind: 'agent-text',
+                id: 'agent-2',
+                localId: null,
+                createdAt: 4_000,
+                text: 'OK',
+            },
+            {
+                kind: 'user-text',
+                id: 'user-2',
+                localId: null,
+                createdAt: 3_000,
+                text: 'second',
+            },
+            {
+                kind: 'agent-text',
+                id: 'agent-1',
+                localId: null,
+                createdAt: 2_000,
+                text: 'OK',
+            },
+            {
+                kind: 'user-text',
+                id: 'user-1',
+                localId: null,
+                createdAt: 1_000,
+                text: 'first',
+            },
+        ];
+
+        expect(groupMessagesForDisplay(messages, false).map((item) => item.id)).toEqual([
+            'agent-2',
+            'user-2',
+            'agent-1',
+            'user-1',
+        ]);
+    });
+
     it('summarizes lowercase Pi tool names with the shared categories', () => {
         const messages: Message[] = [
             namedToolMessage('tool-find', 'find', 3),

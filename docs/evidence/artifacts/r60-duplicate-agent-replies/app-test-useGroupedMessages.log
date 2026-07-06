@@ -1,0 +1,125 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+> lyntty-app@1.0.0 test /home/jc/dev/lyntty/packages/lyntty-app
+> vitest -- useGroupedMessages.test.ts
+
+
+ RUN  v3.2.4 /home/jc/dev/lyntty/packages/lyntty-app
+
+ ✓ sources/sync/ops.codexFork.test.ts (3 tests) 84ms
+ ✓ sources/utils/worktree.test.ts (4 tests) 84ms
+ ✓ sources/utils/sessionUtils.test.ts (6 tests) 86ms
+ ✓ sources/sync/reducer/activityUpdateAccumulator.test.ts (13 tests) 21ms
+ ✓ sources/sync/reducer/reducerTracer.spec.ts (12 tests) 12ms
+ ✓ sources/sync/piSessionOps.test.ts (6 tests) 91ms
+ ✓ sources/sync/piDiscoveredSessions.test.ts (7 tests) 37ms
+ ✓ sources/utils/debounce.test.ts (38 tests) 39ms
+ ✓ sources/hooks/useImagePicker.test.ts (1 test) 9ms
+ ✓ sources/components/AgentGoalBar.spec.ts (5 tests) 136ms
+ ✓ sources/auth/secretKeyBackup.spec.ts (57 tests) 28ms
+ ✓ sources/sync/apiAttachments.test.ts (13 tests) 25ms
+ ✓ sources/sync/storageTypes.spec.ts (9 tests) 23ms
+ ✓ sources/sync/settings.spec.ts (34 tests) 46ms
+stderr | sources/auth/AuthContext.test.ts > AuthProvider login > does not keep Create account spinning while initial sync is still running
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+ ✓ sources/components/markdown/parseMarkdown.test.ts (3 tests) 10ms
+ ✓ sources/auth/AuthContext.test.ts (1 test) 30ms
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > rejects file events without required size
+Unrecognized message type: session (id: db-file-missing-size)
+
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for non-cuid subagent identifiers
+Unrecognized message type: session (id: db-subagent-invalid)
+
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for malformed session payloads
+Unrecognized message type: session (id: db-8)
+
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for turn-end session events without status
+Unrecognized message type: session (id: db-10)
+
+stderr | sources/sync/typesRaw.spec.ts > Zod Transform - WOLOG Content Normalization > Session protocol normalization > returns null for service events from user role
+Unrecognized message type: session (id: db-11)
+
+ ✓ sources/sync/typesRaw.spec.ts (61 tests) 61ms
+ ✓ sources/sync/reducer/reducer.spec.ts (57 tests) 65ms
+ ✓ sources/utils/toSnakeCase.test.ts (24 tests) 13ms
+ ✓ sources/utils/sessionFork.test.ts (3 tests) 5ms
+ ✓ sources/encryption/aes.web.test.ts (6 tests) 18ms
+ ✓ sources/utils/deviceCalculations.test.ts (25 tests) 9ms
+ ✓ sources/components/autocomplete/applySuggestion.test.ts (16 tests) 6ms
+ ✓ sources/utils/pathUtils.spec.ts (34 tests) 11ms
+ ✓ sources/sync/piReplyVisibility.e2e.test.ts (4 tests) 15ms
+ ✓ sources/sync/attachmentDiagnostics.test.ts (36 tests) 16ms
+ ✓ sources/utils/notificationRouting.test.ts (7 tests) 6ms
+ ✓ sources/utils/toolComparison.test.ts (9 tests) 7ms
+ ✓ sources/utils/sessionFileLinks.test.ts (8 tests) 8ms
+ ✓ sources/components/parseLocalCommandMessage.spec.ts (24 tests) 12ms
+ ✓ sources/sync/apiGithub.spec.ts (4 tests) 10ms
+stdout | sources/sync/reducer/phase0-skipping.spec.ts > Phase 0 permission skipping issue > should handle permissions when AgentState and matching tools arrive together
+Result messages: [33m3[39m
+Permission mappings: {
+  toolIdToMessageId: [
+    [ [32m'tool1'[39m, [32m'4vzdyajnr57'[39m ],
+    [ [32m'tool2'[39m, [32m'e4kkxsihdbe'[39m ],
+    [ [32m'tool3'[39m, [32m'ifqono8lx4'[39m ]
+  ]
+}
+
+ ✓ sources/sync/reducer/phase0-skipping.spec.ts (2 tests) 8ms
+ ✓ sources/hooks/useGroupedMessages.test.ts (20 tests) 21ms
+ ✓ sources/sync/typesMessageMeta.test.ts (1 test) 6ms
+ ✓ sources/sync/apiTypes.spec.ts (4 tests) 14ms
+ ✓ sources/components/modelModeOptions.test.ts (9 tests) 14ms
+ ✓ sources/components/autocomplete/findActiveWord.test.ts (41 tests) 17ms
+ ✓ sources/components/markdown/parseMarkdownBlock.test.ts (5 tests) 10ms
+ ✓ sources/sync/modeHacks.test.ts (4 tests) 5ms
+ ✓ sources/-session/agentGoalActionHandler.spec.ts (6 tests) 6ms
+ ✓ sources/components/settingsOverview.test.ts (3 tests) 5ms
+ ✓ sources/sync/archiveSessionAction.test.ts (5 tests) 7ms
+ ✓ sources/-session/sessionAbortAction.spec.ts (3 tests) 5ms
+ ✓ sources/utils/resumeCommand.test.ts (7 tests) 5ms
+ ✓ sources/utils/time.test.ts (1 test) 7ms
+ ✓ sources/utils/appLinks.test.ts (2 tests) 5ms
+ ✓ sources/utils/duplicateSheetLayout.test.ts (2 tests) 4ms
+ ✓ sources/encryption/text.test.ts (9 tests) 7ms
+ ✓ sources/components/agentGoalStatus.spec.ts (10 tests) 4ms
+ ✓ sources/utils/toolErrorParser.test.ts (15 tests) 9ms
+ ✓ sources/components/userMessagePresentation.test.ts (5 tests) 8ms
+ ✓ sources/sync/suggestionCommands.spec.ts (2 tests) 5ms
+ ✓ sources/sync/syncRemoteCommandState.test.ts (2 tests) 9ms
+ ✓ sources/sync/attachmentSupport.test.ts (5 tests) 11ms
+ ✓ sources/components/AvatarPet.test.ts (2 tests) 6ms
+ ✓ sources/utils/toolDisplay.test.ts (8 tests) 10ms
+ ✓ sources/utils/previewSecurity.test.ts (7 tests) 10ms
+ ✓ sources/constants/Typography.test.ts (3 tests) 6ms
+stderr | sources/auth/authInvalidation.test.ts > authInvalidation > notifies listeners that subscribe after invalidation was requested
+[auth] Invalid credentials detected; clearing local auth: Failed to fetch sessions: 401
+
+ ✓ sources/auth/authInvalidation.test.ts (2 tests) 14ms
+ ✓ sources/sync/sessionRecency.test.ts (2 tests) 5ms
+ ✓ sources/utils/versionUtils.test.ts (8 tests) 8ms
+ ✓ sources/components/markdown/linkUtils.test.ts (2 tests) 4ms
+ ✓ sources/navigation/browserNavigation.test.ts (6 tests) 9ms
+ ✓ sources/utils/newSessionSidebarLayout.test.ts (5 tests) 11ms
+ ✓ sources/sync/piSessionOpen.test.ts (5 tests) 7ms
+ ✓ sources/sync/git-parsers/gitPath.test.ts (4 tests) 5ms
+ ✓ sources/sync/messageMeta.test.ts (5 tests) 5ms
+ ✓ sources/sync/serverConfig.test.ts (2 tests) 3ms
+ ✓ sources/utils/archiveNavigation.test.ts (1 test) 5ms
+ ✓ sources/utils/codexUnifiedDiff.spec.ts (4 tests) 3ms
+ ✓ sources/sync/apiSocketErrors.spec.ts (2 tests) 3ms
+ ✓ sources/utils/newSessionPickerItems.test.ts (2 tests) 3ms
+ ✓ sources/hooks/useUpdates.test.ts (1 test) 4ms
+ ✓ sources/components/tools/toolPayloadPolicy.test.ts (2 tests) 5ms
+ ✓ sources/components/agentInputControls.spec.ts (2 tests) 3ms
+ ✓ sources/utils/toolCommand.test.ts (4 tests) 3ms
+ ✓ sources/hooks/useTauriZoom.test.ts (1 test) 3ms
+ ✓ sources/components/tools/knownTools.spec.ts (1 test) 2ms
+ ✓ sources/encryption/blob.test.ts (9 tests) 2281ms
+   ✓ blob encryption > should encrypt and decrypt a large blob (1MB)  2272ms
+
+ Test Files  79 passed (79)
+      Tests  783 passed (783)
+   Start at  17:25:11
+   Duration  2.96s (transform 5.06s, setup 0ms, collect 10.97s, tests 3.63s, environment 18ms, prepare 7.37s)

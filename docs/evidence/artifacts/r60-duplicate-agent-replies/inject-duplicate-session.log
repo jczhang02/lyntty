@@ -1,0 +1,15 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+(node:3119444) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+file:///home/jc/dev/lyntty/packages/lyntty-cli/[eval1]:33
+client.shutdown();
+       ^
+
+TypeError: client.shutdown is not a function
+    at file:///home/jc/dev/lyntty/packages/lyntty-cli/[eval1]:33:8
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v26.3.0
+undefined
+/home/jc/dev/lyntty/packages/lyntty-cli:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: tsx

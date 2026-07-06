@@ -239,6 +239,28 @@ describe('PiExternalMirror', () => {
     }
   });
 
+  it('suppresses assistant JSONL entries that appear after live extension delivery was marked', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      mirror.markAssistantTextDeliveredSince('live extension already sent this late entry', Date.parse('2026-07-02T00:00:00.000Z'));
+      appendJsonl(file, assistantEntry('a2', 'live extension already sent this late entry'));
+      await mirror.tick(1_000);
+      await mirror.tick(3_100);
+
+      expect(sent).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('forwards assistant-delivery marking through the startPiExternalMirror wrapper', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);

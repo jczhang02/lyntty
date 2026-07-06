@@ -1751,9 +1751,10 @@ export async function startDaemon(): Promise<void> {
         if (hasDeliveredContentEnvelope(envelopes)) {
           markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: !mirror.extensionHasSeqGap });
         }
-        if (!mirror.extensionHasSeqGap) {
-          markAssistantTextDelivered(mirror, mirror.deliveredAssistantTextInTurn, deliveredCutoff);
-        }
+        // Even if extension event ids have a gap, this exact assistant text was
+        // already flushed to relay from live events. Mark only exact text so the
+        // JSONL fallback can still recover a longer/different final message.
+        markAssistantTextDelivered(mirror, mirror.deliveredAssistantTextInTurn, deliveredCutoff);
         mirror.deliveredAssistantTextInTurn = '';
         if (eventId !== null) {
           mirror.extensionHasSeqGap = false;

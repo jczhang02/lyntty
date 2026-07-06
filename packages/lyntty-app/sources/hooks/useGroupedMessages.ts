@@ -57,8 +57,9 @@ export function groupMessagesForDisplay(
     options: { collapseCurrentTurn?: boolean } = {},
 ): DisplayItem[] {
     const collapseCurrentTurn = options.collapseCurrentTurn ?? true;
-    const turnOf = getTurnAssignments(messages);
-    const displayMessages = completeFinishedTurnRunningTools(messages, turnOf, collapseCurrentTurn);
+    const dedupedMessages = suppressDuplicateAgentTextMessages(messages);
+    const turnOf = getTurnAssignments(dedupedMessages);
+    const displayMessages = completeFinishedTurnRunningTools(dedupedMessages, turnOf, collapseCurrentTurn);
 
     if (!enabled) {
         return displayMessages
@@ -195,6 +196,42 @@ export function groupToolCallsForDisplay(
     }
 
     return result;
+}
+
+function normalizeAgentTextForDedupe(text: string): string {
+    return text.trim().replace(/\s+/g, ' ');
+}
+
+function suppressDuplicateAgentTextMessages(messages: Message[]): Message[] {
+    const turnOf = getTurnAssignments(messages);
+    const seenByTurn = new Map<number, Map<string, number>>();
+    let changed = false;
+    const filtered = messages.filter((msg, index) => {
+        if (msg.kind !== 'agent-text' || msg.isThinking === true) {
+            return true;
+        }
+        const normalized = normalizeAgentTextForDedupe(msg.text);
+        if (!normalized) {
+            return true;
+        }
+        const turn = turnOf[index];
+        let seen = seenByTurn.get(turn);
+        if (!seen) {
+            seen = new Map();
+            seenByTurn.set(turn, seen);
+        }
+        const previousCreatedAt = seen.get(normalized);
+        seen.set(normalized, msg.createdAt);
+        if (previousCreatedAt === undefined) {
+            return true;
+        }
+        if (Math.abs(previousCreatedAt - msg.createdAt) <= 5 * 60_000) {
+            changed = true;
+            return false;
+        }
+        return true;
+    });
+    return changed ? filtered : messages;
 }
 
 function getTurnAssignments(messages: Message[]): number[] {

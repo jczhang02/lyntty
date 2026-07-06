@@ -1,0 +1,34 @@
+17:08:12.711 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: /home/jc/dev/lyntty/docs/evidence/artifacts/r60-duplicate-agent-replies/02_pair_node/accept/debug/.maestro/tests/2026-07-06_170812
+17:08:12.713 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+17:08:12.713 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.6.1
+17:08:12.714 [ INFO] MAESTRO.logSystemInfo: CI: Undefined
+17:08:12.714 [ INFO] MAESTRO.logSystemInfo: OS Name: Linux
+17:08:12.714 [ INFO] MAESTRO.logSystemInfo: OS Version: 6.19.10-jc-xanmod1
+17:08:12.714 [ INFO] MAESTRO.logSystemInfo: Architecture: amd64
+17:08:12.716 [ INFO] MAESTRO.logSystemInfo: Java Version: 21
+17:08:12.717 [ INFO] MAESTRO.logSystemInfo: Xcode Version: null
+17:08:12.718 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+17:08:12.720 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+17:08:12.720 [ INFO] MAESTRO.logSystemInfo: ---------------------
+17:08:14.127 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+17:08:15.002 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device emulator-5554 using port 41731 with execution plan ExecutionPlan(flowsToRun=[/tmp/tmp.fyJB74gEok/02_pair_node_accept.yml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+17:08:17.455 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow:  Running flow Lyntty terminal pairing accept
+17:08:17.465 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+17:08:17.561 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=ANDROID, widthPixels=1080, heightPixels=1920, widthGrid=1080, heightGrid=1920)
+17:08:17.608 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Define variables RUNNING
+17:08:17.612 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Define variables COMPLETED
+17:08:17.613 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Apply configuration RUNNING
+17:08:17.614 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Apply configuration COMPLETED
+17:08:17.614 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Assert that "Pair Node" is visible RUNNING
+17:08:17.850 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Assert that "Pair Node" is visible COMPLETED
+17:08:17.850 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Assert that "End-to-end encrypted" is visible RUNNING
+17:08:17.916 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Assert that "End-to-end encrypted" is visible COMPLETED
+17:08:17.917 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Tap on id: lyntty-pair-accept RUNNING
+17:08:18.027 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={text=, accessibilityText=Accept Connection, hintText=, ignoreBoundsFiltering=false, resource-id=lyntty-pair-accept, clickable=true, bounds=[84,1348][996,1474], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.view.ViewGroup, important-for-accessibility=true, error=}, children=[TreeNode(attributes={text=Accept Connection, accessibilityText=, hintText=, ignoreBoundsFiltering=false, resource-id=, clickable=false, bounds=[317,1377][763,1443], enabled=true, focused=false, checked=false, scrollable=false, selected=false, class=android.widget.TextView, important-for-accessibility=true, error=}, children=[], clickable=false, enabled=true, focused=false, checked=false, selected=false)], clickable=true, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=84, y=1348, width=912, height=126))
+17:08:19.145 [ INFO] maestro.Maestro.tap-HgV9Ck0: Refreshed element
+17:08:19.148 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Tapping at (540, 1411) using hierarchy based logic for wait
+17:08:20.373 [ INFO] maestro.Maestro.hierarchyBasedTap-ogj28Uc: Something has changed in the UI judging by view hierarchy. Proceed.
+17:08:20.374 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Tap on id: lyntty-pair-accept COMPLETED
+17:08:20.374 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Assert that "Terminal connected successfully" is visible RUNNING
+17:08:20.475 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Assert that "Terminal connected successfully" is visible COMPLETED
+17:08:20.798 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from /home/jc/dev/lyntty/docs/evidence/artifacts/r60-duplicate-agent-replies/02_pair_node/accept/output

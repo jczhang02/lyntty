@@ -1,0 +1,8 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+(node:3141312) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+{
+  "sessionId": "cmr90nhji001movq9kdrhhc24",
+  "machineId": "03ebdf7e-ea79-4719-9291-ec1796f0a4bb",
+  "tag": "r60-duplicate-agent-replies-1783330024553"
+}

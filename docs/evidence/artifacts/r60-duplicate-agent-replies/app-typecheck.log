@@ -1,0 +1,4 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+> lyntty-app@1.0.0 typecheck /home/jc/dev/lyntty/packages/lyntty-app
+> tsc --noEmit
