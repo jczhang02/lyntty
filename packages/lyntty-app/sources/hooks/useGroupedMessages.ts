@@ -3,6 +3,7 @@ import { Message } from '@/sync/typesMessage';
 import { knownTools } from '@/components/tools/knownTools';
 import { t } from '@/text';
 import { getToolSummaryCategory } from '@/utils/toolDisplay';
+import { isComputerOriginUserMessage } from '@/components/userMessagePresentation';
 
 // Display item types for the grouped message list
 export type TextItem = {
@@ -57,7 +58,7 @@ export function groupMessagesForDisplay(
     options: { collapseCurrentTurn?: boolean } = {},
 ): DisplayItem[] {
     const collapseCurrentTurn = options.collapseCurrentTurn ?? true;
-    const dedupedMessages = suppressDuplicateAgentTextMessages(messages);
+    const dedupedMessages = suppressDuplicateAgentTextMessages(suppressDuplicateComputerUserMessages(messages));
     const turnOf = getTurnAssignments(dedupedMessages);
     const displayMessages = completeFinishedTurnRunningTools(dedupedMessages, turnOf, collapseCurrentTurn);
 
@@ -198,8 +199,30 @@ export function groupToolCallsForDisplay(
     return result;
 }
 
-function normalizeAgentTextForDedupe(text: string): string {
+function normalizeMessageTextForDedupe(text: string): string {
     return text.trim().replace(/\s+/g, ' ');
+}
+
+function suppressDuplicateComputerUserMessages(messages: Message[]): Message[] {
+    let changed = false;
+    const filtered: Message[] = [];
+    for (const msg of messages) {
+        if (msg.kind !== 'user-text' || !isComputerOriginUserMessage(msg)) {
+            filtered.push(msg);
+            continue;
+        }
+        const previous = filtered[filtered.length - 1];
+        const duplicate = previous?.kind === 'user-text'
+            && isComputerOriginUserMessage(previous)
+            && normalizeMessageTextForDedupe(previous.text) === normalizeMessageTextForDedupe(msg.text)
+            && Math.abs(previous.createdAt - msg.createdAt) <= 5 * 60_000;
+        if (duplicate) {
+            changed = true;
+            continue;
+        }
+        filtered.push(msg);
+    }
+    return changed ? filtered : messages;
 }
 
 function suppressDuplicateAgentTextMessages(messages: Message[]): Message[] {
@@ -210,7 +233,7 @@ function suppressDuplicateAgentTextMessages(messages: Message[]): Message[] {
         if (msg.kind !== 'agent-text' || msg.isThinking === true) {
             return true;
         }
-        const normalized = normalizeAgentTextForDedupe(msg.text);
+        const normalized = normalizeMessageTextForDedupe(msg.text);
         if (!normalized) {
             return true;
         }

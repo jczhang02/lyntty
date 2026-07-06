@@ -85,19 +85,20 @@ export function readPiSessionEntriesFromOffset(file: string, offset: number): { 
   }
 }
 
-type DeliveredAssistantText = {
+type DeliveredText = {
   text: string;
   cutoffTimeMs: number;
   expiresAtMs: number;
 };
 
-const DELIVERED_ASSISTANT_TEXT_TTL_MS = 5 * 60_000;
-const MAX_DELIVERED_ASSISTANT_TEXTS = 100;
+const DELIVERED_TEXT_TTL_MS = 5 * 60_000;
+const MAX_DELIVERED_TEXTS = 100;
 
 export class PiExternalMirror {
   private readonly knownEntryIds = new Set<string>();
   private pendingEntries: SessionEntry[] = [];
-  private deliveredAssistantTexts: DeliveredAssistantText[] = [];
+  private deliveredUserTexts: DeliveredText[] = [];
+  private deliveredAssistantTexts: DeliveredText[] = [];
   private lastObservedChangeAt = 0;
   private lastMtimeMs = 0;
   private lastSize = 0;
@@ -141,6 +142,11 @@ export class PiExternalMirror {
   markUserTextDeliveredSince(text: string, cutoffTimeMs: number): void {
     const normalizedText = text.trim();
     if (!normalizedText) return;
+    const now = Date.now();
+    this.deliveredUserTexts = [
+      ...this.deliveredUserTexts.filter((item) => item.expiresAtMs > now),
+      { text: normalizedText, cutoffTimeMs, expiresAtMs: now + DELIVERED_TEXT_TTL_MS },
+    ].slice(-MAX_DELIVERED_TEXTS);
     const entries = readPiSessionEntries(this.sessionFile);
     const deliveredIds = new Set(entries
       .filter((entry) => this.isUserTextEntry(entry, cutoffTimeMs, normalizedText))
@@ -154,8 +160,8 @@ export class PiExternalMirror {
     const now = Date.now();
     this.deliveredAssistantTexts = [
       ...this.deliveredAssistantTexts.filter((item) => item.expiresAtMs > now),
-      { text: normalizedText, cutoffTimeMs, expiresAtMs: now + DELIVERED_ASSISTANT_TEXT_TTL_MS },
-    ].slice(-MAX_DELIVERED_ASSISTANT_TEXTS);
+      { text: normalizedText, cutoffTimeMs, expiresAtMs: now + DELIVERED_TEXT_TTL_MS },
+    ].slice(-MAX_DELIVERED_TEXTS);
     const entries = readPiSessionEntries(this.sessionFile);
     const deliveredIds = new Set(entries
       .filter((entry) => this.isAssistantTextEntry(entry, cutoffTimeMs, normalizedText))
@@ -206,6 +212,14 @@ export class PiExternalMirror {
     return true;
   }
 
+  private isRecentlyDeliveredUserEntry(entry: SessionEntry, now: number): boolean {
+    this.deliveredUserTexts = this.deliveredUserTexts.filter((item) => item.expiresAtMs > now);
+    if (this.deliveredUserTexts.length === 0) {
+      return false;
+    }
+    return this.deliveredUserTexts.some((item) => this.isUserTextEntry(entry, item.cutoffTimeMs, item.text));
+  }
+
   private isRecentlyDeliveredAssistantEntry(entry: SessionEntry, now: number): boolean {
     this.deliveredAssistantTexts = this.deliveredAssistantTexts.filter((item) => item.expiresAtMs > now);
     if (this.deliveredAssistantTexts.length === 0) {
@@ -228,7 +242,10 @@ export class PiExternalMirror {
     const { entries, nextOffset } = readPiSessionEntriesFromOffset(this.sessionFile, this.lastReadOffset);
     this.lastReadOffset = nextOffset;
     for (const entry of entries) {
-      if (!this.knownEntryIds.has(entry.id) && this.isRecentlyDeliveredAssistantEntry(entry, now)) {
+      if (!this.knownEntryIds.has(entry.id) && (
+        this.isRecentlyDeliveredUserEntry(entry, now)
+        || this.isRecentlyDeliveredAssistantEntry(entry, now)
+      )) {
         this.knownEntryIds.add(entry.id);
       }
     }

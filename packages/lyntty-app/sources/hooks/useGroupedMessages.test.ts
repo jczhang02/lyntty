@@ -51,6 +51,64 @@ function namedToolMessage(id: string, name: string, createdAt: number): ToolCall
 }
 
 describe('useGroupedMessages', () => {
+    it('hides adjacent duplicate computer-origin user messages from live plus JSONL fallback', () => {
+        const messages: Message[] = [
+            {
+                kind: 'user-text',
+                id: 'pi-history-user',
+                localId: 'session:pi-history-user',
+                meta: { sentFrom: 'cli' },
+                createdAt: 2_000,
+                text: 'computer typed prompt',
+            },
+            {
+                kind: 'user-text',
+                id: 'pi-live-user',
+                localId: 'session:pi-live-user',
+                meta: { sentFrom: 'cli' },
+                createdAt: 1_500,
+                text: 'computer typed prompt',
+            },
+            {
+                kind: 'agent-text',
+                id: 'agent',
+                localId: null,
+                createdAt: 1_000,
+                text: 'previous answer',
+            },
+        ];
+
+        expect(groupMessagesForDisplay(messages, false).map((item) => item.id)).toEqual([
+            'pi-history-user',
+            'agent',
+        ]);
+        expect(groupMessagesForDisplay(messages, true).map((item) => item.id)).toEqual([
+            'pi-history-user',
+            'agent',
+        ]);
+    });
+
+    it('keeps repeated phone user messages because they may be intentional sends', () => {
+        const messages: Message[] = [
+            {
+                kind: 'user-text',
+                id: 'phone-2',
+                localId: 'local-2',
+                createdAt: 2_000,
+                text: 'same phone prompt',
+            },
+            {
+                kind: 'user-text',
+                id: 'phone-1',
+                localId: 'local-1',
+                createdAt: 1_500,
+                text: 'same phone prompt',
+            },
+        ];
+
+        expect(groupMessagesForDisplay(messages, false).map((item) => item.id)).toEqual(['phone-2', 'phone-1']);
+    });
+
     it('hides duplicate agent replies from live plus JSONL fallback in the same turn', () => {
         const messages: Message[] = [
             {

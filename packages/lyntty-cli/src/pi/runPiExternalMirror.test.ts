@@ -379,6 +379,28 @@ describe('PiExternalMirror', () => {
     }
   });
 
+  it('suppresses a late JSONL user entry after the live extension delivered the same input', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sent: SessionEntry[][] = [];
+      const mirror = new PiExternalMirror(file, [first], (entries) => {
+        sent.push(entries);
+      }, 2_000);
+
+      mirror.markUserTextDeliveredSince('computer typed prompt', Date.parse('2026-07-02T00:00:00.000Z'));
+      appendJsonl(file, userEntry('u2', 'computer typed prompt'));
+      await mirror.tick(1_000);
+      await mirror.tick(3_100);
+
+      expect(sent).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('drops a pending user entry only when the live extension delivered the same user text', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
