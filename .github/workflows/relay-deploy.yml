@@ -1,0 +1,77 @@
+name: Deploy relay
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: GHCR image tag to deploy, e.g. sha-0123456789ab
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate image tag
+        run: |
+          set -euo pipefail
+          case "${{ inputs.image_tag }}" in
+            sha-[0-9a-fA-F]*) ;;
+            *)
+              echo "image_tag must be a pinned sha-* tag"
+              exit 1
+              ;;
+          esac
+          if [ "${{ inputs.image_tag }}" = "main" ] || [ "${{ inputs.image_tag }}" = "latest" ]; then
+            echo "Refusing floating production deploy tag"
+            exit 1
+          fi
+
+      - name: Install SSH key
+        env:
+          SSH_KEY: ${{ secrets.LYNTTY_VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/lyntty_vps
+          chmod 600 ~/.ssh/lyntty_vps
+
+      - name: Deploy pinned relay image
+        env:
+          HOST: ${{ secrets.LYNTTY_VPS_HOST }}
+          USER: ${{ secrets.LYNTTY_VPS_USER }}
+          PORT: ${{ secrets.LYNTTY_VPS_PORT }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          : "${HOST:?LYNTTY_VPS_HOST is required}"
+          : "${USER:?LYNTTY_VPS_USER is required}"
+          port="${PORT:-22}"
+
+          ssh -i ~/.ssh/lyntty_vps \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -p "$port" \
+            "$USER@$HOST" \
+            "IMAGE_TAG='$IMAGE_TAG' bash -se" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/lyntty
+          test -f /opt/lyntty/.env
+          test -f /opt/lyntty/docker-compose.yml
+
+          if grep -q '^LYNTTY_RELAY_IMAGE_TAG=' /opt/lyntty/.env; then
+            sudo sed -i "s/^LYNTTY_RELAY_IMAGE_TAG=.*/LYNTTY_RELAY_IMAGE_TAG=${IMAGE_TAG}/" /opt/lyntty/.env
+          else
+            printf '\nLYNTTY_RELAY_IMAGE_TAG=%s\n' "$IMAGE_TAG" | sudo tee -a /opt/lyntty/.env >/dev/null
+          fi
+
+          sudo docker compose pull
+          sudo docker compose up -d
+          sudo docker compose ps
+          curl -fsS http://127.0.0.1:3005/health
+          curl -fsS https://relay.jczhang.cc/health
+          REMOTE

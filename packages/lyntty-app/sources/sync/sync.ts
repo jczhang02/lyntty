@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { apiSocket, getCurrentAppState, getLynttyClientId } from '@/sync/apiSocket';
 import { notifyUnreadMessage } from '@/sync/webTabTitle';
 import { AuthCredentials } from '@/auth/tokenStorage';
@@ -1817,7 +1818,11 @@ class Sync {
             // Get platform and app identifiers
             const platform = Platform.OS;
             const version = Constants.expoConfig?.version!;
-            const appId = (Platform.OS === 'ios' ? Constants.expoConfig?.ios?.bundleIdentifier! : Constants.expoConfig?.android?.package!);
+            const appId = Application.applicationId || (Platform.OS === 'ios' ? Constants.expoConfig?.ios?.bundleIdentifier! : Constants.expoConfig?.android?.package!);
+            const parsedBuildVersion = Number(Application.nativeBuildVersion);
+            const versionCode = Platform.OS === 'android' && Number.isFinite(parsedBuildVersion)
+                ? parsedBuildVersion
+                : undefined;
 
             const response = await fetch(`${serverUrl}/v1/version`, {
                 method: 'POST',
@@ -1829,6 +1834,7 @@ class Sync {
                     platform,
                     version,
                     app_id: appId,
+                    version_code: versionCode,
                 }),
             });
 
@@ -1844,7 +1850,11 @@ class Sync {
             if (data.update_required && data.update_url) {
                 storage.getState().applyNativeUpdateStatus({
                     available: true,
-                    updateUrl: data.update_url
+                    updateUrl: data.update_url,
+                    versionName: data.version_name,
+                    versionCode: data.version_code,
+                    sha256: data.sha256,
+                    notes: data.notes,
                 });
             } else {
                 storage.getState().applyNativeUpdateStatus({

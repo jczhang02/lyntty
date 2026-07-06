@@ -8,7 +8,7 @@ export type Config = {
 };
 
 export function loadConfig(): Config {
-    const serverUrl = (process.env.LYNTTY_SERVER_URL ?? 'https://api.cluster-fluster.com').replace(/\/+$/, '');
+    const serverUrl = (process.env.LYNTTY_SERVER_URL ?? 'https://relay.jczhang.cc').replace(/\/+$/, '');
     const homeDir = process.env.LYNTTY_HOME_DIR ?? join(homedir(), '.lyntty');
     const credentialPath = join(homeDir, 'agent.key');
     return { serverUrl, homeDir, credentialPath };

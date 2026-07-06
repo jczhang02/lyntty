@@ -108,6 +108,7 @@ export default {
                 "android.permission.MODIFY_AUDIO_SETTINGS",
                 "android.permission.ACCESS_NETWORK_STATE",
                 "android.permission.POST_NOTIFICATIONS",
+                "android.permission.REQUEST_INSTALL_PACKAGES",
             ],
             blockedPermissions: [
                 "android.permission.ACTIVITY_RECOGNITION",
@@ -120,7 +121,6 @@ export default {
             package: bundleId,
             softwareKeyboardLayoutMode: "resize",
             usesCleartextTraffic: variant !== 'production',
-            googleServicesFile: "./google-services.json",
             intentFilters: variant === 'production' ? [
                 {
                     "action": "VIEW",

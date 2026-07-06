@@ -79,6 +79,10 @@ Any work that can affect global extensions, current Pi sessions, `~/.pi/agent/ex
 
 Do not install, reload, or overwrite the live global Lyntty Pi extension until the user explicitly approves. After extension changes, prefer a new Pi session or user-triggered `/reload`; never force reload of the user's current session.
 
+Never drive the user's current tmux/Pi panes with `tmux send-keys`, `tmux kill-pane`, `tmux kill-window`, `tmux kill-session`, `C-c`, `C-d`, `q`, `/quit`, `/exit`, or similar controls unless the user explicitly asks. TUI or exit-path reproductions must use a new uniquely named tmux session/window, temporary `HOME`, temporary `LYNTTY_HOME_DIR`, temporary Pi agent directory, non-default ports when relevant, and a PID/cwd/env check proving the target is isolated before sending keys or signals. If isolation cannot be proven, stop and ask.
+
+Do not run `lynttyd`, Pi mirror, or Pi extension tests against live `~/.lyntty` or `~/.pi`. Set temporary state/log/session directories for tests that can write daemon state, session state, extension files, or logs.
+
 ## Runtime architecture rules
 
 - Pi JSONL remains canonical history.

@@ -1,10 +1,15 @@
 import { storage } from '@/sync/storage';
 import { useShallow } from 'zustand/react/shallow';
 
-export function useNativeUpdate(): string | null {
-    // Get native update status from global storage
-    const nativeUpdateStatus = storage(useShallow((state) => state.nativeUpdateStatus));
+export type NativeUpdateStatus = {
+    available: boolean;
+    updateUrl?: string;
+    versionName?: string;
+    versionCode?: number;
+    sha256?: string;
+    notes?: string;
+};
 
-    // Return the update URL if available, otherwise null
-    return nativeUpdateStatus?.updateUrl || null;
+export function useNativeUpdate(): NativeUpdateStatus | null {
+    return storage(useShallow((state) => state.nativeUpdateStatus));
 }

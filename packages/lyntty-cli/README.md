@@ -114,7 +114,7 @@ lyntty connect status
 
 | Variable | Description |
 |----------|-------------|
-| `LYNTTY_SERVER_URL` | Custom server URL (default: `https://api.cluster-fluster.com`) |
+| `LYNTTY_SERVER_URL` | Custom server URL (default: `https://relay.jczhang.cc`) |
 | `LYNTTY_WEBAPP_URL` | Custom web app URL (default: `https://app.lyntty.engineering`) |
 | `LYNTTY_HOME_DIR` | Custom home directory for Lyntty data (default: `~/.lyntty`) |
 | `LYNTTY_DISABLE_CAFFEINATE` | Disable macOS sleep prevention |

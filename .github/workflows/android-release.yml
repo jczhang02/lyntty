@@ -1,0 +1,142 @@
+name: Android release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: Human version name, e.g. 1.7.1
+        required: true
+        type: string
+      version_code:
+        description: Optional Android versionCode. Defaults to GitHub run number.
+        required: false
+        type: string
+      notes:
+        description: Release notes
+        required: false
+        type: string
+        default: Manual Lyntty Android APK release
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare release metadata
+        id: release
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE_INPUT: ${{ inputs.version_code }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          version_code="${VERSION_CODE_INPUT:-$GITHUB_RUN_NUMBER}"
+          case "$version_code" in
+            ''|*[!0-9]*)
+              echo "version_code must be numeric"
+              exit 1
+              ;;
+          esac
+          tag="android-v${VERSION_NAME}-${version_code}"
+          apk_name="lyntty-android-v${VERSION_NAME}-${version_code}.apk"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$apk_name" >> "$GITHUB_OUTPUT"
+          printf '%s' "$NOTES" > "$RUNNER_TEMP/release-notes.txt"
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.LYNTTY_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          : "${KEYSTORE_BASE64:?LYNTTY_ANDROID_KEYSTORE_BASE64 is required}"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lyntty-release.jks"
+          chmod 600 "$RUNNER_TEMP/lyntty-release.jks"
+
+      - name: Build signed production APK
+        working-directory: packages/lyntty-app/android
+        env:
+          APP_ENV: production
+          LYNTTY_BUILD_COMMIT_SHA: ${{ github.sha }}
+          LYNTTY_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEYSTORE_PASSWORD }}
+          LYNTTY_ANDROID_KEY_ALIAS: ${{ secrets.LYNTTY_ANDROID_KEY_ALIAS }}
+          LYNTTY_ANDROID_KEY_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ./gradlew assembleRelease \
+            -PlynttyAppId=dev.jczhang.lyntty \
+            -PlynttyAppName=Lyntty \
+            -PlynttyVersionName='${{ inputs.version_name }}' \
+            -PlynttyVersionCode='${{ steps.release.outputs.version_code }}' \
+            -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks" \
+            -PlynttyKeystorePassword="$LYNTTY_ANDROID_KEYSTORE_PASSWORD" \
+            -PlynttyKeyAlias="$LYNTTY_ANDROID_KEY_ALIAS" \
+            -PlynttyKeyPassword="$LYNTTY_ANDROID_KEY_PASSWORD"
+
+      - name: Generate latest.json
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+          TAG: ${{ steps.release.outputs.tag }}
+          APK_NAME: ${{ steps.release.outputs.apk_name }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          apk_source="packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk"
+          test -f "$apk_source"
+          cp "$apk_source" "$RUNNER_TEMP/$APK_NAME"
+          export SHA256
+          SHA256=$(sha256sum "$RUNNER_TEMP/$APK_NAME" | awk '{print $1}')
+          export APK_URL="https://github.com/jczhang02/lyntty/releases/download/${TAG}/${APK_NAME}"
+          export MANIFEST_PATH="$RUNNER_TEMP/latest.json"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const manifest = {
+            platform: 'android',
+            appId: 'dev.jczhang.lyntty',
+            versionName: process.env.VERSION_NAME,
+            versionCode: Number(process.env.VERSION_CODE),
+            apkUrl: process.env.APK_URL,
+            sha256: process.env.SHA256,
+            notes: process.env.NOTES || '',
+            publishedAt: new Date().toISOString(),
+          };
+          fs.writeFileSync(process.env.MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          APK_NAME: ${{ steps.release.outputs.apk_name }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            "$RUNNER_TEMP/$APK_NAME" \
+            "$RUNNER_TEMP/latest.json" \
+            --title "Lyntty Android $TAG" \
+            --notes-file "$RUNNER_TEMP/release-notes.txt"

@@ -211,7 +211,7 @@ interface StorageState {
     socketLastConnectedAt: number | null;
     socketLastDisconnectedAt: number | null;
     isDataReady: boolean;
-    nativeUpdateStatus: { available: boolean; updateUrl?: string } | null;
+    nativeUpdateStatus: { available: boolean; updateUrl?: string; versionName?: string; versionCode?: number; sha256?: string; notes?: string } | null;
     applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[], options?: { replace?: boolean }) => void;
     applyMachines: (machines: Machine[], replace?: boolean) => void;
     deleteMachine: (machineId: string) => void;
@@ -232,7 +232,7 @@ interface StorageState {
     applyProjectFiles: (pathKey: string, files: ProjectFilesList | null) => void;
     getSessionPathKey: (sessionId: string) => string | null;
     applyFileCache: (sessionId: string, filePath: string, content: string | null, diff: string | null, isBinary: boolean) => void;
-    applyNativeUpdateStatus: (status: { available: boolean; updateUrl?: string } | null) => void;
+    applyNativeUpdateStatus: (status: { available: boolean; updateUrl?: string; versionName?: string; versionCode?: number; sha256?: string; notes?: string } | null) => void;
     isMutableToolCall: (sessionId: string, callId: string) => boolean;
     setRealtimeStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'error') => void;
     setRealtimeMode: (mode: 'idle' | 'agent-speaking' | 'user-speaking', immediate?: boolean) => void;
@@ -1041,7 +1041,7 @@ export const storage = create<StorageState>()((set, get) => {
                 }
             }
         })),
-        applyNativeUpdateStatus: (status: { available: boolean; updateUrl?: string } | null) => set((state) => ({
+        applyNativeUpdateStatus: (status: { available: boolean; updateUrl?: string; versionName?: string; versionCode?: number; sha256?: string; notes?: string } | null) => set((state) => ({
             ...state,
             nativeUpdateStatus: status
         })),

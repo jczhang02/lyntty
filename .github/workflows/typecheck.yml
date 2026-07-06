@@ -1,21 +1,17 @@
-name: Expo App TypeScript typecheck
+name: Lyntty CI
 
 on:
     pull_request:
-        paths:
-            - 'packages/lyntty-app/**'
-            - '.github/workflows/typecheck.yml'
+        branches:
+            - main
     push:
         branches:
             - main
-        paths:
-            - 'packages/lyntty-app/**'
-            - '.github/workflows/typecheck.yml'
 
 jobs:
-    typecheck:
+    ci:
         runs-on: ubuntu-latest
-        timeout-minutes: 15
+        timeout-minutes: 45
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -32,5 +28,29 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
-            - name: TypeScript typecheck
-              run: pnpm --filter lyntty-app typecheck
+            - name: Build lyntty-wire
+              run: pnpm --filter ./packages/lyntty-wire build
+
+            - name: Test lyntty-wire
+              run: pnpm --filter ./packages/lyntty-wire test
+
+            - name: Typecheck lyntty-cli
+              run: pnpm --filter ./packages/lyntty-cli typecheck
+
+            - name: Test lyntty-cli
+              run: pnpm --filter ./packages/lyntty-cli test
+
+            - name: Typecheck lyntty-relay
+              run: pnpm --filter ./packages/lyntty-relay typecheck
+
+            - name: Test lyntty-relay
+              run: pnpm --filter ./packages/lyntty-relay test
+
+            - name: Typecheck lyntty-app
+              run: pnpm --filter ./packages/lyntty-app typecheck
+
+            - name: Test lyntty-app
+              run: pnpm --filter ./packages/lyntty-app test
+
+            - name: Check whitespace
+              run: git diff --check

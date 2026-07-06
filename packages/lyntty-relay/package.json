@@ -4,10 +4,10 @@
     "description": "Lyntty self-host server and bundled web app",
     "repository": {
         "type": "git",
-        "url": "https://github.com/slopus/lyntty"
+        "url": "https://github.com/jczhang02/lyntty"
     },
-    "homepage": "https://lyntty.engineering",
-    "bugs": "https://github.com/slopus/lyntty/issues",
+    "homepage": "https://github.com/jczhang02/lyntty",
+    "bugs": "https://github.com/jczhang02/lyntty/issues",
     "author": "Kirill Dubovitskiy",
     "license": "MIT",
     "type": "module",

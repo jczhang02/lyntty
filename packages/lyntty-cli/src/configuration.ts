@@ -56,7 +56,7 @@ class Configuration {
     this.serverUrl =
       process.env.LYNTTY_SERVER_URL ||
       readSettingsStringSync(this.settingsFile, 'serverUrl') ||
-      'https://api.cluster-fluster.com'
+      'https://relay.jczhang.cc'
     this.webappUrl =
       process.env.LYNTTY_WEBAPP_URL ||
       readSettingsStringSync(this.settingsFile, 'webappUrl') ||
