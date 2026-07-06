@@ -42,9 +42,9 @@ Release-style APK validation was rerun after icon, typography, and post-review S
 
 Artifacts:
 
-- `docs/evidence/artifacts/r58-visual-polish/final-review/settings.png`
-- `docs/evidence/artifacts/r58-visual-polish/final-review/settings.xml`
-- `docs/evidence/artifacts/r58-visual-polish/final-review/ui-assertions.txt`
+- `docs/evidence/artifacts/r58-visual-polish/final-review/settings-clean.png`
+- `docs/evidence/artifacts/r58-visual-polish/final-review/settings-clean.xml`
+- `docs/evidence/artifacts/r58-visual-polish/final-review/ui-assertions-clean.txt`
 
 Evidence from final `settings.xml` / assertions:
 

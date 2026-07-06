@@ -1,0 +1,1 @@
+-rw-r--r-- 1 jc jc 292M Jul  6 14:12 packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk

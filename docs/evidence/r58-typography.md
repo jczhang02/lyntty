@@ -63,16 +63,19 @@ cd packages/lyntty-app && APP_ENV=preview EXPO_PUBLIC_LYNTTY_SERVER_URL=http://1
 Artifacts:
 
 - `docs/evidence/artifacts/r58-visual-polish/final-review/settings.png` — release-style APK visual check of updated UI font stack.
-- `docs/evidence/artifacts/r58-visual-polish/final-review/apk-size-before-final.txt` / `apk-size-after-final.txt` — final post-review APK size artifacts.
+- `docs/evidence/artifacts/r58-visual-polish/final-review/assemble-release-clean2.log` — final clean rebuild passed after deleting stale generated LXGW resources.
+- `docs/evidence/artifacts/r58-visual-polish/final-review/apk-size-after-clean.txt` — final clean APK size is `292M`.
+- `docs/evidence/artifacts/r58-visual-polish/final-review/lxgw-apk-scan.txt` — empty file proving the final APK scan found no `LXGW`, `neozhi`, or stale `Lp.ttf` resource entry.
 - `docs/evidence/artifacts/r58-visual-polish/apk-size-before.txt` / `apk-size-after.txt` — earlier full-LXGW build measured the unacceptable 291 MiB → 302 MiB APK growth that led to removing LXGW from the final active font bundle.
 - `docs/evidence/artifacts/r58-visual-polish/final-review/web-export.log` and `web-export-size.txt` — final web export passed without LXGW, with output size `39M` instead of the earlier full-LXGW `60M` export.
 
 Results:
 
-- Release-style APK build/install/launch passed.
-- Maestro first-run account creation passed after the typography update.
+- Clean release-style APK build/install/launch passed.
+- Maestro first-run account creation passed after the typography update using the clean APK.
 - Web export passed.
 - Final web export log includes Source Sans 3 and Source Serif 4 assets and no LXGW asset.
+- Final APK zip scan found no LXGW/NeoZhi/stale `Lp.ttf` asset.
 - No actual artifact secrets were found by sensitive-string scan.
 
 Residual risk: production Chinese typography can be improved later with a subsetted CJK font. The full font should not be boot-loaded as-is.
