@@ -15,6 +15,7 @@ Implemented first standardization pass after docs-first decision ledger:
 - Android production Gradle signing/package/version wiring;
 - manual Android APK release workflow;
 - Expo-only APK download, SHA-256 verification, and Android Package Installer launch;
+- Android push notification release wiring through user-owned Firebase/FCM and EAS project id;
 - current-tree secret hygiene for public-push preparation.
 
 No public push, GHCR publish, GitHub Release, keystore generation, or VPS deploy was performed.
@@ -45,7 +46,7 @@ Android app/update:
 - `packages/lyntty-app/sources/sync/storage.ts`
 - `packages/lyntty-app/sources/sync/sync.ts`
 - `packages/lyntty-app/sources/utils/androidApkUpdate.ts`
-- removed `packages/lyntty-app/google-services.json` from tracking and removed Google Services from the first APK release path.
+- removed `packages/lyntty-app/google-services.json` from tracking; production release now injects Firebase config from GitHub Secret and keeps the file out of git.
 
 CLI/agent defaults and metadata:
 
@@ -96,7 +97,9 @@ Docs/evidence:
 - Production Android release requires release signing props when building `dev.jczhang.lyntty` release.
 - Default local Android builds still use `dev.jczhang.lyntty.dev`.
 - `REQUEST_INSTALL_PACKAGES` permission added to app config and checked-in Android manifest.
-- `google-services.json` removed from git; first APK release path no longer requires Google Services or Firebase keys.
+- `google-services.json` removed from git; production release requires `LYNTTY_GOOGLE_SERVICES_JSON_BASE64` so Android background push notifications can use Firebase/FCM.
+- App config no longer hardcodes inherited Happy EAS project id or Expo owner; production builds use `LYNTTY_EAS_PROJECT_ID` for Expo push token registration and optional Expo update URL.
+- GitHub Actions repository variable `LYNTTY_EAS_PROJECT_ID` was set to the user-owned EAS project id `6bd51197-185a-4f6f-9e94-3d73c6be863c`.
 - Hardcoded Gemini OAuth client secret removed from current source; legacy Gemini command now requires `LYNTTY_GEMINI_CLIENT_SECRET` if used.
 
 ## Secret scan notes
@@ -170,7 +173,8 @@ Result: pass.
 Action required before public push:
 
 - push only the cleaned `main` ref, not scratch refs.
-- If Google/Firebase or Gemini legacy features are reintroduced later, create fresh keys and restrict them in Google Console.
+- Keep Firebase/FCM credentials user-owned; do not reintroduce inherited Happy keys.
+- If Gemini legacy features are used later, create fresh credentials instead of restoring the old embedded client secret.
 
 ## Verification commands
 
@@ -234,6 +238,14 @@ pnpm --filter ./packages/lyntty-app test -- --run
 
 Result: pass, 79 files / 786 tests.
 
+Expo config after removing inherited Happy project id:
+
+```bash
+APP_ENV=production LYNTTY_EAS_PROJECT_ID=6bd51197-185a-4f6f-9e94-3d73c6be863c LYNTTY_EXPO_OWNER=jczhang02 pnpm --dir packages/lyntty-app exec expo config --type public --json
+```
+
+Result: production config uses package `dev.jczhang.lyntty`, owner `jczhang02`, EAS project id `6bd51197-185a-4f6f-9e94-3d73c6be863c`, and update URL `https://u.expo.dev/6bd51197-185a-4f6f-9e94-3d73c6be863c`.
+
 Gradle configuration:
 
 ```bash
@@ -264,6 +276,7 @@ BUILD FAILED
 - GHCR relay image publish: repo not pushed yet.
 - VPS deploy: no deploy workflow run, no production image tag.
 - Device/emulator APK update install: needs signed APK release and Android device/emulator.
+- Push notification delivery: needs Firebase service account uploaded to Expo/EAS and release APK/device validation.
 - Cloudflare/Caddy/VPS provisioning: not performed in this pass.
 
 ## Residual risk
@@ -271,6 +284,6 @@ BUILD FAILED
 - Public push needs force-with-lease because remote `main` has unrelated docs history; take a remote backup branch first.
 - Android APK installer path typechecks but still needs release-style device validation.
 - `expo-file-system/legacy` content URI behavior must be validated on target Android device.
-- Push notifications that require FCM are deferred; first APK release has no Google Services dependency.
+- Push notifications require live Expo/FCM credential validation after `LYNTTY_GOOGLE_SERVICES_JSON_BASE64` and EAS FCM credentials are configured.
 - Relay manifest fetch behavior needs live GitHub Release and relay runtime validation.
 - Manual deploy workflow needs SSH secrets and `/opt/lyntty` bootstrap on VPS before use.

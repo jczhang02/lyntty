@@ -13,9 +13,19 @@ def lynttyKeyAlias = (findProperty('lynttyKeyAlias') ?: System.getenv('LYNTTY_AN
 def lynttyKeyPassword = (findProperty('lynttyKeyPassword') ?: System.getenv('LYNTTY_ANDROID_KEY_PASSWORD'))?.toString()
 def hasLynttyReleaseSigning = lynttyKeystoreFile && lynttyKeystorePassword && lynttyKeyAlias && lynttyKeyPassword
 def isReleaseBuildRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+def lynttyGoogleServicesFile = file('google-services.json')
+def hasLynttyGoogleServices = lynttyGoogleServicesFile.exists()
 
 if (lynttyAppId == 'dev.jczhang.lyntty' && isReleaseBuildRequested && !hasLynttyReleaseSigning) {
     throw new GradleException('Production release builds require Lyntty release signing properties')
+}
+
+if (lynttyAppId == 'dev.jczhang.lyntty' && isReleaseBuildRequested && !hasLynttyGoogleServices) {
+    throw new GradleException('Production release builds require Firebase google-services.json for Android push notifications')
+}
+
+if (hasLynttyGoogleServices) {
+    apply plugin: "com.google.gms.google-services"
 }
 
 /**

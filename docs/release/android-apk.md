@@ -48,7 +48,9 @@ Rules:
 - Never commit `.jks` or `.keystore`.
 - Keep local encrypted backup.
 - Store CI copy in GitHub Secrets as base64 plus passwords.
-- No Google/Firebase config is required for the first GitHub-distributed APK path; add FCM later only if push notifications need it.
+- Android background push notifications require a first-party Firebase project for `dev.jczhang.lyntty`.
+- Store `google-services.json` as a base64 GitHub Secret; keep the file out of git.
+- Store the Expo/EAS project id as a GitHub Actions repository variable so `expo-notifications` can request Expo push tokens.
 - Do not print secret values in CI logs.
 
 GitHub Secrets:
@@ -58,6 +60,13 @@ LYNTTY_ANDROID_KEYSTORE_BASE64
 LYNTTY_ANDROID_KEYSTORE_PASSWORD
 LYNTTY_ANDROID_KEY_ALIAS
 LYNTTY_ANDROID_KEY_PASSWORD
+LYNTTY_GOOGLE_SERVICES_JSON_BASE64
+```
+
+GitHub Actions Variables:
+
+```text
+LYNTTY_EAS_PROJECT_ID
 ```
 
 Manual generation example, only when intentionally creating the permanent key:
@@ -117,8 +126,9 @@ Build outline:
 ```bash
 # CI only, sketch
 printf '%s' "$LYNTTY_ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lyntty-release.jks"
+printf '%s' "$LYNTTY_GOOGLE_SERVICES_JSON_BASE64" | base64 -d > packages/lyntty-app/android/app/google-services.json
 cd packages/lyntty-app/android
-APP_ENV=production ./gradlew assembleRelease \
+APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew assembleRelease \
   -PlynttyAppId=dev.jczhang.lyntty \
   -PlynttyVersionName="$VERSION_NAME" \
   -PlynttyVersionCode="$VERSION_CODE" \
@@ -262,6 +272,8 @@ Important limits:
 
 - `EAS Build`: cloud builds native binaries. Not main path.
 - `EAS Update`: OTA JS/assets update. Not native APK update path.
+- `EAS projectId`: still required by Expo push token registration on Android.
+- FCM v1 service-account credentials are uploaded to Expo/EAS for Expo Push Service delivery; they are not stored in GitHub.
 
 Lyntty main path:
 
@@ -269,7 +281,7 @@ Lyntty main path:
 GitHub Actions Gradle build -> GitHub Release APK/latest.json -> relay /v1/version -> app download/hash -> Android Package Installer
 ```
 
-EAS Update may remain secondary for small JS/resource hotfixes if already enabled, but it must not be the core release/update mechanism.
+EAS Update may remain secondary for small JS/resource hotfixes if explicitly enabled with the Lyntty EAS project id, but it must not be the core release/update mechanism.
 
 ## Test plan
 
@@ -285,10 +297,11 @@ git diff --check
 
 Release workflow checks:
 
-- CI decodes keystore without logging secrets.
+- CI decodes keystore and Firebase Android config without logging secrets.
 - Gradle production release fails without required signing/version properties.
 - APK asset exists and hash matches generated `latest.json`.
 - GitHub Release contains both APK and `latest.json`.
+- Production APK can register an Expo push token with `LYNTTY_EAS_PROJECT_ID` and Firebase Android config.
 
 Device/emulator checks:
 
@@ -303,7 +316,7 @@ Device/emulator checks:
 
 ## Security notes
 
-- Keep keystore out of git and artifacts except encrypted backup / GitHub Secret.
+- Keep keystore and Firebase service files out of git and artifacts except encrypted backup / GitHub Secret.
 - Do not commit generated APKs.
 - Do not log manifest URLs with tokens; current GitHub Release APK URL is public and tokenless.
 - Redact pairing URLs, auth tokens, headers, public-key blobs used as auth material, and secrets in evidence.
@@ -314,6 +327,8 @@ Device/emulator checks:
 - [ ] Production APK uses `dev.jczhang.lyntty`.
 - [ ] Dev APK uses `dev.jczhang.lyntty.dev`.
 - [ ] Production release uses permanent release keystore.
+- [ ] Production APK includes Firebase Android config from GitHub Secret for push notifications.
+- [ ] Production APK embeds Lyntty EAS project id for Expo push token registration.
 - [ ] APK release workflow is manual.
 - [ ] `versionCode` is monotonic and included in `latest.json`.
 - [ ] `latest.json` is CI-generated.

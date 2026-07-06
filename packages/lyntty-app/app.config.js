@@ -23,6 +23,8 @@ const consoleLoggingDefault = {
     preview: true,
     production: false,
 }[variant];
+const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || process.env.LYNTTY_EAS_PROJECT_ID || process.env.EAS_PROJECT_ID;
+const expoOwner = process.env.EXPO_PUBLIC_EXPO_OWNER || process.env.LYNTTY_EXPO_OWNER || process.env.EXPO_OWNER;
 
 function git(args) {
     try {
@@ -54,10 +56,10 @@ function loadBuildMetadata() {
 }
 
 const buildMetadata = loadBuildMetadata();
-const updates = variant === 'development'
+const updates = variant === 'development' || !easProjectId
     ? { enabled: false }
     : {
-        url: "https://u.expo.dev/4558dd3d-cd5a-47cd-bad9-e591a241cc06",
+        url: `https://u.expo.dev/${easProjectId}`,
         requestHeaders: {
             "expo-channel-name": variant === 'preview' ? "preview" : "production"
         }
@@ -119,6 +121,7 @@ export default {
                 "android.permission.READ_MEDIA_VIDEO",
             ],
             package: bundleId,
+            googleServicesFile: "./google-services.json",
             softwareKeyboardLayoutMode: "resize",
             usesCleartextTraffic: variant !== 'production',
             intentFilters: variant === 'production' ? [
@@ -223,9 +226,11 @@ export default {
             router: {
                 root: "./sources/app"
             },
-            eas: {
-                projectId: "4558dd3d-cd5a-47cd-bad9-e591a241cc06"
-            },
+            ...(easProjectId ? {
+                eas: {
+                    projectId: easProjectId
+                }
+            } : {}),
             app: {
                 postHogKey: process.env.EXPO_PUBLIC_POSTHOG_API_KEY,
                 revenueCatAppleKey: process.env.EXPO_PUBLIC_REVENUE_CAT_APPLE,
@@ -238,6 +243,6 @@ export default {
                 buildCommitTimestamp: buildMetadata.commitTimestamp,
             }
         },
-        owner: "bulkacorp"
+        ...(expoOwner ? { owner: expoOwner } : {})
     }
 };
