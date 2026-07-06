@@ -38,11 +38,12 @@ The existing `markUserTextDeliveredSince()` only removed matching user JSONL ent
 
 ### App persisted-state guard
 
-- Added a defensive grouping guard for already-persisted duplicate computer-origin user messages:
-  - applies only to `user-text` identified as computer-origin (`session:*` localId or `sentFrom: cli|computer|terminal|pi`),
-  - requires adjacent same normalized text,
+- Added a defensive grouping guard for already-persisted live+history fallback duplicates:
+  - applies only when one adjacent computer-origin `user-text` is from `pi-live-input-*` and the other from `pi-history-*`,
+  - requires same normalized text,
   - requires timestamps within five minutes,
-  - preserves repeated phone/local optimistic messages because those may be intentional sends.
+  - preserves repeated phone/local optimistic messages,
+  - preserves repeated generic computer-origin messages so intentional repeated desktop Pi inputs remain visible.
 
 ## Verification
 
@@ -51,7 +52,8 @@ The existing `markUserTextDeliveredSince()` only removed matching user JSONL ent
 - `pnpm --filter ./packages/lyntty-cli test -- src/pi/runPiExternalMirror.test.ts`
   - Passed: 90 files / 781 tests.
 - `pnpm --filter ./packages/lyntty-app test -- sources/hooks/useGroupedMessages.test.ts`
-  - Passed: 79 files / 785 tests.
+  - Initial R61 pass: 79 files / 785 tests.
+  - Follow-up narrowed app guard pass: 79 files / 786 tests.
 - `pnpm --filter ./packages/lyntty-cli typecheck`
   - Passed.
 - `pnpm --filter ./packages/lyntty-app typecheck`
@@ -77,4 +79,4 @@ The existing `markUserTextDeliveredSince()` only removed matching user JSONL ent
 ## Residual risk
 
 - Source dedupe is exact text plus time-window based; if live input and JSONL input differ materially, both remain visible.
-- App defensive guard hides adjacent identical computer-origin user bubbles within five minutes. If a user intentionally types the exact same text twice on the computer in rapid succession, mobile will show one; phone-origin repeated sends remain visible.
+- App defensive guard is now limited to explicit `pi-live-input-*` plus `pi-history-*` fallback duplicates. Generic repeated computer-origin inputs remain visible, so intentional repeated desktop Pi sends are not hidden.

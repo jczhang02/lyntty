@@ -203,17 +203,27 @@ function normalizeMessageTextForDedupe(text: string): string {
     return text.trim().replace(/\s+/g, ' ');
 }
 
+function isPiLiveInputFallbackPair(a: Message, b: Message): boolean {
+    if (a.kind !== 'user-text' || b.kind !== 'user-text') {
+        return false;
+    }
+    if (!isComputerOriginUserMessage(a) || !isComputerOriginUserMessage(b)) {
+        return false;
+    }
+    const ids = [a.id, a.localId ?? '', b.id, b.localId ?? ''];
+    const hasLiveInput = ids.some((id) => id.includes('pi-live-input-'));
+    const hasHistoryInput = ids.some((id) => id.includes('pi-history-'));
+    return hasLiveInput && hasHistoryInput;
+}
+
 function suppressDuplicateComputerUserMessages(messages: Message[]): Message[] {
     let changed = false;
     const filtered: Message[] = [];
     for (const msg of messages) {
-        if (msg.kind !== 'user-text' || !isComputerOriginUserMessage(msg)) {
-            filtered.push(msg);
-            continue;
-        }
         const previous = filtered[filtered.length - 1];
         const duplicate = previous?.kind === 'user-text'
-            && isComputerOriginUserMessage(previous)
+            && msg.kind === 'user-text'
+            && isPiLiveInputFallbackPair(previous, msg)
             && normalizeMessageTextForDedupe(previous.text) === normalizeMessageTextForDedupe(msg.text)
             && Math.abs(previous.createdAt - msg.createdAt) <= 5 * 60_000;
         if (duplicate) {

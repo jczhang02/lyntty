@@ -55,16 +55,16 @@ describe('useGroupedMessages', () => {
         const messages: Message[] = [
             {
                 kind: 'user-text',
-                id: 'pi-history-user',
-                localId: 'session:pi-history-user',
+                id: 'pi-history-entry-user-text',
+                localId: 'session:pi-history-entry-user-text',
                 meta: { sentFrom: 'cli' },
                 createdAt: 2_000,
                 text: 'computer typed prompt',
             },
             {
                 kind: 'user-text',
-                id: 'pi-live-user',
-                localId: 'session:pi-live-user',
+                id: 'pi-live-input-session-42-7',
+                localId: 'session:pi-live-input-session-42-7',
                 meta: { sentFrom: 'cli' },
                 createdAt: 1_500,
                 text: 'computer typed prompt',
@@ -79,13 +79,36 @@ describe('useGroupedMessages', () => {
         ];
 
         expect(groupMessagesForDisplay(messages, false).map((item) => item.id)).toEqual([
-            'pi-history-user',
+            'pi-history-entry-user-text',
             'agent',
         ]);
         expect(groupMessagesForDisplay(messages, true).map((item) => item.id)).toEqual([
-            'pi-history-user',
+            'pi-history-entry-user-text',
             'agent',
         ]);
+    });
+
+    it('keeps repeated generic computer user messages because they may be intentional sends', () => {
+        const messages: Message[] = [
+            {
+                kind: 'user-text',
+                id: 'computer-2',
+                localId: 'session:computer-2',
+                meta: { sentFrom: 'cli' },
+                createdAt: 2_000,
+                text: 'same computer prompt',
+            },
+            {
+                kind: 'user-text',
+                id: 'computer-1',
+                localId: 'session:computer-1',
+                meta: { sentFrom: 'cli' },
+                createdAt: 1_500,
+                text: 'same computer prompt',
+            },
+        ];
+
+        expect(groupMessagesForDisplay(messages, false).map((item) => item.id)).toEqual(['computer-2', 'computer-1']);
     });
 
     it('keeps repeated phone user messages because they may be intentional sends', () => {
