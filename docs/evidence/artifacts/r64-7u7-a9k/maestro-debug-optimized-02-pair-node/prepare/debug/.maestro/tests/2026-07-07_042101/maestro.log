@@ -20,7 +20,7 @@
 04:21:05.770 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Apply configuration RUNNING
 04:21:05.770 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$7: Apply configuration COMPLETED
 04:21:05.770 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow$lambda$17$lambda$5: Launch app "dev.jczhang.lyntty.dev" RUNNING
-04:21:07.077 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission android.permission.WRITE_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev android.permission.WRITE_SETTINGS: 
+04:21:07.077 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission android.permission.WRITE_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev android.permission.WRITE_SETTINGS:
 Exception occurred while executing 'grant':
 java.lang.SecurityException: Permission android.permission.WRITE_SETTINGS is managed by role
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:923)
@@ -43,7 +43,7 @@ java.lang.SecurityException: Permission android.permission.WRITE_SETTINGS is man
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.134 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.android.vending.BILLING for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.android.vending.BILLING: 
+04:21:07.134 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.android.vending.BILLING for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.android.vending.BILLING:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.android.vending.BILLING
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -66,7 +66,7 @@ java.lang.IllegalArgumentException: Unknown permission com.android.vending.BILLI
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.180 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE: 
+04:21:07.180 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -89,7 +89,7 @@ java.lang.IllegalArgumentException: Unknown permission com.google.android.finsky
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.197 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.sec.android.provider.badge.permission.READ for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.sec.android.provider.badge.permission.READ: 
+04:21:07.197 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.sec.android.provider.badge.permission.READ for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.sec.android.provider.badge.permission.READ:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.sec.android.provider.badge.permission.READ
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -112,7 +112,7 @@ java.lang.IllegalArgumentException: Unknown permission com.sec.android.provider.
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.211 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.sec.android.provider.badge.permission.WRITE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.sec.android.provider.badge.permission.WRITE: 
+04:21:07.211 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.sec.android.provider.badge.permission.WRITE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.sec.android.provider.badge.permission.WRITE:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.sec.android.provider.badge.permission.WRITE
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -135,7 +135,7 @@ java.lang.IllegalArgumentException: Unknown permission com.sec.android.provider.
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.230 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.htc.launcher.permission.READ_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.htc.launcher.permission.READ_SETTINGS: 
+04:21:07.230 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.htc.launcher.permission.READ_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.htc.launcher.permission.READ_SETTINGS:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.htc.launcher.permission.READ_SETTINGS
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -158,7 +158,7 @@ java.lang.IllegalArgumentException: Unknown permission com.htc.launcher.permissi
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.248 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.htc.launcher.permission.UPDATE_SHORTCUT for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.htc.launcher.permission.UPDATE_SHORTCUT: 
+04:21:07.248 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.htc.launcher.permission.UPDATE_SHORTCUT for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.htc.launcher.permission.UPDATE_SHORTCUT:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.htc.launcher.permission.UPDATE_SHORTCUT
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -181,7 +181,7 @@ java.lang.IllegalArgumentException: Unknown permission com.htc.launcher.permissi
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.262 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.sonyericsson.home.permission.BROADCAST_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.sonyericsson.home.permission.BROADCAST_BADGE: 
+04:21:07.262 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.sonyericsson.home.permission.BROADCAST_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.sonyericsson.home.permission.BROADCAST_BADGE:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.sonyericsson.home.permission.BROADCAST_BADGE
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -204,7 +204,7 @@ java.lang.IllegalArgumentException: Unknown permission com.sonyericsson.home.per
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.283 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.sonymobile.home.permission.PROVIDER_INSERT_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.sonymobile.home.permission.PROVIDER_INSERT_BADGE: 
+04:21:07.283 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.sonymobile.home.permission.PROVIDER_INSERT_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.sonymobile.home.permission.PROVIDER_INSERT_BADGE:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.sonymobile.home.permission.PROVIDER_INSERT_BADGE
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -227,7 +227,7 @@ java.lang.IllegalArgumentException: Unknown permission com.sonymobile.home.permi
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.304 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.anddoes.launcher.permission.UPDATE_COUNT for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.anddoes.launcher.permission.UPDATE_COUNT: 
+04:21:07.304 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.anddoes.launcher.permission.UPDATE_COUNT for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.anddoes.launcher.permission.UPDATE_COUNT:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.anddoes.launcher.permission.UPDATE_COUNT
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -250,7 +250,7 @@ java.lang.IllegalArgumentException: Unknown permission com.anddoes.launcher.perm
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.324 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.majeur.launcher.permission.UPDATE_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.majeur.launcher.permission.UPDATE_BADGE: 
+04:21:07.324 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.majeur.launcher.permission.UPDATE_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.majeur.launcher.permission.UPDATE_BADGE:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.majeur.launcher.permission.UPDATE_BADGE
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -273,7 +273,7 @@ java.lang.IllegalArgumentException: Unknown permission com.majeur.launcher.permi
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.338 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.huawei.android.launcher.permission.CHANGE_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.huawei.android.launcher.permission.CHANGE_BADGE: 
+04:21:07.338 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.huawei.android.launcher.permission.CHANGE_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.huawei.android.launcher.permission.CHANGE_BADGE:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.huawei.android.launcher.permission.CHANGE_BADGE
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -296,7 +296,7 @@ java.lang.IllegalArgumentException: Unknown permission com.huawei.android.launch
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.354 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.huawei.android.launcher.permission.READ_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.huawei.android.launcher.permission.READ_SETTINGS: 
+04:21:07.354 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.huawei.android.launcher.permission.READ_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.huawei.android.launcher.permission.READ_SETTINGS:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.huawei.android.launcher.permission.READ_SETTINGS
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -319,7 +319,7 @@ java.lang.IllegalArgumentException: Unknown permission com.huawei.android.launch
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.368 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.huawei.android.launcher.permission.WRITE_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.huawei.android.launcher.permission.WRITE_SETTINGS: 
+04:21:07.368 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.huawei.android.launcher.permission.WRITE_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.huawei.android.launcher.permission.WRITE_SETTINGS:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.huawei.android.launcher.permission.WRITE_SETTINGS
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -342,7 +342,7 @@ java.lang.IllegalArgumentException: Unknown permission com.huawei.android.launch
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.381 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission android.permission.READ_APP_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev android.permission.READ_APP_BADGE: 
+04:21:07.381 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission android.permission.READ_APP_BADGE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev android.permission.READ_APP_BADGE:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission android.permission.READ_APP_BADGE
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -365,7 +365,7 @@ java.lang.IllegalArgumentException: Unknown permission android.permission.READ_A
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.395 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.oppo.launcher.permission.READ_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.oppo.launcher.permission.READ_SETTINGS: 
+04:21:07.395 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.oppo.launcher.permission.READ_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.oppo.launcher.permission.READ_SETTINGS:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.oppo.launcher.permission.READ_SETTINGS
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -388,7 +388,7 @@ java.lang.IllegalArgumentException: Unknown permission com.oppo.launcher.permiss
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.408 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.oppo.launcher.permission.WRITE_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.oppo.launcher.permission.WRITE_SETTINGS: 
+04:21:07.408 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission com.oppo.launcher.permission.WRITE_SETTINGS for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev com.oppo.launcher.permission.WRITE_SETTINGS:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission com.oppo.launcher.permission.WRITE_SETTINGS
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -411,7 +411,7 @@ java.lang.IllegalArgumentException: Unknown permission com.oppo.launcher.permiss
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.423 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission me.everything.badger.permission.BADGE_COUNT_READ for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev me.everything.badger.permission.BADGE_COUNT_READ: 
+04:21:07.423 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission me.everything.badger.permission.BADGE_COUNT_READ for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev me.everything.badger.permission.BADGE_COUNT_READ:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission me.everything.badger.permission.BADGE_COUNT_READ
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
@@ -434,7 +434,7 @@ java.lang.IllegalArgumentException: Unknown permission me.everything.badger.perm
 	at android.os.Binder.execTransactInternal(Binder.java:1505)
 	at android.os.Binder.execTransact(Binder.java:1444)
 
-04:21:07.444 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission me.everything.badger.permission.BADGE_COUNT_WRITE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev me.everything.badger.permission.BADGE_COUNT_WRITE: 
+04:21:07.444 [DEBUG] maestro.Maestro.setPermissionInternal: Failed to set permission me.everything.badger.permission.BADGE_COUNT_WRITE for app dev.jczhang.lyntty.dev: pm grant dev.jczhang.lyntty.dev me.everything.badger.permission.BADGE_COUNT_WRITE:
 Exception occurred while executing 'grant':
 java.lang.IllegalArgumentException: Unknown permission me.everything.badger.permission.BADGE_COUNT_WRITE
 	at com.android.server.permission.access.permission.PermissionService.setRuntimePermissionGranted(PermissionService.kt:911)
