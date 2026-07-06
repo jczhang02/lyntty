@@ -37,7 +37,7 @@ COPY packages/lyntty-relay ./packages/lyntty-relay
 COPY packages/lyntty-app/sources/sync ./packages/lyntty-app/sources/sync
 
 RUN pnpm --filter lyntty-wire build
-RUN pnpm --filter lyntty-relay build
+RUN pnpm --filter lyntty-relay typecheck
 
 # Stage 3: runtime
 FROM node:26-slim AS runner
