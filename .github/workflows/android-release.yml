@@ -101,14 +101,9 @@ jobs:
           set -euo pipefail
           : "${LYNTTY_EAS_PROJECT_ID:?Repository variable LYNTTY_EAS_PROJECT_ID is required for Expo push tokens}"
           ./gradlew assembleRelease \
-            -PlynttyAppId=dev.jczhang.lyntty \
-            -PlynttyAppName=Lyntty \
             -PlynttyVersionName='${{ inputs.version_name }}' \
             -PlynttyVersionCode='${{ steps.release.outputs.version_code }}' \
-            -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks" \
-            -PlynttyKeystorePassword="$LYNTTY_ANDROID_KEYSTORE_PASSWORD" \
-            -PlynttyKeyAlias="$LYNTTY_ANDROID_KEY_ALIAS" \
-            -PlynttyKeyPassword="$LYNTTY_ANDROID_KEY_PASSWORD"
+            -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks"
 
       - name: Generate latest.json
         env:

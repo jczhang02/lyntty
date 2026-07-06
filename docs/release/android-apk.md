@@ -92,16 +92,13 @@ age -r '<age-recipient-redacted>' -o lyntty-release.jks.age lyntty-release.jks
 
 Accepted direction: use checked-in `packages/lyntty-app/android/` as release source of truth. Do not rely on `expo prebuild` during every CI release.
 
-Desired behavior:
+Implemented behavior:
 
-- default local Gradle builds use dev identity (`dev.jczhang.lyntty.dev`);
-- production APK requires explicit opt-in (`APP_ENV=production` or Gradle property);
-- production release fails if version/signing properties are missing;
+- debug Gradle builds use dev identity (`dev.jczhang.lyntty.dev`) via `applicationIdSuffix`;
+- release Gradle builds use production identity (`dev.jczhang.lyntty`) so EAS credentials reads the correct native package id;
+- production release fails if signing/version properties are missing;
+- production release fails if Firebase `google-services.json` is missing;
 - release signing uses injected keystore only in release workflow.
-
-Current gap:
-
-- `packages/lyntty-app/android/app/build.gradle` hardcodes `dev.jczhang.lyntty.dev`, `versionCode 1`, `versionName "1.7.0"`, and release `signingConfig signingConfigs.debug`.
 
 ## Release workflow
 
@@ -129,7 +126,6 @@ printf '%s' "$LYNTTY_ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lyntty
 printf '%s' "$LYNTTY_GOOGLE_SERVICES_JSON_BASE64" | base64 -d > packages/lyntty-app/android/app/google-services.json
 cd packages/lyntty-app/android
 APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew assembleRelease \
-  -PlynttyAppId=dev.jczhang.lyntty \
   -PlynttyVersionName="$VERSION_NAME" \
   -PlynttyVersionCode="$VERSION_CODE" \
   -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks" \

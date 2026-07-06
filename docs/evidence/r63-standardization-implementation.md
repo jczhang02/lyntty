@@ -95,7 +95,8 @@ Docs/evidence:
 - Android update banner now downloads APK, hashes file bytes with `expo-crypto`, compares manifest `sha256`, then launches Android Package Installer through `expo-intent-launcher` only on match.
 - Hash mismatch blocks installer launch.
 - Production Android release requires release signing props when building `dev.jczhang.lyntty` release.
-- Default local Android builds still use `dev.jczhang.lyntty.dev`.
+- Local debug Android builds use `dev.jczhang.lyntty.dev` through a debug `applicationIdSuffix`.
+- Native Android release builds use literal package id `dev.jczhang.lyntty`, so EAS credentials reads the correct application identifier instead of the old Gradle variable name.
 - `REQUEST_INSTALL_PACKAGES` permission added to app config and checked-in Android manifest.
 - `google-services.json` removed from git; production release requires `LYNTTY_GOOGLE_SERVICES_JSON_BASE64` so Android background push notifications can use Firebase/FCM.
 - App config no longer hardcodes inherited Happy EAS project id or Expo owner; production builds use `LYNTTY_EAS_PROJECT_ID` for Expo push token registration and optional Expo update URL.
@@ -259,7 +260,7 @@ Production release signing guard:
 
 ```bash
 cd packages/lyntty-app/android
-./gradlew :app:assembleRelease -PlynttyAppId=dev.jczhang.lyntty -PlynttyVersionCode=999 -PlynttyVersionName=0.0.0
+./gradlew :app:assembleRelease -PlynttyVersionCode=999 -PlynttyVersionName=0.0.0
 ```
 
 Result: expected failure before build:

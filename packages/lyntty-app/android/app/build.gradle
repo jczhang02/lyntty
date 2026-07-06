@@ -3,10 +3,8 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
-def lynttyAppId = (findProperty('lynttyAppId') ?: System.getenv('LYNTTY_ANDROID_APP_ID') ?: 'dev.jczhang.lyntty.dev').toString()
 def lynttyVersionName = (findProperty('lynttyVersionName') ?: System.getenv('LYNTTY_ANDROID_VERSION_NAME') ?: '1.7.0').toString()
 def lynttyVersionCode = (findProperty('lynttyVersionCode') ?: System.getenv('LYNTTY_ANDROID_VERSION_CODE') ?: '1').toString().toInteger()
-def lynttyAppName = (findProperty('lynttyAppName') ?: (lynttyAppId == 'dev.jczhang.lyntty' ? 'Lyntty' : 'Lyntty (dev)')).toString()
 def lynttyKeystoreFile = (findProperty('lynttyKeystoreFile') ?: System.getenv('LYNTTY_ANDROID_KEYSTORE_FILE'))?.toString()
 def lynttyKeystorePassword = (findProperty('lynttyKeystorePassword') ?: System.getenv('LYNTTY_ANDROID_KEYSTORE_PASSWORD'))?.toString()
 def lynttyKeyAlias = (findProperty('lynttyKeyAlias') ?: System.getenv('LYNTTY_ANDROID_KEY_ALIAS'))?.toString()
@@ -16,11 +14,11 @@ def isReleaseBuildRequested = gradle.startParameter.taskNames.any { it.toLowerCa
 def lynttyGoogleServicesFile = file('google-services.json')
 def hasLynttyGoogleServices = lynttyGoogleServicesFile.exists()
 
-if (lynttyAppId == 'dev.jczhang.lyntty' && isReleaseBuildRequested && !hasLynttyReleaseSigning) {
+if (isReleaseBuildRequested && !hasLynttyReleaseSigning) {
     throw new GradleException('Production release builds require Lyntty release signing properties')
 }
 
-if (lynttyAppId == 'dev.jczhang.lyntty' && isReleaseBuildRequested && !hasLynttyGoogleServices) {
+if (isReleaseBuildRequested && !hasLynttyGoogleServices) {
     throw new GradleException('Production release builds require Firebase google-services.json for Android push notifications')
 }
 
@@ -113,14 +111,14 @@ android {
 
     namespace 'dev.jczhang.lyntty.dev'
     defaultConfig {
-        applicationId lynttyAppId
+        applicationId 'dev.jczhang.lyntty'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode lynttyVersionCode
         versionName lynttyVersionName
         manifestPlaceholders = [
-            lynttyAppName: lynttyAppName,
-            usesCleartextTraffic: lynttyAppId == 'dev.jczhang.lyntty' ? 'false' : 'true'
+            lynttyAppName: 'Lyntty',
+            usesCleartextTraffic: 'false'
         ]
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
@@ -143,9 +141,18 @@ android {
     }
     buildTypes {
         debug {
+            applicationIdSuffix '.dev'
+            manifestPlaceholders = [
+                lynttyAppName: 'Lyntty (dev)',
+                usesCleartextTraffic: 'true'
+            ]
             signingConfig signingConfigs.debug
         }
         release {
+            manifestPlaceholders = [
+                lynttyAppName: 'Lyntty',
+                usesCleartextTraffic: 'false'
+            ]
             signingConfig hasLynttyReleaseSigning ? signingConfigs.release : signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
