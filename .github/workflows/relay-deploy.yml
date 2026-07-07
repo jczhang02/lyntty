@@ -59,19 +59,16 @@ jobs:
             "$USER@$HOST" \
             "IMAGE_TAG='$IMAGE_TAG' bash -se" <<'REMOTE'
           set -euo pipefail
-          cd /opt/lyntty
-          test -f /opt/lyntty/.env
-          test -f /opt/lyntty/docker-compose.yml
+          sudo test -f /opt/lyntty/.env
+          sudo test -f /opt/lyntty/docker-compose.yml
 
-          if grep -q '^LYNTTY_RELAY_IMAGE_TAG=' /opt/lyntty/.env; then
+          if sudo grep -q '^LYNTTY_RELAY_IMAGE_TAG=' /opt/lyntty/.env; then
             sudo sed -i "s/^LYNTTY_RELAY_IMAGE_TAG=.*/LYNTTY_RELAY_IMAGE_TAG=${IMAGE_TAG}/" /opt/lyntty/.env
           else
             printf '\nLYNTTY_RELAY_IMAGE_TAG=%s\n' "$IMAGE_TAG" | sudo tee -a /opt/lyntty/.env >/dev/null
           fi
 
-          sudo docker compose pull
-          sudo docker compose up -d
-          sudo docker compose ps
+          sudo sh -c 'cd /opt/lyntty && docker compose pull && docker compose up -d && docker compose ps'
           curl -fsS http://127.0.0.1:3005/health
           curl -fsS https://relay.jczhang.cc/health
           REMOTE
