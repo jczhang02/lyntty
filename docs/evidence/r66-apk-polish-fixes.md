@@ -1,7 +1,7 @@
 # R66 APK polish fixes
 
 Date: 2026-07-07
-Status: implementation in progress, local app tests passing
+Status: released as Android APK `android-v1.0.0-4`
 
 ## Scope
 
@@ -139,13 +139,49 @@ Results:
 - Candidate tracked/untracked-to-commit gitleaks dir scan covered 21.92 MB with no leaks.
 - Full working-tree gitleaks dir scan reported 30 findings only in ignored local Android build outputs and ignored local `google-services.json` files; these are not candidate commit files.
 
+## Release verification
+
+GitHub Actions:
+
+- Pushed signed commit `8868767` (`fix(android): polish release APK identity`) to `origin/main`.
+- `Lyntty CI` run `28868858586` passed on `8868767`.
+- `Deploy docs` run `28868858576` passed on `8868767`.
+- `Android release` run `28868874531` passed on `8868767`.
+
+Published release:
+
+- Tag: `android-v1.0.0-4`
+- URL: `https://github.com/jczhang02/lyntty/releases/tag/android-v1.0.0-4`
+- APK: `lyntty-android-v1.0.0-4.apk`
+- APK size: `132427524`
+- APK sha256: `8425801a699c53a8285528d532d841f37fa6ccf3afbd4b40f5e443cddaaea4fc`
+- Manifest: `latest.json`
+- Manifest digest: `sha256:936c60c3a53ec8c89d5916dc0f43fc8385b8cb5a3e2d0351048d5bfe94db7331`
+
+Fetched `https://github.com/jczhang02/lyntty/releases/latest/download/latest.json`:
+
+```json
+{
+  "platform": "android",
+  "appId": "dev.jczhang.lyntty",
+  "versionName": "1.0.0",
+  "versionCode": 4,
+  "apkUrl": "https://github.com/jczhang02/lyntty/releases/download/android-v1.0.0-4/lyntty-android-v1.0.0-4.apk",
+  "sha256": "8425801a699c53a8285528d532d841f37fa6ccf3afbd4b40f5e443cddaaea4fc",
+  "notes": "First clean Lyntty Android release line."
+}
+```
+
+Relay checks against `https://relay.jczhang.cc/v1/version`:
+
+- `dev.jczhang.lyntty` Android `version_code=3` returned `update_required: true`, `version_name: 1.0.0`, `version_code: 4`, APK URL, sha256, and notes.
+- `dev.jczhang.lyntty` Android `version_code=4` returned `update_required: false`.
+
 ## Not yet run
 
-- Full Android APK build / APK install
-- Physical phone validation of launcher icon, splash, Settings version, changelog page, and Session transcript fonts
+- Physical phone validation of launcher icon, splash, Settings version, changelog page, and Session transcript fonts after installing `android-v1.0.0-4`.
 
 ## Residual risks
 
 - LXGW Neo ZhiSong adds about 10 MiB source TTF payload before APK compression.
 - React Native text selection with nested script-split `Text` runs needs device validation.
-- Next production release should use `version_name=1.0.0` and `version_code=4` unless the workflow run number or retry plan changes.
