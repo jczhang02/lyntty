@@ -1,7 +1,7 @@
 # Relay VPS deployment runbook
 
 Date: 2026-07-06
-Status: planned, implementation pending
+Status: deployed on `relay-hk` 2026-07-07; see `docs/evidence/r65-relay-vps-deploy.md`
 Related: `docs/standardization/PLAN.md`
 
 ## Purpose
@@ -317,12 +317,12 @@ Health endpoint expected shape:
 
 ## Acceptance
 
-- [ ] `relay.jczhang.cc` DNS resolves to VPS.
-- [ ] Caddy obtains valid HTTPS certificate.
-- [ ] `https://relay.jczhang.cc/health` returns healthy.
-- [ ] Container uses GHCR image pinned to `sha-<shortsha>`.
-- [ ] `/opt/lyntty/data` persists across restart.
-- [ ] Manual deploy can change image tag and healthcheck.
-- [ ] Rollback to previous tag works.
-- [ ] Daily encrypted local backup exists.
+- [x] `relay.jczhang.cc` DNS resolves to VPS.
+- [x] Caddy obtains valid HTTPS certificate.
+- [x] `https://relay.jczhang.cc/health` returns healthy.
+- [x] Container uses GHCR image pinned to `sha-9752c689c927`.
+- [x] `/opt/lyntty/data` persists across restart.
+- [x] Manual deploy can apply a pinned image tag and healthcheck.
+- [ ] Rollback to previous tag works; not exercised yet because there is no older production relay tag.
+- [x] Daily encrypted local backup exists.
 - [ ] Restore procedure has been run at least once on copied data or maintenance window.
