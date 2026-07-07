@@ -17,6 +17,7 @@ import { MermaidRenderer } from './MermaidRenderer';
 import { t } from '@/text';
 import { isHttpMarkdownLink } from './linkUtils';
 import { openExternalUrl } from '@/utils/openExternalUrl';
+import { splitSessionTextByScript } from './sessionTextRuns';
 
 // Option type for callback
 export type Option = {
@@ -263,25 +264,30 @@ function RenderOptionsBlock(props: {
 function RenderSpans(props: RenderSpanProps) {
     return (<>
         {props.spans.map((span, index) => {
-            if (span.url) {
-                const isExternalLink = isHttpMarkdownLink(span.url);
-                return (
-                    <Text
-                        key={index}
-                        selectable={props.selectable}
-                        accessibilityRole={isExternalLink ? 'link' : undefined}
-                        style={[props.baseStyle, isExternalLink && style.link, span.styles.map(s => style[s])]}
-                        {...(isExternalLink && Platform.OS === 'web' ? { onClick: () => props.onLinkPress(span.url!) } as any : {})}
-                        onPress={isExternalLink && Platform.OS !== 'web'
-                            ? () => props.onLinkPress(span.url!)
-                            : undefined}
-                    >
-                        {span.text}
-                    </Text>
-                );
-            } else {
-                return <Text key={index} selectable={props.selectable} style={[props.baseStyle, span.styles.map(s => style[s])]}>{span.text}</Text>
-            }
+            const isCode = span.styles.includes('code');
+            const isExternalLink = span.url ? isHttpMarkdownLink(span.url) : false;
+            const runs = isCode
+                ? [{ text: span.text, script: 'latin' as const }]
+                : splitSessionTextByScript(span.text);
+            return runs.map((run, runIndex) => (
+                <Text
+                    key={`${index}-${runIndex}`}
+                    selectable={props.selectable}
+                    accessibilityRole={isExternalLink ? 'link' : undefined}
+                    style={[
+                        props.baseStyle,
+                        isExternalLink && style.link,
+                        span.styles.map(s => style[s]),
+                        !isCode && run.script === 'cjk' && style.sessionCjk,
+                    ]}
+                    {...(isExternalLink && Platform.OS === 'web' ? { onClick: () => props.onLinkPress(span.url!) } as any : {})}
+                    onPress={isExternalLink && Platform.OS !== 'web'
+                        ? () => props.onLinkPress(span.url!)
+                        : undefined}
+                >
+                    {run.text}
+                </Text>
+            ));
         })}
     </>)
 }
@@ -415,6 +421,10 @@ const style = StyleSheet.create((theme) => ({
         fontWeight: '400',
         textDecorationLine: 'underline',
         cursor: 'pointer',
+    },
+
+    sessionCjk: {
+        ...Typography.cjk(),
     },
 
     // Headers

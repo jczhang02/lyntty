@@ -4,18 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       version_name:
-        description: Human version name, e.g. 1.7.1
+        description: Human version name, e.g. 1.0.0
         required: true
         type: string
       version_code:
         description: Optional Android versionCode. Defaults to GitHub run number.
         required: false
         type: string
-      notes:
-        description: Release notes
-        required: false
-        type: string
-        default: Manual Lyntty Android APK release
 
 permissions:
   contents: write
@@ -51,7 +46,6 @@ jobs:
         env:
           VERSION_NAME: ${{ inputs.version_name }}
           VERSION_CODE_INPUT: ${{ inputs.version_code }}
-          NOTES: ${{ inputs.notes }}
         run: |
           set -euo pipefail
           version_code="${VERSION_CODE_INPUT:-$GITHUB_RUN_NUMBER}"
@@ -66,7 +60,31 @@ jobs:
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "apk_name=$apk_name" >> "$GITHUB_OUTPUT"
-          printf '%s' "$NOTES" > "$RUNNER_TEMP/release-notes.txt"
+          VERSION_CODE="$version_code" node - <<'NODE'
+          const fs = require('node:fs');
+
+          const changelog = fs.readFileSync('packages/lyntty-app/CHANGELOG.md', 'utf8');
+          const match = changelog.match(/^# (.+)\n\n([\s\S]*?)(?=\n# |\s*$)/);
+          if (!match) {
+            throw new Error('CHANGELOG.md must start with a fixed Lyntty Android release entry');
+          }
+
+          const [, title, body] = match;
+          const expectedTitle = `Lyntty Android ${process.env.VERSION_NAME} (${process.env.VERSION_CODE})`;
+          const titlePattern = new RegExp(`^${expectedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} — \\d{4}-\\d{2}-\\d{2}$`);
+          if (!titlePattern.test(title)) {
+            throw new Error(`Top changelog title must be "${expectedTitle} — YYYY-MM-DD"; got "${title}"`);
+          }
+
+          const summary = body.split('\n').map((line) => line.trim()).find((line) => line && !line.startsWith('#') && !line.startsWith('-'));
+          if (!summary) {
+            throw new Error('Top changelog entry must include a one-line summary before sections');
+          }
+
+          const notes = `# ${title}\n\n${body.trim()}\n`;
+          fs.writeFileSync(`${process.env.RUNNER_TEMP}/release-notes.txt`, notes);
+          fs.writeFileSync(`${process.env.RUNNER_TEMP}/release-summary.txt`, `${summary}\n`);
+          NODE
 
       - name: Decode release keystore
         env:
@@ -115,7 +133,6 @@ jobs:
           VERSION_CODE: ${{ steps.release.outputs.version_code }}
           TAG: ${{ steps.release.outputs.tag }}
           APK_NAME: ${{ steps.release.outputs.apk_name }}
-          NOTES: ${{ inputs.notes }}
         run: |
           set -euo pipefail
           apk_source="packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk"
@@ -127,6 +144,7 @@ jobs:
           export MANIFEST_PATH="$RUNNER_TEMP/latest.json"
           node - <<'NODE'
           const fs = require('node:fs');
+          const notes = fs.readFileSync(`${process.env.RUNNER_TEMP}/release-summary.txt`, 'utf8').trim();
           const manifest = {
             platform: 'android',
             appId: 'dev.jczhang.lyntty',
@@ -134,7 +152,7 @@ jobs:
             versionCode: Number(process.env.VERSION_CODE),
             apkUrl: process.env.APK_URL,
             sha256: process.env.SHA256,
-            notes: process.env.NOTES || '',
+            notes,
             publishedAt: new Date().toISOString(),
           };
           fs.writeFileSync(process.env.MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);

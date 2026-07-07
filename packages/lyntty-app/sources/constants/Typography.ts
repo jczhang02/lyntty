@@ -4,9 +4,9 @@ import { Platform } from 'react-native';
  * Typography system for Lyntty.
  *
  * Direction: Anthropic-like editorial warmth without using proprietary fonts.
- * - Display/body serif: Source Serif 4
+ * - Session English prose / display serif: Source Serif 4
  * - UI sans: Source Sans 3
- * - Chinese reading font: LXGW WenKai subset, with platform fallback for missing glyphs
+ * - Session Chinese prose serif: LXGW Neo ZhiSong
  * - Monospace: IBM Plex Mono, retained for code/tool output density
  */
 
@@ -22,8 +22,8 @@ export const FontFamilies = {
     semiBold: 'SourceSerif4-SemiBold',
   },
   cjk: {
-    regular: 'LXGWWenKai-Regular',
-    semiBold: 'LXGWWenKai-Regular',
+    regular: 'LXGWNeoZhiSong-Regular',
+    semiBold: 'LXGWNeoZhiSong-Regular',
   },
   mono: {
     regular: 'IBMPlexMono-Regular',
@@ -92,7 +92,7 @@ export const Typography = {
     fontFamily: getSerifFont('semiBold'),
   }),
   body: () => ({
-    fontFamily: getCjkFont('regular'),
+    fontFamily: getSerifFont('regular'),
   }),
   legacy: {
     spaceMono: () => ({

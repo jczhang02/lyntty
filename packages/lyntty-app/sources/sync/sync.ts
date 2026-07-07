@@ -1803,13 +1803,7 @@ class Sync {
     private fetchNativeUpdate = async () => {
         try {
             // Skip in development
-            if ((Platform.OS !== 'android' && Platform.OS !== 'ios') || !Constants.expoConfig?.version) {
-                return;
-            }
-            if (Platform.OS === 'ios' && !Constants.expoConfig?.ios?.bundleIdentifier) {
-                return;
-            }
-            if (Platform.OS === 'android' && !Constants.expoConfig?.android?.package) {
+            if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
                 return;
             }
 
@@ -1817,8 +1811,11 @@ class Sync {
 
             // Get platform and app identifiers
             const platform = Platform.OS;
-            const version = Constants.expoConfig?.version!;
-            const appId = Application.applicationId || (Platform.OS === 'ios' ? Constants.expoConfig?.ios?.bundleIdentifier! : Constants.expoConfig?.android?.package!);
+            const version = Application.nativeApplicationVersion || Constants.expoConfig?.version;
+            const appId = Application.applicationId || (Platform.OS === 'ios' ? Constants.expoConfig?.ios?.bundleIdentifier : Constants.expoConfig?.android?.package);
+            if (!version || !appId) {
+                return;
+            }
             const parsedBuildVersion = Number(Application.nativeBuildVersion);
             const versionCode = Platform.OS === 'android' && Number.isFinite(parsedBuildVersion)
                 ? parsedBuildVersion

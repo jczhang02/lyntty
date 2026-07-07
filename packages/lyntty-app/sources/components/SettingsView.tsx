@@ -3,8 +3,8 @@ import * as React from 'react';
 import { Text } from '@/components/StyledText';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
-import { Typography } from "@/constants/Typography";
 import { Item } from '@/components/Item';
 import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
@@ -24,10 +24,22 @@ import { t } from '@/text';
 import { getServerUrl } from '@/sync/serverConfig';
 import { formatSettingsNodeSubtitle, formatSettingsServerSubtitle } from './settingsOverview';
 
+function formatAppVersion(): string {
+    const nativeVersion = Application.nativeApplicationVersion;
+    const nativeBuildVersion = Application.nativeBuildVersion;
+    if (nativeVersion && nativeBuildVersion) {
+        return `${nativeVersion} (${nativeBuildVersion})`;
+    }
+    if (nativeVersion) {
+        return nativeVersion;
+    }
+    return Constants.expoConfig?.version || '1.0.0';
+}
+
 export const SettingsView = React.memo(function SettingsView() {
     const { theme } = useUnistyles();
     const router = useRouter();
-    const appVersion = Constants.expoConfig?.version || '1.0.0';
+    const appVersion = formatAppVersion();
     const [devModeEnabled, setDevModeEnabled] = useLocalSettingMutable('devModeEnabled');
     const [showOfflineMachines, setShowOfflineMachines] = React.useState(false);
     const allMachinesWithOffline = useAllMachines({ includeOffline: true });

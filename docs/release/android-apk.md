@@ -1,7 +1,7 @@
 # Android APK release and self-update runbook
 
-Date: 2026-07-06
-Status: planned, implementation pending
+Date: 2026-07-07
+Status: implemented for personal-use Android APK releases
 Related: `docs/standardization/PLAN.md`
 
 ## Purpose
@@ -107,16 +107,19 @@ Trigger: `workflow_dispatch` only.
 Inputs:
 
 ```yaml
-version_name: "1.7.1"
-notes: "Short release notes"
-version_code_override: "" # optional
+version_name: "1.0.0"
+version_code: "4" # optional; defaults to GitHub workflow run number
 ```
 
-Version rules:
+Version and release-note rules:
 
-- `versionName`: human version, e.g. `1.7.1`.
-- `versionCode`: GitHub run number by default, or explicit override.
+- `versionName`: human version, e.g. `1.0.0`.
+- `versionCode`: GitHub workflow run number by default, or explicit numeric override.
 - Git tag: `android-v<versionName>-<versionCode>`.
+- Top `packages/lyntty-app/CHANGELOG.md` entry is the release-note source of truth.
+- Top changelog title must match `Lyntty Android <versionName> (<versionCode>) — YYYY-MM-DD`.
+- GitHub Release notes use the full top changelog entry.
+- `latest.json.notes` uses the one-line summary under that title.
 
 Build outline:
 
@@ -163,11 +166,11 @@ Schema:
 {
   "platform": "android",
   "appId": "dev.jczhang.lyntty",
-  "versionName": "1.7.1",
-  "versionCode": 178,
-  "apkUrl": "https://github.com/jczhang02/lyntty/releases/download/android-v1.7.1-178/lyntty-android-v1.7.1-178.apk",
+  "versionName": "1.0.0",
+  "versionCode": 4,
+  "apkUrl": "https://github.com/jczhang02/lyntty/releases/download/android-v1.0.0-4/lyntty-android-v1.0.0-4.apk",
   "sha256": "<hex-sha256>",
-  "notes": "Short release notes",
+  "notes": "First clean Lyntty Android release line.",
   "publishedAt": "2026-07-06T00:00:00Z"
 }
 ```
@@ -185,8 +188,8 @@ Content-Type: application/json
 {
   "platform": "android",
   "app_id": "dev.jczhang.lyntty",
-  "version": "1.7.0",
-  "version_code": 177
+  "version": "1.0.0",
+  "version_code": 3
 }
 ```
 
@@ -195,12 +198,12 @@ Planned response:
 ```json
 {
   "update_required": true,
-  "version_name": "1.7.1",
-  "version_code": 178,
-  "apk_url": "https://github.com/jczhang02/lyntty/releases/download/android-v1.7.1-178/lyntty-android-v1.7.1-178.apk",
-  "update_url": "https://github.com/jczhang02/lyntty/releases/download/android-v1.7.1-178/lyntty-android-v1.7.1-178.apk",
+  "version_name": "1.0.0",
+  "version_code": 4,
+  "apk_url": "https://github.com/jczhang02/lyntty/releases/download/android-v1.0.0-4/lyntty-android-v1.0.0-4.apk",
+  "update_url": "https://github.com/jczhang02/lyntty/releases/download/android-v1.0.0-4/lyntty-android-v1.0.0-4.apk",
   "sha256": "<hex-sha256>",
-  "notes": "Short release notes"
+  "notes": "First clean Lyntty Android release line."
 }
 ```
 
@@ -212,10 +215,10 @@ Rules:
 - Relay caches manifest briefly, e.g. 5-15 minutes.
 - Env override may point relay at another manifest URL for rollback/testing.
 
-Current gap:
+Implemented behavior:
 
-- App currently sends no `version_code` and expects `update_required` / `update_url`.
-- Relay currently returns Happy-era `{ updateUrl }` and Play/App Store URLs.
+- App sends native application version and Android `version_code` when available.
+- Relay returns snake_case `update_required`, `update_url`, `version_name`, `version_code`, `apk_url`, `sha256`, and `notes`.
 
 ## Expo-only APK install path
 
@@ -326,17 +329,17 @@ Device/emulator checks:
 
 ## Acceptance
 
-- [ ] Production APK uses `dev.jczhang.lyntty`.
-- [ ] Dev APK uses `dev.jczhang.lyntty.dev`.
-- [ ] Production release uses permanent release keystore.
-- [ ] Production APK includes Firebase Android config from GitHub Secret for push notifications.
-- [ ] Production APK embeds Lyntty EAS project id for Expo push token registration.
-- [ ] APK release workflow is manual.
-- [ ] `versionCode` is monotonic and included in `latest.json`.
-- [ ] `latest.json` is CI-generated.
-- [ ] Relay returns planned snake_case update response.
-- [ ] App downloads APK and verifies `sha256` before installer.
-- [ ] Hash mismatch blocks install.
-- [ ] Android Package Installer confirmation appears.
-- [ ] No native updater shim added.
-- [ ] EAS Update is not required for native updates.
+- [x] Production APK uses `dev.jczhang.lyntty`.
+- [x] Dev APK uses `dev.jczhang.lyntty.dev`.
+- [x] Production release uses permanent release keystore.
+- [x] Production APK includes Firebase Android config from GitHub Secret for push notifications.
+- [x] Production APK embeds Lyntty EAS project id for Expo push token registration.
+- [x] APK release workflow is manual.
+- [x] `versionCode` is monotonic and included in `latest.json`.
+- [x] `latest.json` is CI-generated.
+- [x] Relay returns planned snake_case update response.
+- [x] App downloads APK and verifies `sha256` before installer.
+- [x] Hash mismatch blocks install.
+- [x] Android Package Installer confirmation appears.
+- [x] No native updater shim added.
+- [x] EAS Update is not required for native updates.
