@@ -6,6 +6,7 @@ import { Encryption } from './encryption/encryption';
 import { isAuthInvalidationMessage, requestAuthInvalidation } from '@/auth/authInvalidation';
 import { storage } from './storage';
 import { formatSessionRpcFailure } from './apiSocketErrors';
+import { buildAppPresencePayload } from './apiSocketPresence';
 
 export function getLynttyClientId(): string {
     let platform: string = Platform.OS; // 'ios' | 'android' | 'web'
@@ -65,6 +66,7 @@ class ApiSocket {
     private reconnectedListeners: Set<() => void> = new Set();
     private statusListeners: Set<(status: 'disconnected' | 'connecting' | 'connected' | 'error') => void> = new Set();
     private currentStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected';
+    private visibleSessionId: string | null = null;
 
     //
     // Initialization
@@ -93,7 +95,7 @@ class ApiSocket {
                 token: this.config.token,
                 clientType: 'user-scoped' as const,
                 lynttyClient: getLynttyClientId(),
-                appState: getCurrentAppState(),
+                ...buildAppPresencePayload(getCurrentAppState(), this.visibleSessionId),
             },
             transports: ['websocket'],
             reconnection: true,
@@ -117,6 +119,7 @@ class ApiSocket {
         this.disconnect();
         this.config = null;
         this.encryption = null;
+        this.visibleSessionId = null;
         this.messageHandlers.clear();
         this.reconnectedListeners.clear();
         this.statusListeners.clear();
@@ -193,11 +196,23 @@ class ApiSocket {
     }
 
     /**
-     * Sends app focus state to server for push notification routing.
-     * Server uses this to suppress pushes when the mobile app is in foreground.
+     * Sends app focus + visible Session Remote state for push routing.
      */
     sendAppState(state: string) {
-        this.socket?.emit('app-state', { state });
+        this.socket?.emit('app-state', buildAppPresencePayload(state, this.visibleSessionId));
+    }
+
+    setVisibleSessionId(sessionId: string) {
+        this.visibleSessionId = sessionId;
+        this.sendAppState(getCurrentAppState());
+    }
+
+    clearVisibleSessionId(sessionId: string) {
+        if (this.visibleSessionId !== sessionId) {
+            return;
+        }
+        this.visibleSessionId = null;
+        this.sendAppState(getCurrentAppState());
     }
 
     send(event: string, data: any) {

@@ -10,18 +10,20 @@
  * Connected clients still receive the realtime message update over socket;
  * only the Expo push for "new message" went away.
  *
- * Suppression: if the user has ANY non-machine client that is active
- * (connected + not backgrounded), suppress the push — they can see in-app
- * indicators (unread dots, tab title counter) instead.
+ * Suppression: if the user has a non-machine client that is active and
+ * visibly looking at this same Session Remote, suppress the system push —
+ * they can see the result in-app. Settings/Home/other-session clients do
+ * not suppress.
  *
- * "Active" is determined by socket.data.appState:
- *   - Clients send `app-state: { state: 'active' | 'background' }` via socket.
- *   - Old clients that never send it are treated as active (connected = present).
+ * "Same-session visible" is determined by socket.data.appState and
+ * socket.data.visibleSessionId:
+ *   - Clients send `app-state: { state, visibleSessionId }` via socket.
+ *   - Old clients that never send visibleSessionId fail open and do not suppress.
  *   - On disconnect the socket (and its state) disappears automatically.
  */
 
 import { db } from "@/storage/db";
-import { isUserActive } from "@/app/push/focusTracker";
+import { isUserViewingSession } from "@/app/push/focusTracker";
 import { sendPushNotifications } from "@/app/push/pushSend";
 import { log } from "@/utils/log";
 
@@ -88,8 +90,8 @@ export async function dispatchSessionEventPush(params: {
 
     try {
         try {
-            if (await isUserActive(userId)) {
-                log({ module: 'push' }, `Suppressed session-event push for user ${userId} session ${sessionId}: user active`);
+            if (await isUserViewingSession(userId, sessionId)) {
+                log({ module: 'push' }, `Suppressed session-event push for user ${userId} session ${sessionId}: same session visible`);
                 return;
             }
         } catch (presenceError) {
