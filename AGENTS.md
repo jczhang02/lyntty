@@ -65,6 +65,23 @@ Evidence expectations:
 - Evidence should list exact commands, artifacts, not-run reasons, and residual risk.
 - Redact pairing URLs (`lyntty://terminal?...`), auth tokens, public-key blobs when used as auth material, encryption keys, request headers, and secrets from artifacts before commit.
 
+## Git and repository hygiene
+
+Use Type's stricter Git discipline, adapted for Lyntty's Beads/evidence workflow:
+
+- Treat `main` as protected. Do not directly commit, push, force-push, or make durable agent edits on `main`; use a task branch or isolated worktree and merge by PR.
+- If the current checkout is `main` and the user asks for code/docs changes, stop before editing and propose a branch/worktree unless the user explicitly authorizes the one-off policy/config edit.
+- Before editing files for a task, check `pwd`, current branch, and `git status --short`. If running in an explicit worktree, also verify the worktree path matches the intended task. Mismatch means stop, do not edit.
+- Manual project worktrees should live under repo-root `worktrees/<short-topic>/`. Do not create project worktrees in `worktree/` or outside this repository unless the tool creates an isolated temporary worktree itself.
+- Worktrees must keep dependencies, build outputs, runtime state, and ports isolated. Do not share `node_modules`, native build outputs, Expo/Gradle artifacts, local daemon state, `LYNTTY_HOME_DIR`, or relay ports across worktrees.
+- Stage only files that belong to the current Bead/task. Do not stage secrets, `.env*`, pairing URLs, auth material, local logs, temporary artifacts, or unrelated dirty files. Stage `.beads/` only when the Bead state change is part of this repository task.
+- On non-`main` task branches/worktrees, create local commits for verified logical units unless the user says `不提交`, `暂停提交`, or `bypass commit`. Use small Conventional Commits with GPG signing; split 3+ file changes by logical unit when practical (`app`, `cli`, `relay`, `wire`, `docs`, `tests`, `assets`, `ci`).
+- Before any local commit, inspect `pwd`, branch, `git status --short`, `git diff`, and `git log --oneline -10`. Verification failures or unverified behavior mean no commit; report the blocker instead.
+- After a local commit for an active Bead, add a Bead note with the commit hash, verification commands, and residual risk.
+- `git push`, tag creation, release publishing, PR creation, PR merge, and force operations require explicit user approval.
+- Do not add AI-agent co-authors such as `claude`, `codex`, `open-agent`, or `pi` unless the user explicitly asks.
+- Every durable code/config/docs change should end with clear PR-ready state: changed files, verification, not-run items, evidence docs when required, and reviewer/manual test notes for Android, relay, daemon, or mobile behavior.
+
 ## Pi extension and live environment safety
 
 Do not modify or test Pi extension behavior against the user's live Pi environment by default.
@@ -137,7 +154,7 @@ Android/E2E notes:
 - Prefer TypeScript types and pure helper tests around tricky state transitions.
 - Recoverable app/daemon/relay errors should log-and-continue or show user remediation, not crash/RedBox.
 - Do not add broad abstractions, rewrites, or legacy cleanup unless the task explicitly asks.
-- Use Conventional Commits with GPG signing for repository commits.
+- Follow the Git and repository hygiene section for branch, staging, commit, and PR boundaries.
 
 ## Legacy Happy/Claude guidance
 
