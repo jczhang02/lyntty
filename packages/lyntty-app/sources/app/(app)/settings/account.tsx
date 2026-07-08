@@ -134,7 +134,7 @@ export default React.memo(() => {
         } catch (error) {
             console.error('Failed to load push notification settings:', error);
             if (showError) {
-                Modal.alert(t('common.error'), 'Failed to load push notification settings.');
+                Modal.alert(t('common.error'), t('appWide.failedToLoadPushNotificationSettings'));
             }
         } finally {
             setLoadingPushSettings(false);
@@ -190,21 +190,21 @@ export default React.memo(() => {
             if (result.granted) {
                 await syncCurrentPushToken(auth.credentials);
                 await loadPushSettings();
-                Modal.alert(t('common.success'), 'Push notifications are enabled for this device.');
+                Modal.alert(t('common.success'), t('appWide.pushNotificationsAreEnabledForThisDevice'));
                 return;
             }
 
             await loadPushSettings();
 
             if (result.openedSettings) {
-                Modal.alert('Open Settings', 'The system will not show the permission prompt again, so Lyntty opened Settings instead.');
+                Modal.alert(t('appWide.openSettings'), t('appWide.theSystemWillNotShowThePermissionPromptAgain'));
                 return;
             }
 
-            Modal.alert(t('common.error'), 'Push notification permission was not granted.');
+            Modal.alert(t('common.error'), t('appWide.pushNotificationPermissionWasNotGranted'));
         } catch (error) {
             console.error('Failed to request push permission:', error);
-            Modal.alert(t('common.error'), 'Failed to request push notification permission.');
+            Modal.alert(t('common.error'), t('appWide.failedToRequestPushNotificationPermission'));
         } finally {
             setRequestingPushPermission(false);
         }
@@ -222,14 +222,14 @@ export default React.memo(() => {
             await loadPushSettings();
 
             if (!result.permission.granted) {
-                Modal.alert(t('common.error'), 'Push notifications are not enabled for this device yet.');
+                Modal.alert(t('common.error'), t('appWide.pushNotificationsAreNotEnabledForThisDeviceYet'));
                 return;
             }
 
-            Modal.alert(t('common.success'), 'This device push token was refreshed.');
+            Modal.alert(t('common.success'), t('appWide.thisDevicePushTokenWasRefreshed'));
         } catch (error) {
             console.error('Failed to refresh push token:', error);
-            Modal.alert(t('common.error'), 'Failed to refresh this device push token.');
+            Modal.alert(t('common.error'), t('appWide.failedToRefreshThisDevicePushToken'));
         } finally {
             setRefreshingPushToken(false);
         }
@@ -241,8 +241,8 @@ export default React.memo(() => {
         }
 
         const confirmed = await Modal.confirm(
-            'Delete Push Token',
-            `Remove ${formatPushTokenFingerprint(pushToken.token)} from your account?`,
+            t('appWide.deletePushToken'),
+            t('appWide.removeValueFromYourAccount', { value0: formatPushTokenFingerprint(pushToken.token) }),
             { confirmText: t('common.delete'), destructive: true }
         );
 
@@ -256,7 +256,7 @@ export default React.memo(() => {
             await loadPushSettings();
         } catch (error) {
             console.error('Failed to delete push token:', error);
-            Modal.alert(t('common.error'), 'Failed to delete push token.');
+            Modal.alert(t('common.error'), t('appWide.failedToDeletePushToken'));
         } finally {
             setDeletingPushToken(null);
         }
@@ -353,11 +353,11 @@ export default React.memo(() => {
                 )}
 
                 <ItemGroup
-                    title="Push Notifications"
-                    footer="Shows every push token registered on your account. Tap an old token to delete it."
+                    title={t('appWide.pushNotifications')}
+                    footer={t('appWide.showsEveryPushTokenRegisteredOnYourAccountTap')}
                 >
                     <Item
-                        title="Permission"
+                        title={t('appWide.permission')}
                         detail={formatPushPermissionLabel(pushPermission)}
                         subtitle={formatPushPermissionSubtitle(pushPermission)}
                         icon={<Ionicons name="notifications-outline" size={29} color="#007AFF" />}
@@ -365,12 +365,12 @@ export default React.memo(() => {
                         showChevron={false}
                     />
                     <Item
-                        title="Request Permission Again"
+                        title={t('appWide.requestPermissionAgain')}
                         subtitle={pushPermission?.status === 'unsupported'
-                            ? 'Push notification permissions are only available on iPhone and Android.'
+                            ? t('appWide.pushNotificationPermissionsAreOnlyAvailableOnIphoneAnd')
                             : pushPermission?.canAskAgain
-                            ? 'Shows the system prompt again if iOS still allows it.'
-                            : 'Opens system settings when iOS will not prompt again.'}
+                            ? t('appWide.showsTheSystemPromptAgainIfIosStillAllows')
+                            : t('appWide.opensSystemSettingsWhenIosWillNotPromptAgain')}
                         icon={<Ionicons name="shield-checkmark-outline" size={29} color="#34C759" />}
                         onPress={handlePushPermissionRequest}
                         loading={requestingPushPermission}
@@ -378,10 +378,10 @@ export default React.memo(() => {
                         showChevron={false}
                     />
                     <Item
-                        title="Re-register This Device"
+                        title={t('appWide.reRegisterThisDevice')}
                         subtitle={currentPushToken
-                            ? `Current token ${formatPushTokenFingerprint(currentPushToken)}`
-                            : 'Fetches the current Expo token and registers it again.'}
+                            ? t('appWide.currentTokenValue', { value0: formatPushTokenFingerprint(currentPushToken) })
+                            : t('appWide.fetchesTheCurrentExpoTokenAndRegistersItAgain')}
                         icon={<Ionicons name="refresh-outline" size={29} color="#FF9500" />}
                         onPress={handleRefreshCurrentPushToken}
                         loading={refreshingPushToken}
@@ -391,13 +391,13 @@ export default React.memo(() => {
                 </ItemGroup>
 
                 <ItemGroup
-                    title={`Registered Tokens (${pushTokens.length})`}
-                    footer="Current-device metadata comes from this phone. Older tokens use their token fingerprint plus server timestamps."
+                    title={t('appWide.registeredTokensValue', { value0: pushTokens.length })}
+                    footer={t('appWide.currentDeviceMetadataComesFromThisPhoneOlderTokens')}
                 >
                     {pushTokens.length === 0 ? (
                         <Item
-                            title="No registered push tokens"
-                            subtitle="Once this device is registered, it will appear here."
+                            title={t('appWide.noRegisteredPushTokens')}
+                            subtitle={t('appWide.onceThisDeviceIsRegisteredItWillAppearHere')}
                             showChevron={false}
                         />
                     ) : (
@@ -408,7 +408,7 @@ export default React.memo(() => {
                                     <Item
                                         key={pushToken.id}
                                         title={formatPushTokenFingerprint(pushToken.token)}
-                                        detail={isCurrentDevice ? 'This device' : undefined}
+                                        detail={isCurrentDevice ? t('appWide.thisDevice') : undefined}
                                         subtitle={buildPushTokenSubtitle(pushToken, {
                                             isCurrentDevice,
                                             currentDeviceLabel: currentPushDevice.deviceLabel,

@@ -1,6 +1,7 @@
 import { Platform, Linking } from 'react-native';
 import { Modal } from '@/modal';
 import { AudioModule } from 'expo-audio';
+import { t } from '@/text';
 
 export interface MicrophonePermissionResult {
   granted: boolean;
@@ -91,14 +92,14 @@ export function showMicrophonePermissionDeniedAlert(canAskAgain: boolean = false
     // Web: Show browser-specific instructions
     Modal.alert(
       title,
-      'Please allow microphone access in your browser settings. You may need to click the lock icon in the address bar and enable microphone permission for this site.',
+      t('appWide.pleaseAllowMicrophoneAccessInYourBrowserSettingsYou'),
       [{ text: 'OK' }]
     );
   } else {
     Modal.alert(title, message, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('appWide.cancel'), style: 'cancel' },
       {
-        text: 'Open Settings',
+        text: t('appWide.openSettings'),
         onPress: () => {
           // Opens app settings on iOS/Android
           Linking.openSettings();

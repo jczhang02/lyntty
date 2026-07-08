@@ -34,7 +34,7 @@ export function SessionActionsNativeMenu({
         <DropdownMenu>
             <DropdownMenu.Items>
                 <DropdownMenuItem onClick={openDetails}>
-                    <DropdownMenuItem.Text>Details</DropdownMenuItem.Text>
+                    <DropdownMenuItem.Text>{t('appWide.details')}</DropdownMenuItem.Text>
                 </DropdownMenuItem>
                 {canArchive && (
                     <DropdownMenuItem onClick={archiveSession}>
@@ -43,7 +43,7 @@ export function SessionActionsNativeMenu({
                 )}
                 {canShowResume && (
                     <DropdownMenuItem onClick={resumeSession}>
-                        <DropdownMenuItem.Text>Resume</DropdownMenuItem.Text>
+                        <DropdownMenuItem.Text>{t('appWide.resume')}</DropdownMenuItem.Text>
                     </DropdownMenuItem>
                 )}
                 {canCopySessionMetadata && (

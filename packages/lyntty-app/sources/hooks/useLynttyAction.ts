@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Modal } from '@/modal';
 import { LynttyError } from '@/utils/errors';
+import { t } from '@/text';
 
 export function useLynttyAction(action: () => Promise<void>) {
     const [loading, setLoading] = React.useState(false);
@@ -27,10 +28,10 @@ export function useLynttyAction(action: () => Promise<void>) {
                             //     await alert('Error', e.message, [{ text: 'OK', style: 'cancel' }]);
                             //     break;
                             // }
-                            Modal.alert('Error', e.message, [{ text: 'OK', style: 'cancel' }]);
+                            Modal.alert(t('appWide.error'), e.message, [{ text: 'OK', style: 'cancel' }]);
                             break;
                         } else {
-                            Modal.alert('Error', 'Unknown error', [{ text: 'OK', style: 'cancel' }]);
+                            Modal.alert(t('appWide.error'), t('appWide.unknownError'), [{ text: 'OK', style: 'cancel' }]);
                             break;
                         }
                     }

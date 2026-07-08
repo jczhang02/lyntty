@@ -5,10 +5,12 @@
 
 import Fuse from 'fuse.js';
 import { storage } from './storage';
+import type { TranslationKey } from '@/text';
 
 export interface CommandItem {
     command: string;        // The command without slash (e.g., "compact")
     description?: string;   // Optional description of what the command does
+    descriptionKey?: TranslationKey;
 }
 
 interface SearchOptions {
@@ -53,8 +55,8 @@ export const IGNORED_COMMANDS = [
 
 // Default commands always available
 const DEFAULT_COMMANDS: CommandItem[] = [
-    { command: 'goal', description: 'Show or manage the current Pi goal' },
-    { command: 'context', description: 'Show Pi context usage' },
+    { command: 'goal', descriptionKey: 'appWide.showOrManageTheCurrentPiGoal' },
+    { command: 'context', descriptionKey: 'appWide.showPiContextUsage' },
 ];
 
 // Command descriptions for known tools/commands

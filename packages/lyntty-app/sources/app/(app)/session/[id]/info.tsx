@@ -137,7 +137,7 @@ function SessionInfoContent({ session }: { session: Session }) {
         if (!session) return;
         try {
             await Clipboard.setStringAsync(session.id);
-            Modal.alert(t('common.success'), 'Lyntty session ID copied');
+            Modal.alert(t('common.success'), t('appWide.lynttySessionIdCopied'));
         } catch (error) {
             Modal.alert(t('common.error'), t('sessionInfo.failedToCopySessionId'));
         }
@@ -263,7 +263,7 @@ function SessionInfoContent({ session }: { session: Session }) {
                 {/* Session Details */}
                 <ItemGroup>
                     <Item
-                        title="Lyntty Session ID"
+                        title={t('appWide.lynttySessionId')}
                         subtitle={`${session.id.substring(0, 8)}...${session.id.substring(session.id.length - 8)}`}
                         icon={<Ionicons name="finger-print-outline" size={29} color="#007AFF" />}
                         onPress={handleCopySessionId}
@@ -271,7 +271,7 @@ function SessionInfoContent({ session }: { session: Session }) {
                     {/* Resume command — shown for disconnected sessions with a backend session ID */}
                     {!sessionStatus.isConnected && getResumeCommand(session) && (
                         <CopyableItem
-                            title="Resume Command"
+                            title={t('appWide.resumeCommand')}
                             subtitle={getResumeCommand(session)!}
                             icon={<Ionicons name="play-circle-outline" size={29} color="#30D158" />}
                             copyText={getResumeCommand(session)!}
@@ -376,19 +376,19 @@ function SessionInfoContent({ session }: { session: Session }) {
                             />
                         )}
                         <Item
-                            title="Runtime"
+                            title={t('appWide.runtime')}
                             subtitle="pi"
                             icon={<Ionicons name="sparkles-outline" size={29} color="#5856D6" />}
                             showChevron={false}
                         />
                         <Item
-                            title="Sandbox"
+                            title={t('appWide.sandbox')}
                             subtitle={formatSandboxMetadata(session.metadata.sandbox, session.metadata.homeDir)}
                             icon={<Ionicons name="shield-outline" size={29} color="#5856D6" />}
                             showChevron={false}
                         />
                         <Item
-                            title="Dangerously Skip Permissions"
+                            title={t('appWide.dangerouslySkipPermissions')}
                             subtitle={formatDangerouslySkipPermissionsMetadata(
                                 session.metadata.dangerouslySkipPermissions,
                                 session.metadata.flavor,
@@ -420,7 +420,7 @@ function SessionInfoContent({ session }: { session: Session }) {
                             onPress={handleCopyMetadata}
                         />
                         <Item
-                            title={t('sessionInfo.copyMetadata') + '\n& Client Logs'}
+                            title={t('sessionInfo.copyMetadata') + t('appWide.clientLogs')}
                             icon={<Ionicons name="document-text-outline" size={29} color="#007AFF" />}
                             onPress={handleCopyMetadataAndLogs}
                         />
@@ -467,11 +467,11 @@ function SessionInfoContent({ session }: { session: Session }) {
 
                 {/* Raw JSON (Dev Mode Only) */}
                 {devModeEnabled && (
-                    <ItemGroup title="Raw JSON (Dev Mode)">
+                    <ItemGroup title={t('appWide.rawJsonDevMode')}>
                         {session.agentState && (
                             <>
                                 <Item
-                                    title="Agent State"
+                                    title={t('appWide.agentState')}
                                     icon={<Ionicons name="code-working-outline" size={29} color="#FF9500" />}
                                     showChevron={false}
                                 />
@@ -486,7 +486,7 @@ function SessionInfoContent({ session }: { session: Session }) {
                         {session.metadata && (
                             <>
                                 <Item
-                                    title="Metadata"
+                                    title={t('appWide.metadata')}
                                     icon={<Ionicons name="information-circle-outline" size={29} color="#5856D6" />}
                                     showChevron={false}
                                 />
@@ -501,7 +501,7 @@ function SessionInfoContent({ session }: { session: Session }) {
                         {sessionStatus && (
                             <>
                                 <Item
-                                    title="Session Status"
+                                    title={t('appWide.sessionStatus')}
                                     icon={<Ionicons name="analytics-outline" size={29} color="#007AFF" />}
                                     showChevron={false}
                                 />
@@ -521,7 +521,7 @@ function SessionInfoContent({ session }: { session: Session }) {
                         )}
                         {/* Full Session Object */}
                         <Item
-                            title="Full Session Object"
+                            title={t('appWide.fullSessionObject')}
                             icon={<Ionicons name="document-text-outline" size={29} color="#34C759" />}
                             showChevron={false}
                         />

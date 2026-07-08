@@ -35,10 +35,10 @@ export const UpdateBanner = React.memo(() => {
 
             if (!nativeUpdate.sha256) {
                 Alert.alert(
-                    'Update blocked',
-                    'Release manifest is missing SHA-256. Open the GitHub Release instead.',
+                    t('appWide.updateBlocked'),
+                    t('appWide.releaseManifestIsMissingSha256OpenTheGithub'),
                     [
-                        { text: 'Open GitHub', onPress: () => void openExternalUrl(updateUrl) },
+                        { text: t('appWide.openGithub'), onPress: () => void openExternalUrl(updateUrl) },
                         { text: 'OK', style: 'cancel' },
                     ]
                 );
@@ -54,11 +54,11 @@ export const UpdateBanner = React.memo(() => {
                 });
             } catch (error) {
                 Alert.alert(
-                    'Update failed',
-                    `${messageFromUnknown(error)}\n\nIf Android blocks installs from this app, open install settings, allow Lyntty, then retry.`,
+                    t('appWide.updateFailed'),
+                    t('appWide.valueIfAndroidBlocksInstallsFromThisAppOpen', { value0: messageFromUnknown(error) }),
                     [
-                        { text: 'Install settings', onPress: () => void openAndroidUnknownSourcesSettings() },
-                        { text: 'Open GitHub', onPress: () => void openExternalUrl(updateUrl) },
+                        { text: t('appWide.installSettings'), onPress: () => void openAndroidUnknownSourcesSettings() },
+                        { text: t('appWide.openGithub'), onPress: () => void openExternalUrl(updateUrl) },
                         { text: 'OK', style: 'cancel' },
                     ]
                 );
@@ -71,7 +71,7 @@ export const UpdateBanner = React.memo(() => {
             <ItemGroup>
                 <Item
                     title={nativeUpdate.versionName ? `${t('updateBanner.nativeUpdateAvailable')} ${nativeUpdate.versionName}` : t('updateBanner.nativeUpdateAvailable')}
-                    subtitle={installingNativeUpdate ? 'Downloading and verifying APK…' : (Platform.OS === 'ios' ? t('updateBanner.tapToUpdateAppStore') : 'Tap to download, verify, and install APK')}
+                    subtitle={installingNativeUpdate ? t('appWide.downloadingAndVerifyingApk') : (Platform.OS === 'ios' ? t('updateBanner.tapToUpdateAppStore') : t('appWide.tapToDownloadVerifyAndInstallApk'))}
                     icon={<Ionicons name="download-outline" size={28} color={theme.colors.success} />}
                     showChevron={true}
                     onPress={installingNativeUpdate ? undefined : handleNativeUpdate}

@@ -131,25 +131,25 @@ export default function MachineDetailScreen() {
     const handleStopDaemon = async () => {
         // Show confirmation modal using alert with buttons
         Modal.alert(
-            'Stop Daemon?',
-            'You will not be able to spawn new sessions on this machine until you restart the daemon on your computer again. Your current sessions will stay alive.',
+            t('appWide.stopDaemon'),
+            t('appWide.youWillNotBeAbleToSpawnNewSessions'),
             [
                 {
-                    text: 'Cancel',
+                    text: t('appWide.cancel'),
                     style: 'cancel'
                 },
                 {
-                    text: 'Stop Daemon',
+                    text: t('appWide.stopDaemon2'),
                     style: 'destructive',
                     onPress: async () => {
                         setIsStoppingDaemon(true);
                         try {
                             const result = await machineStopDaemon(machineId!);
-                            Modal.alert('Daemon Stopped', result.message);
+                            Modal.alert(t('appWide.daemonStopped'), result.message);
                             // Refresh to get updated metadata
                             await sync.refreshMachines();
                         } catch (error) {
-                            Modal.alert(t('common.error'), 'Failed to stop daemon. It may not be running.');
+                            Modal.alert(t('common.error'), t('appWide.failedToStopDaemonItMayNotBeRunning'));
                         } finally {
                             setIsStoppingDaemon(false);
                         }
@@ -231,11 +231,11 @@ export default function MachineDetailScreen() {
         if (!machine || !machineId) return;
 
         const newDisplayName = await Modal.prompt(
-            'Rename Machine',
-            'Give this machine a custom name. Leave empty to use the default hostname.',
+            t('appWide.renameMachine'),
+            t('appWide.giveThisMachineACustomNameLeaveEmptyTo'),
             {
                 defaultValue: machine.metadata?.displayName || '',
-                placeholder: machine.metadata?.host || 'Enter machine name',
+                placeholder: machine.metadata?.host || t('appWide.enterMachineName'),
                 cancelText: t('common.cancel'),
                 confirmText: t('common.rename')
             }
@@ -255,11 +255,11 @@ export default function MachineDetailScreen() {
                     machine.metadataVersion
                 );
 
-                Modal.alert(t('common.success'), 'Machine renamed successfully');
+                Modal.alert(t('common.success'), t('appWide.machineRenamedSuccessfully'));
             } catch (error) {
                 Modal.alert(
-                    'Error',
-                    error instanceof Error ? error.message : 'Failed to rename machine'
+                    t('appWide.error'),
+                    error instanceof Error ? error.message : t('appWide.failedToRenameMachine')
                 );
                 // Refresh to get latest state
                 await sync.refreshMachines();
@@ -289,7 +289,7 @@ export default function MachineDetailScreen() {
                     navigateToSession(result.sessionId);
                     break;
                 case 'requestToApproveDirectoryCreation': {
-                    const approved = await Modal.confirm('Create Directory?', `The directory '${result.directory}' does not exist. Would you like to create it?`, { cancelText: t('common.cancel'), confirmText: t('common.create') });
+                    const approved = await Modal.confirm(t('appWide.createDirectory'), t('appWide.theDirectoryValueDoesNotExistWouldYouLike', { value0: result.directory }), { cancelText: t('common.cancel'), confirmText: t('common.create') });
                     if (approved) {
                         await handleStartSession(true);
                     }
@@ -319,7 +319,7 @@ export default function MachineDetailScreen() {
         }
 
         if (!piSession.cwd) {
-            Modal.alert(t('common.error'), 'Pi session has no working directory on this machine.');
+            Modal.alert(t('common.error'), t('appWide.piSessionHasNoWorkingDirectoryOnThisMachine'));
             return;
         }
 
@@ -367,9 +367,7 @@ export default function MachineDetailScreen() {
                     }}
                 />
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    <Text style={[Typography.default(), { fontSize: 16, color: '#666' }]}>
-                        Machine not found
-                    </Text>
+                    <Text style={[Typography.default(), { fontSize: 16, color: '#666' }]}>{t('appWide.machineNotFound')}</Text>
                 </View>
             </>
         );
@@ -464,7 +462,7 @@ export default function MachineDetailScreen() {
                                         ref={inputRef}
                                         value={customPath}
                                         onChangeText={setCustomPath}
-                                        placeholder={'Enter custom path'}
+                                        placeholder={t('appWide.enterCustomPath')}
                                         maxHeight={76}
                                         paddingTop={8}
                                         paddingBottom={8}
@@ -614,24 +612,24 @@ export default function MachineDetailScreen() {
                 )}
 
                 {/* Pi sessions on this machine */}
-                <ItemGroup title={'Pi sessions on this machine'}>
+                <ItemGroup title={t('appWide.piSessionsOnThisMachine')}>
                     {isLoadingPiSessions && piSessions.length === 0 ? (
                         <Item
-                            title={'Scanning local Pi history…'}
+                            title={t('appWide.scanningLocalPiHistory')}
                             showChevron={false}
                             rightElement={<ActivityIndicator size="small" color={theme.colors.textSecondary} />}
                         />
                     ) : piSessionsError ? (
                         <Item
-                            title={'Unable to scan Pi sessions'}
+                            title={t('appWide.unableToScanPiSessions')}
                             subtitle={piSessionsError}
                             subtitleLines={0}
                             showChevron={false}
                         />
                     ) : piSessions.length === 0 ? (
                         <Item
-                            title={isMachineOnline(machine) ? 'No local Pi sessions found' : 'Machine offline'}
-                            subtitle={isMachineOnline(machine) ? 'Start a pi session on this node to create history.' : 'Connect this node to scan local Pi history.'}
+                            title={isMachineOnline(machine) ? t('appWide.noLocalPiSessionsFound') : t('appWide.machineOffline')}
+                            subtitle={isMachineOnline(machine) ? t('appWide.startAPiSessionOnThisNodeToCreate') : t('appWide.connectThisNodeToScanLocalPiHistory')}
                             showChevron={false}
                         />
                     ) : (
@@ -651,7 +649,7 @@ export default function MachineDetailScreen() {
                     )}
                     {piSessions.length > 12 && (
                         <Item
-                            title={`Showing 12 of ${piSessions.length} Pi sessions`}
+                            title={t('appWide.showing12OfValuePiSessions', { value0: piSessions.length })}
                             showChevron={false}
                             titleStyle={{ textAlign: 'center', color: theme.colors.textSecondary }}
                         />
@@ -660,7 +658,7 @@ export default function MachineDetailScreen() {
 
                 {/* Previous Sessions (relay cache) */}
                 {previousSessions.length > 0 && (
-                    <ItemGroup title={'Relay sessions (up to 5 most recent)'}>
+                    <ItemGroup title={t('appWide.relaySessionsUpTo5MostRecent')}>
                         {previousSessions.map(session => (
                             <Item
                                 key={session.id}

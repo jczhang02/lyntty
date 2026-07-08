@@ -465,8 +465,8 @@ class Sync {
         try {
             this.backgroundSendNotificationId = await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: 'Message not sent',
-                    body: 'A message is still sending in the background. It will fail in 30 seconds if not delivered.',
+                    title: t('appWide.messageNotSent'),
+                    body: t('appWide.messageStillSendingInBackground'),
                     sound: true
                 },
                 trigger: {
@@ -499,8 +499,8 @@ class Sync {
         try {
             await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: 'Message failed',
-                    body: 'A message failed to send while the app was in background. Open Lyntty and retry.',
+                    title: t('appWide.messageFailed'),
+                    body: t('appWide.messageFailedInBackground'),
                     sound: true
                 },
                 trigger: null

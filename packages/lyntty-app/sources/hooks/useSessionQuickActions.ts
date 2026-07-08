@@ -292,7 +292,7 @@ export function useSessionQuickActions(
             style: item.destructive ? 'destructive' as const : undefined,
         }));
         buttons.push({ text: t('common.cancel'), style: 'cancel' });
-        Modal.alert('Session', undefined, buttons);
+        Modal.alert(t('appWide.session'), undefined, buttons);
     }, [actionItems]);
 
     return {

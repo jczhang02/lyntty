@@ -21,12 +21,12 @@ export default function FeaturesSettingsScreen() {
         <ItemList style={{ paddingTop: 0 }}>
             {/* Interface */}
             <ItemGroup
-                title="Interface"
-                footer="Optional panels and layout elements."
+                title={t('appWide.interface')}
+                footer={t('appWide.optionalPanelsAndLayoutElements')}
             >
                 <Item
-                    title="File Diffs Sidebar"
-                    subtitle="Show changed-file details on larger screens"
+                    title={t('appWide.fileDiffsSidebar')}
+                    subtitle={t('appWide.showChangedFileDetailsOnLargerScreens')}
                     icon={<Ionicons name="git-branch-outline" size={29} color="#5AC8FA" />}
                     rightElement={
                         <Switch
@@ -92,8 +92,8 @@ export default function FeaturesSettingsScreen() {
                     showChevron={false}
                 />
                 <Item
-                    title="Resume Pi Session"
-                    subtitle="Resume disconnected pi sessions through lynttyd"
+                    title={t('appWide.resumePiSession')}
+                    subtitle={t('appWide.resumeDisconnectedPiSessionsThroughLynttyd')}
                     icon={<Ionicons name="play-circle-outline" size={29} color="#30D158" />}
                     rightElement={
                         <Switch
@@ -118,8 +118,8 @@ export default function FeaturesSettingsScreen() {
             </ItemGroup>
 
             <ItemGroup
-                title="Session Remote"
-                footer="Mobile-safe controls for pi sessions."
+                title={t('appWide.sessionRemote')}
+                footer={t('appWide.mobileSafeControlsForPiSessions')}
             >
                 <Item
                     title={t('settingsFeatures.commandPalette')}
@@ -134,8 +134,8 @@ export default function FeaturesSettingsScreen() {
                     showChevron={false}
                 />
                 <Item
-                    title="Send mobile context to pi"
-                    subtitle="Let pi know messages come from Lyntty mobile for phone-friendly replies."
+                    title={t('appWide.sendMobileContextToPi')}
+                    subtitle={t('appWide.letPiKnowMessagesComeFromLynttyMobileFor')}
                     icon={<Ionicons name="phone-portrait-outline" size={29} color="#34C759" />}
                     rightElement={
                         <Switch

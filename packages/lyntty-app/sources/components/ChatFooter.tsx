@@ -3,6 +3,7 @@ import { View, Text, ViewStyle, TextStyle } from 'react-native';
 import { Typography } from '@/constants/Typography';
 import { Ionicons } from '@expo/vector-icons';
 import { useUnistyles } from 'react-native-unistyles';
+import { t } from '@/text';
 
 interface ChatFooterProps {
     controlledByUser?: boolean;
@@ -40,9 +41,7 @@ export const ChatFooter = React.memo((props: ChatFooterProps) => {
                         size={16}
                         color={theme.colors.box.warning.text}
                     />
-                    <Text style={warningTextStyle}>
-                        Permissions shown in terminal only. Reset or send a message to control from app.
-                    </Text>
+                    <Text style={warningTextStyle}>{t('appWide.permissionsShownInTerminalOnlyResetOrSendA')}</Text>
                 </View>
             )}
         </View>

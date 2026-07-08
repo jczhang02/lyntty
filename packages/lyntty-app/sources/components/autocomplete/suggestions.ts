@@ -2,6 +2,7 @@ import { CommandSuggestion, FileMentionSuggestion } from '@/components/AgentInpu
 import * as React from 'react';
 import { searchFiles, FileItem } from '@/sync/suggestionFile';
 import { searchCommands, CommandItem } from '@/sync/suggestionCommands';
+import { t } from '@/text';
 
 export async function getCommandSuggestions(sessionId: string, query: string): Promise<{
     key: string;
@@ -21,7 +22,7 @@ export async function getCommandSuggestions(sessionId: string, query: string): P
             text: `/${cmd.command}`,
             component: () => React.createElement(CommandSuggestion, {
                 command: cmd.command,
-                description: cmd.description
+                description: cmd.descriptionKey ? t(cmd.descriptionKey) : cmd.description
             })
         }));
     } catch (error) {

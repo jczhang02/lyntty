@@ -153,7 +153,7 @@ export default function ArtifactDetailScreen() {
             console.error('Failed to delete artifact:', err);
             Modal.alert(
                 t('common.error'),
-                'Failed to delete artifact'
+                t('appWide.failedToDeleteArtifact')
             );
         } finally {
             setIsDeleting(false);
@@ -256,7 +256,7 @@ export default function ArtifactDetailScreen() {
                                 !artifact.title && styles.untitledTitle
                             ]}
                         >
-                            {artifact.title || 'Untitled'}
+                            {artifact.title || t('appWide.untitled')}
                         </Text>
                         <Text style={styles.meta}>
                             {formattedDate}
@@ -267,9 +267,7 @@ export default function ArtifactDetailScreen() {
                         {artifact.body ? (
                             <MarkdownView markdown={artifact.body} />
                         ) : (
-                            <Text style={styles.emptyBody}>
-                                No content
-                            </Text>
+                            <Text style={styles.emptyBody}>{t('appWide.noContent')}</Text>
                         )}
                     </View>
                 </ScrollView>
