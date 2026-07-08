@@ -24,7 +24,7 @@ Workflow: `.github/workflows/typecheck.yml`
 | `app` | `pnpm ci:app` | app typecheck, i18n ESLint guard, tests, Expo config inspection |
 | `agent` | `pnpm ci:agent` | retained agent package typecheck and tests |
 
-This workflow uses `contents: read` and `cancel-in-progress: true`.
+This workflow uses `contents: read` and `cancel-in-progress: true`. The relay job installs Bun because `pnpm ci:relay` runs the runtime build script.
 
 ## Manual / release tiers
 
