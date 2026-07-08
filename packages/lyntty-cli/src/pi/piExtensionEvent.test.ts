@@ -83,6 +83,12 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('HEARTBEAT_MS');
       expect(source).toContain('queuedPayloads');
       expect(source).toContain('startHeartbeat(ctx)');
+      expect(source).toContain('safeSessionSnapshot(ctx');
+      expect(source).toContain('function isStaleContextError');
+      expect(source).toContain('stopSessionTimers(session.piSessionId)');
+      expect(source).toContain('void pollCommands(pi, ctx, session).catch');
+      expect(source).not.toContain('void pollCommands(pi, ctx);');
+      expect(source).not.toContain('send(ctx, { type: "remote_heartbeat" });');
     } finally {
       await rm(home, { recursive: true, force: true });
     }

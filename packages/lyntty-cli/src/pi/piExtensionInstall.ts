@@ -17,7 +17,8 @@ let enabled = true;
 let lastStatus = "not connected";
 let draining = false;
 let nextEventId = 1;
-type QueuedPayload = { session: ReturnType<typeof sessionSnapshot>; event: Record<string, unknown>; eventId: number; timestamp: number; attempts?: number };
+type SessionSnapshot = ReturnType<typeof sessionSnapshot>;
+type QueuedPayload = { session: SessionSnapshot; event: Record<string, unknown>; eventId: number; timestamp: number; attempts?: number };
 type PiCommandInfo = { name: string; description?: string; source: string; sourceInfo?: Record<string, unknown> };
 type RemotePiCommand =
   | { type: "send_user_message"; text: string }
@@ -40,6 +41,7 @@ const commandPollTimers = new Map<string, ReturnType<typeof setInterval>>();
 const lastAckedCommandSeq = new Map<string, number>();
 const pendingCommandAcks = new Map<string, CommandAck[]>();
 let executingCommand = false;
+let activePiSessionId: string | null = null;
 
 function lynttyHome(): string {
   return process.env.LYNTTY_HOME_DIR || join(homedir(), ".lyntty");
@@ -110,6 +112,64 @@ function sessionSnapshot(ctx: ExtensionContext) {
   };
 }
 
+function isStaleContextError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("This extension ctx is stale after session replacement or reload");
+}
+
+function stopHeartbeatBySessionId(sessionId: string): void {
+  const timer = heartbeatTimers.get(sessionId);
+  if (!timer) return;
+  clearInterval(timer);
+  heartbeatTimers.delete(sessionId);
+}
+
+function stopCommandPollingBySessionId(sessionId: string): void {
+  const timer = commandPollTimers.get(sessionId);
+  if (!timer) return;
+  clearInterval(timer);
+  commandPollTimers.delete(sessionId);
+}
+
+function stopSessionTimers(sessionId: string): void {
+  stopHeartbeatBySessionId(sessionId);
+  stopCommandPollingBySessionId(sessionId);
+}
+
+function stopOtherSessionTimers(sessionId: string): void {
+  for (const existingSessionId of [...heartbeatTimers.keys()]) {
+    if (existingSessionId !== sessionId) stopHeartbeatBySessionId(existingSessionId);
+  }
+  for (const existingSessionId of [...commandPollTimers.keys()]) {
+    if (existingSessionId !== sessionId) stopCommandPollingBySessionId(existingSessionId);
+  }
+}
+
+function handleContextError(sessionId: string | null | undefined, error: unknown): void {
+  if (isStaleContextError(error)) {
+    if (sessionId) stopSessionTimers(sessionId);
+    if (sessionId === activePiSessionId) activePiSessionId = null;
+    lastStatus = "Pi session context replaced; waiting for next session event";
+    return;
+  }
+  lastStatus = error instanceof Error ? error.message : "Pi extension context failed";
+}
+
+function safeSessionSnapshot(ctx: ExtensionContext, staleSessionId?: string): SessionSnapshot | null {
+  try {
+    return sessionSnapshot(ctx);
+  } catch (error) {
+    handleContextError(staleSessionId, error);
+    return null;
+  }
+}
+
+function markActiveSession(session: SessionSnapshot): void {
+  const sessionId = session.piSessionId;
+  if (!sessionId) return;
+  activePiSessionId = sessionId;
+  stopOtherSessionTimers(sessionId);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     const timer = setTimeout(resolve, ms);
@@ -159,13 +219,9 @@ function drainQueue(): void {
   })();
 }
 
-function send(ctx: ExtensionContext, event: Record<string, unknown>): void {
+function sendForSession(session: SessionSnapshot, event: Record<string, unknown>): void {
   if (!enabled) return;
-  const session = sessionSnapshot(ctx);
   if (!session.piSessionId) return;
-  if (event.type !== "session_shutdown") {
-    startHeartbeat(ctx);
-  }
   enqueuePayload({
     session,
     event,
@@ -175,22 +231,35 @@ function send(ctx: ExtensionContext, event: Record<string, unknown>): void {
   drainQueue();
 }
 
+function send(ctx: ExtensionContext, event: Record<string, unknown>): void {
+  const session = safeSessionSnapshot(ctx);
+  if (!session?.piSessionId) return;
+  markActiveSession(session);
+  if (event.type !== "session_shutdown") {
+    startHeartbeat(ctx);
+  }
+  sendForSession(session, event);
+}
+
 function startHeartbeat(ctx: ExtensionContext): void {
-  const sessionId = ctx.sessionManager.getSessionId();
-  if (!sessionId || heartbeatTimers.has(sessionId)) return;
+  const session = safeSessionSnapshot(ctx);
+  if (!session?.piSessionId || heartbeatTimers.has(session.piSessionId)) return;
+  const sessionId = session.piSessionId;
+  markActiveSession(session);
   const timer = setInterval(() => {
-    send(ctx, { type: "remote_heartbeat" });
+    if (!enabled || activePiSessionId !== sessionId) {
+      stopHeartbeatBySessionId(sessionId);
+      return;
+    }
+    sendForSession(session, { type: "remote_heartbeat" });
   }, HEARTBEAT_MS);
   timer.unref?.();
   heartbeatTimers.set(sessionId, timer);
 }
 
 function stopHeartbeat(ctx: ExtensionContext): void {
-  const sessionId = ctx.sessionManager.getSessionId();
-  const timer = sessionId ? heartbeatTimers.get(sessionId) : undefined;
-  if (!timer) return;
-  clearInterval(timer);
-  heartbeatTimers.delete(sessionId);
+  const session = safeSessionSnapshot(ctx);
+  if (session?.piSessionId) stopHeartbeatBySessionId(session.piSessionId);
 }
 
 function mobileContextText(): string {
@@ -352,12 +421,22 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
     case "reload": {
       const maybeReload = (ctx as unknown as { reload?: () => Promise<void> }).reload;
       if (!maybeReload) throw new Error("reload is not available in this Pi context");
+      const session = safeSessionSnapshot(ctx);
+      if (session?.piSessionId) {
+        stopSessionTimers(session.piSessionId);
+        if (session.piSessionId === activePiSessionId) activePiSessionId = null;
+      }
       await maybeReload.call(ctx);
       return;
     }
     case "internal_shutdown": {
       const maybeShutdown = (ctx as unknown as { shutdown?: () => Promise<void> | void }).shutdown;
       if (!maybeShutdown) throw new Error("shutdown is not available in this Pi context");
+      const session = safeSessionSnapshot(ctx);
+      if (session?.piSessionId) {
+        stopSessionTimers(session.piSessionId);
+        if (session.piSessionId === activePiSessionId) activePiSessionId = null;
+      }
       setTimeout(() => {
         void Promise.resolve(maybeShutdown.call(ctx)).catch(() => undefined);
       }, 100);
@@ -394,11 +473,11 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
   }
 }
 
-async function sendCommandAck(session: ReturnType<typeof sessionSnapshot>, ack: CommandAck): Promise<boolean> {
+async function sendCommandAck(session: SessionSnapshot, ack: CommandAck): Promise<boolean> {
   return postToDaemon("/pi-extension/command-ack", { session, ack });
 }
 
-async function flushPendingCommandAcks(session: ReturnType<typeof sessionSnapshot>): Promise<void> {
+async function flushPendingCommandAcks(session: SessionSnapshot): Promise<void> {
   const sessionId = session.piSessionId;
   const pending = pendingCommandAcks.get(sessionId);
   if (!pending || pending.length === 0) return;
@@ -413,9 +492,8 @@ async function flushPendingCommandAcks(session: ReturnType<typeof sessionSnapsho
   pendingCommandAcks.delete(sessionId);
 }
 
-async function pollCommands(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
-  if (!enabled || executingCommand) return;
-  const session = sessionSnapshot(ctx);
+async function pollCommands(pi: ExtensionAPI, ctx: ExtensionContext, session: SessionSnapshot): Promise<void> {
+  if (!enabled || executingCommand || activePiSessionId !== session.piSessionId) return;
   if (!session.piSessionId) return;
   await flushPendingCommandAcks(session);
   if ((pendingCommandAcks.get(session.piSessionId)?.length ?? 0) > 0) return;
@@ -427,12 +505,22 @@ async function pollCommands(pi: ExtensionAPI, ctx: ExtensionContext): Promise<vo
   if (!response.ok || !response.data || response.data.status !== "ok") return;
 
   for (const envelope of response.data.commands) {
+    const currentSession = safeSessionSnapshot(ctx, session.piSessionId);
+    if (!currentSession?.piSessionId || currentSession.piSessionId !== session.piSessionId) {
+      if (currentSession?.piSessionId) markActiveSession(currentSession);
+      const ack: CommandAck = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "failed", error: "Pi session context was replaced before command execution" };
+      const ok = await sendCommandAck(session, ack);
+      if (!ok) pendingCommandAcks.set(session.piSessionId, [...(pendingCommandAcks.get(session.piSessionId) ?? []), ack]);
+      return;
+    }
+
     executingCommand = true;
     let ack: CommandAck;
     try {
       const result = await executeRemoteCommand(pi, ctx, envelope);
       ack = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "accepted_by_pi", ...result };
     } catch (error) {
+      if (isStaleContextError(error)) handleContextError(session.piSessionId, error);
       ack = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "failed", error: error instanceof Error ? error.message : "Pi command failed" };
     } finally {
       executingCommand = false;
@@ -447,26 +535,31 @@ async function pollCommands(pi: ExtensionAPI, ctx: ExtensionContext): Promise<vo
       pendingCommandAcks.set(session.piSessionId, [...(pendingCommandAcks.get(session.piSessionId) ?? []), ack]);
       return;
     }
+
+    if (ack.status === "accepted_by_pi" && (envelope.command.type === "reload" || envelope.command.type === "internal_shutdown")) return;
   }
 }
 
 function startCommandPolling(pi: ExtensionAPI, ctx: ExtensionContext): void {
-  const sessionId = ctx.sessionManager.getSessionId();
-  if (!sessionId || commandPollTimers.has(sessionId)) return;
+  const session = safeSessionSnapshot(ctx);
+  if (!session?.piSessionId || commandPollTimers.has(session.piSessionId)) return;
+  const sessionId = session.piSessionId;
+  markActiveSession(session);
   const timer = setInterval(() => {
-    void pollCommands(pi, ctx);
+    if (!enabled || activePiSessionId !== sessionId) {
+      stopCommandPollingBySessionId(sessionId);
+      return;
+    }
+    void pollCommands(pi, ctx, session).catch((error) => handleContextError(sessionId, error));
   }, COMMAND_POLL_MS);
   timer.unref?.();
   commandPollTimers.set(sessionId, timer);
-  void pollCommands(pi, ctx);
+  void pollCommands(pi, ctx, session).catch((error) => handleContextError(sessionId, error));
 }
 
 function stopCommandPolling(ctx: ExtensionContext): void {
-  const sessionId = ctx.sessionManager.getSessionId();
-  const timer = sessionId ? commandPollTimers.get(sessionId) : undefined;
-  if (!timer) return;
-  clearInterval(timer);
-  commandPollTimers.delete(sessionId);
+  const session = safeSessionSnapshot(ctx);
+  if (session?.piSessionId) stopCommandPollingBySessionId(session.piSessionId);
 }
 
 export default function lynttyRemoteExtension(pi: ExtensionAPI) {
@@ -476,6 +569,7 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
       const action = String(args || "").trim().toLowerCase();
       if (action === "off" || action === "disable") {
         enabled = false;
+        stopHeartbeat(ctx);
         stopCommandPolling(ctx);
         ctx.ui.notify("Lyntty remote sync disabled for this Pi process", "info");
         return;
@@ -491,7 +585,12 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
 
       startHeartbeat(ctx);
       startCommandPolling(pi, ctx);
-      const ok = await postToDaemon("/pi-extension/status", { session: sessionSnapshot(ctx) });
+      const session = safeSessionSnapshot(ctx);
+      if (!session?.piSessionId) {
+        ctx.ui.notify(` + "`Lyntty remote: ${lastStatus}`" + `, "warning");
+        return;
+      }
+      const ok = await postToDaemon("/pi-extension/status", { session });
       ctx.ui.notify(ok ? "Lyntty remote: connected" : ` + "`Lyntty remote: ${lastStatus}`" + `, ok ? "info" : "warning");
     },
   });
@@ -502,6 +601,7 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
       const action = String(args || "").trim().toLowerCase();
       if (action === "off" || action === "remote off") {
         enabled = false;
+        stopHeartbeat(ctx);
         stopCommandPolling(ctx);
         ctx.ui.notify("Lyntty remote sync disabled for this Pi process", "info");
         return;
@@ -516,7 +616,12 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
       }
       startHeartbeat(ctx);
       startCommandPolling(pi, ctx);
-      const ok = await postToDaemon("/pi-extension/status", { session: sessionSnapshot(ctx) });
+      const session = safeSessionSnapshot(ctx);
+      if (!session?.piSessionId) {
+        ctx.ui.notify(` + "`Lyntty remote: ${lastStatus}`" + `, "warning");
+        return;
+      }
+      const ok = await postToDaemon("/pi-extension/status", { session });
       ctx.ui.notify(ok ? "Lyntty remote: connected" : ` + "`Lyntty remote: ${lastStatus}`" + `, ok ? "info" : "warning");
     },
   });
