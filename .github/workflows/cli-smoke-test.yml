@@ -25,8 +25,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    env:
-      LYNTTY_HOME_DIR: ${{ runner.temp }}/lyntty-home
     strategy:
       matrix:
         node-version: [26]
@@ -72,6 +70,7 @@ jobs:
     - name: Test binary execution
       run: |
         export HOME="$RUNNER_TEMP/lyntty-smoke-home"
+        export LYNTTY_HOME_DIR="$RUNNER_TEMP/lyntty-home"
         mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
 
         # Test that the binary starts successfully
@@ -104,7 +103,8 @@ jobs:
     - name: Test packaged server (lyntty server)
       run: |
         export HOME="$RUNNER_TEMP/lyntty-server-home"
-        export LYNTTY_HOME_DIR="$(mktemp -d)"
+        LYNTTY_HOME_DIR="$(mktemp -d)"
+        export LYNTTY_HOME_DIR
         mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
 
         timeout 90s lyntty server --port 4505 --host 127.0.0.1 --no-persist --reset > /tmp/lyntty-relay.log 2>&1 &
@@ -130,8 +130,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 35
-    env:
-      LYNTTY_HOME_DIR: ${{ runner.temp }}\\lyntty-home
     strategy:
       matrix:
         node-version: [26]
