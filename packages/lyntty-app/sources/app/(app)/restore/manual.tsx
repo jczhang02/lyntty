@@ -111,9 +111,7 @@ export default function Restore() {
         <ScrollView style={styles.scrollView}>
             <View style={styles.container}>
                 <View style={styles.contentWrapper}>
-                    <Text style={styles.instructionText}>
-                        Enter your secret key to restore access to your account.
-                    </Text>
+                    <Text style={styles.instructionText}>{t('appWide.enterYourSecretKeyToRestoreAccessToYour')}</Text>
 
                     <TextInput
                         style={styles.textInput}

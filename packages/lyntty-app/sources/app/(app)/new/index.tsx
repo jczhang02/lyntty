@@ -283,7 +283,7 @@ function PickerContent({
                     <TextInput
                         value={search}
                         onChangeText={setSearch}
-                        placeholder={searchPlaceholder ?? 'search...'}
+                        placeholder={searchPlaceholder ?? t('appWide.search')}
                         placeholderTextColor={theme.colors.textSecondary}
                         style={[pickerStyles.searchInput, { color: theme.colors.text }]}
                         autoCapitalize="none"
@@ -303,9 +303,7 @@ function PickerContent({
                 )}
                 {filtered.map(renderOption)}
                 {filtered.length === 0 && search.length > 0 && (
-                    <Text style={[pickerStyles.emptyText, { color: theme.colors.textSecondary }]}>
-                        no results
-                    </Text>
+                    <Text style={[pickerStyles.emptyText, { color: theme.colors.textSecondary }]}>{t('appWide.noResults')}</Text>
                 )}
             </ScrollView>
         </View>
@@ -386,7 +384,7 @@ function PathPickerContent({
                                 { opacity: pressed ? 0.82 : 1 },
                             ]}
                             accessibilityRole="button"
-                            accessibilityLabel="Done"
+                            accessibilityLabel={t('appWide.done')}
                         >
                             <GlassView
                                 glassEffectStyle="regular"
@@ -426,7 +424,7 @@ function PathPickerContent({
                         onChangeText={onChangeValue}
                         onSelectionChange={handleSelectionChange}
                         selection={selection}
-                        placeholder="Enter project path"
+                        placeholder={t('appWide.enterProjectPath')}
                         placeholderTextColor={theme.colors.textSecondary}
                         style={[
                             pickerStyles.pathTextInput,
@@ -444,14 +442,10 @@ function PathPickerContent({
             </View>
 
             {isCustomPath && (
-                <Text style={[pickerStyles.pathMetaText, { color: theme.colors.textSecondary }]}>
-                    using custom path above
-                </Text>
+                <Text style={[pickerStyles.pathMetaText, { color: theme.colors.textSecondary }]}>{t('appWide.usingCustomPathAbove')}</Text>
             )}
 
-            <Text style={[pickerStyles.sectionLabel, { color: theme.colors.textSecondary }]}>
-                Recent
-            </Text>
+            <Text style={[pickerStyles.sectionLabel, { color: theme.colors.textSecondary }]}>{t('appWide.recent')}</Text>
 
             <ScrollView
                 style={[pickerStyles.optionList, embedded && pickerStyles.embeddedOptionList]}
@@ -493,9 +487,7 @@ function PathPickerContent({
                 })}
 
                 {items.length === 0 && (
-                    <Text style={[pickerStyles.emptyText, { color: theme.colors.textSecondary }]}>
-                        no recent projects yet
-                    </Text>
+                    <Text style={[pickerStyles.emptyText, { color: theme.colors.textSecondary }]}>{t('appWide.noRecentProjectsYet')}</Text>
                 )}
             </ScrollView>
         </View>
@@ -823,17 +815,17 @@ function NewSessionScreen() {
     const pickerData = React.useMemo(() => {
         switch (activePicker) {
             case 'machine':
-                return { title: 'Machine', items: machineItems, selectedKey: selectedMachineId, searchPlaceholder: 'search machines...' };
+                return { title: t('appWide.machine'), items: machineItems, selectedKey: selectedMachineId, searchPlaceholder: 'search machines...' };
             case 'worktree':
-                return { title: 'Worktree', fixedItems: WORKTREE_FIXED_ITEMS, items: worktreeItems, selectedKey: worktreeKey, searchPlaceholder: 'search worktrees...' };
+                return { title: t('appWide.worktree'), fixedItems: WORKTREE_FIXED_ITEMS, items: worktreeItems, selectedKey: worktreeKey, searchPlaceholder: 'search worktrees...' };
             case 'agent':
-                return { title: 'Agent', items: getAgentPickerItems(availableAgents), selectedKey: selectedAgent, searchPlaceholder: 'search agents...' };
+                return { title: t('appWide.agent'), items: getAgentPickerItems(availableAgents), selectedKey: selectedAgent, searchPlaceholder: 'search agents...' };
             case 'model':
-                return { title: 'Model', items: getModePickerItems(modelModes), selectedKey: currentModelKey, searchPlaceholder: 'search models...' };
+                return { title: t('appWide.model'), items: getModePickerItems(modelModes), selectedKey: currentModelKey, searchPlaceholder: 'search models...' };
             case 'effort':
-                return { title: 'Effort', items: getModePickerItems(effortLevels), selectedKey: currentEffort?.key ?? null, searchPlaceholder: 'search efforts...' };
+                return { title: t('appWide.effort'), items: getModePickerItems(effortLevels), selectedKey: currentEffort?.key ?? null, searchPlaceholder: 'search efforts...' };
             case 'permission':
-                return { title: 'Permissions', items: getModePickerItems(permissionModes), selectedKey: currentPermission?.key ?? null, searchPlaceholder: 'search permissions...' };
+                return { title: t('appWide.permissions'), items: getModePickerItems(permissionModes), selectedKey: currentPermission?.key ?? null, searchPlaceholder: 'search permissions...' };
             default:
                 return null;
         }
@@ -907,11 +899,11 @@ function NewSessionScreen() {
     // Spawn session handler
     const handleSend = React.useCallback(async (approvedNewDirectoryCreation: boolean = false) => {
         if (!selectedMachineId || !selectedMachine) {
-            Modal.alert(t('common.error'), 'Please select a machine');
+            Modal.alert(t('common.error'), t('appWide.pleaseSelectAMachine'));
             return;
         }
         if (!isMachineOnline(selectedMachine)) {
-            Modal.alert(t('common.error'), 'Machine is offline');
+            Modal.alert(t('common.error'), t('appWide.machineIsOffline'));
             return;
         }
 
@@ -925,7 +917,7 @@ function NewSessionScreen() {
             if (worktreeKey === '__new__') {
                 const worktreeResult = await createWorktree(selectedMachineId, absolutePath);
                 if (!worktreeResult.success) {
-                    Modal.alert(t('common.error'), worktreeResult.error || 'Failed to create worktree');
+                    Modal.alert(t('common.error'), worktreeResult.error || t('appWide.failedToCreateWorktree'));
                     return;
                 }
                 spawnDirectory = worktreeResult.worktreePath;
@@ -978,8 +970,8 @@ function NewSessionScreen() {
                     break;
                 case 'requestToApproveDirectoryCreation': {
                     const approved = await Modal.confirm(
-                        'Create Directory?',
-                        `The directory '${result.directory}' does not exist. Would you like to create it?`,
+                        t('appWide.createDirectory'),
+                        t('appWide.theDirectoryValueDoesNotExistWouldYouLike', { value0: result.directory }),
                         { cancelText: t('common.cancel'), confirmText: t('common.create') },
                     );
                     if (approved) {
@@ -1048,7 +1040,7 @@ function NewSessionScreen() {
             ]}>
                 {type === 'path' ? (
                     <PathPickerContent
-                        title="Project"
+                        title={t('appWide.project')}
                         items={pathItems}
                         value={selectedPath}
                         homeDir={selectedHomeDir}
@@ -1317,7 +1309,7 @@ function NewSessionScreen() {
             <View style={styles.inputField}>
                 <PromptInput
                     ref={composerInputRef}
-                    placeholder="What would you like to work on?"
+                    placeholder={t('appWide.whatWouldYouLikeToWorkOn')}
                     onKeyPress={handleKeyPress}
                 />
             </View>
@@ -1426,7 +1418,7 @@ function NewSessionScreen() {
                 >
                     {activePicker === 'path' ? (
                         <PathPickerContent
-                            title="Project"
+                            title={t('appWide.project')}
                             items={pathItems}
                             value={selectedPath}
                             homeDir={selectedHomeDir}
@@ -1443,8 +1435,8 @@ function NewSessionScreen() {
 }
 
 const WORKTREE_FIXED_ITEMS: PickerItem[] = [
-    { key: '__none__', label: 'no worktree' },
-    { key: '__new__', label: 'new worktree' },
+    { key: '__none__', label: t('appWide.noWorktree') },
+    { key: '__new__', label: t('appWide.newWorktree') },
 ];
 
 const styles = StyleSheet.create((theme) => ({

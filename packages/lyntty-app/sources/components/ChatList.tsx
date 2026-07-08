@@ -16,6 +16,7 @@ import { Octicons } from '@expo/vector-icons';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Modal } from '@/modal';
 import { useSessionQuickActions } from '@/hooks/useSessionQuickActions';
+import { t } from '@/text';
 
 const SCROLL_THRESHOLD = 300;
 
@@ -54,7 +55,7 @@ const ListHeader = React.memo((props: { isLoadingOlder: boolean; olderLoadError:
                     style={{ paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center' }}
                 >
                     <View style={{ borderColor: theme.colors.divider, borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12 }}>
-                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>Could not load older messages · Retry</Text>
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>{t('appWide.couldNotLoadOlderMessagesRetry')}</Text>
                     </View>
                 </Pressable>
             )}

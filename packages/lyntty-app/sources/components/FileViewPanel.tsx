@@ -338,7 +338,7 @@ export const FileViewPanel = React.memo(function FileViewPanel({
                     </Text>
                     <View style={{ flex: 1 }} />
                     <Pressable onPress={handleShowDiff} style={[styles.warningAction, { borderColor: theme.colors.divider }]}>
-                        <Text style={[styles.warningActionText, { color: theme.colors.textLink }]}>Diff</Text>
+                        <Text style={[styles.warningActionText, { color: theme.colors.textLink }]}>{t('appWide.diff')}</Text>
                     </Pressable>
                     <Pressable onPress={handleReload} style={[styles.warningAction, { borderColor: theme.colors.divider }]}>
                         <Text style={[styles.warningActionText, { color: theme.colors.textLink }]}>{t('files.reload')}</Text>
@@ -478,9 +478,7 @@ const FileHeaderRight = React.memo(function FileHeaderRight({
                             { color: theme.colors.textSecondary },
                             displayMode === 'preview' && styles.toggleTextActive,
                             displayMode === 'preview' && { color: theme.colors.text },
-                        ]}>
-                            Preview
-                        </Text>
+                        ]}>{t('appWide.preview')}</Text>
                     </Pressable>
                 </View>
             )}

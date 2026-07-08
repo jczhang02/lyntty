@@ -136,12 +136,7 @@ export default function Restore() {
             <View style={styles.container}>
 
                 <View style={{justifyContent: 'flex-end' }}>
-                    <Text style={styles.secondInstructionText}>
-                        1. Open Lyntty on your mobile device{'\n'}
-                        2. Go to Settings → Account{'\n'}
-                        3. Tap "Link New Device"{'\n'}
-                        4. Scan this QR code
-                    </Text>
+                    <Text style={styles.secondInstructionText}>{t('appWide.text1OpenLynttyOnYourMobileDevice')}{'\n'}{t('appWide.text2GoToSettingsAccount')}{'\n'}{t('appWide.text3TapLinkNewDevice')}{'\n'}{t('appWide.text4ScanThisQrCode')}</Text>
                 </View>
                 {!authReady && (
                     <View style={{ width: 200, height: 200, backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center' }}>
@@ -157,7 +152,7 @@ export default function Restore() {
                     />
                 )}
                 <View style={{ flexGrow: 4, paddingTop: 30 }}>
-                    <RoundButton title="Restore with Secret Key Instead" display='inverted' onPress={() => {
+                    <RoundButton title={t('appWide.restoreWithSecretKeyInstead')} display='inverted' onPress={() => {
                         router.push('/restore/manual');
                     }} />
                 </View>

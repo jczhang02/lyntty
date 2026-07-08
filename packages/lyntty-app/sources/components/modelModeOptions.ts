@@ -25,14 +25,16 @@ type MetadataOption = {
     description?: string | null;
 };
 
-const GEMINI_MODEL_FALLBACKS: ModelMode[] = [
-    { key: 'gemini-3.1-pro-preview', name: 'gemini 3.1 pro', description: 'latest & most capable' },
-    { key: 'gemini-3-flash-preview', name: 'gemini 3 flash', description: 'latest & fast' },
-    { key: 'gemini-3.1-flash-lite-preview', name: 'gemini 3.1 flash lite', description: 'latest & fastest' },
-    { key: 'gemini-2.5-pro', name: 'gemini 2.5 pro', description: 'most capable' },
-    { key: 'gemini-2.5-flash', name: 'gemini 2.5 flash', description: 'fast & efficient' },
-    { key: 'gemini-2.5-flash-lite', name: 'gemini 2.5 flash lite', description: 'fastest' },
-];
+function getGeminiModelFallbacks(translate: Translate): ModelMode[] {
+    return [
+        { key: 'gemini-3.1-pro-preview', name: 'gemini 3.1 pro', description: translate('appWide.latestMostCapable') },
+        { key: 'gemini-3-flash-preview', name: 'gemini 3 flash', description: translate('appWide.latestFast') },
+        { key: 'gemini-3.1-flash-lite-preview', name: 'gemini 3.1 flash lite', description: translate('appWide.latestFastest') },
+        { key: 'gemini-2.5-pro', name: 'gemini 2.5 pro', description: translate('appWide.mostCapable') },
+        { key: 'gemini-2.5-flash', name: 'gemini 2.5 flash', description: translate('appWide.fastEfficient') },
+        { key: 'gemini-2.5-flash-lite', name: 'gemini 2.5 flash lite', description: translate('appWide.fastest') },
+    ];
+}
 
 export function mapMetadataOptions(options?: MetadataOption[] | null): ModeOption[] {
     if (!options || options.length === 0) {
@@ -96,8 +98,8 @@ export function getCodexModelModes(): ModelMode[] {
     ];
 }
 
-export function getGeminiModelModes(): ModelMode[] {
-    return GEMINI_MODEL_FALLBACKS;
+export function getGeminiModelModes(translate: Translate = (key) => key): ModelMode[] {
+    return getGeminiModelFallbacks(translate);
 }
 
 export function getOpenClawPermissionModes(translate: Translate): PermissionMode[] {
@@ -141,12 +143,12 @@ export function getPiModelModes(): ModelMode[] {
     ];
 }
 
-export function getHardcodedModelModes(flavor: AgentFlavor, _translate: Translate): ModelMode[] {
+export function getHardcodedModelModes(flavor: AgentFlavor, translate: Translate): ModelMode[] {
     if (flavor === 'codex') {
         return getCodexModelModes();
     }
     if (flavor === 'gemini') {
-        return getGeminiModelModes();
+        return getGeminiModelModes(translate);
     }
     if (flavor === 'openclaw') {
         return getOpenClawModelModes();

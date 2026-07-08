@@ -1206,7 +1206,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                         <MultiTextInput
                             ref={inputRef}
                             testID="lyntty-session-input"
-                            accessibilityLabel="Lyntty session message input"
+                            accessibilityLabel={t('appWide.lynttySessionMessageInput')}
                             defaultValue={props.initialValue}
                             paddingTop={Platform.OS === 'web' ? 10 : 8}
                             paddingBottom={Platform.OS === 'web' ? 10 : 8}
@@ -1304,7 +1304,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             onPress={handleAbortPress}
                                             disabled={isAborting}
                                             testID="lyntty-session-stop"
-                                            accessibilityLabel="Stop current Pi turn"
+                                            accessibilityLabel={t('appWide.stopCurrentPiTurn')}
                                         >
                                             {isAborting ? (
                                                 <ActivityIndicator
@@ -1364,7 +1364,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                 >
                                     <Pressable
                                         testID="lyntty-session-send"
-                                        accessibilityLabel="Send message"
+                                        accessibilityLabel={t('appWide.sendMessage')}
                                         style={(p) => ({
                                             width: '100%',
                                             height: '100%',

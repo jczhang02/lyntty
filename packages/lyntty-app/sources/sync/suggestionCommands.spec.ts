@@ -18,7 +18,7 @@ describe('suggestionCommands', () => {
         expect(commands).toEqual(expect.arrayContaining([
             expect.objectContaining({
                 command: 'goal',
-                description: 'Show or manage the current Pi goal',
+                descriptionKey: 'appWide.showOrManageTheCurrentPiGoal',
             }),
             expect.objectContaining({ command: 'context' }),
         ]));

@@ -580,7 +580,7 @@ export const knownTools = {
         }
     },
     'change_title': {
-        title: 'Change Title',
+        title: t('appWide.changeTitle'),
         icon: ICON_EDIT,
         hidden: true,
         minimal: true,

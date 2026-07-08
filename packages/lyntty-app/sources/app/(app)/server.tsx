@@ -191,7 +191,7 @@ export default function ServerConfigScreen() {
                             <Text style={styles.labelText}>{t('server.customServerUrlLabel').toUpperCase()}</Text>
                             <TextInput
                                 testID="lyntty-server-url-input"
-                                accessibilityLabel="Lyntty server URL"
+                                accessibilityLabel={t('appWide.lynttyServerUrl')}
                                 style={[
                                     styles.textInput,
                                     isValidating && styles.textInputValidating

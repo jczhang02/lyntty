@@ -4,6 +4,7 @@
  */
 import * as React from 'react';
 import { View, Text } from 'react-native';
+import { t } from '@/text';
 
 interface CodeEditorProps {
     value: string;
@@ -16,7 +17,7 @@ interface CodeEditorProps {
 export const CodeEditor = React.memo(function CodeEditor(_props: CodeEditorProps) {
     return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text>Editor not available on this platform</Text>
+            <Text>{t('appWide.editorNotAvailableOnThisPlatform')}</Text>
         </View>
     );
 });

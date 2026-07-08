@@ -4,6 +4,7 @@ import { BaseModal } from './BaseModal';
 import { PromptModalConfig } from '../types';
 import { Typography } from '@/constants/Typography';
 import { useUnistyles } from 'react-native-unistyles';
+import { t } from '@/text';
 
 interface WebPromptModalProps {
     config: PromptModalConfig;
@@ -160,7 +161,7 @@ export function WebPromptModal({ config, onClose, onConfirm }: WebPromptModalPro
                             styles.cancelText,
                             Typography.default()
                         ]}>
-                            {config.cancelText || 'Cancel'}
+                            {config.cancelText || t('appWide.cancel')}
                         </Text>
                     </Pressable>
                     <View style={styles.buttonSeparator} />

@@ -14,7 +14,7 @@ export function useOpenPiDiscoveredSession() {
     return React.useCallback(async (session: SessionRowData) => {
         const request = buildPiSessionSpawnRequest(session);
         if (!request) {
-            Modal.alert(t('common.error'), 'Cannot open this local Pi session because node metadata is incomplete.');
+            Modal.alert(t('common.error'), t('appWide.cannotOpenThisLocalPiSessionBecauseNodeMetadata'));
             return;
         }
 

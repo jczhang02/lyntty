@@ -9,6 +9,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { storage } from '@/sync/storage';
 import { useShallow } from 'zustand/react/shallow';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
+import { t } from '@/text';
 
 export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -23,8 +24,8 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
             // Navigation commands
             {
                 id: 'new-session',
-                title: 'New Session',
-                subtitle: 'Start a new chat session',
+                title: t('appWide.newSession'),
+                subtitle: t('appWide.startANewChatSession'),
                 icon: 'add-circle-outline',
                 category: 'Sessions',
                 shortcut: '⌘N',
@@ -34,8 +35,8 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
             },
             {
                 id: 'sessions',
-                title: 'View All Sessions',
-                subtitle: 'Browse your chat history',
+                title: t('appWide.viewAllSessions'),
+                subtitle: t('appWide.browseYourChatHistory'),
                 icon: 'chatbubbles-outline',
                 category: 'Sessions',
                 action: () => {
@@ -44,8 +45,8 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
             },
             {
                 id: 'settings',
-                title: 'Settings',
-                subtitle: 'Configure your preferences',
+                title: t('appWide.settings'),
+                subtitle: t('appWide.configureYourPreferences'),
                 icon: 'settings-outline',
                 category: 'Navigation',
                 shortcut: '⌘,',
@@ -55,8 +56,8 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
             },
             {
                 id: 'account',
-                title: 'Account',
-                subtitle: 'Manage your account',
+                title: t('appWide.account'),
+                subtitle: t('appWide.manageYourAccount'),
                 icon: 'person-circle-outline',
                 category: 'Navigation',
                 action: () => {
@@ -65,8 +66,8 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
             },
             {
                 id: 'connect',
-                title: 'Connect Device',
-                subtitle: 'Connect a new device via web',
+                title: t('appWide.connectDevice'),
+                subtitle: t('appWide.connectANewDeviceViaWeb'),
                 icon: 'link-outline',
                 category: 'Navigation',
                 action: () => {
@@ -97,8 +98,8 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
         // System commands
         cmds.push({
             id: 'sign-out',
-            title: 'Sign Out',
-            subtitle: 'Sign out of your account',
+            title: t('appWide.signOut'),
+            subtitle: t('appWide.signOutOfYourAccount'),
             icon: 'log-out-outline',
             category: 'System',
             action: async () => {
