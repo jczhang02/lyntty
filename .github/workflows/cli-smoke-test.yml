@@ -2,11 +2,9 @@ name: CLI Smoke Test
 
 on:
   workflow_dispatch:
-  # Work around GitHub Actions creating failed 0-job push runs for some
-  # dispatch-only workflows. Keep push declared but ignored for every branch.
+  # GitHub can create failed 0-job push runs for dispatch-only workflows.
+  # Declare push explicitly, then skip jobs unless this was manually dispatched.
   push:
-    branches-ignore:
-      - '**'
 
 permissions:
   contents: read
@@ -17,6 +15,7 @@ concurrency:
 
 jobs:
   smoke-test-linux:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -121,6 +120,7 @@ jobs:
         echo "lyntty server smoke test passed (booted + Prisma query engine OK)"
 
   smoke-test-windows:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 35
     env:
