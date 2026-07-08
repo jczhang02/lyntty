@@ -3,7 +3,7 @@ name: CLI Smoke Test
 on:
   workflow_dispatch:
   # GitHub can create failed 0-job push runs for dispatch-only workflows.
-  # Declare push explicitly, then skip jobs unless this was manually dispatched.
+  # Declare push explicitly and run a no-op push job; real smoke jobs stay manual.
   push:
 
 permissions:
@@ -14,6 +14,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  push-noop:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: echo "CLI smoke is manual; push event intentionally no-ops."
+
   smoke-test-linux:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
