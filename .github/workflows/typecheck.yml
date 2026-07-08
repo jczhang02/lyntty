@@ -1,56 +1,147 @@
 name: Lyntty CI
 
 on:
-    pull_request:
-        branches:
-            - main
-    push:
-        branches:
-            - main
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
 
 jobs:
-    ci:
-        runs-on: ubuntu-latest
-        timeout-minutes: 45
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+  repo-hygiene:
+    name: Repo hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Install pnpm
-              uses: pnpm/action-setup@v4
+      - name: Check whitespace
+        run: git diff --check
 
-            - name: Setup Node
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 26
-                  cache: pnpm
+  wire:
+    name: lyntty-wire
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Install dependencies
-              run: pnpm install --frozen-lockfile
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
-            - name: Build lyntty-wire
-              run: pnpm --filter ./packages/lyntty-wire build
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
 
-            - name: Test lyntty-wire
-              run: pnpm --filter ./packages/lyntty-wire test
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-            - name: Typecheck lyntty-cli
-              run: pnpm --filter ./packages/lyntty-cli typecheck
+      - name: Build and test lyntty-wire
+        run: pnpm ci:wire
 
-            - name: Test lyntty-cli
-              run: pnpm --filter ./packages/lyntty-cli test
+  cli:
+    name: lyntty-cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Typecheck lyntty-relay
-              run: pnpm --filter ./packages/lyntty-relay typecheck
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
-            - name: Test lyntty-relay
-              run: pnpm --filter ./packages/lyntty-relay test
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
 
-            - name: Typecheck lyntty-app
-              run: pnpm --filter ./packages/lyntty-app typecheck
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-            - name: Test lyntty-app
-              run: pnpm --filter ./packages/lyntty-app test
+      - name: Typecheck and test lyntty-cli
+        run: pnpm ci:cli
 
-            - name: Check whitespace
-              run: git diff --check
+  relay:
+    name: lyntty-relay
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck, build, and test lyntty-relay
+        run: pnpm ci:relay
+
+  app:
+    name: lyntty-app
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck, lint, test, and inspect Expo config
+        run: pnpm ci:app
+
+  agent:
+    name: lyntty-agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck and test lyntty-agent
+        run: pnpm ci:agent

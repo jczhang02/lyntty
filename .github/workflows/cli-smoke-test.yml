@@ -3,9 +3,19 @@ name: CLI Smoke Test
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-smoke-test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   smoke-test-linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      LYNTTY_HOME_DIR: ${{ runner.temp }}/lyntty-home
     strategy:
       matrix:
         node-version: [26]
@@ -50,6 +60,9 @@ jobs:
 
     - name: Test binary execution
       run: |
+        export HOME="$RUNNER_TEMP/lyntty-smoke-home"
+        mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
+
         # Test that the binary starts successfully
         echo "Testing lyntty --help..."
         timeout 30s lyntty --help || {
@@ -79,7 +92,10 @@ jobs:
 
     - name: Test packaged server (lyntty server)
       run: |
+        export HOME="$RUNNER_TEMP/lyntty-server-home"
         export LYNTTY_HOME_DIR="$(mktemp -d)"
+        mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
+
         timeout 90s lyntty server --port 4505 --host 127.0.0.1 --no-persist --reset > /tmp/lyntty-relay.log 2>&1 &
         SERVER_PID=$!
         UP=0
@@ -92,7 +108,7 @@ jobs:
         BODY=$(curl -s -m 5 -G http://127.0.0.1:4505/v1/auth/request/status --data-urlencode "publicKey=$PK" || true)
         echo "auth/request/status -> $BODY"
         kill "$SERVER_PID" 2>/dev/null || true
-        pkill -f lyntty-relay || true
+        wait "$SERVER_PID" 2>/dev/null || true
         echo "=== lyntty server log ==="; cat /tmp/lyntty-relay.log || true
         if [ "$UP" != "1" ]; then echo "Error: lyntty server did not become healthy"; exit 1; fi
         if ! echo "$BODY" | grep -q '"status"'; then echo "Error: Prisma-backed endpoint did not respond"; exit 1; fi
@@ -101,6 +117,9 @@ jobs:
 
   smoke-test-windows:
     runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      LYNTTY_HOME_DIR: ${{ runner.temp }}\\lyntty-home
     strategy:
       matrix:
         node-version: [26]
@@ -168,6 +187,10 @@ jobs:
       shell: cmd
       run: |
         @echo on
+        set HOME=%RUNNER_TEMP%\lyntty-smoke-home
+        set LYNTTY_HOME_DIR=%RUNNER_TEMP%\lyntty-home
+        if not exist "%HOME%" mkdir "%HOME%"
+        if not exist "%LYNTTY_HOME_DIR%" mkdir "%LYNTTY_HOME_DIR%"
 
         rem Get npm global prefix and add to PATH
         for /f "tokens=*" %%i in ('npm config get prefix') do set NPM_PREFIX=%%i
