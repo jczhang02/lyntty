@@ -12,6 +12,7 @@ Start here:
 - `architecture/`
 - `deploy/`
 - `release/`
+- `quality/`
 - `evidence/`
 
 Merged existing repository docs retained under:
