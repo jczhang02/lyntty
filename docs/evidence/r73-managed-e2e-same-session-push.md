@@ -1,7 +1,7 @@
 # R73 managed E2E: same-session-visible push suppression
 
 Date: 2026-07-09
-Branch/worktree: `feat/pi-completion-push` at `16a9763`, `/home/jc/dev/lyntty/worktrees/pi-completion-push`
+Branch/worktree: `feat/pi-completion-push`, `/home/jc/dev/lyntty/worktrees/pi-completion-push`
 Bead: `lyntty-j0u`
 
 ## Scope
@@ -90,10 +90,28 @@ After leaving the app to Android launcher, triggering another `done` push for th
 Push partial for user cmrd0iacm0000ovx4fnl5ny8a session cmrd188om000aovx4o2oy0tqy: ok=0 errors=["DeviceNotRegistered","DeviceNotRegistered"]
 ```
 
+### User LAN phone validation
+
+Artifact: `docs/evidence/artifacts/r73-managed-e2e-same-session-push/user-lan-phone-relay-log.log`
+
+The user then tested the branch over LAN with a dev APK, branch Metro, branch relay at `http://192.168.100.21:33793`, and a live Pi completion path for session `cmrdbianp0003ovwfqn2xx88d`.
+
+When the phone was not foregrounded on the target Session Remote, relay did not suppress and attempted push dispatch. The isolated branch relay had no registered phone token, so dispatch stopped at `No push tokens`:
+
+```text
+No push tokens for user cmrdb9xtd0000ovwfpd14tl79 session cmrdbianp0003ovwfqn2xx88d — skipped
+```
+
+When the phone was foregrounded on the exact target Session Remote, relay suppressed the same `done` event as intended:
+
+```text
+Suppressed session-event push for user cmrdb9xtd0000ovwfpd14tl79 session cmrdbianp0003ovwfqn2xx88d: same session visible
+```
+
 ## Not run / limitations
 
 - No production relay deploy.
-- No real Expo system notification popup in this branch E2E. Local dev APK used fake Expo push tokens, so allow-cases verify relay dispatch path by `Push partial ... DeviceNotRegistered`, not real FCM delivery.
+- No real Expo system notification popup in this branch E2E. Local dev APK/emulator used fake Expo push tokens, and the user's LAN dev APK run had zero registered push tokens in the isolated branch relay, so allow-cases verify relay dispatch path rather than real FCM delivery.
 - Machine-scoped live socket E2E was not run because the seeded env token is user-scoped; unit coverage still covers machine sockets not participating in suppression.
 - A dev launcher connect flow initially failed its `Sessions` assertion because the Expo dev menu overlay stayed open; follow-up Maestro flow closed it and passed.
 

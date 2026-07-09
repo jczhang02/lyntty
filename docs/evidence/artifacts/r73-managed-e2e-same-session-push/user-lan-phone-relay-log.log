@@ -1,0 +1,16 @@
+# User LAN phone validation relay excerpts
+# Date: 2026-07-09
+# Env: lush-ember
+# Relay: http://192.168.100.21:33793
+# App: dev APK over LAN branch Metro
+
+# Phone not foreground / not visible on target Session Remote: relay did not suppress and attempted push dispatch,
+# but no phone token was registered in this isolated branch relay.
+"url": "/v1/sessions/cmrdbianp0003ovwfqn2xx88d/push-event",
+[09:52:25.901] INFO: INFO Auth check - path: /v1/sessions/cmrdbianp0003ovwfqn2xx88d/push-event, has bearer header: true | [1783590745901]
+[09:52:25.908] INFO: INFO No push tokens for user cmrdb9xtd0000ovwfpd14tl79 session cmrdbianp0003ovwfqn2xx88d — skipped | [1783590745908]
+
+# Phone foreground on exact target Session Remote: relay suppressed as same-session-visible.
+"url": "/v1/sessions/cmrdbianp0003ovwfqn2xx88d/push-event",
+[09:53:16.592] INFO: INFO Auth check - path: /v1/sessions/cmrdbianp0003ovwfqn2xx88d/push-event, has bearer header: true | [1783590796592]
+[09:53:16.598] INFO: INFO Suppressed session-event push for user cmrdb9xtd0000ovwfpd14tl79 session cmrdbianp0003ovwfqn2xx88d: same session visible | [1783590796598]
