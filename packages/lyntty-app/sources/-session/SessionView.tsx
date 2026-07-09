@@ -20,6 +20,7 @@ import { Avatar } from '@/components/Avatar';
 import { useDraft } from '@/hooks/useDraft';
 import { useImagePicker } from '@/hooks/useImagePicker';
 import { Modal } from '@/modal';
+import { apiSocket } from '@/sync/apiSocket';
 import { gitStatusSync } from '@/sync/gitStatusSync';
 import { sessionGoalAction } from '@/sync/ops';
 import { storage, useIsDataReady, useLocalSetting, useMachine, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
@@ -51,6 +52,7 @@ import type { ModelMode, PermissionMode } from '@/components/PermissionModeSelec
 import { resolveAgentDefaultConfig } from '@/sync/agentDefaults';
 import { performAgentGoalAction } from './agentGoalActionHandler';
 import { abortSessionFromMobile } from './sessionAbortAction';
+import { useFocusEffect } from '@react-navigation/native';
 
 export const SessionView = React.memo((props: { id: string }) => {
     const sessionId = props.id;
@@ -66,6 +68,13 @@ export const SessionView = React.memo((props: { id: string }) => {
     const { width: windowWidth } = useWindowDimensions();
     const fileDiffsSidebarEnabled = useSetting('fileDiffsSidebar');
     const zenMode = useLocalSetting('zenMode');
+
+    useFocusEffect(
+        React.useCallback(() => {
+            apiSocket.setVisibleSessionId(sessionId);
+            return () => apiSocket.clearVisibleSessionId(sessionId);
+        }, [sessionId])
+    );
 
     // Base condition: can we show the diff sidebar at all?
     const canShowSidebar = fileDiffsSidebarEnabled

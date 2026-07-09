@@ -24,6 +24,7 @@ import { mapPiSessionHistoryPageToEnvelopes } from './runPiHistory';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 import { startPiExternalMirror } from './runPiExternalMirror';
 import { resolvePiRelaySessionTag } from './piRelaySessionTag';
+import { PiCompletionNotificationTracker, sendPiDoneNotification } from './piCompletionNotifications';
 
 export interface RunPiOptions {
   credentials: Credentials;
@@ -183,13 +184,31 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     session: () => session,
     isManagedRuntimeActive: () => thinking || piRuntime.session.isStreaming,
   });
+  const completionNotifications = new PiCompletionNotificationTracker();
+  const sendCompletionPush = () => {
+    try {
+      sendPiDoneNotification(api.push(), session);
+    } catch (pushError) {
+      logger.debug('[pi] Failed to send completion push', pushError);
+    }
+  };
+  const handleAgentStart = () => {
+    thinking = true;
+    completionNotifications.markAgentStart();
+  };
+  const handleAgentEnd = () => {
+    thinking = false;
+    externalMirror?.markCurrentEntriesKnown();
+    session.sendSessionEvent({ type: 'ready' });
+    if (completionNotifications.consumeAgentEnd()) {
+      sendCompletionPush();
+    }
+  };
 
   let unsubscribe = piRuntime.session.subscribe((event) => {
-    if (event.type === 'agent_start') thinking = true;
+    if (event.type === 'agent_start') handleAgentStart();
     if (event.type === 'agent_end') {
-      thinking = false;
-      externalMirror?.markCurrentEntriesKnown();
-      session.sendSessionEvent({ type: 'ready' });
+      handleAgentEnd();
     }
     if (event.type === 'session_info_changed') {
       session.updateMetadata((currentMetadata) => ({
@@ -204,6 +223,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
 
   piRuntime.setRebindSession(async (nextSession) => {
     unsubscribe();
+    completionNotifications.reset();
     await externalMirror?.stop();
     externalMirror = startPiExternalMirror({
       sessionFile: nextSession.sessionManager.getSessionFile(),
@@ -223,11 +243,9 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       slashCommands: nextSlashCommands,
     }));
     unsubscribe = nextSession.subscribe((event) => {
-      if (event.type === 'agent_start') thinking = true;
+      if (event.type === 'agent_start') handleAgentStart();
       if (event.type === 'agent_end') {
-        thinking = false;
-        externalMirror?.markCurrentEntriesKnown();
-        session.sendSessionEvent({ type: 'ready' });
+        handleAgentEnd();
       }
       if (event.type === 'session_info_changed') {
         session.updateMetadata((currentMetadata) => ({
@@ -241,6 +259,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   });
 
   registerKillSessionHandler(session.rpcHandlerManager, async () => {
+    completionNotifications.suppressCurrentTurn();
     await piRuntime.session.abort();
     shutdownRequested?.();
   });
@@ -285,6 +304,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
           return piRuntime.session.steer(action.text);
         case 'abort':
           logger.debug('[pi] Aborting Pi SDK runtime by user request');
+          completionNotifications.suppressCurrentTurn();
           return piRuntime.session.abort().then(() => {
             thinking = false;
             sendPiEnvelopes(piSessionProtocol.endTurn('cancelled'));

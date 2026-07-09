@@ -1,0 +1,23 @@
+{
+  "serverUrl": "http://localhost:45715",
+  "sessionId": "cmrd13lqq0006ovx4rmfu8mjr",
+  "tag": "r73-visible-session-1783572641211-33f6a4c8",
+  "cases": [
+    {
+      "case": "old active client without visibleSessionId",
+      "expected": "allow push attempt"
+    },
+    {
+      "case": "active same Session Remote",
+      "expected": "suppress"
+    },
+    {
+      "case": "active other Session Remote",
+      "expected": "allow push attempt"
+    },
+    {
+      "case": "background same visibleSessionId payload",
+      "expected": "allow push attempt"
+    }
+  ]
+}

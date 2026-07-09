@@ -39,6 +39,7 @@ import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
 import { PiSessionProtocolMapper } from '@/pi/runPiSessionProtocol';
 import { createEnvelope, type SessionEnvelope } from 'lyntty-wire';
 import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiCommandInfo, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
+import { consumePiCompletionNotificationDecision, PiCompletionNotificationTracker, sendPiDoneNotification } from '@/pi/piCompletionNotifications';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -916,6 +917,8 @@ export async function startDaemon(): Promise<void> {
       lastExtensionEventId: number | null;
       extensionHasSeqGap: boolean;
       isStreaming: boolean;
+      canSendCompletionPush: boolean;
+      completionNotifications: PiCompletionNotificationTracker;
       nextCommandSeq: number;
       commands: Array<{
         seq: number;
@@ -1026,6 +1029,9 @@ export async function startDaemon(): Promise<void> {
         }
         return;
       }
+      if (command.type === 'abort') {
+        mirror.completionNotifications.suppressCurrentTurn();
+      }
       mirror.commands.push({
         seq: mirror.nextCommandSeq++,
         localKey,
@@ -1043,6 +1049,9 @@ export async function startDaemon(): Promise<void> {
       if (mirror.commands.length >= MAX_REMOTE_PI_COMMANDS) {
         logger.debug('[pi] Dropping internal remote Pi command because the extension delivery queue is full', { sessionId: mirror.sessionId, localKey });
         return false;
+      }
+      if (command.type === 'abort' || command.type === 'internal_shutdown') {
+        mirror.completionNotifications.suppressCurrentTurn();
       }
       mirror.commands.push({
         seq: mirror.nextCommandSeq++,
@@ -1123,6 +1132,9 @@ export async function startDaemon(): Promise<void> {
       command.error = ack.error;
       if (ack.status === 'accepted_by_pi') {
         command.status = 'accepted_by_pi';
+        if (command.command.type === 'abort' || command.command.type === 'internal_shutdown') {
+          mirror.completionNotifications.suppressCurrentTurn();
+        }
         if (ack.resultText) {
           sendRemoteCommandNotice(mirror, ack.resultText);
         }
@@ -1614,6 +1626,8 @@ export async function startDaemon(): Promise<void> {
           lastExtensionEventId: null,
           extensionHasSeqGap: false,
           isStreaming: false,
+          canSendCompletionPush: Boolean(sessionFile),
+          completionNotifications: new PiCompletionNotificationTracker(),
           nextCommandSeq: 1,
           commands: [],
           seenCommandLocalKeys: new Set(response.metadata.remoteCommandAcceptedLocalKeys ?? []),
@@ -1681,6 +1695,21 @@ export async function startDaemon(): Promise<void> {
       mirror.pendingTextFlushTimer.unref?.();
     };
 
+    const sendPiExtensionCompletionPushIfNeeded = (mirror: ExternalPiMirrorState, piSessionId: string): void => {
+      const hasActiveManagedRuntime = !!resolveActivePiSessionReuse(piSessionId, getCurrentChildren(), machine.id);
+      if (!consumePiCompletionNotificationDecision(mirror.completionNotifications, {
+        canNotify: mirror.canSendCompletionPush,
+        hasActiveManagedRuntime,
+      })) {
+        return;
+      }
+      try {
+        sendPiDoneNotification(api.push(), mirror.sessionClient);
+      } catch (pushError) {
+        logger.debug('[pi] Failed to send extension completion push', pushError);
+      }
+    };
+
     onPiExtensionEventHandler = async (payload) => {
       const { session, event } = payload;
       const result = await ensurePiSessionMirror({
@@ -1718,6 +1747,7 @@ export async function startDaemon(): Promise<void> {
       if (event.type === 'session_shutdown') {
         clearPendingTextFlush(mirror);
         mirror.isStreaming = false;
+        mirror.completionNotifications.reset();
         mirror.sessionClient.sendSessionDeath();
         await mirror.sessionClient.flush();
         externalPiMirrors.delete(mirrorKey);
@@ -1730,6 +1760,7 @@ export async function startDaemon(): Promise<void> {
         capAssistantTextDeliveryWindow(mirror, eventTime);
         mirror.deliveredAssistantTextInTurn = '';
         mirror.isStreaming = true;
+        mirror.completionNotifications.markAgentStart();
       } else if (event.type === 'agent_end') {
         mirror.isStreaming = false;
       }
@@ -1814,6 +1845,7 @@ export async function startDaemon(): Promise<void> {
           mirror.extensionHasSeqGap = false;
           mirror.extensionCoveredSince = eventTime;
         }
+        sendPiExtensionCompletionPushIfNeeded(mirror, session.piSessionId);
       } else {
         if (deliveredAssistantTextChanged) {
           markAssistantTextDelivered(mirror, mirror.deliveredAssistantTextInTurn, deliveredCutoff);

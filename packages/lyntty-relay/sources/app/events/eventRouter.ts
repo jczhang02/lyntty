@@ -212,6 +212,19 @@ export interface EphemeralPayload {
     [key: string]: any;
 }
 
+type SocketPresenceData = {
+    clientType?: string;
+    appState?: string;
+    visibleSessionId?: string | null;
+};
+
+export function isSocketActivelyViewingSession(data: SocketPresenceData, sessionId: string): boolean {
+    if (data.clientType === 'machine-scoped') {
+        return false;
+    }
+    return data.appState === 'active' && data.visibleSessionId === sessionId;
+}
+
 // === EVENT ROUTER CLASS ===
 
 class EventRouter {
@@ -281,20 +294,15 @@ class EventRouter {
     // === PRESENCE QUERIES ===
 
     /**
-     * Returns true if the user has any non-machine socket that hasn't
-     * reported `app-state: background`.  Old clients that never send
-     * `app-state` are treated as active (connected = present).
+     * Returns true only when a non-machine client is active and visibly
+     * viewing the target Session Remote. Old clients that never report
+     * visibleSessionId fail open and do not suppress push delivery.
      *
      * Uses fetchSockets() which works cross-replica via Redis streams adapter.
      */
-    async hasActiveNonMachineSocket(userId: string): Promise<boolean> {
+    async hasActiveNonMachineSocketForSession(userId: string, sessionId: string): Promise<boolean> {
         const sockets = await this.io.in(`user:${userId}`).fetchSockets();
-        return sockets.some(s => {
-            if (s.data.clientType === 'machine-scoped') return false;
-            // No app-state yet → old client or just connected; assume active
-            const appState = s.data.appState as string | undefined;
-            return appState !== 'background';
-        });
+        return sockets.some(s => isSocketActivelyViewingSession(s.data, sessionId));
     }
 
     async hasMachineSocket(userId: string, machineId: string): Promise<boolean> {

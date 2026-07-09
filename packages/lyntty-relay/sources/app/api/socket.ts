@@ -17,6 +17,27 @@ import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
 import { accessKeyHandler } from "./socket/accessKeyHandler";
 import { db } from "@/storage/db";
 
+const MAX_VISIBLE_SESSION_ID_LENGTH = 512;
+
+function normalizeVisibleSessionId(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || trimmed.length > MAX_VISIBLE_SESSION_ID_LENGTH) {
+        return null;
+    }
+    return trimmed;
+}
+
+function applyAppPresence(socket: { data: Record<string, unknown> }, data: { state?: string; visibleSessionId?: unknown }) {
+    const appState = data?.state === 'active' ? 'active' : 'background';
+    socket.data.appState = appState;
+    socket.data.visibleSessionId = appState === 'active'
+        ? normalizeVisibleSessionId(data?.visibleSessionId)
+        : null;
+}
+
 export function startSocket(app: Fastify) {
     const io = new Server(app.server, {
         cors: {
@@ -212,17 +233,17 @@ export function startSocket(app: Fastify) {
             });
         }
 
-        // Track app focus state for push notification routing.
+        // Track app focus + visible Session Remote for push notification routing.
         // State lives on socket.data — no external storage needed.
-        // Read initial state from handshake to close the race window between
-        // connect and the first async app-state event.
-        const initialAppState = socket.handshake.auth.appState as string | undefined;
-        if (initialAppState) {
-            socket.data.appState = initialAppState === 'active' ? 'active' : 'background';
-        }
+        // Read initial state from handshake to close the race window before
+        // the first async app-state event.
+        applyAppPresence(socket, {
+            state: socket.handshake.auth.appState as string | undefined,
+            visibleSessionId: socket.handshake.auth.visibleSessionId,
+        });
 
-        socket.on('app-state', (data: { state: string }) => {
-            socket.data.appState = data?.state === 'active' ? 'active' : 'background';
+        socket.on('app-state', (data: { state?: string; visibleSessionId?: unknown }) => {
+            applyAppPresence(socket, data);
         });
 
         socket.on('disconnect', () => {
