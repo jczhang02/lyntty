@@ -1,0 +1,32 @@
+[04:56:37.301] [32mINFO[39m: [36mINFO Token scope rejected clientType: machine-scoped | [1783572997301][39m
+    [35mlocalTime[39m: "12:56:37.301"
+    [35mmodule[39m: "websocket"
+[04:56:37.312] [32mINFO[39m: [36mINFO incoming request | [1783572997312][39m
+    [35mlocalTime[39m: "12:56:37.312"
+    [35mreqId[39m: "req-1c"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/v1/sessions/cmrd188om000aovx4o2oy0tqy/push-event",
+      "host": "localhost:45715",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 46686
+    }
+[04:56:37.313] [32mINFO[39m: [36mINFO Auth check - path: /v1/sessions/cmrd188om000aovx4o2oy0tqy/push-event, has bearer header: true | [1783572997313][39m
+    [35mlocalTime[39m: "12:56:37.313"
+    [35mmodule[39m: "auth-decorator"
+[04:56:37.316] [32mINFO[39m: [36mINFO Auth success - user: cmrd0iacm0000ovx4fnl5ny8a | [1783572997316][39m
+    [35mlocalTime[39m: "12:56:37.316"
+    [35mmodule[39m: "auth-decorator"
+[04:56:37.318] [32mINFO[39m: [36mINFO Suppressed session-event push for user cmrd0iacm0000ovx4fnl5ny8a session cmrd188om000aovx4o2oy0tqy: same session visible | [1783572997318][39m
+    [35mlocalTime[39m: "12:56:37.318"
+    [35mmodule[39m: "push"
+[04:56:37.318] [32mINFO[39m: [36mINFO request completed | [1783572997318][39m
+    [35mlocalTime[39m: "12:56:37.318"
+    [35mreqId[39m: "req-1c"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 5.27522599697113
+[04:56:40.301] [32mINFO[39m: [36mINFO Token scope rejected clientType: machine-scoped | [1783573000301][39m
+    [35mlocalTime[39m: "12:56:40.301"
+    [35mmodule[39m: "websocket"

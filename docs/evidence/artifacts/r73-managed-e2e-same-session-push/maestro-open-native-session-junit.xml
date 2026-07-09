@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty_v03_api35" tests="1" failures="0" time="18.0">
+    <testcase id="Open native Session Remote for visible-session push E2E" name="Open native Session Remote for visible-session push E2E" classname="Open native Session Remote for visible-session push E2E" file="/tmp/lyntty-e2e-r73/maestro-open-native-session-2.yml" time="18.0" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

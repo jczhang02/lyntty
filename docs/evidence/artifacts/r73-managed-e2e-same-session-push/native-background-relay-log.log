@@ -1,0 +1,29 @@
+[04:58:21.011] [32mINFO[39m: [36mINFO incoming request | [1783573101011][39m
+    [35mlocalTime[39m: "12:58:21.011"
+    [35mreqId[39m: "req-1d"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/v1/sessions/cmrd188om000aovx4o2oy0tqy/push-event",
+      "host": "localhost:45715",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 47662
+    }
+[04:58:21.012] [32mINFO[39m: [36mINFO Auth check - path: /v1/sessions/cmrd188om000aovx4o2oy0tqy/push-event, has bearer header: true | [1783573101012][39m
+    [35mlocalTime[39m: "12:58:21.012"
+    [35mmodule[39m: "auth-decorator"
+[04:58:21.014] [32mINFO[39m: [36mINFO Auth success - user: cmrd0iacm0000ovx4fnl5ny8a | [1783573101014][39m
+    [35mlocalTime[39m: "12:58:21.014"
+    [35mmodule[39m: "auth-decorator"
+[04:58:21.015] [32mINFO[39m: [36mINFO request completed | [1783573101015][39m
+    [35mlocalTime[39m: "12:58:21.015"
+    [35mreqId[39m: "req-1d"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3.9424110054969788
+[04:58:21.306] [33mWARN[39m: [36mundefined Push partial for user cmrd0iacm0000ovx4fnl5ny8a session cmrd188om000aovx4o2oy0tqy: ok=0 errors=["DeviceNotRegistered","DeviceNotRegistered"] | [1783573101306][39m
+    [35mlocalTime[39m: "12:58:21.306"
+    [35mmodule[39m: "push"
+[04:58:22.378] [32mINFO[39m: [36mINFO Token scope rejected clientType: machine-scoped | [1783573102378][39m
+    [35mlocalTime[39m: "12:58:22.378"
+    [35mmodule[39m: "websocket"

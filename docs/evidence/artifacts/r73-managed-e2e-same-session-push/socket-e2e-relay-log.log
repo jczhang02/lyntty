@@ -1,0 +1,215 @@
+[04:50:41.229] [32mINFO[39m: [36mINFO incoming request | [1783572641229][39m
+    [35mlocalTime[39m: "12:50:41.229"
+    [35mreqId[39m: "req-g"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/v1/sessions",
+      "host": "localhost:45715",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59524
+    }
+[04:50:41.229] [32mINFO[39m: [36mINFO Auth check - path: /v1/sessions, has bearer header: true | [1783572641229][39m
+    [35mlocalTime[39m: "12:50:41.229"
+    [35mmodule[39m: "auth-decorator"
+[04:50:41.231] [32mINFO[39m: [36mINFO Auth success - user: cmrd0iacm0000ovx4fnl5ny8a | [1783572641231][39m
+    [35mlocalTime[39m: "12:50:41.232"
+    [35mmodule[39m: "auth-decorator"
+[04:50:41.234] [32mINFO[39m: [36mINFO Creating new session for user cmrd0iacm0000ovx4fnl5ny8a with tag r73-visible-session-1783572641211-33f6a4c8 | [1783572641234][39m
+    [35mlocalTime[39m: "12:50:41.234"
+    [35mmodule[39m: "session-create"
+    [35muserId[39m: "cmrd0iacm0000ovx4fnl5ny8a"
+    [35mtag[39m: "r73-visible-session-1783572641211-33f6a4c8"
+[04:50:41.236] [32mINFO[39m: [36mINFO Session created: cmrd13lqq0006ovx4rmfu8mjr | [1783572641236][39m
+    [35mlocalTime[39m: "12:50:41.236"
+    [35mmodule[39m: "session-create"
+    [35msessionId[39m: "cmrd13lqq0006ovx4rmfu8mjr"
+    [35muserId[39m: "cmrd0iacm0000ovx4fnl5ny8a"
+[04:50:41.236] [32mINFO[39m: [36mINFO Emitting new-session update to user-scoped connections | [1783572641236][39m
+    [35mlocalTime[39m: "12:50:41.236"
+    [35mmodule[39m: "session-create"
+    [35muserId[39m: "cmrd0iacm0000ovx4fnl5ny8a"
+    [35msessionId[39m: "cmrd13lqq0006ovx4rmfu8mjr"
+    [35mupdateType[39m: "new-session"
+    [35mupdateSeq[39m: 4
+[04:50:41.237] [32mINFO[39m: [36mINFO request completed | [1783572641237][39m
+    [35mlocalTime[39m: "12:50:41.237"
+    [35mreqId[39m: "req-g"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 7.438978016376495
+[04:50:41.242] [32mINFO[39m: [36mINFO incoming request | [1783572641242][39m
+    [35mlocalTime[39m: "12:50:41.242"
+    [35mreqId[39m: "req-h"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/v1/push-tokens",
+      "host": "localhost:45715",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59540
+    }
+[04:50:41.242] [32mINFO[39m: [36mINFO Auth check - path: /v1/push-tokens, has bearer header: true | [1783572641242][39m
+    [35mlocalTime[39m: "12:50:41.242"
+    [35mmodule[39m: "auth-decorator"
+[04:50:41.244] [32mINFO[39m: [36mINFO Auth success - user: cmrd0iacm0000ovx4fnl5ny8a | [1783572641244][39m
+    [35mlocalTime[39m: "12:50:41.244"
+    [35mmodule[39m: "auth-decorator"
+[04:50:41.246] [32mINFO[39m: [36mINFO request completed | [1783572641246][39m
+    [35mlocalTime[39m: "12:50:41.246"
+    [35mreqId[39m: "req-h"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3.920728027820587
+[04:50:41.255] [32mINFO[39m: [36mINFO Token verified: cmrd0iacm0000ovx4fnl5ny8a, clientType: user-scoped, client: r73-e2e-old-active-no-visible, sessionId: none, machineId: none, socketId: 0aUZmJ9dzf0pcEMSAAKj | [1783572641255][39m
+    [35mlocalTime[39m: "12:50:41.255"
+    [35mmodule[39m: "websocket"
+[04:50:41.255] [32mINFO[39m: [36mINFO User connected: cmrd0iacm0000ovx4fnl5ny8a | [1783572641255][39m
+    [35mlocalTime[39m: "12:50:41.255"
+    [35mmodule[39m: "websocket"
+[04:50:41.257] [32mINFO[39m: [36mINFO incoming request | [1783572641257][39m
+    [35mlocalTime[39m: "12:50:41.257"
+    [35mreqId[39m: "req-i"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/v1/sessions/cmrd13lqq0006ovx4rmfu8mjr/push-event",
+      "host": "localhost:45715",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59524
+    }
+[04:50:41.257] [32mINFO[39m: [36mINFO Auth check - path: /v1/sessions/cmrd13lqq0006ovx4rmfu8mjr/push-event, has bearer header: true | [1783572641257][39m
+    [35mlocalTime[39m: "12:50:41.257"
+    [35mmodule[39m: "auth-decorator"
+[04:50:41.259] [32mINFO[39m: [36mINFO Auth success - user: cmrd0iacm0000ovx4fnl5ny8a | [1783572641259][39m
+    [35mlocalTime[39m: "12:50:41.259"
+    [35mmodule[39m: "auth-decorator"
+[04:50:41.260] [32mINFO[39m: [36mINFO request completed | [1783572641260][39m
+    [35mlocalTime[39m: "12:50:41.260"
+    [35mreqId[39m: "req-i"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3.382501006126404
+[04:50:41.540] [33mWARN[39m: [36mundefined Push partial for user cmrd0iacm0000ovx4fnl5ny8a session cmrd13lqq0006ovx4rmfu8mjr: ok=0 errors=["DeviceNotRegistered"] | [1783572641540][39m
+    [35mlocalTime[39m: "12:50:41.540"
+    [35mmodule[39m: "push"
+[04:50:43.030] [32mINFO[39m: [36mINFO Token scope rejected clientType: machine-scoped | [1783572643030][39m
+    [35mlocalTime[39m: "12:50:43.030"
+    [35mmodule[39m: "websocket"
+[04:50:43.764] [32mINFO[39m: [36mINFO User disconnected: cmrd0iacm0000ovx4fnl5ny8a | [1783572643764][39m
+    [35mlocalTime[39m: "12:50:43.764"
+    [35mmodule[39m: "websocket"
+[04:50:44.278] [32mINFO[39m: [36mINFO Token verified: cmrd0iacm0000ovx4fnl5ny8a, clientType: user-scoped, client: r73-e2e-same-session-visible, sessionId: none, machineId: none, socketId: kCGHp19U4VMSpzcIAAKn | [1783572644278][39m
+    [35mlocalTime[39m: "12:50:44.278"
+    [35mmodule[39m: "websocket"
+[04:50:44.279] [32mINFO[39m: [36mINFO User connected: cmrd0iacm0000ovx4fnl5ny8a | [1783572644279][39m
+    [35mlocalTime[39m: "12:50:44.279"
+    [35mmodule[39m: "websocket"
+[04:50:44.279] [32mINFO[39m: [36mINFO incoming request | [1783572644279][39m
+    [35mlocalTime[39m: "12:50:44.279"
+    [35mreqId[39m: "req-j"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/v1/sessions/cmrd13lqq0006ovx4rmfu8mjr/push-event",
+      "host": "localhost:45715",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59524
+    }
+[04:50:44.280] [32mINFO[39m: [36mINFO Auth check - path: /v1/sessions/cmrd13lqq0006ovx4rmfu8mjr/push-event, has bearer header: true | [1783572644280][39m
+    [35mlocalTime[39m: "12:50:44.280"
+    [35mmodule[39m: "auth-decorator"
+[04:50:44.282] [32mINFO[39m: [36mINFO Auth success - user: cmrd0iacm0000ovx4fnl5ny8a | [1783572644282][39m
+    [35mlocalTime[39m: "12:50:44.282"
+    [35mmodule[39m: "auth-decorator"
+[04:50:44.283] [32mINFO[39m: [36mINFO Suppressed session-event push for user cmrd0iacm0000ovx4fnl5ny8a session cmrd13lqq0006ovx4rmfu8mjr: same session visible | [1783572644283][39m
+    [35mlocalTime[39m: "12:50:44.283"
+    [35mmodule[39m: "push"
+[04:50:44.283] [32mINFO[39m: [36mINFO request completed | [1783572644283][39m
+    [35mlocalTime[39m: "12:50:44.283"
+    [35mreqId[39m: "req-j"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3.8449449837207794
+[04:50:46.034] [32mINFO[39m: [36mINFO Token scope rejected clientType: machine-scoped | [1783572646034][39m
+    [35mlocalTime[39m: "12:50:46.034"
+    [35mmodule[39m: "websocket"
+[04:50:46.786] [32mINFO[39m: [36mINFO User disconnected: cmrd0iacm0000ovx4fnl5ny8a | [1783572646786][39m
+    [35mlocalTime[39m: "12:50:46.786"
+    [35mmodule[39m: "websocket"
+[04:50:47.291] [32mINFO[39m: [36mINFO Token verified: cmrd0iacm0000ovx4fnl5ny8a, clientType: user-scoped, client: r73-e2e-other-session-visible, sessionId: none, machineId: none, socketId: FWhcNdk-mVKq8U6YAAKr | [1783572647291][39m
+    [35mlocalTime[39m: "12:50:47.291"
+    [35mmodule[39m: "websocket"
+[04:50:47.291] [32mINFO[39m: [36mINFO User connected: cmrd0iacm0000ovx4fnl5ny8a | [1783572647291][39m
+    [35mlocalTime[39m: "12:50:47.291"
+    [35mmodule[39m: "websocket"
+[04:50:47.291] [32mINFO[39m: [36mINFO incoming request | [1783572647291][39m
+    [35mlocalTime[39m: "12:50:47.291"
+    [35mreqId[39m: "req-k"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/v1/sessions/cmrd13lqq0006ovx4rmfu8mjr/push-event",
+      "host": "localhost:45715",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59524
+    }
+[04:50:47.291] [32mINFO[39m: [36mINFO Auth check - path: /v1/sessions/cmrd13lqq0006ovx4rmfu8mjr/push-event, has bearer header: true | [1783572647291][39m
+    [35mlocalTime[39m: "12:50:47.291"
+    [35mmodule[39m: "auth-decorator"
+[04:50:47.293] [32mINFO[39m: [36mINFO Auth success - user: cmrd0iacm0000ovx4fnl5ny8a | [1783572647293][39m
+    [35mlocalTime[39m: "12:50:47.293"
+    [35mmodule[39m: "auth-decorator"
+[04:50:47.294] [32mINFO[39m: [36mINFO request completed | [1783572647294][39m
+    [35mlocalTime[39m: "12:50:47.294"
+    [35mreqId[39m: "req-k"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3.125923991203308
+[04:50:47.575] [33mWARN[39m: [36mundefined Push partial for user cmrd0iacm0000ovx4fnl5ny8a session cmrd13lqq0006ovx4rmfu8mjr: ok=0 errors=["DeviceNotRegistered"] | [1783572647575][39m
+    [35mlocalTime[39m: "12:50:47.575"
+    [35mmodule[39m: "push"
+[04:50:49.037] [32mINFO[39m: [36mINFO Token scope rejected clientType: machine-scoped | [1783572649037][39m
+    [35mlocalTime[39m: "12:50:49.037"
+    [35mmodule[39m: "websocket"
+[04:50:49.797] [32mINFO[39m: [36mINFO User disconnected: cmrd0iacm0000ovx4fnl5ny8a | [1783572649797][39m
+    [35mlocalTime[39m: "12:50:49.797"
+    [35mmodule[39m: "websocket"
+[04:50:50.302] [32mINFO[39m: [36mINFO Token verified: cmrd0iacm0000ovx4fnl5ny8a, clientType: user-scoped, client: r73-e2e-background-same-visible, sessionId: none, machineId: none, socketId: lN-31JNVaqr6DQguAAKv | [1783572650302][39m
+    [35mlocalTime[39m: "12:50:50.302"
+    [35mmodule[39m: "websocket"
+[04:50:50.302] [32mINFO[39m: [36mINFO User connected: cmrd0iacm0000ovx4fnl5ny8a | [1783572650302][39m
+    [35mlocalTime[39m: "12:50:50.302"
+    [35mmodule[39m: "websocket"
+[04:50:50.303] [32mINFO[39m: [36mINFO incoming request | [1783572650303][39m
+    [35mlocalTime[39m: "12:50:50.303"
+    [35mreqId[39m: "req-l"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/v1/sessions/cmrd13lqq0006ovx4rmfu8mjr/push-event",
+      "host": "localhost:45715",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59524
+    }
+[04:50:50.312] [32mINFO[39m: [36mINFO Auth check - path: /v1/sessions/cmrd13lqq0006ovx4rmfu8mjr/push-event, has bearer header: true | [1783572650312][39m
+    [35mlocalTime[39m: "12:50:50.312"
+    [35mmodule[39m: "auth-decorator"
+[04:50:50.314] [32mINFO[39m: [36mINFO Auth success - user: cmrd0iacm0000ovx4fnl5ny8a | [1783572650314][39m
+    [35mlocalTime[39m: "12:50:50.314"
+    [35mmodule[39m: "auth-decorator"
+[04:50:50.316] [32mINFO[39m: [36mINFO request completed | [1783572650316][39m
+    [35mlocalTime[39m: "12:50:50.316"
+    [35mreqId[39m: "req-l"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3.50559401512146
+[04:50:50.597] [33mWARN[39m: [36mundefined Push partial for user cmrd0iacm0000ovx4fnl5ny8a session cmrd13lqq0006ovx4rmfu8mjr: ok=0 errors=["DeviceNotRegistered"] | [1783572650597][39m
+    [35mlocalTime[39m: "12:50:50.597"
+    [35mmodule[39m: "push"
+[04:50:52.039] [32mINFO[39m: [36mINFO Token scope rejected clientType: machine-scoped | [1783572652039][39m
+    [35mlocalTime[39m: "12:50:52.039"
+    [35mmodule[39m: "websocket"
+[04:50:52.819] [32mINFO[39m: [36mINFO User disconnected: cmrd0iacm0000ovx4fnl5ny8a | [1783572652819][39m
+    [35mlocalTime[39m: "12:50:52.819"
+    [35mmodule[39m: "websocket"
