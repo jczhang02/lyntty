@@ -6,7 +6,7 @@
     </linearGradient>
   </defs>
   <rect width="1024" height="1024" fill="url(#lynttyIconBackground)"/>
-  <g id="lyntty-mark" transform="translate(512 522.000) scale(0.673418) translate(-515.000 -506.000)">
+  <g id="lyntty-mark" transform="translate(512 522.000) scale(0.538734) translate(-515.000 -506.000)">
     <g transform="translate(0 1024) scale(0.1 -0.1)" fill="#F8FAFC">
       <path d="M1425 9711 c-88 -22 -163 -82 -199 -160 -20 -44 -21 -62 -24 -501 -2
 -310 0 -471 8 -507 14 -64 59 -133 109 -166 76 -50 122 -57 403 -57 l258 0 0
