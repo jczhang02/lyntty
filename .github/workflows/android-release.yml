@@ -22,10 +22,26 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: production-android
     timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release source
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Android releases must run from refs/heads/main"
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+            echo "Android release HEAD must equal origin/main"
+            exit 1
+          fi
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -52,6 +68,10 @@ jobs:
           VERSION_CODE_INPUT: ${{ inputs.version_code }}
         run: |
           set -euo pipefail
+          if [[ ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version_name must be strict SemVer (for example 1.2.3)"
+            exit 1
+          fi
           version_code="${VERSION_CODE_INPUT:-$GITHUB_RUN_NUMBER}"
           case "$version_code" in
             ''|*[!0-9]*)
@@ -119,6 +139,8 @@ jobs:
           LYNTTY_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEYSTORE_PASSWORD }}
           LYNTTY_ANDROID_KEY_ALIAS: ${{ secrets.LYNTTY_ANDROID_KEY_ALIAS }}
           LYNTTY_ANDROID_KEY_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEY_PASSWORD }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
         run: |
           set -euo pipefail
           : "${LYNTTY_EAS_PROJECT_ID:?Repository variable LYNTTY_EAS_PROJECT_ID is required for Expo push tokens}"
@@ -127,8 +149,8 @@ jobs:
             -x lintVitalRelease \
             -PreactNativeArchitectures=arm64-v8a \
             -Pandroid.enablePngCrunchInReleaseBuilds=false \
-            -PlynttyVersionName='${{ inputs.version_name }}' \
-            -PlynttyVersionCode='${{ steps.release.outputs.version_code }}' \
+            -PlynttyVersionName="$VERSION_NAME" \
+            -PlynttyVersionCode="$VERSION_CODE" \
             -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks"
 
       - name: Generate latest.json

@@ -27,9 +27,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check repository hardening
+        run: node --test scripts/workflow-hardening.test.mjs scripts/evidence-redaction.test.mjs
 
       - name: Check whitespace
-        run: git diff --check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$BASE_SHA" ]]; then
+            git diff --check "$BASE_SHA...$GITHUB_SHA"
+          else
+            git show --check --format= "$GITHUB_SHA"
+          fi
 
   wire:
     name: lyntty-wire
@@ -50,6 +63,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm ci:audit
 
       - name: Build and test lyntty-wire
         run: pnpm ci:wire

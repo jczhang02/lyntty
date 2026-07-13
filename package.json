@@ -23,7 +23,9 @@
         "ci:relay": "pnpm --filter ./packages/lyntty-relay typecheck && pnpm --filter ./packages/lyntty-relay build && pnpm --filter ./packages/lyntty-relay test",
         "ci:app": "pnpm --filter ./packages/lyntty-app typecheck && pnpm --filter ./packages/lyntty-app lint:i18n && pnpm --filter ./packages/lyntty-app test -- --run && pnpm --filter ./packages/lyntty-app exec expo config --type introspect --json > /tmp/lyntty-expo-config.json",
         "ci:agent": "pnpm --filter ./packages/lyntty-agent typecheck && pnpm --filter ./packages/lyntty-agent test",
-        "ci:fast": "pnpm ci:wire && pnpm ci:cli && pnpm ci:relay && pnpm ci:app && pnpm ci:agent && git diff --check",
+        "ci:audit": "pnpm audit --prod --audit-level high",
+        "ci:fast": "pnpm test:repo-hardening && pnpm ci:audit && pnpm ci:wire && pnpm ci:cli && pnpm ci:relay && pnpm ci:app && pnpm ci:agent && git diff --check",
+        "test:repo-hardening": "node --test scripts/workflow-hardening.test.mjs scripts/evidence-redaction.test.mjs",
         "mobile": "pnpm --filter lyntty-app start",
         "android": "pnpm --filter lyntty-app android",
         "e2e:maestro": "scripts/e2e/run-maestro.sh e2e/maestro",
@@ -42,26 +44,6 @@
             "packages/lyntty-wire",
             "packages/lyntty-app-logs",
             "packages/codium"
-        ]
-    },
-    "pnpm": {
-        "overrides": {
-            "whatwg-url": "14.2.0",
-            "parse-path": "7.0.3",
-            "@types/parse-path": "7.0.3"
-        },
-        "onlyBuiltDependencies": [
-            "@more-tech/react-native-libsodium",
-            "@prisma/client",
-            "@prisma/engines",
-            "@shopify/react-native-skia",
-            "@tailwindcss/oxide",
-            "better-sqlite3",
-            "electron",
-            "esbuild",
-            "node-pty",
-            "prisma",
-            "sharp"
         ]
     },
     "packageManager": "pnpm@10.11.0"
