@@ -30,14 +30,16 @@ export const ChatList = React.memo((props: { session: Session }) => {
             hasMoreOlder={hasMoreOlder}
             isLoadingOlder={isLoadingOlder}
             olderLoadError={olderLoadError}
+            hasHistoryGap={props.session.metadata?.piHasHistoryGap === true || props.session.metadata?.controlState === 'history_gap'}
         />
     )
 });
 
-const ListHeader = React.memo((props: { isLoadingOlder: boolean; olderLoadError: string | null; onRetry: () => void }) => {
+const ListHeader = React.memo((props: { isLoadingOlder: boolean; olderLoadError: string | null; hasHistoryGap: boolean; onRetry: () => void }) => {
     const headerHeight = useHeaderHeight();
     const safeArea = useSafeAreaInsets();
     const { theme } = useUnistyles();
+    const hasHistoryGap = props.hasHistoryGap || props.olderLoadError?.startsWith('history_gap:') === true;
     // ListFooterComponent on an inverted FlatList renders at the visual top
     // — that is exactly where the spinner for "loading older messages"
     // belongs. The spacer below keeps the header bar from clipping the
@@ -49,15 +51,24 @@ const ListHeader = React.memo((props: { isLoadingOlder: boolean; olderLoadError:
                     <ActivityIndicator size="small" />
                 </View>
             )}
-            {!props.isLoadingOlder && props.olderLoadError && (
-                <Pressable
-                    onPress={props.onRetry}
-                    style={{ paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center' }}
-                >
-                    <View style={{ borderColor: theme.colors.divider, borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12 }}>
-                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>{t('appWide.couldNotLoadOlderMessagesRetry')}</Text>
+            {!props.isLoadingOlder && (props.olderLoadError || hasHistoryGap) && (
+                hasHistoryGap ? (
+                    <View style={{ paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderColor: theme.colors.divider, borderWidth: 1, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 12 }}>
+                            <Octicons name="info" size={14} color={theme.colors.textSecondary} />
+                            <Text style={{ color: theme.colors.textSecondary, fontSize: 13, flexShrink: 1 }}>{t('appWide.piHistoryGapOlderMessagesUnavailable')}</Text>
+                        </View>
                     </View>
-                </Pressable>
+                ) : props.olderLoadError ? (
+                    <Pressable
+                        onPress={props.onRetry}
+                        style={{ paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center' }}
+                    >
+                        <View style={{ borderColor: theme.colors.divider, borderWidth: 1, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12 }}>
+                            <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>{t('appWide.couldNotLoadOlderMessagesRetry')}</Text>
+                        </View>
+                    </Pressable>
+                ) : null
             )}
             <View style={{ flexDirection: 'row', alignItems: 'center', height: headerHeight + safeArea.top + 32 }} />
         </View>
@@ -78,6 +89,7 @@ const ChatListInternal = React.memo((props: {
     hasMoreOlder: boolean,
     isLoadingOlder: boolean,
     olderLoadError: string | null,
+    hasHistoryGap: boolean,
 }) => {
     const { theme } = useUnistyles();
     const flatListRef = React.useRef<FlatList>(null);
@@ -352,7 +364,7 @@ const ChatListInternal = React.memo((props: {
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
                 ListHeaderComponent={<ListFooter sessionId={props.sessionId} />}
-                ListFooterComponent={<ListHeader isLoadingOlder={props.isLoadingOlder} olderLoadError={props.olderLoadError} onRetry={handleRetryLoadOlder} />}
+                ListFooterComponent={<ListHeader isLoadingOlder={props.isLoadingOlder} olderLoadError={props.olderLoadError} hasHistoryGap={props.hasHistoryGap} onRetry={handleRetryLoadOlder} />}
                 onEndReached={handleLoadOlder}
                 onEndReachedThreshold={0.5}
             />

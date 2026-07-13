@@ -13,6 +13,7 @@ import {
     getAttachmentDiagnostic,
 } from './attachmentDiagnostics';
 import { ApiEphemeralUpdateSchema, ApiMessage, ApiUpdateContainerSchema } from './apiTypes';
+import { orderApiMessagesForReducer } from './messageOrdering';
 import type { ApiEphemeralActivityUpdate } from './apiTypes';
 import { Session, Machine, type PiMachineSessionRecord } from './storageTypes';
 import { InvalidateSync } from '@/utils/sync';
@@ -25,7 +26,7 @@ import { isRunningOnMac } from '@/utils/platform';
 import { NormalizedMessage, normalizeRawMessage, RawRecord } from './typesRaw';
 import { applySettings, Settings, settingsDefaults, settingsParse, settingsToSyncPayload, SUPPORTED_SCHEMA_VERSION } from './settings';
 import { Profile, profileParse } from './profile';
-import { loadPendingSettings, savePendingSettings } from './persistence';
+import { loadPendingOutbox, loadPendingSettings, loadPendingSyntheticOutbox, savePendingOutbox, savePendingSettings, savePendingSyntheticOutbox } from './persistence';
 import {
     initializeTracking,
     trackGitHubConnected,
@@ -64,6 +65,7 @@ import { readFileBytes } from '@/utils/readFileBytes';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { mergePiDiscoveredSessions } from './piDiscoveredSessions';
+import { applyPiHistoryPageResult, type PiHistoryPageResult } from './piHistoryPage';
 
 type V3GetSessionMessagesResponse = {
     messages: ApiMessage[];
@@ -116,12 +118,13 @@ class Sync {
     // load older history. Set after the initial latest-page fetch and
     // advanced downward by loadOlderMessages.
     private sessionOldestSeq = new Map<string, number>();
-    private pendingOutbox = new Map<string, OutboxMessage[]>();
-    private pendingSyntheticOutbox = new Map<string, Array<{ text: string; options?: SendMessageOptions }>>();
+    private pendingOutbox: Map<string, OutboxMessage[]> = loadPendingOutbox();
+    private pendingSyntheticOutbox = loadPendingSyntheticOutbox() as Map<string, Array<{ text: string; options?: SendMessageOptions }>>;
     private flushingSyntheticOutbox = new Set<string>();
     private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
     private sessionQueueProcessing = new Set<string>();
     private sessionMessageLocks = new Map<string, AsyncLock>();
+    private updateProcessingChain: Promise<void> = Promise.resolve();
     private sessionDataKeys = new Map<string, Uint8Array>(); // Store session data encryption keys internally
     private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
     private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
@@ -243,7 +246,9 @@ class Sync {
         this.sessionLastSeq.clear();
         this.sessionOldestSeq.clear();
         this.pendingOutbox.clear();
+        savePendingOutbox(this.pendingOutbox);
         this.pendingSyntheticOutbox.clear();
+        savePendingSyntheticOutbox(this.pendingSyntheticOutbox);
         this.flushingSyntheticOutbox.clear();
         this.sessionMessageQueue.clear();
         this.sessionQueueProcessing.clear();
@@ -333,6 +338,12 @@ class Sync {
         // let it resolve in the background instead of blocking the UI.
         this.sessionsSync.awaitQueue().then(() => {
             storage.getState().applyReady();
+            for (const sessionId of this.pendingOutbox.keys()) {
+                this.getSendSync(sessionId).invalidate();
+            }
+            if (this.hasPendingOutboxMessages()) {
+                this.maybeStartBackgroundSendWatchdog();
+            }
         }).catch((error) => {
             console.error('Failed to load sessions:', error);
             // Still mark ready so the UI doesn't stay on a blank screen forever
@@ -527,6 +538,8 @@ class Sync {
             sessionIds.push(sessionId);
         }
 
+        savePendingOutbox(this.pendingOutbox);
+
         for (const sessionId of sessionIds) {
             this.enqueueMessages(sessionId, [{
                 id: randomUUID(),
@@ -626,6 +639,7 @@ class Sync {
         const pending = this.pendingSyntheticOutbox.get(sessionId) ?? [];
         pending.push({ text, options });
         this.pendingSyntheticOutbox.set(sessionId, pending);
+        savePendingSyntheticOutbox(this.pendingSyntheticOutbox);
 
         const now = Date.now();
         const session = storage.getState().sessions[sessionId];
@@ -670,10 +684,12 @@ class Sync {
                 const current = this.pendingSyntheticOutbox.get(syntheticSessionId);
                 if (!current || current.length === 0) {
                     this.pendingSyntheticOutbox.delete(syntheticSessionId);
+                    savePendingSyntheticOutbox(this.pendingSyntheticOutbox);
                     return;
                 }
                 const item = current[0];
-                await this.sendMessage(relaySessionId, item.text, item.options);
+                const queued = await this.sendMessage(relaySessionId, item.text, item.options);
+                if (!queued) return;
                 const afterSend = this.pendingSyntheticOutbox.get(syntheticSessionId) ?? [];
                 const remaining = afterSend.filter((entry) => entry !== item);
                 if (remaining.length > 0) {
@@ -681,13 +697,14 @@ class Sync {
                 } else {
                     this.pendingSyntheticOutbox.delete(syntheticSessionId);
                 }
+                savePendingSyntheticOutbox(this.pendingSyntheticOutbox);
             }
         } finally {
             this.flushingSyntheticOutbox.delete(syntheticSessionId);
         }
     }
 
-    async sendMessage(sessionId: string, text: string, options?: SendMessageOptions) {
+    async sendMessage(sessionId: string, text: string, options?: SendMessageOptions): Promise<boolean> {
 
         // Get session data from storage
         let session = storage.getState().sessions[sessionId];
@@ -696,7 +713,8 @@ class Sync {
             session = storage.getState().sessions[sessionId];
             if (!session) {
                 console.error(`Session ${sessionId} not found in storage after sync`);
-                return;
+                Modal.alert(t('common.error'), t('appWide.messageFailed'));
+                return false;
             }
         }
 
@@ -710,11 +728,12 @@ class Sync {
             encryption = this.encryption.getSessionEncryption(sessionId);
             if (!encryption && session.metadata?.piSynthetic) {
                 this.queueSyntheticMessage(sessionId, text, options);
-                return;
+                return true;
             }
             if (!encryption) {
                 console.error(`Session ${sessionId} not found after sync`);
-                return;
+                Modal.alert(t('common.error'), t('appWide.messageFailed'));
+                return false;
             }
         }
 
@@ -737,7 +756,7 @@ class Sync {
                 [{ text: t('common.ok'), style: 'cancel' }],
             );
             if (!attachmentPlan.shouldSendText) {
-                return;
+                return false;
             }
         }
 
@@ -800,6 +819,7 @@ class Sync {
                         this.enqueueMessages(sessionId, [fileNormalized]);
                     }
                     pending.push({ localId: fileLocalId, content: encryptedFileRecord });
+                    savePendingOutbox(this.pendingOutbox);
                 }
             }
         }
@@ -863,10 +883,12 @@ class Sync {
             localId,
             content: encryptedRawRecord
         });
+        savePendingOutbox(this.pendingOutbox);
         trackMessageSent(source, session.metadata);
 
         this.getSendSync(sessionId).invalidate();
         this.maybeStartBackgroundSendWatchdog();
+        return true;
     }
 
     /** Server sent us settings — merge any pending local changes on top, then apply as one update. */
@@ -1949,6 +1971,8 @@ class Sync {
 
             const data = await response.json() as V3PostSessionMessagesResponse;
             pending.splice(0, batch.length);
+            if (pending.length === 0) this.pendingOutbox.delete(sessionId);
+            savePendingOutbox(this.pendingOutbox);
             if (Array.isArray(data.messages) && data.messages.length > 0) {
                 const currentLastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
                 let maxSeq = currentLastSeq;
@@ -2098,7 +2122,10 @@ class Sync {
         messages: ApiMessage[]
     ) => {
         if (messages.length === 0) return;
-        const decryptedMessages = await encryption.decryptMessages(messages);
+        // Backward pages arrive newest-first from the relay, but session
+        // protocol turn-start/text/turn-end events are stateful and must be
+        // reduced in ascending sequence order.
+        const decryptedMessages = await encryption.decryptMessages(orderApiMessagesForReducer(messages));
         const normalizedMessages: NormalizedMessage[] = [];
         for (let i = 0; i < decryptedMessages.length; i++) {
             const decrypted = decryptedMessages[i];
@@ -2134,6 +2161,7 @@ class Sync {
 
         storage.getState().applyOlderMessagesLoading(sessionId, true);
         const lock = this.getSessionMessageLock(sessionId);
+        let historyGapReason: string | null = null;
         try {
             await lock.inLock(async () => {
                 const encryption = this.encryption.getSessionEncryption(sessionId);
@@ -2144,26 +2172,23 @@ class Sync {
                 const currentSession = storage.getState().sessions[sessionId];
                 if (currentSession?.metadata?.piHistoryHasMore === true) {
                     const fromSeq = this.sessionLastSeq.get(sessionId) ?? 0;
-                    const result = await apiSocket.sessionRPC<{
-                        type: 'success';
-                        sent: number;
-                        nextCursor?: string;
-                        hasMore: boolean;
-                        totalMessages: number;
-                    }, { beforeEntryId?: string }>(
+                    const result = await apiSocket.sessionRPC<PiHistoryPageResult, { beforeEntryId?: string }>(
                         sessionId,
                         'pi-history-page',
                         currentSession.metadata.piHistoryCursor ? { beforeEntryId: currentSession.metadata.piHistoryCursor } : {},
                     );
+                    const latestSession = storage.getState().sessions[sessionId] ?? currentSession;
                     storage.getState().applySessions([{
-                        ...currentSession,
-                        metadata: {
-                            ...currentSession.metadata,
-                            piHistoryCursor: result.nextCursor,
-                            piHistoryHasMore: result.hasMore,
-                            piHistoryTotalMessages: result.totalMessages,
-                        },
+                        ...latestSession,
+                        metadata: applyPiHistoryPageResult(latestSession.metadata ?? currentSession.metadata!, result),
                     }]);
+                    if (result.type === 'history_gap') {
+                        historyGapReason = `history_gap: ${result.reason}`;
+                        storage.getState().applyOlderMessagesPagination(sessionId, {
+                            hasMore: (this.sessionOldestSeq.get(sessionId) ?? 0) > 1,
+                        });
+                        return;
+                    }
                     await this.fetchForwardSince(sessionId, encryption, fromSeq);
                     storage.getState().applyOlderMessagesPagination(sessionId, {
                         hasMore: result.hasMore || (this.sessionOldestSeq.get(sessionId) ?? 0) > 1,
@@ -2198,7 +2223,7 @@ class Sync {
                     hasMore: !!data.hasMore && messages.length > 0
                 });
             });
-            storage.getState().applyOlderMessagesError(sessionId, null);
+            storage.getState().applyOlderMessagesError(sessionId, historyGapReason);
         } catch (error) {
             storage.getState().applyOlderMessagesError(
                 sessionId,
@@ -2257,7 +2282,15 @@ class Sync {
         });
     }
 
-    private handleUpdate = async (update: unknown) => {
+    private handleUpdate = (update: unknown) => {
+        this.updateProcessingChain = this.updateProcessingChain
+            .then(() => this.processUpdate(update))
+            .catch((error) => {
+                console.error('Failed to process relay update in order', error);
+            });
+    }
+
+    private processUpdate = async (update: unknown) => {
         const validatedUpdate = ApiUpdateContainerSchema.safeParse(update);
         if (!validatedUpdate.success) {
             console.log('❌ Sync: Invalid update received:', validatedUpdate.error);
@@ -2378,6 +2411,7 @@ class Sync {
             this.messagesSync.delete(sessionId);
             this.sendSync.delete(sessionId);
             this.pendingOutbox.delete(sessionId);
+            savePendingOutbox(this.pendingOutbox);
             this.sessionLastSeq.delete(sessionId);
             this.sessionOldestSeq.delete(sessionId);
             this.sessionMessageLocks.delete(sessionId);

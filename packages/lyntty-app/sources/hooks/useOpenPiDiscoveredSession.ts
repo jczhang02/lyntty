@@ -48,6 +48,7 @@ export function useOpenPiDiscoveredSession() {
                 await attachRelaySession(mirrorResult.sessionId);
                 return true;
             }
+            Modal.alert(t('common.error'), mirrorResult.errorMessage);
             return false;
         };
 
@@ -56,10 +57,10 @@ export function useOpenPiDiscoveredSession() {
             void ensureMirror();
             return;
         } else if (session.piSynthetic) {
-            const attached = await ensureMirror();
-            if (attached) {
-                return;
-            }
+            await ensureMirror();
+            // A discovered computer-side Pi session must never fall through to
+            // managed runtime spawn when its extension is missing or stale.
+            return;
         }
 
         const result = await machineSpawnNewSession(request);

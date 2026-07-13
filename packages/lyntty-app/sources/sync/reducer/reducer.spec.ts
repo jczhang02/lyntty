@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { NormalizedMessage } from '../typesRaw';
-import { createReducer } from './reducer';
+import { applyRemoteCommandOutcomes, createReducer } from './reducer';
 import { reducer } from './reducer';
 import { AgentState } from '../storageTypes';
 
@@ -164,6 +164,32 @@ describe('reducer', () => {
                     remoteCommandLocalKey: 'mobile-local-1',
                     remoteCommandState: 'accepted_by_pi',
                 },
+            });
+        });
+
+        it('marks a queued optimistic Pi command as failed from session metadata', () => {
+            const state = createReducer();
+            reducer(state, [{
+                id: 'phone-msg',
+                localId: 'mobile-local-1',
+                createdAt: 1000,
+                role: 'user',
+                content: { type: 'text', text: 'hello' },
+                isSidechain: false,
+                meta: {
+                    sentFrom: 'android',
+                    remoteCommandLocalKey: 'mobile-local-1',
+                    remoteCommandState: 'queued',
+                },
+            }]);
+
+            const changed = applyRemoteCommandOutcomes(state, [], ['mobile-local-1']);
+
+            expect(changed).toHaveLength(1);
+            expect(changed[0]).toMatchObject({
+                kind: 'user-text',
+                localId: 'mobile-local-1',
+                meta: { remoteCommandState: 'failed' },
             });
         });
 

@@ -366,7 +366,7 @@ const AGENT_INPUT_AUTOCOMPLETE_PREFIXES = ['@', '/'];
 // the whole loaded screen on every keystroke).
 type ChatComposerHandle = {
     getMessage: () => string;
-    clearMessage: () => void;
+    clearMessageIfUnchanged: (expected: string) => void;
 };
 
 type ChatComposerProps = Omit<
@@ -408,7 +408,8 @@ const ChatComposer = React.memo(function ChatComposer(props: ChatComposerProps) 
 
     React.useImperativeHandle(composerHandleRef, () => ({
         getMessage: () => inputHandleRef.current?.getText() ?? '',
-        clearMessage: () => {
+        clearMessageIfUnchanged: (expected: string) => {
+            if ((inputHandleRef.current?.getText() ?? '') !== expected) return;
             inputHandleRef.current?.setTextAndSelection('', { start: 0, end: 0 });
             setMessage('');
             clearDraft();
@@ -503,6 +504,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     // clear it without subscribing to it (which would re-render the whole
     // SessionViewLoaded tree on every keystroke).
     const composerHandleRef = React.useRef<ChatComposerHandle | null>(null);
+    const sendInFlightRef = React.useRef(false);
 
     // Handle dismissing CLI version warning
     const handleDismissCliWarning = React.useCallback(() => {
@@ -542,13 +544,20 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     // handleSend reads the live message via the composer ref, so it doesn't
     // need to re-create on every keystroke.
     const handleSend = React.useCallback(() => {
+        if (sendInFlightRef.current) return;
         const liveMessage = composerHandleRef.current?.getMessage() ?? '';
-        if (liveMessage.trim() || (expImageUpload && selectedImages.length > 0)) {
-            const attachments = expImageUpload ? selectedImages : undefined;
-            composerHandleRef.current?.clearMessage();
+        if (!liveMessage.trim() && !(expImageUpload && selectedImages.length > 0)) return;
+        const attachments = expImageUpload ? selectedImages : undefined;
+        sendInFlightRef.current = true;
+        void sync.sendMessage(sessionId, liveMessage, { source: 'chat', attachments }).then((queued) => {
+            if (!queued) return;
+            composerHandleRef.current?.clearMessageIfUnchanged(liveMessage);
             if (expImageUpload) clearImages();
-            sync.sendMessage(sessionId, liveMessage, { source: 'chat', attachments });
-        }
+        }).catch(() => {
+            Modal.alert(t('common.error'), t('appWide.messageFailed'));
+        }).finally(() => {
+            sendInFlightRef.current = false;
+        });
     }, [sessionId, expImageUpload, selectedImages, clearImages]);
 
     const handleAbort = React.useCallback(async () => {

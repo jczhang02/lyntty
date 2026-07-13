@@ -11,6 +11,75 @@ const REGISTERED_PUSH_TOKEN_KEY = 'registered-push-token-v1';
 const VOICE_SOFT_PAYWALL_SHOWN_KEY = 'voice-soft-paywall-shown';
 const VOICE_ONBOARDING_PROMPT_LOAD_COUNT_KEY = 'voice-onboarding-prompt-load-count';
 const VOICE_MESSAGE_COUNT_KEY = 'voice-message-count';
+const PENDING_OUTBOX_KEY = 'pending-message-outbox-v1';
+const PENDING_SYNTHETIC_OUTBOX_KEY = 'pending-synthetic-message-outbox-v1';
+
+export type PersistedOutboxMessage = {
+    localId: string;
+    content: string;
+};
+
+export function parsePendingOutbox(raw: string | undefined): Map<string, PersistedOutboxMessage[]> {
+    const result = new Map<string, PersistedOutboxMessage[]>();
+    if (!raw) return result;
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return result;
+        for (const [sessionId, entries] of Object.entries(parsed).slice(0, 100)) {
+            if (!sessionId || !Array.isArray(entries)) continue;
+            const valid = entries.slice(0, 1_000).filter((entry): entry is PersistedOutboxMessage => (
+                Boolean(entry)
+                && typeof entry === 'object'
+                && typeof (entry as PersistedOutboxMessage).localId === 'string'
+                && typeof (entry as PersistedOutboxMessage).content === 'string'
+            ));
+            if (valid.length > 0) result.set(sessionId, valid);
+        }
+    } catch (error) {
+        console.error('Failed to parse pending message outbox', error);
+    }
+    return result;
+}
+
+export function loadPendingOutbox(): Map<string, PersistedOutboxMessage[]> {
+    return parsePendingOutbox(mmkv.getString(PENDING_OUTBOX_KEY));
+}
+
+export function savePendingOutbox(outbox: Map<string, PersistedOutboxMessage[]>): void {
+    mmkv.set(PENDING_OUTBOX_KEY, JSON.stringify(Object.fromEntries(outbox)));
+}
+
+export type PersistedSyntheticOutboxMessage = {
+    text: string;
+    options?: unknown;
+};
+
+export function parsePendingSyntheticOutbox(raw: string | undefined): Map<string, PersistedSyntheticOutboxMessage[]> {
+    const result = new Map<string, PersistedSyntheticOutboxMessage[]>();
+    if (!raw) return result;
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return result;
+        for (const [sessionId, entries] of Object.entries(parsed).slice(0, 100)) {
+            if (!sessionId || !Array.isArray(entries)) continue;
+            const valid = entries.slice(0, 1_000).filter((entry): entry is PersistedSyntheticOutboxMessage => (
+                Boolean(entry) && typeof entry === 'object' && typeof (entry as PersistedSyntheticOutboxMessage).text === 'string'
+            ));
+            if (valid.length > 0) result.set(sessionId, valid);
+        }
+    } catch (error) {
+        console.error('Failed to parse pending synthetic message outbox', error);
+    }
+    return result;
+}
+
+export function loadPendingSyntheticOutbox(): Map<string, PersistedSyntheticOutboxMessage[]> {
+    return parsePendingSyntheticOutbox(mmkv.getString(PENDING_SYNTHETIC_OUTBOX_KEY));
+}
+
+export function savePendingSyntheticOutbox(outbox: Map<string, PersistedSyntheticOutboxMessage[]>): void {
+    mmkv.set(PENDING_SYNTHETIC_OUTBOX_KEY, JSON.stringify(Object.fromEntries(outbox)));
+}
 
 export type NewSessionAgentType = 'pi' | 'claude' | 'codex' | 'gemini' | 'openclaw';
 export type NewSessionSessionType = 'simple' | 'worktree';

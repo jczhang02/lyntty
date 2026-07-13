@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: Lyntty recovers latest Pi reply after app restart
+tags:
+  - reliability
+  - app-restart
+  - reply-recovery
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "R75 Maestro Pi Session"
+    timeout: 120000
+- tapOn: "R75 Maestro Pi Session"
+- extendedWaitUntil:
+    visible: "${PONG}"
+    timeout: 120000
+- assertNotVisible: "Session has been deleted"

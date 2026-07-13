@@ -1319,3 +1319,38 @@ function convertReducerMessageToMessage(reducerMsg: ReducerMessage, state: Reduc
 
     return null;
 }
+
+export function applyRemoteCommandOutcomes(
+    state: ReducerState,
+    acceptedLocalKeys: readonly string[],
+    failedLocalKeys: readonly string[],
+): Message[] {
+    const accepted = new Set(acceptedLocalKeys);
+    const failed = new Set(failedLocalKeys);
+    const changed: Message[] = [];
+
+    for (const [messageId, message] of state.messages) {
+        const localKey = message.localId ?? message.meta?.remoteCommandLocalKey;
+        if (message.role !== 'user' || !localKey) continue;
+        const nextState = failed.has(localKey)
+            ? 'failed'
+            : accepted.has(localKey)
+                ? 'accepted_by_pi'
+                : null;
+        if (!nextState || message.meta?.remoteCommandState === nextState) continue;
+
+        const updated: ReducerMessage = {
+            ...message,
+            meta: {
+                ...message.meta,
+                remoteCommandLocalKey: localKey,
+                remoteCommandState: nextState,
+            },
+        };
+        state.messages.set(messageId, updated);
+        const converted = convertReducerMessageToMessage(updated, state);
+        if (converted) changed.push(converted);
+    }
+
+    return changed;
+}

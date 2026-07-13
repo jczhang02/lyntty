@@ -14,7 +14,7 @@ export const MessageMetaSchema = z.object({
     displayText: z.string().optional(), // Optional text to display in UI instead of actual message text
     remoteCommandLocalKey: z.string().optional(), // Local optimistic user message id for Pi shared-control echo merging
     sendMobileContextToPi: z.boolean().optional(), // Whether this remote command asked Pi to receive mobile context
-    remoteCommandState: z.enum(['queued', 'accepted_by_pi']).optional(),
+    remoteCommandState: z.enum(['queued', 'accepted_by_pi', 'failed']).optional(),
 });
 
 export type MessageMeta = z.infer<typeof MessageMetaSchema>;

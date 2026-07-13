@@ -11,14 +11,16 @@ def lynttyKeyAlias = (findProperty('lynttyKeyAlias') ?: System.getenv('LYNTTY_AN
 def lynttyKeyPassword = (findProperty('lynttyKeyPassword') ?: System.getenv('LYNTTY_ANDROID_KEY_PASSWORD'))?.toString()
 def hasLynttyReleaseSigning = lynttyKeystoreFile && lynttyKeystorePassword && lynttyKeyAlias && lynttyKeyPassword
 def isReleaseBuildRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+def isProductionAppEnv = (System.getenv('APP_ENV') ?: 'development') == 'production'
+def isProductionReleaseBuild = isReleaseBuildRequested && isProductionAppEnv
 def lynttyGoogleServicesFile = file('google-services.json')
 def hasLynttyGoogleServices = lynttyGoogleServicesFile.exists()
 
-if (isReleaseBuildRequested && !hasLynttyReleaseSigning) {
+if (isProductionReleaseBuild && !hasLynttyReleaseSigning) {
     throw new GradleException('Production release builds require Lyntty release signing properties')
 }
 
-if (isReleaseBuildRequested && !hasLynttyGoogleServices) {
+if (isProductionReleaseBuild && !hasLynttyGoogleServices) {
     throw new GradleException('Production release builds require Firebase google-services.json for Android push notifications')
 }
 
@@ -142,6 +144,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix '.dev'
+            resValue 'bool', 'lyntty_uses_cleartext', 'true'
             manifestPlaceholders = [
                 lynttyAppName: 'Lyntty (dev)',
                 usesCleartextTraffic: 'true'
@@ -149,9 +152,13 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
+            resValue 'bool', 'lyntty_uses_cleartext', isProductionAppEnv ? 'false' : 'true'
+            if (!isProductionAppEnv) {
+                applicationIdSuffix '.dev'
+            }
             manifestPlaceholders = [
-                lynttyAppName: 'Lyntty',
-                usesCleartextTraffic: 'false'
+                lynttyAppName: isProductionAppEnv ? 'Lyntty' : 'Lyntty (dev)',
+                usesCleartextTraffic: isProductionAppEnv ? false : true
             ]
             signingConfig hasLynttyReleaseSigning ? signingConfigs.release : signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'

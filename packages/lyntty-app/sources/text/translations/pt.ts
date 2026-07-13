@@ -1033,6 +1033,7 @@ export const pt: TranslationStructure = {
         connectionError: "Connection Error",
         connectThisNodeToScanLocalPiHistory: "Connect this node to scan local Pi history.",
         couldNotLoadOlderMessagesRetry: "Could not load older messages · Retry",
+        piHistoryGapOlderMessagesUnavailable: "History gap · Some older Pi messages are unavailable on this computer.",
         created: "Created",
         createDirectory: "Create Directory?",
         currentDeviceMetadataComesFromThisPhoneOlderTokens: "Current-device metadata comes from this phone. Older tokens use their token fingerprint plus server timestamps.",
