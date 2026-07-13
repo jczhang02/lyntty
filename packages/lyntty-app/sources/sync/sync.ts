@@ -95,6 +95,10 @@ type OutboxMessage = {
 };
 
 type SendMessageOptions = {
+    /** Stable transport id used when migrating a persisted synthetic send. */
+    localId?: string;
+    /** Persist first; caller atomically removes the synthetic source before send. */
+    deferSend?: boolean;
     displayText?: string;
     source?: MessageSentSource;
     /** Optional image attachments to send before the text message. */
@@ -119,7 +123,7 @@ class Sync {
     // advanced downward by loadOlderMessages.
     private sessionOldestSeq = new Map<string, number>();
     private pendingOutbox: Map<string, OutboxMessage[]> = loadPendingOutbox();
-    private pendingSyntheticOutbox = loadPendingSyntheticOutbox() as Map<string, Array<{ text: string; options?: SendMessageOptions }>>;
+    private pendingSyntheticOutbox = loadPendingSyntheticOutbox() as Map<string, Array<{ localId: string; machineId: string; piSessionId: string; text: string; options?: SendMessageOptions }>>;
     private flushingSyntheticOutbox = new Set<string>();
     private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
     private sessionQueueProcessing = new Set<string>();
@@ -635,14 +639,22 @@ class Sync {
         return { uploaded, failed };
     }
 
-    private queueSyntheticMessage(sessionId: string, text: string, options?: SendMessageOptions) {
+    private queueSyntheticMessage(sessionId: string, text: string, options?: SendMessageOptions): boolean {
+        const session = storage.getState().sessions[sessionId];
+        if (!session?.metadata?.machineId || !session.metadata.piSessionId) return false;
+        const localId = randomUUID();
         const pending = this.pendingSyntheticOutbox.get(sessionId) ?? [];
-        pending.push({ text, options });
+        pending.push({
+            localId,
+            machineId: session.metadata.machineId,
+            piSessionId: session.metadata.piSessionId,
+            text,
+            options,
+        });
         this.pendingSyntheticOutbox.set(sessionId, pending);
         savePendingSyntheticOutbox(this.pendingSyntheticOutbox);
 
         const now = Date.now();
-        const session = storage.getState().sessions[sessionId];
         if (session) {
             storage.getState().applySessions([{
                 ...session,
@@ -651,7 +663,6 @@ class Sync {
             }]);
         }
 
-        const localId = randomUUID();
         const record: RawRecord = {
             role: 'user',
             content: { type: 'text', text },
@@ -664,6 +675,31 @@ class Sync {
         if (normalized) {
             this.enqueueMessages(sessionId, [normalized]);
         }
+        return true;
+    }
+
+    private reconcileSyntheticOutbox(): void {
+        const normalLocalIds = new Set(
+            [...this.pendingOutbox.values()].flatMap((entries) => entries.map((entry) => entry.localId)),
+        );
+        let changed = false;
+        for (const [syntheticSessionId, entries] of this.pendingSyntheticOutbox) {
+            const remaining = entries.filter((entry) => !normalLocalIds.has(entry.localId));
+            if (remaining.length !== entries.length) {
+                changed = true;
+                if (remaining.length > 0) this.pendingSyntheticOutbox.set(syntheticSessionId, remaining);
+                else this.pendingSyntheticOutbox.delete(syntheticSessionId);
+            }
+            const identity = remaining[0];
+            if (!identity) continue;
+            const relaySession = Object.values(storage.getState().sessions).find((candidate) => (
+                candidate.metadata?.piSynthetic !== true
+                && candidate.metadata?.machineId === identity.machineId
+                && candidate.metadata?.piSessionId === identity.piSessionId
+            ));
+            if (relaySession) void this.flushSyntheticMessages(syntheticSessionId, relaySession.id);
+        }
+        if (changed) savePendingSyntheticOutbox(this.pendingSyntheticOutbox);
     }
 
     async flushSyntheticMessages(syntheticSessionId: string, relaySessionId: string) {
@@ -688,7 +724,13 @@ class Sync {
                     return;
                 }
                 const item = current[0];
-                const queued = await this.sendMessage(relaySessionId, item.text, item.options);
+                // Reuse the synthetic local id so a crash during migration is
+                // idempotent against both the durable normal and synthetic queues.
+                const queued = await this.sendMessage(relaySessionId, item.text, {
+                    ...item.options,
+                    localId: item.localId,
+                    deferSend: true,
+                });
                 if (!queued) return;
                 const afterSend = this.pendingSyntheticOutbox.get(syntheticSessionId) ?? [];
                 const remaining = afterSend.filter((entry) => entry !== item);
@@ -698,6 +740,10 @@ class Sync {
                     this.pendingSyntheticOutbox.delete(syntheticSessionId);
                 }
                 savePendingSyntheticOutbox(this.pendingSyntheticOutbox);
+                // The normal encrypted outbox is durable and the synthetic
+                // source is now durably removed, so network delivery may begin.
+                this.getSendSync(relaySessionId).invalidate();
+                this.maybeStartBackgroundSendWatchdog();
             }
         } finally {
             this.flushingSyntheticOutbox.delete(syntheticSessionId);
@@ -727,8 +773,7 @@ class Sync {
             await this.sessionsSync.awaitQueue();
             encryption = this.encryption.getSessionEncryption(sessionId);
             if (!encryption && session.metadata?.piSynthetic) {
-                this.queueSyntheticMessage(sessionId, text, options);
-                return true;
+                return this.queueSyntheticMessage(sessionId, text, options);
             }
             if (!encryption) {
                 console.error(`Session ${sessionId} not found after sync`);
@@ -825,7 +870,7 @@ class Sync {
         }
 
         // Generate local ID
-        const localId = randomUUID();
+        const localId = options?.localId ?? randomUUID();
 
         // Determine sentFrom based on platform
         let sentFrom: string;
@@ -886,8 +931,10 @@ class Sync {
         savePendingOutbox(this.pendingOutbox);
         trackMessageSent(source, session.metadata);
 
-        this.getSendSync(sessionId).invalidate();
-        this.maybeStartBackgroundSendWatchdog();
+        if (!options?.deferSend) {
+            this.getSendSync(sessionId).invalidate();
+            this.maybeStartBackgroundSendWatchdog();
+        }
         return true;
     }
 
@@ -1215,6 +1262,9 @@ class Sync {
         // Apply to storage. This is a full server/discovery snapshot, so remove
         // stale rows from a previous account, server, or deleted relay state.
         this.applySessions(sessionsWithPiHistory, { replace: true });
+        // Canonical relay sessions may appear after startup. Reconcile after
+        // every full snapshot so their synthetic sends cannot be stranded.
+        this.reconcileSyntheticOutbox();
         log.log(`📥 fetchSessions completed - processed ${decryptedSessions.length} relay sessions + ${sessionsWithPiHistory.length - decryptedSessions.length} local Pi sessions`);
 
     }

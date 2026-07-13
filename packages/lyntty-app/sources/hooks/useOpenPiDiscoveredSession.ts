@@ -30,9 +30,7 @@ export function useOpenPiDiscoveredSession() {
                 navigateToSession(relaySessionId);
             }
             await sync.refreshSessions();
-            if (relaySessionId !== session.id) {
-                void sync.flushSyntheticMessages(session.id, relaySessionId);
-            }
+            void sync.flushSyntheticMessages(session.id, relaySessionId);
         };
 
         const ensureMirror = async (): Promise<boolean> => {

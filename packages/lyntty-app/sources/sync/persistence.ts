@@ -50,6 +50,9 @@ export function savePendingOutbox(outbox: Map<string, PersistedOutboxMessage[]>)
 }
 
 export type PersistedSyntheticOutboxMessage = {
+    localId: string;
+    machineId: string;
+    piSessionId: string;
     text: string;
     options?: unknown;
 };
@@ -62,9 +65,28 @@ export function parsePendingSyntheticOutbox(raw: string | undefined): Map<string
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return result;
         for (const [sessionId, entries] of Object.entries(parsed).slice(0, 100)) {
             if (!sessionId || !Array.isArray(entries)) continue;
-            const valid = entries.slice(0, 1_000).filter((entry): entry is PersistedSyntheticOutboxMessage => (
-                Boolean(entry) && typeof entry === 'object' && typeof (entry as PersistedSyntheticOutboxMessage).text === 'string'
-            ));
+            const identity = /^pi-local:([^:]+):(.+)$/.exec(sessionId);
+            const valid = entries.slice(0, 1_000).flatMap((entry, index): PersistedSyntheticOutboxMessage[] => {
+                if (!entry || typeof entry !== 'object' || typeof (entry as { text?: unknown }).text !== 'string') return [];
+                const candidate = entry as Partial<PersistedSyntheticOutboxMessage>;
+                const text = (entry as { text: string }).text;
+                if (
+                    typeof candidate.localId === 'string'
+                    && typeof candidate.machineId === 'string'
+                    && typeof candidate.piSessionId === 'string'
+                ) return [candidate as PersistedSyntheticOutboxMessage];
+                if (!identity) return [];
+                // v1 migration: the synthetic row id already carried both Pi
+                // identity fields. Derive a stable id so restart migration is
+                // idempotent rather than silently dropping the queued send.
+                return [{
+                    localId: `synthetic:${sessionId}:${index}`,
+                    machineId: identity[1],
+                    piSessionId: identity[2],
+                    text,
+                    options: candidate.options,
+                }];
+            });
             if (valid.length > 0) result.set(sessionId, valid);
         }
     } catch (error) {
