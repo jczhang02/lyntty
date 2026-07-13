@@ -335,6 +335,7 @@ export type Metadata = {
   controlState?: 'ready' | 'queued' | 'waiting_extension' | 'takeover_required' | 'missing_local_history' | 'computer_offline' | string,
   sharedControlEnabled?: boolean,
   remoteCommandAcceptedLocalKeys?: string[],
+  remoteCommandFailedLocalKeys?: string[],
   archivedBy?: string,
   archiveReason?: string,
   flavor?: string

@@ -2,8 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import { join } from 'node:path';
 
-const LYNTTY_PI_EXTENSION_SOURCE = String.raw`import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+const LYNTTY_PI_EXTENSION_SOURCE = String.raw`import { createHash, randomUUID } from "node:crypto";
+import { chmod, mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -13,12 +13,14 @@ const RETRY_DELAY_MS = 1_000;
 const HEARTBEAT_MS = 60_000;
 const COMMAND_POLL_MS = 1_000;
 const MAX_QUEUED_SENDS = 1_000;
-let enabled = true;
+const bridgeLockedOff = process.env.LYNTTY_PI_EXTENSION_DISABLED === "1";
+let enabled = !bridgeLockedOff;
 let lastStatus = "not connected";
 let draining = false;
 let nextEventId = 1;
+const extensionInstanceId = randomUUID();
 type SessionSnapshot = ReturnType<typeof sessionSnapshot>;
-type QueuedPayload = { session: SessionSnapshot; event: Record<string, unknown>; eventId: number; timestamp: number; attempts?: number };
+type QueuedPayload = { session: SessionSnapshot; event: Record<string, unknown>; extensionInstanceId: string; eventId: number; timestamp: number; attempts?: number };
 type PiCommandInfo = { name: string; description?: string; source: string; sourceInfo?: Record<string, unknown> };
 type RemotePiCommand =
   | { type: "send_user_message"; text: string }
@@ -33,18 +35,84 @@ type RemotePiCommand =
   | { type: "invoke_pi_command"; commandLine: string; deliverAs?: "followUp" }
   | { type: "set_label"; entryId: string; label?: string };
 type RemotePiCommandEnvelope = { seq: number; deliveryToken: string; localKey?: string; mobileContext?: boolean; command: RemotePiCommand };
-type CommandAck = { seq: number; deliveryToken: string; status: "accepted_by_pi" | "failed"; error?: string; resultText?: string; commands?: PiCommandInfo[] };
+type CommandAck = { seq: number; extensionInstanceId?: string; queueEpoch?: string; deliveryToken: string; status: "accepted_by_pi" | "failed"; error?: string; resultText?: string; commands?: PiCommandInfo[] };
 type GoalState = { goalId: string; objective: string; status: string; tokenBudget: number | null; usage: { tokensUsed: number; activeSeconds: number }; createdAt: number; updatedAt: number };
 const queuedPayloads: QueuedPayload[] = [];
 const heartbeatTimers = new Map<string, ReturnType<typeof setInterval>>();
 const commandPollTimers = new Map<string, ReturnType<typeof setInterval>>();
 const lastAckedCommandSeq = new Map<string, number>();
+const commandQueueEpochs = new Map<string, string>();
+const commandPollInFlight = new Set<string>();
 const pendingCommandAcks = new Map<string, CommandAck[]>();
+type PromptAcceptance = { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> };
+const pendingPromptAcceptances = new Map<string, PromptAcceptance[]>();
+type ExecutedCommandState = "executing" | "accepted_by_pi";
+const executedCommandLedgers = new Map<string, Record<string, ExecutedCommandState>>();
 let executingCommand = false;
 let activePiSessionId: string | null = null;
 
 function lynttyHome(): string {
   return process.env.LYNTTY_HOME_DIR || join(homedir(), ".lyntty");
+}
+
+function executedCommandLedgerPath(piSessionId: string): string {
+  const fileName = createHash("sha256").update(piSessionId).digest("hex") + ".json";
+  return join(lynttyHome(), "pi-extension-command-ledger", fileName);
+}
+
+async function loadExecutedCommandLedger(piSessionId: string): Promise<Record<string, ExecutedCommandState>> {
+  const cached = executedCommandLedgers.get(piSessionId);
+  if (cached) return cached;
+  let ledger: Record<string, ExecutedCommandState> = {};
+  try {
+    const parsed = JSON.parse(await readFile(executedCommandLedgerPath(piSessionId), "utf8")) as { version?: unknown; outcomes?: unknown };
+    if (parsed.version === 1 && parsed.outcomes && typeof parsed.outcomes === "object") {
+      ledger = parsed.outcomes as Record<string, ExecutedCommandState>;
+    }
+  } catch {
+    ledger = {};
+  }
+  executedCommandLedgers.set(piSessionId, ledger);
+  return ledger;
+}
+
+async function getExecutedCommandState(piSessionId: string, localKey: string): Promise<ExecutedCommandState | null> {
+  const ledger = await loadExecutedCommandLedger(piSessionId);
+  const state = ledger[localKey];
+  return state === "executing" || state === "accepted_by_pi" ? state : null;
+}
+
+async function fsyncPath(path: string): Promise<void> {
+  try {
+    const handle = await open(path, "r");
+    try {
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  } catch {
+    // Best-effort on filesystems/platforms that do not support directory fsync.
+  }
+}
+
+async function persistExecutedCommandState(
+  piSessionId: string,
+  localKey: string,
+  state: ExecutedCommandState | null,
+): Promise<void> {
+  const ledger = await loadExecutedCommandLedger(piSessionId);
+  if (state) ledger[localKey] = state;
+  else delete ledger[localKey];
+  const directory = join(lynttyHome(), "pi-extension-command-ledger");
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const path = executedCommandLedgerPath(piSessionId);
+  const temporaryPath = path + "." + process.pid + "." + randomUUID() + ".tmp";
+  await writeFile(temporaryPath, JSON.stringify({ version: 1, outcomes: ledger }), { encoding: "utf8", mode: 0o600 });
+  await chmod(temporaryPath, 0o600).catch(() => undefined);
+  await fsyncPath(temporaryPath);
+  await rename(temporaryPath, path);
+  await chmod(path, 0o600).catch(() => undefined);
+  await fsyncPath(directory);
 }
 
 async function readDaemonPort(): Promise<number | null> {
@@ -225,6 +293,7 @@ function sendForSession(session: SessionSnapshot, event: Record<string, unknown>
   enqueuePayload({
     session,
     event,
+    extensionInstanceId,
     eventId: nextEventId++,
     timestamp: Date.now(),
   });
@@ -397,20 +466,64 @@ function isSupportedPiCommandLine(pi: ExtensionAPI, commandLine: string): boolea
   return safePiCommands(pi).some((command) => command.name === commandName);
 }
 
+function settlePromptAcceptance(text: string, error?: Error): boolean {
+  const pending = pendingPromptAcceptances.get(text);
+  const acceptance = pending?.shift();
+  if (!acceptance) return false;
+  clearTimeout(acceptance.timer);
+  if (pending && pending.length === 0) pendingPromptAcceptances.delete(text);
+  if (error) acceptance.reject(error);
+  else acceptance.resolve();
+  return true;
+}
+
+function settleAnyPromptAcceptance(): boolean {
+  const first = pendingPromptAcceptances.keys().next().value;
+  return typeof first === "string" ? settlePromptAcceptance(first) : false;
+}
+
+function waitForPromptAcceptance(text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      settlePromptAcceptance(text, new Error("Pi did not confirm prompt acceptance"));
+    }, 5_000);
+    timer.unref?.();
+    pendingPromptAcceptances.set(text, [
+      ...(pendingPromptAcceptances.get(text) ?? []),
+      { resolve, reject, timer },
+    ]);
+  });
+}
+
+async function sendUserMessageAndWaitForAcceptance(
+  pi: ExtensionAPI,
+  text: string,
+  deliverAs?: "steer" | "followUp",
+): Promise<void> {
+  const acceptance = waitForPromptAcceptance(text);
+  try {
+    if (deliverAs) pi.sendUserMessage(text, { deliverAs });
+    else pi.sendUserMessage(text);
+  } catch (error) {
+    settlePromptAcceptance(text, error instanceof Error ? error : new Error(String(error)));
+  }
+  await acceptance;
+}
+
 async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, envelope: RemotePiCommandEnvelope): Promise<Partial<CommandAck> | undefined> {
   const command = envelope.command;
   switch (command.type) {
     case "send_user_message":
       await injectMobileContext(pi, envelope);
-      await pi.sendUserMessage(command.text);
+      await sendUserMessageAndWaitForAcceptance(pi, command.text);
       return;
     case "follow_up":
       await injectMobileContext(pi, envelope, "followUp");
-      await pi.sendUserMessage(command.text, { deliverAs: "followUp" });
+      await sendUserMessageAndWaitForAcceptance(pi, command.text, "followUp");
       return;
     case "steer":
       await injectMobileContext(pi, envelope, "steer");
-      await pi.sendUserMessage(command.text, { deliverAs: "steer" });
+      await sendUserMessageAndWaitForAcceptance(pi, command.text, "steer");
       return;
     case "abort":
       ctx.abort();
@@ -461,9 +574,9 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
       const expanded = await expandSkillCommand(pi, command.commandLine);
       await injectMobileContext(pi, envelope, command.deliverAs);
       if (command.deliverAs) {
-        await pi.sendUserMessage(expanded, { deliverAs: command.deliverAs });
+        await sendUserMessageAndWaitForAcceptance(pi, expanded, command.deliverAs);
       } else {
-        await pi.sendUserMessage(expanded);
+        await sendUserMessageAndWaitForAcceptance(pi, expanded);
       }
       return { resultText: "Queued /" + name + "." };
     }
@@ -474,7 +587,10 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
 }
 
 async function sendCommandAck(session: SessionSnapshot, ack: CommandAck): Promise<boolean> {
-  return postToDaemon("/pi-extension/command-ack", { session, ack });
+  return postToDaemon("/pi-extension/command-ack", {
+    session,
+    ack: { ...ack, extensionInstanceId },
+  });
 }
 
 async function flushPendingCommandAcks(session: SessionSnapshot): Promise<void> {
@@ -494,21 +610,54 @@ async function flushPendingCommandAcks(session: SessionSnapshot): Promise<void> 
 
 async function pollCommands(pi: ExtensionAPI, ctx: ExtensionContext, session: SessionSnapshot): Promise<void> {
   if (!enabled || executingCommand || activePiSessionId !== session.piSessionId) return;
-  if (!session.piSessionId) return;
+  if (!session.piSessionId || commandPollInFlight.has(session.piSessionId)) return;
+  commandPollInFlight.add(session.piSessionId);
+  try {
   await flushPendingCommandAcks(session);
   if ((pendingCommandAcks.get(session.piSessionId)?.length ?? 0) > 0) return;
 
-  const response = await postJsonToDaemon<{ status: "ok"; commands: RemotePiCommandEnvelope[] }>("/pi-extension/commands", {
+  const response = await postJsonToDaemon<{ status: "ok"; queueEpoch?: string; commands: RemotePiCommandEnvelope[] }>("/pi-extension/commands", {
     session,
+    extensionInstanceId,
     afterSeq: lastAckedCommandSeq.get(session.piSessionId) || 0,
   });
   if (!response.ok || !response.data || response.data.status !== "ok") return;
+  const queueEpoch = response.data.queueEpoch;
+  if (queueEpoch && commandQueueEpochs.get(session.piSessionId) !== queueEpoch) {
+    commandQueueEpochs.set(session.piSessionId, queueEpoch);
+    lastAckedCommandSeq.set(session.piSessionId, 0);
+    pendingCommandAcks.delete(session.piSessionId);
+  }
 
   for (const envelope of response.data.commands) {
+    const durableState = envelope.localKey
+      ? await getExecutedCommandState(session.piSessionId, envelope.localKey)
+      : null;
+    if (durableState) {
+      const ack: CommandAck = durableState === "accepted_by_pi"
+        ? { seq: envelope.seq, queueEpoch, deliveryToken: envelope.deliveryToken, status: "accepted_by_pi" }
+        : {
+            seq: envelope.seq,
+            queueEpoch,
+            deliveryToken: envelope.deliveryToken,
+            status: "failed",
+            error: "Previous Pi command execution was interrupted; delivery outcome is uncertain. Retry as a new command.",
+          };
+      const ok = await sendCommandAck(session, ack);
+      if (!ok) {
+        pendingCommandAcks.set(session.piSessionId, [...(pendingCommandAcks.get(session.piSessionId) ?? []), ack]);
+        return;
+      }
+      if (ack.status === "accepted_by_pi") {
+        lastAckedCommandSeq.set(session.piSessionId, Math.max(lastAckedCommandSeq.get(session.piSessionId) || 0, envelope.seq));
+      }
+      continue;
+    }
+
     const currentSession = safeSessionSnapshot(ctx, session.piSessionId);
     if (!currentSession?.piSessionId || currentSession.piSessionId !== session.piSessionId) {
       if (currentSession?.piSessionId) markActiveSession(currentSession);
-      const ack: CommandAck = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "failed", error: "Pi session context was replaced before command execution" };
+      const ack: CommandAck = { seq: envelope.seq, queueEpoch, deliveryToken: envelope.deliveryToken, status: "failed", error: "Pi session context was replaced before command execution" };
       const ok = await sendCommandAck(session, ack);
       if (!ok) pendingCommandAcks.set(session.piSessionId, [...(pendingCommandAcks.get(session.piSessionId) ?? []), ack]);
       return;
@@ -516,12 +665,30 @@ async function pollCommands(pi: ExtensionAPI, ctx: ExtensionContext, session: Se
 
     executingCommand = true;
     let ack: CommandAck;
+    let commandExecuted = false;
     try {
+      if (envelope.localKey) {
+        await persistExecutedCommandState(session.piSessionId, envelope.localKey, "executing");
+      }
       const result = await executeRemoteCommand(pi, ctx, envelope);
-      ack = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "accepted_by_pi", ...result };
+      commandExecuted = true;
+      if (envelope.localKey) {
+        await persistExecutedCommandState(session.piSessionId, envelope.localKey, "accepted_by_pi");
+      }
+      ack = { seq: envelope.seq, queueEpoch, deliveryToken: envelope.deliveryToken, status: "accepted_by_pi", ...result };
     } catch (error) {
       if (isStaleContextError(error)) handleContextError(session.piSessionId, error);
-      ack = { seq: envelope.seq, deliveryToken: envelope.deliveryToken, status: "failed", error: error instanceof Error ? error.message : "Pi command failed" };
+      if (envelope.localKey && !commandExecuted) {
+        await persistExecutedCommandState(session.piSessionId, envelope.localKey, null).catch(() => undefined);
+      }
+      const detail = error instanceof Error ? error.message : "Pi command failed";
+      ack = {
+        seq: envelope.seq,
+        queueEpoch,
+        deliveryToken: envelope.deliveryToken,
+        status: "failed",
+        error: commandExecuted ? "Pi accepted the command but its durable acknowledgement failed: " + detail : detail,
+      };
     } finally {
       executingCommand = false;
     }
@@ -537,6 +704,9 @@ async function pollCommands(pi: ExtensionAPI, ctx: ExtensionContext, session: Se
     }
 
     if (ack.status === "accepted_by_pi" && (envelope.command.type === "reload" || envelope.command.type === "internal_shutdown")) return;
+  }
+  } finally {
+    commandPollInFlight.delete(session.piSessionId);
   }
 }
 
@@ -575,6 +745,10 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
         return;
       }
       if (action === "on" || action === "enable") {
+        if (bridgeLockedOff) {
+          ctx.ui.notify("Lyntty remote bridge is owned by the managed runtime in this Pi process", "warning");
+          return;
+        }
         enabled = true;
         startCommandPolling(pi, ctx);
         send(ctx, { type: "command_list", commands: safePiCommands(pi) });
@@ -607,6 +781,10 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
         return;
       }
       if (action === "on" || action === "remote on") {
+        if (bridgeLockedOff) {
+          ctx.ui.notify("Lyntty remote bridge is owned by the managed runtime in this Pi process", "warning");
+          return;
+        }
         enabled = true;
         startCommandPolling(pi, ctx);
         send(ctx, { type: "command_list", commands: safePiCommands(pi) });
@@ -637,8 +815,23 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
     send(ctx, { type: "session_info_changed", name: event.name });
   });
 
+  pi.on("before_agent_start", async (event) => {
+    if (!settlePromptAcceptance(event.prompt)) settleAnyPromptAcceptance();
+  });
+
   pi.on("input", async (event, ctx) => {
-    if (event.source === "extension") return;
+    if (event.source === "extension") {
+      if (event.streamingBehavior) {
+        setTimeout(() => {
+          if (ctx.hasPendingMessages()) {
+            settlePromptAcceptance(event.text);
+          } else {
+            settlePromptAcceptance(event.text, new Error("Pi did not queue the remote prompt"));
+          }
+        }, 0);
+      }
+      return;
+    }
     if (typeof event.text !== "string" || event.text.trim().length === 0) return;
     send(ctx, {
       type: "input",

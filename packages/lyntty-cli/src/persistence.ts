@@ -4,15 +4,30 @@
  * Handles settings and private key storage in ~/.lyntty/ or local .lyntty/
  */
 
+import { createHash } from 'node:crypto';
 import { FileHandle } from 'node:fs/promises'
 import { readFile, writeFile, mkdir, open, unlink, rename, stat } from 'node:fs/promises'
-import { chmodSync, existsSync, writeFileSync, readFileSync, unlinkSync, renameSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, writeFileSync, readFileSync, unlinkSync, renameSync } from 'node:fs'
 import { constants } from 'node:fs'
+import { join } from 'node:path';
 import { configuration } from '@/configuration'
 import * as z from 'zod';
 import { encodeBase64, decodeBase64 } from '@/api/encryption';
 import type { Metadata } from '@/api/types';
 import { logger } from '@/ui/logger';
+
+function fsyncPath(path: string): void {
+  try {
+    const fd = openSync(path, 'r');
+    try {
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    // Best-effort on filesystems/platforms that do not support directory fsync.
+  }
+}
 
 function restrictFileToOwner(path: string): void {
   try {
@@ -448,6 +463,67 @@ export function readPersistedSessions(): Record<string, PersistedSession> {
   } catch {
     return {};
   }
+}
+
+export type PersistedPiCommandOutcome = 'executing' | 'accepted_by_pi' | 'failed';
+
+type PiCommandLedgerFile = {
+  version: 1;
+  outcomes: Record<string, PersistedPiCommandOutcome>;
+};
+
+export function piCommandLedgerPath(piSessionId: string): string {
+  const fileName = `${createHash('sha256').update(piSessionId).digest('hex')}.json`;
+  return join(configuration.piCommandLedgerDir, fileName);
+}
+
+function readPiCommandLedgerFile(piSessionId: string): PiCommandLedgerFile {
+  try {
+    const path = piCommandLedgerPath(piSessionId);
+    if (!existsSync(path)) return { version: 1, outcomes: {} };
+    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as Partial<PiCommandLedgerFile>;
+    if (parsed.version !== 1 || !parsed.outcomes || typeof parsed.outcomes !== 'object') {
+      return { version: 1, outcomes: {} };
+    }
+    return { version: 1, outcomes: parsed.outcomes };
+  } catch {
+    return { version: 1, outcomes: {} };
+  }
+}
+
+export function readPersistedPiCommandOutcomes(piSessionId: string): {
+  acceptedLocalKeys: string[];
+  failedLocalKeys: string[];
+  uncertainLocalKeys: string[];
+} {
+  const outcomes = readPiCommandLedgerFile(piSessionId).outcomes;
+  const acceptedLocalKeys: string[] = [];
+  const failedLocalKeys: string[] = [];
+  const uncertainLocalKeys: string[] = [];
+  for (const [localKey, outcome] of Object.entries(outcomes)) {
+    if (outcome === 'accepted_by_pi') acceptedLocalKeys.push(localKey);
+    if (outcome === 'failed') failedLocalKeys.push(localKey);
+    if (outcome === 'executing') uncertainLocalKeys.push(localKey);
+  }
+  return { acceptedLocalKeys, failedLocalKeys, uncertainLocalKeys };
+}
+
+export function persistPiCommandOutcome(
+  piSessionId: string,
+  localKey: string,
+  outcome: PersistedPiCommandOutcome,
+): void {
+  const ledger = readPiCommandLedgerFile(piSessionId);
+  ledger.outcomes[localKey] = outcome;
+  mkdirSync(configuration.piCommandLedgerDir, { recursive: true, mode: 0o700 });
+  const path = piCommandLedgerPath(piSessionId);
+  const tmpFile = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmpFile, JSON.stringify(ledger), { encoding: 'utf-8', mode: 0o600 });
+  restrictFileToOwner(tmpFile);
+  fsyncPath(tmpFile);
+  renameSync(tmpFile, path);
+  restrictFileToOwner(path);
+  fsyncPath(configuration.piCommandLedgerDir);
 }
 
 export function persistSession(sessionId: string, session: PersistedSession): void {

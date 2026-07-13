@@ -1,9 +1,6 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
-export function resolvePiRelaySessionTag(machineId: string, piSessionId?: string): string {
-  if (!piSessionId) {
-    return randomUUID();
-  }
+export function resolvePiRelaySessionTag(machineId: string, piSessionId: string): string {
   const digest = createHash('sha256')
     .update(`${machineId}:${piSessionId}`)
     .digest('hex')

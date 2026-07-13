@@ -62,15 +62,15 @@ describe('classifyPiSessionRecovery', () => {
     });
   });
 
-  it('keeps local Pi sessions visible when relay import ledger is ahead', () => {
+  it('marks a history gap when the relay import ledger is ahead of local JSONL', () => {
     expect(classifyPiSessionRecovery({
       local: sessionInfo({ messageCount: 2 }),
       registered: { piSessionId: 'pi-1', importedMessageCount: 5 },
       now,
     })).toMatchObject({
-      state: 'registered',
+      state: 'history_gap',
       needsBackfill: false,
-      hasHistoryGap: false,
+      hasHistoryGap: true,
     });
   });
 

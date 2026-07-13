@@ -54,6 +54,13 @@ describe('resolvePiActivationLock', () => {
     });
   });
 
+  it('defaults an omitted agent to Pi at the daemon spawn boundary', () => {
+    expect(resolvePiActivationLock({ directory: '/repo' }, [activePiSession()])).toMatchObject({
+      type: 'blocked',
+      activePid: 123,
+    });
+  });
+
   it('requires takeover when a new Pi runtime without session id already owns the directory', () => {
     expect(resolvePiActivationLock({ directory: '/repo', agent: 'pi' }, [activePiSession()])).toEqual({
       type: 'blocked',
@@ -79,12 +86,11 @@ describe('resolvePiActivationLock', () => {
     });
   });
 
-  it('reports wait as unsupported queue semantics for now', () => {
+  it('returns a wait lease that the daemon can hold until the active runtime exits', () => {
     expect(resolvePiActivationLock({ directory: '/repo', agent: 'pi', takeoverChoice: 'wait' }, [activePiSession()])).toEqual({
-      type: 'blocked',
+      type: 'wait',
       activeSessionId: 'ses-active',
       activePid: 123,
-      errorMessage: 'active runtime already holds lease for /repo; wait queue is not implemented yet',
     });
   });
 });

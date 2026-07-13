@@ -14,7 +14,11 @@ export interface PiRemoteActionInput {
 }
 
 export class PiCommandLedger {
-  private claimedKeys = new Set<string>();
+  private claimedKeys: Set<string>;
+
+  constructor(initialKeys: Iterable<string> = []) {
+    this.claimedKeys = new Set(initialKeys);
+  }
 
   claim(key: string | undefined): boolean {
     if (!key) {

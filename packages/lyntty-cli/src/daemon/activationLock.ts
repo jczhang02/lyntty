@@ -37,6 +37,7 @@ export function resolveActivePiSessionReuse(
 export type PiActivationLockResult =
   | { type: 'allow' }
   | { type: 'takeover'; activeSessionId: string; activePid: number; choice: Extract<PiTakeoverChoice, 'stop' | 'interrupt'> }
+  | { type: 'wait'; activeSessionId: string; activePid: number }
   | { type: 'blocked'; activeSessionId: string; activePid: number; errorMessage: string };
 
 function normalizeDirectory(directory: string): string {
@@ -61,7 +62,7 @@ export function resolvePiActivationLock(
   options: Pick<SpawnSessionOptions, 'directory' | 'agent' | 'takeoverChoice' | 'machineId' | 'sessionId'>,
   sessions: readonly TrackedSession[],
 ): PiActivationLockResult {
-  if (options.agent !== 'pi') {
+  if (options.agent && options.agent !== 'pi') {
     return { type: 'allow' };
   }
 
@@ -76,14 +77,14 @@ export function resolvePiActivationLock(
   if (options.takeoverChoice === 'stop' || options.takeoverChoice === 'interrupt') {
     return { type: 'takeover', activeSessionId, activePid: active.pid, choice: options.takeoverChoice };
   }
+  if (options.takeoverChoice === 'wait') {
+    return { type: 'wait', activeSessionId, activePid: active.pid };
+  }
 
-  const queueMessage = options.takeoverChoice === 'wait'
-    ? 'wait queue is not implemented yet'
-    : 'choose stop or interrupt to take over';
   return {
     type: 'blocked',
     activeSessionId,
     activePid: active.pid,
-    errorMessage: `active runtime already holds lease for ${describePiLease(options)}; ${queueMessage}`,
+    errorMessage: `active runtime already holds lease for ${describePiLease(options)}; choose stop or interrupt to take over`,
   };
 }

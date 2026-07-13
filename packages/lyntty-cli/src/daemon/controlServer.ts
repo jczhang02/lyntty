@@ -31,7 +31,7 @@ export function startDaemonControlServer({
   requestShutdown: () => void;
   onLynttySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
   onPiExtensionEvent?: (payload: LynttyPiExtensionPayload) => Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }>;
-  pollPiExtensionCommands?: (session: LynttyPiExtensionPayload['session'], afterSeq: number) => Promise<{ status: 'ok'; commands: LynttyPiRemoteCommandEnvelope[] } | { status: 'error'; error: string }>;
+  pollPiExtensionCommands?: (session: LynttyPiExtensionPayload['session'], afterSeq: number, extensionInstanceId?: string) => Promise<{ status: 'ok'; queueEpoch?: string; commands: LynttyPiRemoteCommandEnvelope[] } | { status: 'error'; error: string }>;
   onPiExtensionCommandAck?: (session: LynttyPiExtensionPayload['session'], ack: LynttyPiRemoteCommandAck) => Promise<{ status: 'ok' } | { status: 'error'; error: string }>;
   piExtensionToken: string;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
@@ -108,6 +108,7 @@ export function startDaemonControlServer({
         name: z.string().max(512).optional(),
       }),
       event: z.record(z.string(), z.unknown()),
+      extensionInstanceId: z.string().min(1).max(256).optional(),
       eventId: z.number().int().positive().optional(),
       timestamp: z.number().optional(),
     });
@@ -176,11 +177,13 @@ export function startDaemonControlServer({
       schema: {
         body: z.object({
           session: PiExtensionSessionSchema,
+          extensionInstanceId: z.string().min(1).max(256).optional(),
           afterSeq: z.number().int().nonnegative().optional(),
         }),
         response: {
           200: z.object({
             status: z.literal('ok'),
+            queueEpoch: z.string().min(1).max(256).optional(),
             commands: z.array(z.object({
               seq: z.number().int().positive(),
               deliveryToken: z.string().min(1).max(256),
@@ -197,7 +200,7 @@ export function startDaemonControlServer({
       if (!pollPiExtensionCommands) {
         return { status: 'ok' as const, commands: [] };
       }
-      const result = await pollPiExtensionCommands(request.body.session, request.body.afterSeq ?? 0);
+      const result = await pollPiExtensionCommands(request.body.session, request.body.afterSeq ?? 0, request.body.extensionInstanceId);
       if (result.status === 'error') {
         reply.code(500);
       }
@@ -210,6 +213,8 @@ export function startDaemonControlServer({
           session: PiExtensionSessionSchema,
           ack: z.object({
             seq: z.number().int().positive(),
+            extensionInstanceId: z.string().min(1).max(256).optional(),
+            queueEpoch: z.string().min(1).max(256).optional(),
             status: z.enum(['delivered_to_pi_extension', 'accepted_by_pi', 'failed']),
             deliveryToken: z.string().min(1).max(256).optional(),
             error: z.string().max(2048).optional(),

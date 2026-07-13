@@ -33,6 +33,8 @@ export interface SetupOfflineReconnectionOptions {
      * Use this to update the session reference in the calling code.
      */
     onSessionSwap: (newSession: ApiSessionClient) => void;
+    /** Skip replaying historical relay commands for a managed runtime reconnect. */
+    skipExistingMessages?: boolean;
 }
 
 /**
@@ -92,6 +94,7 @@ export function setupOfflineReconnection(opts: SetupOfflineReconnectionOptions):
                 const resp = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
                 if (!resp) throw new Error('Server unavailable');
                 const realSession = api.sessionSyncClient(resp);
+                if (opts.skipExistingMessages) realSession.skipExistingMessages();
                 // Notify caller to swap the session reference
                 onSessionSwap(realSession);
                 return realSession;
@@ -105,6 +108,7 @@ export function setupOfflineReconnection(opts: SetupOfflineReconnectionOptions):
         return { session, reconnectionHandle, isOffline: true };
     } else {
         session = api.sessionSyncClient(response);
+        if (opts.skipExistingMessages) session.skipExistingMessages();
         return { session, reconnectionHandle: null, isOffline: false };
     }
 }

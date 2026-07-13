@@ -193,4 +193,21 @@ describe('mapPiSessionHistoryToEnvelopes', () => {
     expect(older.nextCursor).toBe('u2');
     expect(older.envelopes.map((envelope) => envelope.ev.t === 'text' ? envelope.ev.text : '')).toEqual(['message 2', 'message 3']);
   });
+
+  it('reports history_gap instead of replaying the tail for an unknown cursor', () => {
+    const entries = [
+      { type: 'message', id: 'u1', parentId: null, timestamp: '2026-07-01T09:00:00.000Z', message: { role: 'user', content: 'one' } },
+      { type: 'message', id: 'u2', parentId: 'u1', timestamp: '2026-07-01T09:00:01.000Z', message: { role: 'user', content: 'two' } },
+    ] as any[];
+
+    const page = mapPiSessionHistoryPageToEnvelopes(entries, { beforeEntryId: 'missing-entry', limit: 1 });
+
+    expect(page.historyGap).toEqual({
+      code: 'history_gap',
+      missingCursor: 'missing-entry',
+      reason: 'requested Pi history cursor is not present in local JSONL',
+    });
+    expect(page.envelopes).toEqual([]);
+    expect(page.hasMore).toBe(false);
+  });
 });

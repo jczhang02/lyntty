@@ -132,11 +132,11 @@ export function classifyPiSessionRecovery(input: {
   if (localMessageCount < importedMessageCount) {
     return {
       ...base,
-      state: 'registered',
+      state: 'history_gap',
       needsRegistration: false,
       needsBackfill: false,
-      hasHistoryGap: false,
-      reason: `local Pi history exists with ${localMessageCount} messages; relay import ledger expects ${importedMessageCount}`,
+      hasHistoryGap: true,
+      reason: `local Pi history has ${localMessageCount} messages but relay import ledger expects ${importedMessageCount}`,
     };
   }
 

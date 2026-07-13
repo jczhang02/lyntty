@@ -46,6 +46,18 @@ describe.runIf(process.platform !== 'win32')('secret persistence permissions', (
     expect(fileMode(configuration.privateKeyFile)).toBe(0o600);
   });
 
+  it('durably records Pi command outcomes with owner-only permissions', () => {
+    persistence.persistPiCommandOutcome('pi-session-1', 'local-1', 'accepted_by_pi');
+    persistence.persistPiCommandOutcome('pi-session-1', 'local-2', 'failed');
+
+    expect(persistence.readPersistedPiCommandOutcomes('pi-session-1')).toEqual({
+      acceptedLocalKeys: ['local-1'],
+      failedLocalKeys: ['local-2'],
+      uncertainLocalKeys: [],
+    });
+    expect(fileMode(persistence.piCommandLedgerPath('pi-session-1'))).toBe(0o600);
+  });
+
   it('writes the session encryption ledger with owner-only permissions', () => {
     persistence.persistSession('relay-session-1', {
       encryptionKey: 'secret-key',

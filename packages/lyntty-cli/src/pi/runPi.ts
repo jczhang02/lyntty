@@ -10,7 +10,7 @@ import {
 import { ApiClient } from '@/api/api';
 import type { ApiSessionClient } from '@/api/apiSession';
 import { encodeBase64 } from '@/api/encryption';
-import { Credentials, readSettings } from '@/persistence';
+import { Credentials, persistPiCommandOutcome, readPersistedPiCommandOutcomes, readSettings } from '@/persistence';
 import { createSessionMetadata } from '@/utils/createSessionMetadata';
 import { initialMachineMetadata } from '@/daemon/run';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
@@ -23,7 +23,7 @@ import { bindPiSessionExtensions, getPiPluginFeatureSummary, listPiRemoteSlashCo
 import { mapPiSessionHistoryPageToEnvelopes } from './runPiHistory';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 import { startPiExternalMirror } from './runPiExternalMirror';
-import { resolvePiRelaySessionTag } from './piRelaySessionTag';
+import { createPiRuntimeRelayIdentity } from './piRuntimeRelayIdentity';
 import { PiCompletionNotificationTracker, sendPiDoneNotification } from './piCompletionNotifications';
 
 export interface RunPiOptions {
@@ -76,6 +76,9 @@ async function createPiRuntime(cwd: string, piSessionId?: string): Promise<Agent
 }
 
 export async function runPi(opts: RunPiOptions): Promise<void> {
+  // The managed SDK runtime is the sole relay command owner in this process.
+  // Keep the globally installed ordinary-TUI bridge disabled, including reloads.
+  process.env.LYNTTY_PI_EXTENSION_DISABLED = '1';
   connectionState.setBackend('pi');
 
   const api = await ApiClient.create(opts.credentials);
@@ -90,8 +93,12 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   });
 
   const requestedPiSessionId = process.env.LYNTTY_PI_SESSION_ID;
-  const sessionTag = resolvePiRelaySessionTag(settings.machineId, requestedPiSessionId);
-  const piRuntime = await createPiRuntime(process.cwd(), requestedPiSessionId);
+  const { piRuntime, sessionTag } = await createPiRuntimeRelayIdentity({
+    machineId: settings.machineId,
+    cwd: process.cwd(),
+    requestedPiSessionId,
+    createRuntime: createPiRuntime,
+  });
   let shutdownRequested: (() => void) | null = null;
   await bindPiSessionExtensions(piRuntime, {
     onShutdown: () => shutdownRequested?.(),
@@ -160,6 +167,22 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       piRuntime.session.sessionManager.getBranch(),
       { beforeEntryId, limit: PI_HISTORY_PAGE_MESSAGE_LIMIT },
     );
+    const historyGap = page.historyGap;
+    if (historyGap) {
+      await session.updateMetadataAndAwait((currentMetadata) => ({
+        ...currentMetadata,
+        controlState: 'history_gap',
+        piHasHistoryGap: true,
+        piRecoveryReason: historyGap.reason,
+        piHistoryHasMore: false,
+      }));
+      return {
+        type: 'history_gap' as const,
+        ...page.historyGap,
+        hasMore: false,
+        totalMessages: page.totalMessages,
+      };
+    }
     for (const envelope of page.envelopes) {
       session.sendSessionProtocolMessage(envelope);
     }
@@ -274,12 +297,48 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
 
   session.sendSessionEvent({ type: 'ready' });
 
-  const commandLedger = new PiCommandLedger();
+  const persistedCommandOutcomes = readPersistedPiCommandOutcomes(piRuntime.session.sessionId);
+  const sessionMetadata = session.getMetadata();
+  const acceptedCommandKeys = new Set([
+    ...persistedCommandOutcomes.acceptedLocalKeys,
+    ...(sessionMetadata?.remoteCommandAcceptedLocalKeys ?? []),
+  ]);
+  const failedCommandKeys = new Set([
+    ...persistedCommandOutcomes.failedLocalKeys,
+    ...persistedCommandOutcomes.uncertainLocalKeys,
+    ...(sessionMetadata?.remoteCommandFailedLocalKeys ?? []),
+  ]);
+  for (const localKey of persistedCommandOutcomes.uncertainLocalKeys) {
+    persistPiCommandOutcome(piRuntime.session.sessionId, localKey, 'failed');
+  }
+  const commandLedger = new PiCommandLedger([
+    ...acceptedCommandKeys,
+    ...failedCommandKeys,
+  ]);
+  const updateCommandOutcomeMetadata = (): void => {
+    session.updateMetadata((currentMetadata) => ({
+      ...currentMetadata,
+      remoteCommandAcceptedLocalKeys: [...acceptedCommandKeys].slice(-500),
+      remoteCommandFailedLocalKeys: [...failedCommandKeys].slice(-500),
+    }));
+  };
+  updateCommandOutcomeMetadata();
 
   session.onUserMessage((message) => {
     if (!commandLedger.claim(message.localKey)) {
       logger.debug('[pi] Dropping duplicate user command', { localKey: message.localKey });
       return;
+    }
+
+    if (message.localKey) {
+      try {
+        persistPiCommandOutcome(piRuntime.session.sessionId, message.localKey, 'executing');
+      } catch (error) {
+        failedCommandKeys.add(message.localKey);
+        updateCommandOutcomeMetadata();
+        logger.warn('[pi] Refusing remote command because its durable ledger is unavailable', { localKey: message.localKey, error });
+        return;
+      }
     }
 
     const action = resolvePiRemoteAction({
@@ -320,9 +379,32 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       }
     })();
 
-    run?.catch((error) => {
+    if (!run) {
+      if (message.localKey) {
+        persistPiCommandOutcome(piRuntime.session.sessionId, message.localKey, 'failed');
+        failedCommandKeys.add(message.localKey);
+        updateCommandOutcomeMetadata();
+      }
+      return;
+    }
+
+    void run.then(() => {
+      if (!message.localKey) return;
+      persistPiCommandOutcome(piRuntime.session.sessionId, message.localKey, 'accepted_by_pi');
+      acceptedCommandKeys.add(message.localKey);
+      updateCommandOutcomeMetadata();
+    }).catch((error) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       thinking = false;
+      if (message.localKey) {
+        try {
+          persistPiCommandOutcome(piRuntime.session.sessionId, message.localKey, 'failed');
+        } catch (persistError) {
+          logger.warn('[pi] Failed to persist remote command failure', { localKey: message.localKey, persistError });
+        }
+        failedCommandKeys.add(message.localKey);
+        updateCommandOutcomeMetadata();
+      }
       logger.warn('[pi] Failed to handle Session Remote command', { errorMessage });
       session.sendSessionEvent({ type: 'ready' });
     });
