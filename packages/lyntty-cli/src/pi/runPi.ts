@@ -10,12 +10,11 @@ import {
 import { ApiClient } from '@/api/api';
 import type { ApiSessionClient } from '@/api/apiSession';
 import { encodeBase64 } from '@/api/encryption';
-import { Credentials, persistPiCommandOutcome, readPersistedPiCommandOutcomes, readSettings } from '@/persistence';
+import { Credentials, persistPiCommandBoundary, persistPiCommandOutcome, readPersistedPiCommandBoundary, readPersistedPiCommandOutcomes, readSettings } from '@/persistence';
 import { createSessionMetadata } from '@/utils/createSessionMetadata';
 import { initialMachineMetadata } from '@/daemon/run';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
 import { registerKillSessionHandler } from '@/claude/registerKillSessionHandler';
-import { setupOfflineReconnection } from '@/utils/setupOfflineReconnection';
 import { connectionState } from '@/utils/serverConnectionErrors';
 import { logger } from '@/ui/logger';
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
@@ -132,28 +131,25 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   }
 
   const response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
-  let session: ApiSessionClient;
-  const { session: initialSession, reconnectionHandle } = setupOfflineReconnection({
-    api,
-    sessionTag,
-    metadata,
-    state,
-    response,
-    onSessionSwap: (newSession) => {
-      session = newSession;
-    },
-  });
-  session = initialSession;
+  if (!response) {
+    await piRuntime.dispose();
+    throw new Error('Unable to connect to relay; managed Pi runtime was not started');
+  }
+  const session: ApiSessionClient = api.sessionSyncClient(response);
+  let commandBoundary = readPersistedPiCommandBoundary(piRuntime.session.sessionId);
+  if (commandBoundary === null) {
+    commandBoundary = response.seq;
+    persistPiCommandBoundary(piRuntime.session.sessionId, commandBoundary);
+  }
+  session.skipMessagesThrough(commandBoundary);
 
-  if (response) {
-    await notifyDaemonSessionStarted(response.id, metadata, {
+  await notifyDaemonSessionStarted(response.id, metadata, {
       encryptionKey: encodeBase64(response.encryptionKey),
       encryptionVariant: response.encryptionVariant,
       seq: response.seq,
       metadataVersion: response.metadataVersion,
       agentStateVersion: response.agentStateVersion,
     });
-  }
 
   let thinking = false;
   const piSessionProtocol = new PiSessionProtocolMapper();
@@ -162,7 +158,9 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       session.sendSessionProtocolMessage(envelope);
     }
   };
-  const sendPiHistoryPage = async (beforeEntryId?: string) => {
+  let piHistoryPageChain: Promise<void> = Promise.resolve();
+  const sendPiHistoryPage = (beforeEntryId?: string) => {
+    const request = piHistoryPageChain.then(async () => {
     const page = mapPiSessionHistoryPageToEnvelopes(
       piRuntime.session.sessionManager.getBranch(),
       { beforeEntryId, limit: PI_HISTORY_PAGE_MESSAGE_LIMIT },
@@ -183,10 +181,15 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
         totalMessages: page.totalMessages,
       };
     }
-    for (const envelope of page.envelopes) {
+    await session.flushConfirmed();
+    await session.syncExistingSessionProtocolEnvelopeIds();
+    const unsentEnvelopes = page.envelopes.filter(
+      (envelope) => !session.hasSessionProtocolEnvelope(envelope.id),
+    );
+    for (const envelope of unsentEnvelopes) {
       session.sendSessionProtocolMessage(envelope);
     }
-    await session.flush();
+    if (unsentEnvelopes.length > 0) await session.flushConfirmed();
     await session.updateMetadataAndAwait((currentMetadata) => ({
       ...currentMetadata,
       piHistoryCursor: page.nextCursor,
@@ -195,11 +198,14 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     }));
     return {
       type: 'success' as const,
-      sent: page.envelopes.length,
+      sent: unsentEnvelopes.length,
       nextCursor: page.nextCursor,
       hasMore: page.hasMore,
       totalMessages: page.totalMessages,
     };
+    });
+    piHistoryPageChain = request.then(() => undefined, () => undefined);
+    return request;
   };
   let externalMirror = startPiExternalMirror({
     sessionFile: piRuntime.session.sessionManager.getSessionFile(),
@@ -341,6 +347,16 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       }
     }
 
+    let acceptedByPi = false;
+    const markAcceptedByPi = (): void => {
+      if (acceptedByPi || !message.localKey) return;
+      persistPiCommandOutcome(piRuntime.session.sessionId, message.localKey, 'accepted_by_pi');
+      acceptedCommandKeys.add(message.localKey);
+      failedCommandKeys.delete(message.localKey);
+      acceptedByPi = true;
+      updateCommandOutcomeMetadata();
+    };
+
     const action = resolvePiRemoteAction({
       text: message.content.text,
       isStreaming: piRuntime.session.isStreaming,
@@ -354,7 +370,12 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
           return null;
         case 'prompt':
           logger.debug('[pi] Forwarding prompt to Pi SDK runtime', { length: action.text.length });
-          return piRuntime.session.prompt(action.text);
+          return piRuntime.session.prompt(action.text, {
+            source: 'rpc',
+            preflightResult: (accepted) => {
+              if (accepted) markAcceptedByPi();
+            },
+          });
         case 'followUp':
           logger.debug('[pi] Forwarding follow-up to Pi SDK runtime', { length: action.text.length });
           return piRuntime.session.followUp(action.text);
@@ -389,14 +410,13 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     }
 
     void run.then(() => {
-      if (!message.localKey) return;
-      persistPiCommandOutcome(piRuntime.session.sessionId, message.localKey, 'accepted_by_pi');
-      acceptedCommandKeys.add(message.localKey);
-      updateCommandOutcomeMetadata();
+      // follow-up, steer, abort, and immediate extension commands resolve at
+      // their acceptance boundary; prompt uses preflightResult above.
+      markAcceptedByPi();
     }).catch((error) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       thinking = false;
-      if (message.localKey) {
+      if (message.localKey && !acceptedByPi) {
         try {
           persistPiCommandOutcome(piRuntime.session.sessionId, message.localKey, 'failed');
         } catch (persistError) {
@@ -417,7 +437,6 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   await new Promise<void>((resolve) => {
     const shutdown = () => {
       clearInterval(keepAlive);
-      reconnectionHandle?.cancel();
       unsubscribe();
       void externalMirror?.stop();
       void piRuntime.dispose();

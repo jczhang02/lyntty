@@ -595,7 +595,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         });
 
         const payload = mockAxiosPost.mock.calls[0][1];
-        expect(payload.messages[0].localId).toMatch(/^session:[^:]+:env-1$/);
+        expect(payload.messages[0].localId).toBe('session:env-1');
         const decrypted = decrypt(
             session.encryptionKey,
             session.encryptionVariant,
@@ -813,7 +813,10 @@ describe('ApiSessionClient v3 messages API migration', () => {
         const onUserMessage = vi.fn();
         client.onUserMessage(onUserMessage);
         client.skipExistingMessages();
-        const oldMessage = { role: 'user', content: { type: 'text', text: 'old' } };
+        const oldMessage = {
+            role: 'session',
+            content: { id: 'existing-envelope', time: 1, role: 'agent', ev: { t: 'text', text: 'old' } },
+        };
         const newMessage = { role: 'user', content: { type: 'text', text: 'new' } };
         mockAxiosGet.mockResolvedValueOnce({
             data: {
@@ -829,6 +832,22 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
         expect(onUserMessage).toHaveBeenCalledTimes(1);
         expect(onUserMessage).toHaveBeenCalledWith({ ...newMessage, localKey: 'new-key' });
+        expect(client.hasSessionProtocolEnvelope('existing-envelope')).toBe(true);
+        expect(client.getSessionProtocolCoveredThrough()).toBe(1);
+    });
+
+    it('fails relay history inventory on endpoint rejection', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        mockAxiosGet.mockRejectedValueOnce(new Error('inventory unavailable'));
+
+        await expect(client.syncExistingSessionProtocolEnvelopeIds(50)).rejects.toThrow('inventory unavailable');
+    });
+
+    it('bounds relay history inventory when the endpoint never settles', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        mockAxiosGet.mockImplementationOnce(() => new Promise(() => undefined));
+
+        await expect(client.syncExistingSessionProtocolEnvelopeIds(5)).rejects.toThrow('Relay history inventory timed out');
     });
 
     it('keeps initial replay at seq0 even when an outbox POST advances the known server seq first', async () => {
@@ -1229,7 +1248,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect(mockAxiosGet.mock.calls[0][1].params.after_seq).toBe(0);
     });
 
-    it('namespaces session-protocol local ids per client process', () => {
+    it('keeps session-protocol local ids stable across client reconstruction', () => {
         const first = new ApiSessionClient('fake-token', session);
         const second = new ApiSessionClient('fake-token', session);
         const envelope = { id: 'stable-entry', role: 'agent', time: 1, turn: 'turn-1', ev: { t: 'text', text: 'hello' } } as const;
@@ -1239,9 +1258,8 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
         const firstLocalId = (first as any).pendingOutbox[0].localId;
         const secondLocalId = (second as any).pendingOutbox[0].localId;
-        expect(firstLocalId).toMatch(/:stable-entry$/);
-        expect(secondLocalId).toMatch(/:stable-entry$/);
-        expect(firstLocalId).not.toBe(secondLocalId);
+        expect(firstLocalId).toBe('session:stable-entry');
+        expect(secondLocalId).toBe(firstLocalId);
     });
 
     it('never reconnects after close triggers a disconnect event', async () => {

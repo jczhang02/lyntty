@@ -24,6 +24,8 @@ class Configuration {
   public readonly daemonLockFile: string
   public readonly sessionsFile: string
   public readonly piCommandLedgerDir: string
+  public readonly piCommandBoundaryDir: string
+  public readonly piHistoryWatermarkDir: string
   public readonly currentCliVersion: string
 
   public readonly isExperimentalEnabled: boolean
@@ -50,6 +52,8 @@ class Configuration {
     this.daemonLockFile = join(this.lynttyHomeDir, 'daemon.state.json.lock')
     this.sessionsFile = join(this.lynttyHomeDir, 'sessions.json')
     this.piCommandLedgerDir = join(this.lynttyHomeDir, 'pi-command-ledger')
+    this.piCommandBoundaryDir = join(this.lynttyHomeDir, 'pi-command-boundary')
+    this.piHistoryWatermarkDir = join(this.lynttyHomeDir, 'pi-history-watermark')
 
     // URL precedence (both): LYNTTY_*_URL env > settings.<key> > default.
     // Settings are read sync here (avoid circular import with persistence.ts).

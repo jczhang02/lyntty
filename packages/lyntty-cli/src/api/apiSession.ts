@@ -232,7 +232,8 @@ export class ApiSessionClient extends EventEmitter {
     // can advance the server sequence before the initial relay replay completes.
     private receiveSeq = 0;
     private pendingOutbox: Array<{ content: string; localId: string }> = [];
-    private readonly protocolLocalIdNamespace = randomUUID();
+    private readonly knownSessionProtocolEnvelopeIds = new Set<string>();
+    private knownSessionProtocolCoveredThrough: number | null = null;
     private readonly sendSync: InvalidateSync;
     private readonly receiveSync: InvalidateSync;
 
@@ -565,7 +566,20 @@ export class ApiSessionClient extends EventEmitter {
         };
     }
 
+    private rememberSessionProtocolEnvelope(message: unknown): void {
+        if (!message || typeof message !== 'object' || (message as { role?: unknown }).role !== 'session') return;
+        const envelope = (message as { content?: unknown }).content;
+        if (envelope && typeof envelope === 'object' && typeof (envelope as { id?: unknown }).id === 'string') {
+            this.knownSessionProtocolEnvelopeIds.add((envelope as { id: string }).id);
+            const time = (envelope as { time?: unknown }).time;
+            if (typeof time === 'number' && Number.isFinite(time)) {
+                this.knownSessionProtocolCoveredThrough = Math.max(this.knownSessionProtocolCoveredThrough ?? 0, time);
+            }
+        }
+    }
+
     private routeIncomingMessage(message: unknown, relayLocalId?: string) {
+        this.rememberSessionProtocolEnvelope(message);
         const userResult = UserMessageSchema.safeParse(message);
         if (userResult.success) {
             const userMessage = relayLocalId && !userResult.data.localKey
@@ -624,14 +638,16 @@ export class ApiSessionClient extends EventEmitter {
                     maxSeq = message.seq;
                 }
 
-                if (skipThroughSeq !== null && message.seq <= skipThroughSeq) continue;
-
                 if (message.content?.t !== 'encrypted') {
                     continue;
                 }
 
                 try {
                     const body = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(message.content.c));
+                    if (skipThroughSeq !== null && message.seq <= skipThroughSeq) {
+                        this.rememberSessionProtocolEnvelope(body);
+                        continue;
+                    }
                     this.routeIncomingMessage(body, message.localId ?? message.id);
                 } catch (error) {
                     logger.debug('[API] Failed to decrypt fetched message', {
@@ -809,11 +825,66 @@ export class ApiSessionClient extends EventEmitter {
             }
         };
 
-        // Envelope ids are stable across JSONL replay, while encrypted content
-        // uses a fresh nonce in each client process. Namespace the transport
-        // id so a daemon restart cannot turn an old replay into a permanent
-        // localId-content conflict that blocks newer live events.
-        this.enqueueMessage(content, invalidate, `session:${this.protocolLocalIdNamespace}:${envelope.id}`);
+        // Preserve the original protocol transport key so upgraded daemons
+        // can identify already-imported envelopes without duplicating history.
+        this.enqueueMessage(content, invalidate, `session:${envelope.id}`);
+    }
+
+    async syncExistingSessionProtocolEnvelopeIds(timeoutMs: number = 10_000): Promise<void> {
+        const inventory = async (): Promise<void> => {
+            let afterSeq = 0;
+            while (true) {
+                const response = await axios.get<V3GetSessionMessagesResponse>(
+                    `${configuration.serverUrl}/v3/sessions/${encodeURIComponent(this.sessionId)}/messages`,
+                    {
+                        params: { after_seq: afterSeq, limit: 100 },
+                        headers: this.authHeaders(),
+                        timeout: timeoutMs,
+                    },
+                );
+                const messages = Array.isArray(response.data.messages) ? response.data.messages : [];
+                let maxSeq = afterSeq;
+                for (const message of messages) {
+                    maxSeq = Math.max(maxSeq, message.seq);
+                    if (message.content?.t !== 'encrypted') continue;
+                    try {
+                        this.rememberSessionProtocolEnvelope(
+                            decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(message.content.c)),
+                        );
+                    } catch (error) {
+                        logger.debug('[API] Failed to inventory encrypted relay message', {
+                            sessionId: this.sessionId,
+                            seq: message.seq,
+                            error,
+                        });
+                        throw error;
+                    }
+                }
+                if (!response.data.hasMore) return;
+                if (maxSeq === afterSeq) throw new Error('Relay history inventory pagination stalled');
+                afterSeq = maxSeq;
+            }
+        };
+
+        let timeout: ReturnType<typeof setTimeout> | null = null;
+        try {
+            await Promise.race([
+                inventory(),
+                new Promise<never>((_resolve, reject) => {
+                    timeout = setTimeout(() => reject(new Error('Relay history inventory timed out')), timeoutMs);
+                }),
+            ]);
+        } finally {
+            if (timeout) clearTimeout(timeout);
+        }
+    }
+
+    hasSessionProtocolEnvelope(envelopeId: string): boolean {
+        return this.knownSessionProtocolEnvelopeIds.has(envelopeId);
+    }
+
+    getSessionProtocolCoveredThrough(): number | null {
+        return this.knownSessionProtocolCoveredThrough;
     }
 
     sendSessionProtocolMessage(envelope: SessionEnvelope, meta?: Record<string, unknown>) {
@@ -946,6 +1017,10 @@ export class ApiSessionClient extends EventEmitter {
         this.skipMessagesThroughSeq = this.initialServerSeq;
     }
 
+    skipMessagesThrough(relaySeq: number) {
+        this.skipMessagesThroughSeq = Math.max(0, Math.min(this.initialServerSeq, relaySeq));
+    }
+
     async updateMetadataAndAwait(handler: (metadata: Metadata) => Metadata) {
         await this.metadataLock.inLock(async () => {
             await backoff(async () => {
@@ -961,7 +1036,7 @@ export class ApiSessionClient extends EventEmitter {
                     }
                     throw new Error('Metadata version mismatch');
                 } else if (answer.result === 'error') {
-                    // Hard error - ignore
+                    throw new Error('Metadata update was rejected by relay');
                 }
             });
         });
@@ -1002,6 +1077,23 @@ export class ApiSessionClient extends EventEmitter {
     /**
      * Wait for socket buffer to flush
      */
+    async flushConfirmed(timeoutMs: number = 10000): Promise<void> {
+        let timeout: NodeJS.Timeout | null = null;
+        try {
+            const completed = await Promise.race([
+                this.sendSync.invalidateAndAwait().then(() => true),
+                new Promise<false>((resolve) => {
+                    timeout = setTimeout(() => resolve(false), timeoutMs);
+                }),
+            ]);
+            if (!completed || this.pendingOutbox.length > 0) {
+                throw new Error(`Session outbox was not acknowledged within ${timeoutMs}ms`);
+            }
+        } finally {
+            if (timeout) clearTimeout(timeout);
+        }
+    }
+
     async flush(): Promise<void> {
         await Promise.race([
             this.sendSync.invalidateAndAwait(),

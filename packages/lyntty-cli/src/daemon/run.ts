@@ -16,7 +16,7 @@ import { startCaffeinate, stopCaffeinate } from '@/utils/caffeinate';
 import packageJson from '../../package.json';
 import { getEnvironmentInfo } from '@/ui/doctor';
 import { spawnLynttyCLI } from '@/utils/spawnLynttyCLI';
-import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedPiCommandOutcomes, readPersistedSessions, persistPiCommandOutcome, persistSession } from '@/persistence';
+import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedPiCommandBoundary, readPersistedPiCommandOutcomes, readPersistedPiHistoryWatermark, readPersistedSessions, persistPiCommandBoundary, persistPiCommandOutcome, persistPiHistoryWatermark, persistSession } from '@/persistence';
 import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledLynttyVersion, stopDaemon } from './controlClient';
@@ -34,14 +34,14 @@ import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
 import { resolveActivePiSessionReuse, resolvePiActivationLock } from './activationLock';
 import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
 import { discoverLocalPiSessions, discoverLocalPiSessionsPage, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
-import { mapPiSessionHistoryPageToEnvelopes } from '@/pi/runPiHistory';
+import { mapPiSessionHistoryPageToEnvelopes, mapPiSessionHistoryToEnvelopes } from '@/pi/runPiHistory';
 import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalMirror';
 import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
 import { PiSessionProtocolMapper } from '@/pi/runPiSessionProtocol';
 import { createEnvelope, type SessionEnvelope } from 'lyntty-wire';
 import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiCommandInfo, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
 import { consumePiCompletionNotificationDecision, PiCompletionNotificationTracker, sendPiDoneNotification } from '@/pi/piCompletionNotifications';
-import { applyPiCommandFailure, isStalePiCommandAck, removeTerminalPiCommandPrefix, resolvePiCommandAdmission, selectNextQueuedPiCommand, shouldReplayExistingPiCommands } from './piCommandQueue';
+import { applyPiCommandFailure, isStalePiCommandAck, removeTerminalPiCommandPrefix, resolvePiCommandAdmission, selectNextQueuedPiCommand } from './piCommandQueue';
 import { PiActivationLeaseRegistry } from './activationLeaseRegistry';
 import { isExternalPiMirrorActive, resolveExternalPiActivationLease, resolveStalePiMirrorCleanup } from './externalPiActivation';
 import { applyPiExtensionSequence } from './piExtensionSequence';
@@ -1747,32 +1747,93 @@ export async function startDaemon(): Promise<void> {
       }
 
       const sessionClient = new ApiSessionClient(credentials.token, response);
-      if (!shouldReplayExistingPiCommands(response.metadata)) {
-        sessionClient.skipExistingMessages();
+      let commandBoundary = readPersistedPiCommandBoundary(piSessionId);
+      if (commandBoundary === null) {
+        // First hardening upgrade is fail-closed: historical relay commands
+        // predate the durable outcome ledger and must never execute again.
+        commandBoundary = response.seq;
+        persistPiCommandBoundary(piSessionId, commandBoundary);
       }
-      // A loaded relay session already owns its imported timeline. Replaying
-      // the same JSONL tail on every daemon restart duplicates history and,
-      // with randomized encryption, can poison the outbox with 409 conflicts.
-      // Live extension events and explicit older-page RPCs handle subsequent
-      // delivery; only a newly created relay session receives the initial tail.
-      if (response.seq === 0) {
-        for (const envelope of page.envelopes) {
+      sessionClient.skipMessagesThrough(commandBoundary);
+      // Resume canonical JSONL replay from the last durably imported entry.
+      // This avoids duplicate tails while recovering entries written during a
+      // daemon outage, when extension event retries may have been exhausted.
+      const historyWatermark = readPersistedPiHistoryWatermark(piSessionId);
+      let startupHistoryGapReason: string | null = null;
+      let startupHistoryEnvelopes = response.seq === 0
+        ? page.envelopes
+        : historyWatermark
+          ? []
+          // First upgrade from a daemon without durable watermarks: prefer a
+          // one-time idempotent canonical replay over permanently skipping an
+          // unknown outage window.
+          : mapPiSessionHistoryToEnvelopes(entries);
+      if (response.seq > 0 && historyWatermark) {
+        const watermarkIndex = entries.findIndex((entry) => entry.id === historyWatermark);
+        if (watermarkIndex >= 0) {
+          startupHistoryEnvelopes = mapPiSessionHistoryToEnvelopes(entries.slice(watermarkIndex + 1));
+        } else {
+          startupHistoryEnvelopes = mapPiSessionHistoryToEnvelopes(entries);
+          startupHistoryGapReason = 'persisted Pi history watermark is missing from local JSONL';
+        }
+      }
+      let startupHistoryInventoryConfirmed = true;
+      if (startupHistoryEnvelopes.length > 0) {
+        try {
+          await sessionClient.syncExistingSessionProtocolEnvelopeIds();
+          const coveredThrough = historyWatermark
+            ? null
+            : sessionClient.getSessionProtocolCoveredThrough();
+          if (!historyWatermark && coveredThrough !== null && response.seq > 0) {
+            startupHistoryGapReason = 'legacy relay coverage has no exact canonical JSONL watermark';
+          }
+          startupHistoryEnvelopes = startupHistoryEnvelopes.filter((envelope) => (
+            (coveredThrough === null || envelope.time > coveredThrough)
+            && !sessionClient.hasSessionProtocolEnvelope(envelope.id)
+          ));
+        } catch (error) {
+          startupHistoryInventoryConfirmed = false;
+          startupHistoryGapReason = 'relay history inventory unavailable; canonical replay deferred';
+          logger.warn('[pi] Could not inventory relay history; canonical replay deferred', { piSessionId, error });
+        }
+      }
+      if (startupHistoryInventoryConfirmed) {
+        for (const envelope of startupHistoryEnvelopes) {
           sessionClient.sendSessionProtocolMessage(envelope);
         }
       }
-      await sessionClient.flush();
-      sessionClient.updateMetadata((currentMetadata) => ({
+      let startupHistoryConfirmed = startupHistoryInventoryConfirmed && startupHistoryEnvelopes.length === 0;
+      if (startupHistoryInventoryConfirmed && !startupHistoryConfirmed) {
+        try {
+          await sessionClient.flushConfirmed();
+          startupHistoryConfirmed = true;
+        } catch (error) {
+          startupHistoryGapReason ??= 'canonical Pi history replay is awaiting relay acknowledgement';
+          logger.warn('[pi] Canonical history replay remains pending; watermark not advanced', { piSessionId, error });
+        }
+      }
+      const latestHistoryEntryId = entries.at(-1)?.id;
+      if (startupHistoryConfirmed && !startupHistoryGapReason && latestHistoryEntryId) {
+        persistPiHistoryWatermark(piSessionId, latestHistoryEntryId);
+      }
+      await sessionClient.updateMetadataAndAwait((currentMetadata) => ({
         ...currentMetadata,
         lifecycleState: extensionConnected ? 'running' : 'waiting_extension',
         lifecycleStateSince: Date.now(),
         runtimeOwner: extensionConnected ? 'pi-extension' : 'none',
-        controlState: extensionConnected ? 'ready' : 'waiting_extension',
+        controlState: startupHistoryGapReason
+          ? 'history_gap'
+          : extensionConnected ? 'ready' : 'waiting_extension',
+        piHasHistoryGap: startupHistoryGapReason ? true : currentMetadata.piHasHistoryGap,
+        piRecoveryReason: startupHistoryGapReason ?? currentMetadata.piRecoveryReason,
         piHistoryCursor: page.nextCursor,
         piHistoryHasMore: page.hasMore,
         piHistoryTotalMessages: page.totalMessages,
       }));
 
-      sessionClient.rpcHandlerManager.registerHandler('pi-history-page', async (params: unknown) => {
+      let piHistoryPageChain: Promise<void> = Promise.resolve();
+      sessionClient.rpcHandlerManager.registerHandler('pi-history-page', (params: unknown) => {
+        const request = piHistoryPageChain.then(async () => {
         if (!sessionFile) {
           return {
             type: 'success' as const,
@@ -1790,7 +1851,7 @@ export async function startDaemon(): Promise<void> {
         const nextPage = mapPiSessionHistoryPageToEnvelopes(currentEntries, { beforeEntryId, limit: 50 });
         const historyGap = nextPage.historyGap;
         if (historyGap) {
-          sessionClient.updateMetadata((currentMetadata) => ({
+          await sessionClient.updateMetadataAndAwait((currentMetadata) => ({
             ...currentMetadata,
             controlState: 'history_gap',
             piHasHistoryGap: true,
@@ -1804,11 +1865,18 @@ export async function startDaemon(): Promise<void> {
             totalMessages: nextPage.totalMessages,
           };
         }
-        for (const envelope of nextPage.envelopes) {
+        // Settle any prior page attempt before inventorying ids. A retry may
+        // otherwise advance its cursor while the prior ciphertext is pending.
+        await sessionClient.flushConfirmed();
+        await sessionClient.syncExistingSessionProtocolEnvelopeIds();
+        const unsentEnvelopes = nextPage.envelopes.filter(
+          (envelope) => !sessionClient.hasSessionProtocolEnvelope(envelope.id),
+        );
+        for (const envelope of unsentEnvelopes) {
           sessionClient.sendSessionProtocolMessage(envelope);
         }
-        await sessionClient.flush();
-        sessionClient.updateMetadata((currentMetadata) => ({
+        if (unsentEnvelopes.length > 0) await sessionClient.flushConfirmed();
+        await sessionClient.updateMetadataAndAwait((currentMetadata) => ({
           ...currentMetadata,
           piHistoryCursor: nextPage.nextCursor,
           piHistoryHasMore: nextPage.hasMore,
@@ -1816,11 +1884,14 @@ export async function startDaemon(): Promise<void> {
         }));
         return {
           type: 'success' as const,
-          sent: nextPage.envelopes.length,
+          sent: unsentEnvelopes.length,
           nextCursor: nextPage.nextCursor,
           hasMore: nextPage.hasMore,
           totalMessages: nextPage.totalMessages,
         };
+        });
+        piHistoryPageChain = request.then(() => undefined, () => undefined);
+        return request;
       });
 
       let mirrorState: ExternalPiMirrorState | null = null;
@@ -1865,13 +1936,16 @@ export async function startDaemon(): Promise<void> {
           sessionClient,
           mapper: new PiSessionProtocolMapper(),
           lastExtensionSeenAt: extensionConnected ? Date.now() : 0,
-          activeExtensionInstanceId: options.extensionInstanceId ?? null,
+          activeExtensionInstanceId: null,
           legacyExtensionNoticeSent: false,
           keepAliveInterval,
           pendingTextFlushTimer: null,
-          lastExtensionInstanceId: options.extensionInstanceId ?? null,
+          lastExtensionInstanceId: null,
           lastExtensionEventId: null,
-          extensionHasSeqGap: false,
+          // Startup inventory/replay uncertainty uses the same sticky recovery
+          // path as an extension sequence gap. The next agent_end must inventory
+          // and replay canonical JSONL before advancing the durable watermark.
+          extensionHasSeqGap: startupHistoryGapReason !== null,
           isStreaming: false,
           canSendCompletionPush: Boolean(sessionFile),
           completionNotifications: new PiCompletionNotificationTracker(),
@@ -1993,7 +2067,10 @@ export async function startDaemon(): Promise<void> {
       logger.debug('[pi] Received Pi extension event', {
         piSessionId: session.piSessionId,
         eventType: event.type,
+        eventReason: event.type === 'session_start' && 'reason' in event ? event.reason : undefined,
         eventId: payload.eventId,
+        extensionInstanceId: payload.extensionInstanceId,
+        activeExtensionInstanceId: mirror.activeExtensionInstanceId,
         ownership,
       });
       if (ownership === 'missing_instance_id') {
@@ -2123,8 +2200,9 @@ export async function startDaemon(): Promise<void> {
         await mirror.sessionClient.flush();
       }
       if (agentEvent.type === 'agent_end') {
+        const hadExtensionSeqGap = mirror.extensionHasSeqGap;
         if (hasDeliveredContentEnvelope(envelopes)) {
-          markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: !mirror.extensionHasSeqGap });
+          markExtensionDelivered(mirror, deliveredCutoff, { includeAssistantMessages: !hadExtensionSeqGap });
         }
         const assistantDeliveryUntil = eventTime + PI_ASSISTANT_JSONL_DELIVERY_GRACE_MS;
         capAssistantTextDeliveryWindow(mirror, assistantDeliveryUntil);
@@ -2133,9 +2211,43 @@ export async function startDaemon(): Promise<void> {
         // JSONL fallback can still recover a longer/different final message.
         markAssistantTextDelivered(mirror, mirror.deliveredAssistantTextInTurn, deliveredCutoff, assistantDeliveryUntil);
         mirror.deliveredAssistantTextInTurn = '';
-        if (eventId !== null) {
-          mirror.extensionHasSeqGap = false;
-          mirror.extensionCoveredSince = eventTime;
+        if (session.sessionFile) {
+          const canonicalEntries = readPiSessionEntries(session.sessionFile);
+          const latestEntryId = canonicalEntries.at(-1)?.id;
+          if (latestEntryId) {
+            try {
+              // First prove all contiguous live envelopes reached the relay.
+              await mirror.sessionClient.flushConfirmed();
+              if (hadExtensionSeqGap) {
+                const watermark = readPersistedPiHistoryWatermark(session.piSessionId);
+                const watermarkIndex = watermark
+                  ? canonicalEntries.findIndex((entry) => entry.id === watermark)
+                  : -1;
+                const recoveryEntries = watermarkIndex >= 0
+                  ? canonicalEntries.slice(watermarkIndex + 1)
+                  : canonicalEntries;
+                await mirror.sessionClient.syncExistingSessionProtocolEnvelopeIds();
+                const recoveryEnvelopes = mapPiSessionHistoryToEnvelopes(recoveryEntries).filter(
+                  (envelope) => !mirror.sessionClient.hasSessionProtocolEnvelope(envelope.id),
+                );
+                for (const envelope of recoveryEnvelopes) {
+                  mirror.sessionClient.sendSessionProtocolMessage(envelope);
+                }
+                if (recoveryEnvelopes.length > 0) await mirror.sessionClient.flushConfirmed();
+              }
+              persistPiHistoryWatermark(session.piSessionId, latestEntryId);
+              if (eventId !== null) {
+                mirror.extensionHasSeqGap = false;
+                mirror.extensionCoveredSince = eventTime;
+              }
+            } catch (error) {
+              logger.warn('[pi] Live canonical history remains pending; watermark not advanced', {
+                piSessionId: session.piSessionId,
+                hadExtensionSeqGap,
+                error,
+              });
+            }
+          }
         }
         sendPiExtensionCompletionPushIfNeeded(mirror, session.piSessionId);
       } else {

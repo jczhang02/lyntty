@@ -8,15 +8,19 @@ export function applyPiExtensionSequence(
   state: PiExtensionSequenceState,
   event: { extensionInstanceId?: string; eventId?: number },
 ): boolean {
-  if (event.extensionInstanceId && event.extensionInstanceId !== state.lastExtensionInstanceId) {
-    state.lastExtensionInstanceId = event.extensionInstanceId;
-    state.lastExtensionEventId = null;
-    state.extensionHasSeqGap = false;
-  }
-
   const eventId = typeof event.eventId === 'number' && Number.isFinite(event.eventId)
     ? event.eventId
     : null;
+  if (event.extensionInstanceId && event.extensionInstanceId !== state.lastExtensionInstanceId) {
+    const replacedEstablishedOwner = state.lastExtensionInstanceId !== null;
+    state.lastExtensionInstanceId = event.extensionInstanceId;
+    state.lastExtensionEventId = null;
+    // A new owner resets only its per-instance cursor. Any unresolved gap
+    // remains sticky until canonical JSONL fallback is acknowledged. Event 1
+    // is the owner claim; seeing a later first id proves the prefix was lost.
+    if (replacedEstablishedOwner || eventId !== 1) state.extensionHasSeqGap = true;
+  }
+
   if (eventId === null) {
     state.extensionHasSeqGap = true;
     return true;

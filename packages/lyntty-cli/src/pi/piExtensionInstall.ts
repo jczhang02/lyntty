@@ -18,7 +18,7 @@ let enabled = !bridgeLockedOff;
 let lastStatus = "not connected";
 let draining = false;
 let nextEventId = 1;
-const extensionInstanceId = randomUUID();
+let extensionInstanceId = randomUUID();
 type SessionSnapshot = ReturnType<typeof sessionSnapshot>;
 type QueuedPayload = { session: SessionSnapshot; event: Record<string, unknown>; extensionInstanceId: string; eventId: number; timestamp: number; attempts?: number };
 type PiCommandInfo = { name: string; description?: string; source: string; sourceInfo?: Record<string, unknown> };
@@ -82,14 +82,18 @@ async function getExecutedCommandState(piSessionId: string, localKey: string): P
   return state === "executing" || state === "accepted_by_pi" ? state : null;
 }
 
-async function fsyncPath(path: string): Promise<void> {
+async function fsyncFile(path: string): Promise<void> {
+  const handle = await open(path, "r");
   try {
-    const handle = await open(path, "r");
-    try {
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+async function fsyncDirectory(path: string): Promise<void> {
+  try {
+    await fsyncFile(path);
   } catch {
     // Best-effort on filesystems/platforms that do not support directory fsync.
   }
@@ -109,10 +113,10 @@ async function persistExecutedCommandState(
   const temporaryPath = path + "." + process.pid + "." + randomUUID() + ".tmp";
   await writeFile(temporaryPath, JSON.stringify({ version: 1, outcomes: ledger }), { encoding: "utf8", mode: 0o600 });
   await chmod(temporaryPath, 0o600).catch(() => undefined);
-  await fsyncPath(temporaryPath);
+  await fsyncFile(temporaryPath);
   await rename(temporaryPath, path);
   await chmod(path, 0o600).catch(() => undefined);
-  await fsyncPath(directory);
+  await fsyncDirectory(directory);
 }
 
 async function readDaemonPort(): Promise<number | null> {
@@ -266,6 +270,9 @@ function drainQueue(): void {
       while (queuedPayloads.length > 0) {
         const payload = queuedPayloads[0];
         const ok = await postToDaemon("/pi-extension/event", payload);
+        // A /reload epoch rotation may replace the queue while this POST is
+        // in flight. Never shift a newly enqueued owner-claim event.
+        if (queuedPayloads[0] !== payload) continue;
         if (!ok) {
           payload.attempts = (payload.attempts || 0) + 1;
           if (payload.attempts >= 5) {
@@ -805,10 +812,16 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_start", async (event, ctx) => {
+    // Pi may preserve the module cache across /reload. Rotate the ownership
+    // token at the lifecycle boundary so lynttyd can fence the old bridge.
+    extensionInstanceId = randomUUID();
+    nextEventId = 1;
+    queuedPayloads.length = 0;
     startHeartbeat(ctx);
     startCommandPolling(pi, ctx);
-    send(ctx, { type: "command_list", commands: safePiCommands(pi) });
+    // Claim the new owner epoch before lower-authority command metadata.
     send(ctx, { type: "session_start", reason: event.reason });
+    send(ctx, { type: "command_list", commands: safePiCommands(pi) });
   });
 
   pi.on("session_info_changed", async (event, ctx) => {

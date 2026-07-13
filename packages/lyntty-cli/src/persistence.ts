@@ -16,6 +16,15 @@ import { encodeBase64, decodeBase64 } from '@/api/encryption';
 import type { Metadata } from '@/api/types';
 import { logger } from '@/ui/logger';
 
+function fsyncFile(path: string): void {
+  const fd = openSync(path, 'r');
+  try {
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function fsyncPath(path: string): void {
   try {
     const fd = openSync(path, 'r');
@@ -520,10 +529,64 @@ export function persistPiCommandOutcome(
   const tmpFile = `${path}.${process.pid}.tmp`;
   writeFileSync(tmpFile, JSON.stringify(ledger), { encoding: 'utf-8', mode: 0o600 });
   restrictFileToOwner(tmpFile);
-  fsyncPath(tmpFile);
+  fsyncFile(tmpFile);
   renameSync(tmpFile, path);
   restrictFileToOwner(path);
   fsyncPath(configuration.piCommandLedgerDir);
+}
+
+export function piCommandBoundaryPath(piSessionId: string): string {
+  const fileName = `${createHash('sha256').update(piSessionId).digest('hex')}.json`;
+  return join(configuration.piCommandBoundaryDir, fileName);
+}
+
+export function readPersistedPiCommandBoundary(piSessionId: string): number | null {
+  try {
+    const parsed = JSON.parse(readFileSync(piCommandBoundaryPath(piSessionId), 'utf-8')) as { version?: unknown; relaySeq?: unknown };
+    return parsed.version === 1 && typeof parsed.relaySeq === 'number' && Number.isSafeInteger(parsed.relaySeq) && parsed.relaySeq >= 0
+      ? parsed.relaySeq
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function persistPiCommandBoundary(piSessionId: string, relaySeq: number): void {
+  mkdirSync(configuration.piCommandBoundaryDir, { recursive: true, mode: 0o700 });
+  const path = piCommandBoundaryPath(piSessionId);
+  const tmpFile = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmpFile, JSON.stringify({ version: 1, relaySeq }), { encoding: 'utf-8', mode: 0o600 });
+  restrictFileToOwner(tmpFile);
+  fsyncFile(tmpFile);
+  renameSync(tmpFile, path);
+  restrictFileToOwner(path);
+  fsyncPath(configuration.piCommandBoundaryDir);
+}
+
+export function piHistoryWatermarkPath(piSessionId: string): string {
+  const fileName = `${createHash('sha256').update(piSessionId).digest('hex')}.json`;
+  return join(configuration.piHistoryWatermarkDir, fileName);
+}
+
+export function readPersistedPiHistoryWatermark(piSessionId: string): string | null {
+  try {
+    const parsed = JSON.parse(readFileSync(piHistoryWatermarkPath(piSessionId), 'utf-8')) as { version?: unknown; entryId?: unknown };
+    return parsed.version === 1 && typeof parsed.entryId === 'string' ? parsed.entryId : null;
+  } catch {
+    return null;
+  }
+}
+
+export function persistPiHistoryWatermark(piSessionId: string, entryId: string): void {
+  mkdirSync(configuration.piHistoryWatermarkDir, { recursive: true, mode: 0o700 });
+  const path = piHistoryWatermarkPath(piSessionId);
+  const tmpFile = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmpFile, JSON.stringify({ version: 1, entryId }), { encoding: 'utf-8', mode: 0o600 });
+  restrictFileToOwner(tmpFile);
+  fsyncFile(tmpFile);
+  renameSync(tmpFile, path);
+  restrictFileToOwner(path);
+  fsyncPath(configuration.piHistoryWatermarkDir);
 }
 
 export function persistSession(sessionId: string, session: PersistedSession): void {

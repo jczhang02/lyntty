@@ -46,6 +46,20 @@ describe.runIf(process.platform !== 'win32')('secret persistence permissions', (
     expect(fileMode(configuration.privateKeyFile)).toBe(0o600);
   });
 
+  it('persists the pre-hardening Pi command boundary with owner-only permissions', () => {
+    persistence.persistPiCommandBoundary('pi-session-1', 42);
+
+    expect(persistence.readPersistedPiCommandBoundary('pi-session-1')).toBe(42);
+    expect(fileMode(persistence.piCommandBoundaryPath('pi-session-1'))).toBe(0o600);
+  });
+
+  it('persists Pi history watermarks with owner-only permissions', () => {
+    persistence.persistPiHistoryWatermark('pi-session-1', 'entry-42');
+
+    expect(persistence.readPersistedPiHistoryWatermark('pi-session-1')).toBe('entry-42');
+    expect(fileMode(persistence.piHistoryWatermarkPath('pi-session-1'))).toBe(0o600);
+  });
+
   it('durably records Pi command outcomes with owner-only permissions', () => {
     persistence.persistPiCommandOutcome('pi-session-1', 'local-1', 'accepted_by_pi');
     persistence.persistPiCommandOutcome('pi-session-1', 'local-2', 'failed');
