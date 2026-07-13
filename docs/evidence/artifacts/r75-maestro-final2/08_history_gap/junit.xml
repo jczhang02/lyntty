@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty_v03_api35" tests="1" failures="0" time="13.0">
+    <testcase id="Lyntty renders explicit Pi history gap" name="Lyntty renders explicit Pi history gap" classname="Lyntty renders explicit Pi history gap" file="e2e/maestro/08_history_gap.yml" time="13.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="reliability, history-gap"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

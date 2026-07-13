@@ -50,8 +50,57 @@ HOME=<temporary> LYNTTY_HOME_DIR=<temporary> pnpm ci:fast
 
 ## 第二轮——运行时可靠性
 
-待执行。
+状态：完成多轮实现、对抗性审查、阻塞修复、全量测试与独立终审。
 
-## 第三轮——移动端与 Maestro E2E
+### 变更与验证
 
-待执行。
+- Pi 命令队列加入 epoch、紧急命令排序、有限重试、终态失败、queue-full 反馈、独立 relay receive cursor 和按 session fsync 的 outcome ledger。
+- 以 Pi 真正接受 prompt 作为 durable success；隔离 stale ACK、并发 extension instance 与旧 RPC owner。
+- 增加 keyed activation lease、wait/stop/interrupt takeover、进程退出等待、stale mirror 清理和 managed runtime bridge 硬锁。
+- mirror teardown 会永久关闭 session client，旧 reconnect timer 不会复活。
+- relay tag 使用真实 Pi session id；`history_gap` 贯穿 daemon RPC、持久 metadata、Sessions Home 与 Session Remote。
+- 增加 fsync canonical JSONL watermark、确认式 replay、relay envelope inventory 和向后兼容的确定性 protocol local id；重启只补发未确认 entry，extension sequence gap 补齐后才推进 watermark。
+- CLI 最终：101 files / 834 tests，typecheck/build 通过。
+- 隔离实测：手机命令在 `lynttyd` 停止时先进入 relay，重启后仅由 Pi 执行一次并返回 APK；extension `/reload` 后仅新 instance 消费命令。
+- 第二轮独立终审修复永久 close 问题后，无剩余 P0/P1。
+
+## 第三轮——移动端可靠性与 Maestro E2E
+
+状态：完成实现、release-style APK、真实多维 Maestro 和独立终审。
+
+### 变更
+
+- MMKV 持久化加密 relay outbox 与 synthetic-session send；按真实 `pi-local:` identity 迁移 v1 数据，每次 session snapshot 后重试 canonical reconciliation，并在网络发送前完成 synthetic-to-normal 密文持久化切换。
+- 消息 durable queue 成功前不清 composer；阻止重复点击并显式报告 session/encryption 失败。
+- discovered computer-side Pi mirror 失败时不再降级启动重复 managed runtime。
+- backward relay page 先按 seq 升序再进入有状态 reducer，live update 串行处理；waiting-extension/history-gap remediation 保持可见。
+- 恢复非生产 release-style APK 路径 `dev.jczhang.lyntty.dev`，使用固定 preview-only signer；生产 release 仍强制独立生产签名与 Firebase 文件。
+- `react-native-worklets` 升至与 Reanimated 兼容的 0.10 系列。
+
+### APK 与 Maestro 证据
+
+全程使用临时 `HOME`、临时 `LYNTTY_HOME_DIR`、独立 tmux Pi session、本地 3005 relay 和 Android API 35 AVD `lyntty_v03_api35`；未修改真实 `~/.pi`、`~/.lyntty` 或生产环境。
+
+APK：package `dev.jczhang.lyntty.dev`，version `1.0.0` / code 1，target SDK 36；SHA-256、signer fingerprint、大小、package metadata 与完整构建日志记录于 `docs/evidence/artifacts/r75-maestro-final2/`。preview cleartext resource 为 true，production 保持 false。
+
+Maestro 通过维度：
+
+1. 首次创建账户；
+2. 加密 deep-link 配对 node；
+3. 历史 Pi session 打开与手机实时回复；
+4. App stop/relaunch 后恢复 session 与回复；
+5. daemon 停止期间手机命令先持久化到目标 session message endpoint，重启后只执行一次；fragmented prompt 不含完整 assistant token，因此 pane 中 `pane_occurrences=1`；
+6. 在已核验隔离 pane 中交互执行 Pi `/reload`，日志出现 `eventReason: reload`、新 owner claim，随后远程命令只执行一次；
+7. unknown cursor 触发并显示明确 `history_gap`。
+
+本地 artifacts：`docs/evidence/artifacts/r75-maestro-final2/`，包括七个维度 JUnit、编排 checkpoint、reload ownership window、APK build/signer metadata 与 cleanup 记录；临时 pairing 材料已删除。
+
+### 最终门禁与残余风险
+
+- App：87 files / 808 tests，typecheck 通过；
+- CLI：101 files / 834 tests，typecheck/build 通过；
+- Wire：19 tests，build 通过；Relay：101 tests，typecheck 通过；production audit high/critical 为 0（moderate 27、low 6）；
+- workflow hardening 3/3、release APK assembly、`git diff --check` 均通过；
+- 独立最终发布阻塞审查结论：**APPROVE**，无剩余 P0/P1。
+- 未做真机或 iOS；Android API 35 release-style emulator 是本轮设备证据。
+- 未执行生产签名、publish、deploy、npm publish、push 或 PR；GitHub Environment reviewer/branch policy 仍需仓库所有者配置。

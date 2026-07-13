@@ -1,0 +1,11 @@
+[02:55:02.544] [API] socket.close() called
+[02:55:02.544] [API] Socket disconnected: io client disconnect
+[02:55:02.556] Session created/loaded: cmrjkwj3w0003ovtv9re7dcn0 (tag: pi:fa6f66393a722fce877dd40b24f4148d)
+[02:55:02.558] [pi] Received Pi extension event {
+  piSessionId: '019f5cd2-1662-7134-98cb-7576bbd5b737',
+  eventType: 'session_start',
+  eventReason: 'reload',
+  eventId: 1,
+  extensionInstanceId: '66db800c-cdc1-4c74-a2bb-080b6eda2632',
+  activeExtensionInstanceId: '66db800c-cdc1-4c74-a2bb-080b6eda2632',
+  ownership: 'claimed'}

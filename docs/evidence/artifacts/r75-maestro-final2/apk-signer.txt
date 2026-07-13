@@ -1,0 +1,2 @@
+Signer #1 certificate DN: CN=Lyntty Preview, OU=Development, O=Lyntty, L=Local, ST=Local, C=US
+Signer #1 certificate SHA-256 digest: ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c

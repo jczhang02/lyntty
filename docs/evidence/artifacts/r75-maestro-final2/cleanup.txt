@@ -1,0 +1,1 @@
+isolated HOME/LYNTTY_HOME_DIR, tmux Pi session, local relay, and API 35 AVD stopped and removed

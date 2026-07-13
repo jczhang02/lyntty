@@ -1,0 +1,3 @@
+prompt_did_not_contain_expected_token=true
+baseline_occurrences=0
+pane_occurrences=1
