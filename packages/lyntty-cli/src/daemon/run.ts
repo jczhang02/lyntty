@@ -21,6 +21,7 @@ import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledLynttyVersion, stopDaemon } from './controlClient';
 import { startDaemonControlServer } from './controlServer';
+import { findBlockedSessionEnvironmentKeys } from './sessionEnvironment';
 import { statSync } from 'fs';
 import { join } from 'path';
 import { projectPath } from '@/projectPath';
@@ -582,6 +583,14 @@ export async function startDaemon(): Promise<void> {
           return {
             type: 'error',
             errorMessage: 'Lyntty pi runtime does not accept external agent tokens.',
+          };
+        }
+
+        const blockedEnvironmentKeys = findBlockedSessionEnvironmentKeys(options.environmentVariables);
+        if (blockedEnvironmentKeys.length > 0) {
+          return {
+            type: 'error',
+            errorMessage: `Session environment contains reserved or unsafe variables: ${blockedEnvironmentKeys.join(', ')}`,
           };
         }
 

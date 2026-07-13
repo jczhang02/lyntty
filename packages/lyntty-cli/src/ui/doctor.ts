@@ -7,7 +7,7 @@
 
 import chalk from 'chalk'
 import { configuration } from '@/configuration'
-import { readSettings, readCredentials } from '@/persistence'
+import { readSettings, readCredentials, type DaemonLocallyPersistedState } from '@/persistence'
 import { checkIfDaemonRunningAndCleanupStaleState } from '@/daemon/controlClient'
 import { findAllLynttyProcesses } from '@/daemon/doctor'
 import { readDaemonState } from '@/persistence'
@@ -15,6 +15,13 @@ import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectPath } from '@/projectPath'
 import packageJson from '../../package.json'
+
+export function redactDaemonStateForDisplay(state: DaemonLocallyPersistedState): DaemonLocallyPersistedState {
+    return {
+        ...state,
+        ...(state.piExtensionToken ? { piExtensionToken: '<redacted>' } : {}),
+    }
+}
 
 /**
  * Get relevant environment information for debugging
@@ -88,7 +95,7 @@ export async function runDoctorDaemon(): Promise<void> {
         if (state) {
             console.log(chalk.bold('\n📄 Daemon State:'));
             console.log(chalk.blue(`Location: ${configuration.daemonStateFile}`));
-            console.log(chalk.gray(JSON.stringify(state, null, 2)));
+            console.log(chalk.gray(JSON.stringify(redactDaemonStateForDisplay(state), null, 2)));
         }
     } catch (error) {
         console.log(chalk.red('❌ Error checking daemon status'));
@@ -272,7 +279,7 @@ export async function runDoctorCommand(): Promise<void> {
         if (state) {
             console.log(chalk.bold('\n📄 Daemon State:'));
             console.log(chalk.blue(`Location: ${configuration.daemonStateFile}`));
-            console.log(chalk.gray(JSON.stringify(state, null, 2)));
+            console.log(chalk.gray(JSON.stringify(redactDaemonStateForDisplay(state), null, 2)));
         }
     } catch (error) {
         console.log(chalk.red('❌ Error checking daemon status'));

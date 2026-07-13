@@ -14,6 +14,14 @@ import { encodeBase64, decodeBase64 } from '@/api/encryption';
 import type { Metadata } from '@/api/types';
 import { logger } from '@/ui/logger';
 
+function restrictFileToOwner(path: string): void {
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    // Best-effort hardening for platforms without POSIX permissions.
+  }
+}
+
 export const SandboxConfigSchema = z.object({
   enabled: z.boolean().default(false),
   workspaceRoot: z.string().optional(),
@@ -267,7 +275,8 @@ export async function writeCredentialsLegacy(credentials: { secret: Uint8Array, 
   await writeFile(configuration.privateKeyFile, JSON.stringify({
     secret: encodeBase64(credentials.secret),
     token: credentials.token
-  }, null, 2));
+  }, null, 2), { mode: 0o600 });
+  restrictFileToOwner(configuration.privateKeyFile);
 }
 
 export async function writeCredentialsDataKey(credentials: { publicKey: Uint8Array, machineKey: Uint8Array, token: string }): Promise<void> {
@@ -277,7 +286,8 @@ export async function writeCredentialsDataKey(credentials: { publicKey: Uint8Arr
   await writeFile(configuration.privateKeyFile, JSON.stringify({
     encryption: { publicKey: encodeBase64(credentials.publicKey), machineKey: encodeBase64(credentials.machineKey) },
     token: credentials.token
-  }, null, 2));
+  }, null, 2), { mode: 0o600 });
+  restrictFileToOwner(configuration.privateKeyFile);
 }
 
 export async function clearCredentials(): Promise<void> {
@@ -353,7 +363,8 @@ export async function acquireDaemonLock(
       // O_EXCL ensures we only create if it doesn't exist (atomic lock acquisition)
       const fileHandle = await open(
         configuration.daemonLockFile,
-        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY
+        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+        0o600,
       );
       // Write PID to lock file for debugging
       await fileHandle.writeFile(String(process.pid));
@@ -444,8 +455,10 @@ export function persistSession(sessionId: string, session: PersistedSession): vo
     const existing = readPersistedSessions();
     existing[sessionId] = session;
     const tmpFile = configuration.sessionsFile + '.tmp';
-    writeFileSync(tmpFile, JSON.stringify({ sessions: existing }, null, 2), 'utf-8');
+    writeFileSync(tmpFile, JSON.stringify({ sessions: existing }, null, 2), { encoding: 'utf-8', mode: 0o600 });
+    restrictFileToOwner(tmpFile);
     renameSync(tmpFile, configuration.sessionsFile);
+    restrictFileToOwner(configuration.sessionsFile);
   } catch (error) {
     logger.debug(`[PERSISTENCE] Failed to persist session ${sessionId}:`, error);
   }
