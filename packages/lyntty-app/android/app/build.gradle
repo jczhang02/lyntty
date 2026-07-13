@@ -13,6 +13,9 @@ def hasLynttyReleaseSigning = lynttyKeystoreFile && lynttyKeystorePassword && ly
 def isReleaseBuildRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
 def isProductionAppEnv = (System.getenv('APP_ENV') ?: 'development') == 'production'
 def isProductionReleaseBuild = isReleaseBuildRequested && isProductionAppEnv
+// Fixed, preview-only development signer. Its password is intentionally public;
+// production builds never select this signing config.
+def lynttyPreviewKeystoreFile = file('lyntty-preview.keystore')
 def lynttyGoogleServicesFile = file('google-services.json')
 def hasLynttyGoogleServices = lynttyGoogleServicesFile.exists()
 
@@ -132,6 +135,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        preview {
+            storeFile lynttyPreviewKeystoreFile
+            storePassword 'lyntty-preview'
+            keyAlias 'lyntty-preview'
+            keyPassword 'lyntty-preview'
+        }
         release {
             if (hasLynttyReleaseSigning) {
                 storeFile file(lynttyKeystoreFile)
@@ -160,7 +169,7 @@ android {
                 lynttyAppName: isProductionAppEnv ? 'Lyntty' : 'Lyntty (dev)',
                 usesCleartextTraffic: isProductionAppEnv ? false : true
             ]
-            signingConfig hasLynttyReleaseSigning ? signingConfigs.release : signingConfigs.debug
+            signingConfig isProductionAppEnv ? signingConfigs.release : signingConfigs.preview
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
