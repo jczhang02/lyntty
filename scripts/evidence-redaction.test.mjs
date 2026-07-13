@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const PAIRING_URL_PATTERN = /lyntty:\/\/terminal\?[^\s"'<>`]+/g;
+const AUTH_PUBLIC_KEY_PATTERN = /publicKey=(?!\[REDACTED\])[A-Za-z0-9_-]{16,}/;
 const SAFE_PAIRING_URL_PLACEHOLDERS = new Set([
   'lyntty://terminal?...',
   'lyntty://terminal?[REDACTED]',
@@ -24,14 +25,18 @@ export function findUnsafePairingUrls(content) {
     .filter((url) => !SAFE_PAIRING_URL_PLACEHOLDERS.has(url));
 }
 
-test('tracked evidence contains no complete Lyntty pairing URL bytes', () => {
-  const leaks = trackedEvidenceFiles().filter((path) => findUnsafePairingUrls(readFileSync(path)).length > 0);
-  assert.deepEqual(leaks, [], `pairing URLs must be redacted in: ${leaks.join(', ')}`);
+test('tracked evidence contains no complete Lyntty pairing URL or auth public-key bytes', () => {
+  const leaks = trackedEvidenceFiles().filter((path) => {
+    const content = readFileSync(path);
+    return findUnsafePairingUrls(content).length > 0 || AUTH_PUBLIC_KEY_PATTERN.test(content.toString('latin1'));
+  });
+  assert.deepEqual(leaks, [], `pairing URLs and auth public keys must be redacted in: ${leaks.join(', ')}`);
 });
 
-test('binary content and deceptive suffixes cannot bypass pairing URL scanning', () => {
-  const content = Buffer.from('\0prefix lyntty://terminal?real-secret... suffix\0', 'latin1');
+test('binary content and deceptive suffixes cannot bypass auth-material scanning', () => {
+  const content = Buffer.from('\0prefix lyntty://terminal?real-secret... publicKey=auth_public_key_material suffix\0', 'latin1');
   assert.deepEqual(findUnsafePairingUrls(content), ['lyntty://terminal?real-secret...']);
+  assert.equal(AUTH_PUBLIC_KEY_PATTERN.test(content.toString('latin1')), true);
 });
 
 test('auth and pairing screenshots must be removed or explicitly redacted before commit', () => {

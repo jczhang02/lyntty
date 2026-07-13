@@ -7,9 +7,9 @@ tags:
 - stopApp
 - launchApp
 - extendedWaitUntil:
-    visible: "R75 Maestro Pi Session"
+    visible: "${HISTORY_TITLE}"
     timeout: 120000
-- tapOn: "R75 Maestro Pi Session"
+- tapOn: "${HISTORY_TITLE}"
 - scrollUntilVisible:
     element:
       text: "History gap · Some older Pi messages are unavailable on this computer."
