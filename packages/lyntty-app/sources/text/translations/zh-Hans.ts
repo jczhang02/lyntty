@@ -1035,6 +1035,7 @@ export const zhHans: TranslationStructure = {
         connectionError: "连接错误",
         connectThisNodeToScanLocalPiHistory: "连接此节点以扫描本地 Pi 历史。",
         couldNotLoadOlderMessagesRetry: "无法加载更早的消息 · 重试",
+        piHistoryGapOlderMessagesUnavailable: "历史缺口 · 此电脑上的部分较早 Pi 消息不可用。",
         created: "已创建",
         createDirectory: "创建目录？",
         currentDeviceMetadataComesFromThisPhoneOlderTokens: "当前设备元数据来自这台手机。旧 token 使用 token 指纹和服务器时间戳。",

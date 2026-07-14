@@ -1,0 +1,18 @@
+appId: ${APP_ID}
+name: Lyntty renders explicit Pi history gap
+tags:
+  - reliability
+  - history-gap
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "${HISTORY_TITLE}"
+    timeout: 120000
+- tapOn: "${HISTORY_TITLE}"
+- scrollUntilVisible:
+    element:
+      text: "History gap · Some older Pi messages are unavailable on this computer."
+    direction: UP
+    timeout: 120000
+- assertVisible: "History gap · Some older Pi messages are unavailable on this computer."

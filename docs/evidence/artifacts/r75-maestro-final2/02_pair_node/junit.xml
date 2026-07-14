@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty_v03_api35" tests="1" failures="0" time="13.0">
+    <testcase id="Lyntty terminal deep link pairing" name="Lyntty terminal deep link pairing" classname="Lyntty terminal deep link pairing" file="e2e/maestro/02_pair_node.yml" time="13.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="core, pairing"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

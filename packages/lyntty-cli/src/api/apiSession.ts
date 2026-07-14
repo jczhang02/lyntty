@@ -211,8 +211,11 @@ export class ApiSessionClient extends EventEmitter {
     private encryptionKey: Uint8Array;
     private encryptionVariant: 'legacy' | 'dataKey';
     private reconnectInterval: NodeJS.Timeout | null = null;
+    private reconnectTimeout: NodeJS.Timeout | null = null;
+    private closed = false;
     private ignoreArchiveSignal = false;
-    private skipInitialMessages = false;
+    private readonly initialServerSeq: number;
+    private skipMessagesThroughSeq: number | null = null;
     private claudeSessionProtocolState: ClaudeSessionProtocolState = {
         currentTurnId: null,
         uuidToProviderSubagent: new Map<string, string>(),
@@ -225,7 +228,12 @@ export class ApiSessionClient extends EventEmitter {
         activeSubagents: new Set<string>(),
     };
     private lastSeq = 0;
+    // Receive cursor is independent from lastSeq because posting our own outbox
+    // can advance the server sequence before the initial relay replay completes.
+    private receiveSeq = 0;
     private pendingOutbox: Array<{ content: string; localId: string }> = [];
+    private readonly knownSessionProtocolEnvelopeIds = new Set<string>();
+    private knownSessionProtocolCoveredThrough: number | null = null;
     private readonly sendSync: InvalidateSync;
     private readonly receiveSync: InvalidateSync;
 
@@ -233,6 +241,7 @@ export class ApiSessionClient extends EventEmitter {
         super()
         this.token = token;
         this.sessionId = session.id;
+        this.initialServerSeq = session.seq;
         this.metadata = session.metadata;
         this.metadataVersion = session.metadataVersion;
         this.agentState = session.agentState;
@@ -274,10 +283,18 @@ export class ApiSessionClient extends EventEmitter {
         //
 
         this.socket.on('connect', () => {
+            if (this.closed) {
+                this.socket.close();
+                return;
+            }
             logger.debug('Socket connected successfully');
             if (this.reconnectInterval) {
                 clearInterval(this.reconnectInterval);
                 this.reconnectInterval = null;
+            }
+            if (this.reconnectTimeout) {
+                clearTimeout(this.reconnectTimeout);
+                this.reconnectTimeout = null;
             }
             this.rpcHandlerManager.onSocketConnect(this.socket);
             this.receiveSync.invalidate();
@@ -291,13 +308,13 @@ export class ApiSessionClient extends EventEmitter {
         this.socket.on('disconnect', (reason) => {
             logger.debug(`[API] Socket disconnected: ${reason}`);
             this.rpcHandlerManager.onSocketDisconnect();
-            this.startSmartReconnect();
+            if (!this.closed) this.startSmartReconnect();
         })
 
         this.socket.on('connect_error', (error) => {
             logger.debug('[API] Socket connection error:', error);
             this.rpcHandlerManager.onSocketDisconnect();
-            this.startSmartReconnect();
+            if (!this.closed) this.startSmartReconnect();
         })
 
         // Server events
@@ -312,7 +329,7 @@ export class ApiSessionClient extends EventEmitter {
 
                 if (data.body.t === 'new-message') {
                     const messageSeq = data.body.message?.seq;
-                    if (typeof messageSeq !== 'number' || messageSeq !== this.lastSeq + 1 || data.body.message.content.t !== 'encrypted') {
+                    if (typeof messageSeq !== 'number' || messageSeq !== this.lastSeq + 1 || messageSeq !== this.receiveSeq + 1 || data.body.message.content.t !== 'encrypted') {
                         this.receiveSync.invalidate();
                         return;
                     }
@@ -325,8 +342,9 @@ export class ApiSessionClient extends EventEmitter {
                             ? (body as { content: { type: string } }).content.type
                             : 'unknown',
                     });
-                    this.routeIncomingMessage(body, data.body.message.localId ?? undefined);
+                    this.routeIncomingMessage(body, data.body.message.localId ?? data.body.message.id);
                     this.lastSeq = messageSeq;
+                    this.receiveSeq = messageSeq;
                 } else if (data.body.t === 'update-session') {
                     if (data.body.metadata && data.body.metadata.version > this.metadataVersion) {
                         this.metadata = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(data.body.metadata.value));
@@ -548,7 +566,20 @@ export class ApiSessionClient extends EventEmitter {
         };
     }
 
+    private rememberSessionProtocolEnvelope(message: unknown): void {
+        if (!message || typeof message !== 'object' || (message as { role?: unknown }).role !== 'session') return;
+        const envelope = (message as { content?: unknown }).content;
+        if (envelope && typeof envelope === 'object' && typeof (envelope as { id?: unknown }).id === 'string') {
+            this.knownSessionProtocolEnvelopeIds.add((envelope as { id: string }).id);
+            const time = (envelope as { time?: unknown }).time;
+            if (typeof time === 'number' && Number.isFinite(time)) {
+                this.knownSessionProtocolCoveredThrough = Math.max(this.knownSessionProtocolCoveredThrough ?? 0, time);
+            }
+        }
+    }
+
     private routeIncomingMessage(message: unknown, relayLocalId?: string) {
+        this.rememberSessionProtocolEnvelope(message);
         const userResult = UserMessageSchema.safeParse(message);
         if (userResult.success) {
             const userMessage = relayLocalId && !userResult.data.localKey
@@ -582,14 +613,10 @@ export class ApiSessionClient extends EventEmitter {
     }
 
     private async fetchMessages() {
-        // On reconnect, skip processing existing messages — just advance lastSeq
-        const skipRouting = this.skipInitialMessages;
-        if (skipRouting) {
-            this.skipInitialMessages = false;
-            logger.debug('[API] Reconnect mode: skipping existing messages, advancing lastSeq');
-        }
-
-        let afterSeq = this.lastSeq;
+        // A reconnect cutover skips only messages that existed in the session
+        // snapshot used to construct this client. Newer commands must still route.
+        const skipThroughSeq = this.skipMessagesThroughSeq;
+        let afterSeq = this.receiveSeq;
         while (true) {
             const response = await axios.get<V3GetSessionMessagesResponse>(
                 `${configuration.serverUrl}/v3/sessions/${encodeURIComponent(this.sessionId)}/messages`,
@@ -611,15 +638,17 @@ export class ApiSessionClient extends EventEmitter {
                     maxSeq = message.seq;
                 }
 
-                if (skipRouting) continue;
-
                 if (message.content?.t !== 'encrypted') {
                     continue;
                 }
 
                 try {
                     const body = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(message.content.c));
-                    this.routeIncomingMessage(body, message.localId ?? undefined);
+                    if (skipThroughSeq !== null && message.seq <= skipThroughSeq) {
+                        this.rememberSessionProtocolEnvelope(body);
+                        continue;
+                    }
+                    this.routeIncomingMessage(body, message.localId ?? message.id);
                 } catch (error) {
                     logger.debug('[API] Failed to decrypt fetched message', {
                         sessionId: this.sessionId,
@@ -629,7 +658,11 @@ export class ApiSessionClient extends EventEmitter {
                 }
             }
 
+            this.receiveSeq = Math.max(this.receiveSeq, maxSeq);
             this.lastSeq = Math.max(this.lastSeq, maxSeq);
+            if (this.skipMessagesThroughSeq !== null && this.receiveSeq >= this.skipMessagesThroughSeq) {
+                this.skipMessagesThroughSeq = null;
+            }
             const hasMore = !!response.data.hasMore;
             if (hasMore && maxSeq === afterSeq) {
                 logger.debug('[API] fetchMessages pagination stalled, stopping to avoid infinite loop', {
@@ -792,7 +825,66 @@ export class ApiSessionClient extends EventEmitter {
             }
         };
 
+        // Preserve the original protocol transport key so upgraded daemons
+        // can identify already-imported envelopes without duplicating history.
         this.enqueueMessage(content, invalidate, `session:${envelope.id}`);
+    }
+
+    async syncExistingSessionProtocolEnvelopeIds(timeoutMs: number = 10_000): Promise<void> {
+        const inventory = async (): Promise<void> => {
+            let afterSeq = 0;
+            while (true) {
+                const response = await axios.get<V3GetSessionMessagesResponse>(
+                    `${configuration.serverUrl}/v3/sessions/${encodeURIComponent(this.sessionId)}/messages`,
+                    {
+                        params: { after_seq: afterSeq, limit: 100 },
+                        headers: this.authHeaders(),
+                        timeout: timeoutMs,
+                    },
+                );
+                const messages = Array.isArray(response.data.messages) ? response.data.messages : [];
+                let maxSeq = afterSeq;
+                for (const message of messages) {
+                    maxSeq = Math.max(maxSeq, message.seq);
+                    if (message.content?.t !== 'encrypted') continue;
+                    try {
+                        this.rememberSessionProtocolEnvelope(
+                            decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(message.content.c)),
+                        );
+                    } catch (error) {
+                        logger.debug('[API] Failed to inventory encrypted relay message', {
+                            sessionId: this.sessionId,
+                            seq: message.seq,
+                            error,
+                        });
+                        throw error;
+                    }
+                }
+                if (!response.data.hasMore) return;
+                if (maxSeq === afterSeq) throw new Error('Relay history inventory pagination stalled');
+                afterSeq = maxSeq;
+            }
+        };
+
+        let timeout: ReturnType<typeof setTimeout> | null = null;
+        try {
+            await Promise.race([
+                inventory(),
+                new Promise<never>((_resolve, reject) => {
+                    timeout = setTimeout(() => reject(new Error('Relay history inventory timed out')), timeoutMs);
+                }),
+            ]);
+        } finally {
+            if (timeout) clearTimeout(timeout);
+        }
+    }
+
+    hasSessionProtocolEnvelope(envelopeId: string): boolean {
+        return this.knownSessionProtocolEnvelopeIds.has(envelopeId);
+    }
+
+    getSessionProtocolCoveredThrough(): number | null {
+        return this.knownSessionProtocolCoveredThrough;
     }
 
     sendSessionProtocolMessage(envelope: SessionEnvelope, meta?: Record<string, unknown>) {
@@ -922,7 +1014,11 @@ export class ApiSessionClient extends EventEmitter {
     }
 
     skipExistingMessages() {
-        this.skipInitialMessages = true;
+        this.skipMessagesThroughSeq = this.initialServerSeq;
+    }
+
+    skipMessagesThrough(relaySeq: number) {
+        this.skipMessagesThroughSeq = Math.max(0, Math.min(this.initialServerSeq, relaySeq));
     }
 
     async updateMetadataAndAwait(handler: (metadata: Metadata) => Metadata) {
@@ -940,7 +1036,7 @@ export class ApiSessionClient extends EventEmitter {
                     }
                     throw new Error('Metadata version mismatch');
                 } else if (answer.result === 'error') {
-                    // Hard error - ignore
+                    throw new Error('Metadata update was rejected by relay');
                 }
             });
         });
@@ -981,6 +1077,23 @@ export class ApiSessionClient extends EventEmitter {
     /**
      * Wait for socket buffer to flush
      */
+    async flushConfirmed(timeoutMs: number = 10000): Promise<void> {
+        let timeout: NodeJS.Timeout | null = null;
+        try {
+            const completed = await Promise.race([
+                this.sendSync.invalidateAndAwait().then(() => true),
+                new Promise<false>((resolve) => {
+                    timeout = setTimeout(() => resolve(false), timeoutMs);
+                }),
+            ]);
+            if (!completed || this.pendingOutbox.length > 0) {
+                throw new Error(`Session outbox was not acknowledged within ${timeoutMs}ms`);
+            }
+        } finally {
+            if (timeout) clearTimeout(timeout);
+        }
+    }
+
     async flush(): Promise<void> {
         await Promise.race([
             this.sendSync.invalidateAndAwait(),
@@ -1001,19 +1114,29 @@ export class ApiSessionClient extends EventEmitter {
 
     async close() {
         logger.debug('[API] socket.close() called');
+        this.closed = true;
         this.sendSync.stop();
         this.receiveSync.stop();
         if (this.reconnectInterval) {
             clearInterval(this.reconnectInterval);
             this.reconnectInterval = null;
         }
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
         this.socket.close();
     }
 
     private startSmartReconnect() {
-        if (this.reconnectInterval) return;
+        if (this.closed || this.reconnectInterval) return;
 
         this.reconnectInterval = setInterval(() => {
+            if (this.closed) {
+                clearInterval(this.reconnectInterval!);
+                this.reconnectInterval = null;
+                return;
+            }
             if (this.socket.connected) {
                 clearInterval(this.reconnectInterval!);
                 this.reconnectInterval = null;
@@ -1029,7 +1152,10 @@ export class ApiSessionClient extends EventEmitter {
 
         if (shouldReconnect()) {
             logger.debug('[API] Network up + lid open — reconnecting in 1s');
-            setTimeout(() => { if (!this.socket.connected) this.socket.connect() }, 1000);
+            this.reconnectTimeout = setTimeout(() => {
+                this.reconnectTimeout = null;
+                if (!this.closed && !this.socket.connected) this.socket.connect();
+            }, 1000);
         }
     }
 }

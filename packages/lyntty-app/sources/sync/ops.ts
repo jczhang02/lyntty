@@ -6,6 +6,7 @@
 import { apiSocket } from './apiSocket';
 import { sync } from './sync';
 import type { MachineMetadata, PiMachineSessionRecord, PiRecoveryState } from './storageTypes';
+import type { PiHistoryPageResult } from './piHistoryPage';
 
 // Strict type definitions for all operations
 
@@ -882,19 +883,13 @@ export async function sessionKill(sessionId: string): Promise<SessionKillRespons
     }
 }
 
-export type PiHistoryPageResponse = {
-    type: 'success';
-    sent: number;
-    nextCursor?: string;
-    hasMore: boolean;
-    totalMessages: number;
-};
+export type { PiHistoryPageResult as PiHistoryPageResponse } from './piHistoryPage';
 
 export async function sessionLoadPiHistoryPage(
     sessionId: string,
     beforeEntryId?: string,
-): Promise<PiHistoryPageResponse> {
-    return apiSocket.sessionRPC<PiHistoryPageResponse, { beforeEntryId?: string }>(
+): Promise<PiHistoryPageResult> {
+    return apiSocket.sessionRPC<PiHistoryPageResult, { beforeEntryId?: string }>(
         sessionId,
         'pi-history-page',
         beforeEntryId ? { beforeEntryId } : {},

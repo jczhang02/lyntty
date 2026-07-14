@@ -56,6 +56,18 @@ describe('userMessagePresentation', () => {
         });
     });
 
+    it('shows an explicit terminal label when a Pi command was not delivered', () => {
+        expect(getUserMessagePresentation(userMessage({
+            localId: 'phone-local-1',
+            text: 'hello',
+            meta: { sentFrom: 'android', remoteCommandState: 'failed' },
+        }))).toEqual({
+            frame: 'phoneBubble',
+            parseRawSlashCommands: true,
+            sourceLabel: 'Not delivered',
+        });
+    });
+
     it('uses a prompt-card frame for user numbered and bulleted lists', () => {
         expect(isBlockUserMessageText('1. first visible body\n2. second visible body')).toBe(true);
         expect(isBlockUserMessageText('- first visible body\n- second visible body')).toBe(true);

@@ -10,6 +10,7 @@ export type LynttyPiExtensionSession = {
 export type LynttyPiExtensionPayload = {
   session: LynttyPiExtensionSession;
   event: Record<string, unknown>;
+  extensionInstanceId?: string;
   eventId?: number;
   timestamp?: number;
 };
@@ -46,6 +47,8 @@ export type LynttyPiRemoteCommandEnvelope = {
 
 export type LynttyPiRemoteCommandAck = {
   seq: number;
+  extensionInstanceId?: string;
+  queueEpoch?: string;
   status: 'delivered_to_pi_extension' | 'accepted_by_pi' | 'failed';
   deliveryToken?: string;
   error?: string;

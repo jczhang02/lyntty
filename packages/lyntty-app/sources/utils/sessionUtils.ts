@@ -160,14 +160,18 @@ export function getSessionSubtitle(session: Session): string {
     if (session.metadata) {
         const path = formatPathRelativeToHome(session.metadata.path, session.metadata.homeDir);
         if (session.metadata.piDiscoveryState) {
+            const hasHistoryGap = session.metadata.piDiscoveryState !== 'missing_local_history'
+                && (session.metadata.piHasHistoryGap === true || session.metadata.controlState === 'history_gap');
             const details = [
                 path,
                 typeof session.metadata.piMessageCount === 'number'
                     ? `${session.metadata.piMessageCount} messages`
                     : undefined,
-                session.metadata.piDiscoveryState === 'history_gap' || session.metadata.piDiscoveryState === 'missing_local_history'
-                    ? undefined
-                    : session.metadata.piDiscoveryState,
+                hasHistoryGap
+                    ? t('appWide.piHistoryGapOlderMessagesUnavailable')
+                    : session.metadata.piDiscoveryState === 'missing_local_history'
+                        ? undefined
+                        : session.metadata.piDiscoveryState,
             ];
             return details.filter(Boolean).join(' • ');
         }

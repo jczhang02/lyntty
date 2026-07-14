@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+name: Lyntty queues Pi input across daemon restart
+tags:
+  - reliability
+  - daemon-restart
+  - command-replay
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "${HISTORY_TITLE}"
+    timeout: 120000
+- tapOn: "${HISTORY_TITLE}"
+- waitForAnimationToEnd
+- tapOn:
+    id: "lyntty-session-input"
+- inputText: "${PROMPT}"
+- tapOn:
+    id: "lyntty-session-send"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "${PONG}"
+    direction: DOWN
+    timeout: 180000
+- assertNotVisible: "Session has been deleted"

@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Session } from '@/sync/storageTypes';
 
 vi.mock('@/text', () => ({
-    t: (key: string) => key === 'session.newChat' ? 'New chat' : key,
+    t: (key: string) => {
+        if (key === 'session.newChat') return 'New chat';
+        if (key === 'appWide.piHistoryGapOlderMessagesUnavailable') return 'History gap · Some older Pi messages are unavailable on this computer.';
+        return key;
+    },
 }));
 
 vi.mock('./resumeCommand', () => ({
@@ -49,7 +53,7 @@ describe('getSessionSubtitle', () => {
         }))).toBe('~/dev/lyntty • 42 messages • discovered_local');
     });
 
-    it('does not show missing-history or history-gap states in user subtitles', async () => {
+    it('does not show missing-history state in user subtitles', async () => {
         const { getSessionSubtitle } = await import('./sessionUtils');
 
         expect(getSessionSubtitle(session({
@@ -64,6 +68,23 @@ describe('getSessionSubtitle', () => {
                 piHasHistoryGap: true,
             },
         }))).toBe('~/dev/lyntty • 0 messages');
+    });
+
+    it('shows an explicit history-gap state in user subtitles', async () => {
+        const { getSessionSubtitle } = await import('./sessionUtils');
+
+        expect(getSessionSubtitle(session({
+            metadata: {
+                path: '/home/jc/dev/lyntty',
+                host: 'thinkpad',
+                homeDir: '/home/jc',
+                piSessionId: 'pi-gap',
+                flavor: 'pi',
+                piDiscoveryState: 'history_gap',
+                piMessageCount: 2,
+                piHasHistoryGap: true,
+            },
+        }))).toBe('~/dev/lyntty • 2 messages • History gap · Some older Pi messages are unavailable on this computer.');
     });
 });
 

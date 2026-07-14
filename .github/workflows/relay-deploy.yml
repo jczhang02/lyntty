@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: GHCR image tag to deploy, e.g. sha-0123456789ab
+        description: GHCR image tag to deploy, e.g. sha-<40-character commit>
         required: true
         type: string
 
@@ -18,20 +18,34 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production-relay
     timeout-minutes: 15
     steps:
-      - name: Validate image tag
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate deploy source
         run: |
           set -euo pipefail
-          case "${{ inputs.image_tag }}" in
-            sha-[0-9a-fA-F]*) ;;
-            *)
-              echo "image_tag must be a pinned sha-* tag"
-              exit 1
-              ;;
-          esac
-          if [ "${{ inputs.image_tag }}" = "main" ] || [ "${{ inputs.image_tag }}" = "latest" ]; then
-            echo "Refusing floating production deploy tag"
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Relay deploys must run from refs/heads/main"
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+            echo "Relay deploy HEAD must equal origin/main"
+            exit 1
+          fi
+
+      - name: Validate image tag
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
+            echo "image_tag must be sha- followed by a full lowercase commit SHA"
             exit 1
           fi
 
@@ -61,8 +75,13 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -p "$port" \
             "$USER@$HOST" \
-            "IMAGE_TAG='$IMAGE_TAG' bash -se" <<'REMOTE'
+            "bash -se -- $IMAGE_TAG" <<'REMOTE'
           set -euo pipefail
+          IMAGE_TAG="$1"
+          if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
+            echo "invalid relay image tag" >&2
+            exit 1
+          fi
           sudo test -f /opt/lyntty/.env
           sudo test -f /opt/lyntty/docker-compose.yml
 

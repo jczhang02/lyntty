@@ -4,15 +4,47 @@
  * Handles settings and private key storage in ~/.lyntty/ or local .lyntty/
  */
 
+import { createHash } from 'node:crypto';
 import { FileHandle } from 'node:fs/promises'
 import { readFile, writeFile, mkdir, open, unlink, rename, stat } from 'node:fs/promises'
-import { chmodSync, existsSync, writeFileSync, readFileSync, unlinkSync, renameSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, writeFileSync, readFileSync, unlinkSync, renameSync } from 'node:fs'
 import { constants } from 'node:fs'
+import { join } from 'node:path';
 import { configuration } from '@/configuration'
 import * as z from 'zod';
 import { encodeBase64, decodeBase64 } from '@/api/encryption';
 import type { Metadata } from '@/api/types';
 import { logger } from '@/ui/logger';
+
+function fsyncFile(path: string): void {
+  const fd = openSync(path, 'r');
+  try {
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function fsyncPath(path: string): void {
+  try {
+    const fd = openSync(path, 'r');
+    try {
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    // Best-effort on filesystems/platforms that do not support directory fsync.
+  }
+}
+
+function restrictFileToOwner(path: string): void {
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    // Best-effort hardening for platforms without POSIX permissions.
+  }
+}
 
 export const SandboxConfigSchema = z.object({
   enabled: z.boolean().default(false),
@@ -267,7 +299,8 @@ export async function writeCredentialsLegacy(credentials: { secret: Uint8Array, 
   await writeFile(configuration.privateKeyFile, JSON.stringify({
     secret: encodeBase64(credentials.secret),
     token: credentials.token
-  }, null, 2));
+  }, null, 2), { mode: 0o600 });
+  restrictFileToOwner(configuration.privateKeyFile);
 }
 
 export async function writeCredentialsDataKey(credentials: { publicKey: Uint8Array, machineKey: Uint8Array, token: string }): Promise<void> {
@@ -277,7 +310,8 @@ export async function writeCredentialsDataKey(credentials: { publicKey: Uint8Arr
   await writeFile(configuration.privateKeyFile, JSON.stringify({
     encryption: { publicKey: encodeBase64(credentials.publicKey), machineKey: encodeBase64(credentials.machineKey) },
     token: credentials.token
-  }, null, 2));
+  }, null, 2), { mode: 0o600 });
+  restrictFileToOwner(configuration.privateKeyFile);
 }
 
 export async function clearCredentials(): Promise<void> {
@@ -353,7 +387,8 @@ export async function acquireDaemonLock(
       // O_EXCL ensures we only create if it doesn't exist (atomic lock acquisition)
       const fileHandle = await open(
         configuration.daemonLockFile,
-        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY
+        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+        0o600,
       );
       // Write PID to lock file for debugging
       await fileHandle.writeFile(String(process.pid));
@@ -439,13 +474,130 @@ export function readPersistedSessions(): Record<string, PersistedSession> {
   }
 }
 
+export type PersistedPiCommandOutcome = 'executing' | 'accepted_by_pi' | 'failed';
+
+type PiCommandLedgerFile = {
+  version: 1;
+  outcomes: Record<string, PersistedPiCommandOutcome>;
+};
+
+export function piCommandLedgerPath(piSessionId: string): string {
+  const fileName = `${createHash('sha256').update(piSessionId).digest('hex')}.json`;
+  return join(configuration.piCommandLedgerDir, fileName);
+}
+
+function readPiCommandLedgerFile(piSessionId: string): PiCommandLedgerFile {
+  try {
+    const path = piCommandLedgerPath(piSessionId);
+    if (!existsSync(path)) return { version: 1, outcomes: {} };
+    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as Partial<PiCommandLedgerFile>;
+    if (parsed.version !== 1 || !parsed.outcomes || typeof parsed.outcomes !== 'object') {
+      return { version: 1, outcomes: {} };
+    }
+    return { version: 1, outcomes: parsed.outcomes };
+  } catch {
+    return { version: 1, outcomes: {} };
+  }
+}
+
+export function readPersistedPiCommandOutcomes(piSessionId: string): {
+  acceptedLocalKeys: string[];
+  failedLocalKeys: string[];
+  uncertainLocalKeys: string[];
+} {
+  const outcomes = readPiCommandLedgerFile(piSessionId).outcomes;
+  const acceptedLocalKeys: string[] = [];
+  const failedLocalKeys: string[] = [];
+  const uncertainLocalKeys: string[] = [];
+  for (const [localKey, outcome] of Object.entries(outcomes)) {
+    if (outcome === 'accepted_by_pi') acceptedLocalKeys.push(localKey);
+    if (outcome === 'failed') failedLocalKeys.push(localKey);
+    if (outcome === 'executing') uncertainLocalKeys.push(localKey);
+  }
+  return { acceptedLocalKeys, failedLocalKeys, uncertainLocalKeys };
+}
+
+export function persistPiCommandOutcome(
+  piSessionId: string,
+  localKey: string,
+  outcome: PersistedPiCommandOutcome,
+): void {
+  const ledger = readPiCommandLedgerFile(piSessionId);
+  ledger.outcomes[localKey] = outcome;
+  mkdirSync(configuration.piCommandLedgerDir, { recursive: true, mode: 0o700 });
+  const path = piCommandLedgerPath(piSessionId);
+  const tmpFile = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmpFile, JSON.stringify(ledger), { encoding: 'utf-8', mode: 0o600 });
+  restrictFileToOwner(tmpFile);
+  fsyncFile(tmpFile);
+  renameSync(tmpFile, path);
+  restrictFileToOwner(path);
+  fsyncPath(configuration.piCommandLedgerDir);
+}
+
+export function piCommandBoundaryPath(piSessionId: string): string {
+  const fileName = `${createHash('sha256').update(piSessionId).digest('hex')}.json`;
+  return join(configuration.piCommandBoundaryDir, fileName);
+}
+
+export function readPersistedPiCommandBoundary(piSessionId: string): number | null {
+  try {
+    const parsed = JSON.parse(readFileSync(piCommandBoundaryPath(piSessionId), 'utf-8')) as { version?: unknown; relaySeq?: unknown };
+    return parsed.version === 1 && typeof parsed.relaySeq === 'number' && Number.isSafeInteger(parsed.relaySeq) && parsed.relaySeq >= 0
+      ? parsed.relaySeq
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function persistPiCommandBoundary(piSessionId: string, relaySeq: number): void {
+  mkdirSync(configuration.piCommandBoundaryDir, { recursive: true, mode: 0o700 });
+  const path = piCommandBoundaryPath(piSessionId);
+  const tmpFile = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmpFile, JSON.stringify({ version: 1, relaySeq }), { encoding: 'utf-8', mode: 0o600 });
+  restrictFileToOwner(tmpFile);
+  fsyncFile(tmpFile);
+  renameSync(tmpFile, path);
+  restrictFileToOwner(path);
+  fsyncPath(configuration.piCommandBoundaryDir);
+}
+
+export function piHistoryWatermarkPath(piSessionId: string): string {
+  const fileName = `${createHash('sha256').update(piSessionId).digest('hex')}.json`;
+  return join(configuration.piHistoryWatermarkDir, fileName);
+}
+
+export function readPersistedPiHistoryWatermark(piSessionId: string): string | null {
+  try {
+    const parsed = JSON.parse(readFileSync(piHistoryWatermarkPath(piSessionId), 'utf-8')) as { version?: unknown; entryId?: unknown };
+    return parsed.version === 1 && typeof parsed.entryId === 'string' ? parsed.entryId : null;
+  } catch {
+    return null;
+  }
+}
+
+export function persistPiHistoryWatermark(piSessionId: string, entryId: string): void {
+  mkdirSync(configuration.piHistoryWatermarkDir, { recursive: true, mode: 0o700 });
+  const path = piHistoryWatermarkPath(piSessionId);
+  const tmpFile = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmpFile, JSON.stringify({ version: 1, entryId }), { encoding: 'utf-8', mode: 0o600 });
+  restrictFileToOwner(tmpFile);
+  fsyncFile(tmpFile);
+  renameSync(tmpFile, path);
+  restrictFileToOwner(path);
+  fsyncPath(configuration.piHistoryWatermarkDir);
+}
+
 export function persistSession(sessionId: string, session: PersistedSession): void {
   try {
     const existing = readPersistedSessions();
     existing[sessionId] = session;
     const tmpFile = configuration.sessionsFile + '.tmp';
-    writeFileSync(tmpFile, JSON.stringify({ sessions: existing }, null, 2), 'utf-8');
+    writeFileSync(tmpFile, JSON.stringify({ sessions: existing }, null, 2), { encoding: 'utf-8', mode: 0o600 });
+    restrictFileToOwner(tmpFile);
     renameSync(tmpFile, configuration.sessionsFile);
+    restrictFileToOwner(configuration.sessionsFile);
   } catch (error) {
     logger.debug(`[PERSISTENCE] Failed to persist session ${sessionId}:`, error);
   }

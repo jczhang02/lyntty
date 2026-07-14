@@ -1,0 +1,66 @@
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('react-native-mmkv', () => ({
+    MMKV: class {
+        getString() { return undefined; }
+        set() {}
+    },
+}));
+
+import { parsePendingOutbox, parsePendingSyntheticOutbox } from './persistence';
+
+describe('pending message outbox persistence', () => {
+    it('restores valid encrypted entries and drops malformed data', () => {
+        const restored = parsePendingOutbox(JSON.stringify({
+            'session-1': [
+                { localId: 'local-1', content: 'encrypted-record' },
+                { localId: 123, content: 'invalid' },
+            ],
+            'session-2': 'invalid',
+        }));
+
+        expect([...restored.entries()]).toEqual([
+            ['session-1', [{ localId: 'local-1', content: 'encrypted-record' }]],
+        ]);
+    });
+
+    it('restores synthetic-session sends for relay attachment after restart', () => {
+        expect([...parsePendingSyntheticOutbox(JSON.stringify({
+            'pi-local:machine-1:session-1': [{
+                localId: 'local-1',
+                machineId: 'machine-1',
+                piSessionId: 'session-1',
+                text: 'continue',
+                options: { source: 'chat' },
+            }],
+        })).entries()]).toEqual([
+            ['pi-local:machine-1:session-1', [{
+                localId: 'local-1',
+                machineId: 'machine-1',
+                piSessionId: 'session-1',
+                text: 'continue',
+                options: { source: 'chat' },
+            }]],
+        ]);
+    });
+
+    it('migrates the production v1 synthetic id without dropping sends', () => {
+        expect([...parsePendingSyntheticOutbox(JSON.stringify({
+            'pi-local:machine-1:session-1': [{ text: 'continue', options: { source: 'chat' } }],
+        })).entries()]).toEqual([[
+            'pi-local:machine-1:session-1',
+            [{
+                localId: 'synthetic:pi-local:machine-1:session-1:0',
+                machineId: 'machine-1',
+                piSessionId: 'session-1',
+                text: 'continue',
+                options: { source: 'chat' },
+            }],
+        ]]);
+    });
+
+    it('fails closed for invalid JSON', () => {
+        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        expect(parsePendingOutbox('{invalid')).toEqual(new Map());
+    });
+});

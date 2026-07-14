@@ -32,7 +32,10 @@ async function daemonPost(path: string, body?: any): Promise<{ error?: string } 
     const timeout = process.env.LYNTTY_DAEMON_HTTP_TIMEOUT ? parseInt(process.env.LYNTTY_DAEMON_HTTP_TIMEOUT) : 10_000;
     const response = await fetch(`http://127.0.0.1:${state.httpPort}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(state.piExtensionToken ? { 'X-Lyntty-Extension-Token': state.piExtensionToken } : {}),
+      },
       body: JSON.stringify(body || {}),
       // Mostly increased for stress test
       signal: AbortSignal.timeout(timeout)
@@ -157,7 +160,10 @@ export async function checkIfDaemonRunningAndCleanupStaleState(): Promise<boolea
     try {
       const response = await fetch(`http://127.0.0.1:${state.httpPort}/list`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(state.piExtensionToken ? { 'X-Lyntty-Extension-Token': state.piExtensionToken } : {}),
+        },
         body: '{}',
         signal: AbortSignal.timeout(2000)
       });

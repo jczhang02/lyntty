@@ -352,6 +352,11 @@ export type PiHistoryPage = {
   nextCursor?: string;
   hasMore: boolean;
   totalMessages: number;
+  historyGap?: {
+    code: 'history_gap';
+    missingCursor: string;
+    reason: string;
+  };
 };
 
 export type PiHistoryPageOptions = {
@@ -472,7 +477,19 @@ export function mapPiSessionHistoryPageToEnvelopes(
   const beforeIndex = options.beforeEntryId
     ? renderableEntries.findIndex((entry) => entry.id === options.beforeEntryId)
     : renderableEntries.length;
-  const endExclusive = beforeIndex >= 0 ? beforeIndex : renderableEntries.length;
+  if (options.beforeEntryId && beforeIndex < 0) {
+    return {
+      envelopes: [],
+      hasMore: false,
+      totalMessages: renderableEntries.length,
+      historyGap: {
+        code: 'history_gap',
+        missingCursor: options.beforeEntryId,
+        reason: 'requested Pi history cursor is not present in local JSONL',
+      },
+    };
+  }
+  const endExclusive = beforeIndex;
   let start = endExclusive;
   let estimatedBytes = 0;
   while (start > 0 && endExclusive - start < limit) {

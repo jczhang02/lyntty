@@ -12,7 +12,7 @@ function useDeepEqual<T>(selector: (state: StorageState) => T): (state: StorageS
 import { Session, Machine, GitStatus } from "./storageTypes";
 import type { GitStatusFiles } from "./gitStatusFiles";
 import type { ProjectFilesList } from "./projectFiles";
-import { createReducer, reducer, ReducerState } from "./reducer/reducer";
+import { applyRemoteCommandOutcomes, createReducer, reducer, ReducerState } from "./reducer/reducer";
 import { Message } from "./typesMessage";
 import { NormalizedMessage } from "./typesRaw";
 import { isMachineOnline } from '@/utils/machineUtils';
@@ -605,6 +605,26 @@ export const storage = create<StorageState>()((set, get) => {
                     }
                 }
 
+                const sessionMessagesForOutcomes = updatedSessionMessages[session.id];
+                if (sessionMessagesForOutcomes) {
+                    const outcomeMessages = applyRemoteCommandOutcomes(
+                        sessionMessagesForOutcomes.reducerState,
+                        newSession.metadata?.remoteCommandAcceptedLocalKeys ?? [],
+                        newSession.metadata?.remoteCommandFailedLocalKeys ?? [],
+                    );
+                    if (outcomeMessages.length > 0) {
+                        const messagesMap = { ...sessionMessagesForOutcomes.messagesMap };
+                        for (const message of outcomeMessages) {
+                            messagesMap[message.id] = message;
+                        }
+                        updatedSessionMessages[session.id] = {
+                            ...sessionMessagesForOutcomes,
+                            messagesMap,
+                            messages: Object.values(messagesMap).sort(compareMessagesNewestFirst),
+                        };
+                    }
+                }
+
                 const maybeUpdatedSessionMessages = updatedSessionMessages[session.id];
                 if (maybeUpdatedSessionMessages && newSession.metadata?.piHistoryHasMore === true && !maybeUpdatedSessionMessages.hasMoreOlder) {
                     updatedSessionMessages[session.id] = {
@@ -739,7 +759,14 @@ export const storage = create<StorageState>()((set, get) => {
 
                 // Run reducer with agentState
                 const reducerResult = reducer(existingSession.reducerState, normalizedMessages, agentState);
-                const processedMessages = reducerResult.messages;
+                const processedMessages = [
+                    ...reducerResult.messages,
+                    ...applyRemoteCommandOutcomes(
+                        existingSession.reducerState,
+                        session?.metadata?.remoteCommandAcceptedLocalKeys ?? [],
+                        session?.metadata?.remoteCommandFailedLocalKeys ?? [],
+                    ),
+                ];
                 for (let message of processedMessages) {
                     changed.add(message.id);
                 }

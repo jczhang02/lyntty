@@ -22,6 +22,7 @@ type EnvironmentConfig = {
 type DaemonState = {
     httpPort?: number;
     pid?: number;
+    piExtensionToken?: string;
 };
 
 let previousCurrentEnv: string | null = null;
@@ -309,11 +310,12 @@ async function runAgentAuthLogin(env: NodeJS.ProcessEnv, approval: { serverUrl: 
     });
 }
 
-async function listDaemonSessions(httpPort: number): Promise<Array<{ lynttySessionId: string; pid: number; startedBy: string }>> {
+async function listDaemonSessions(httpPort: number, controlToken: string): Promise<Array<{ lynttySessionId: string; pid: number; startedBy: string }>> {
     const response = await fetch(`http://127.0.0.1:${httpPort}/list`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-Lyntty-Extension-Token': controlToken,
         },
         body: '{}',
     });
@@ -324,11 +326,12 @@ async function listDaemonSessions(httpPort: number): Promise<Array<{ lynttySessi
     return parsed.children;
 }
 
-async function stopDaemonSession(httpPort: number, sessionId: string): Promise<boolean> {
+async function stopDaemonSession(httpPort: number, controlToken: string, sessionId: string): Promise<boolean> {
     const response = await fetch(`http://127.0.0.1:${httpPort}/stop-session`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-Lyntty-Extension-Token': controlToken,
         },
         body: JSON.stringify({ sessionId }),
     });
@@ -374,7 +377,7 @@ describe('lyntty-agent integration', { timeout: 180_000 }, () => {
                 const daemonState = readDaemonState(integrationEnvDir);
                 if (daemonState?.httpPort) {
                     for (const sessionId of spawnedSessionIds) {
-                        await stopDaemonSession(daemonState.httpPort, sessionId).catch(() => false);
+                        await stopDaemonSession(daemonState.httpPort, daemonState.piExtensionToken ?? '', sessionId).catch(() => false);
                     }
                 }
             }
@@ -501,7 +504,7 @@ describe('lyntty-agent integration', { timeout: 180_000 }, () => {
         expect(daemonState?.httpPort).toBeTruthy();
 
         await waitFor(async () => {
-            const sessions = await listDaemonSessions(daemonState!.httpPort!);
+            const sessions = await listDaemonSessions(daemonState!.httpPort!, daemonState!.piExtensionToken ?? '');
             return sessions.some(session => session.lynttySessionId === sessionId);
         }, 20_000, 'spawned session to be tracked by daemon');
     });

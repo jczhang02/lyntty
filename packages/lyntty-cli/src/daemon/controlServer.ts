@@ -12,6 +12,7 @@ import { decodeBase64 } from '@/api/encryption';
 import { TrackedSession, SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
 import type { LynttyPiCommandInfo, LynttyPiExtensionPayload, LynttyPiRemoteCommandAck, LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
+import { findBlockedSessionEnvironmentKeys } from './sessionEnvironment';
 
 export function startDaemonControlServer({
   getChildren,
@@ -30,9 +31,9 @@ export function startDaemonControlServer({
   requestShutdown: () => void;
   onLynttySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
   onPiExtensionEvent?: (payload: LynttyPiExtensionPayload) => Promise<{ status: 'ok'; sessionId?: string } | { status: 'error'; error: string }>;
-  pollPiExtensionCommands?: (session: LynttyPiExtensionPayload['session'], afterSeq: number) => Promise<{ status: 'ok'; commands: LynttyPiRemoteCommandEnvelope[] } | { status: 'error'; error: string }>;
+  pollPiExtensionCommands?: (session: LynttyPiExtensionPayload['session'], afterSeq: number, extensionInstanceId?: string) => Promise<{ status: 'ok'; queueEpoch?: string; commands: LynttyPiRemoteCommandEnvelope[] } | { status: 'error'; error: string }>;
   onPiExtensionCommandAck?: (session: LynttyPiExtensionPayload['session'], ack: LynttyPiRemoteCommandAck) => Promise<{ status: 'ok' } | { status: 'error'; error: string }>;
-  piExtensionToken?: string;
+  piExtensionToken: string;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
   return new Promise((resolve) => {
     const app = fastify({
@@ -44,14 +45,17 @@ export function startDaemonControlServer({
     app.setSerializerCompiler(serializerCompiler);
     const typed = app.withTypeProvider<ZodTypeProvider>();
 
-    const requirePiExtensionAuth = (request: { headers: Record<string, string | string[] | undefined> }, reply: { code: (statusCode: 401) => unknown }): boolean => {
-      if (!piExtensionToken) return true;
+    const hasLocalControlAuth = (request: { headers: Record<string, string | string[] | undefined> }): boolean => {
       const raw = request.headers['x-lyntty-extension-token'];
       const token = Array.isArray(raw) ? raw[0] : raw;
-      if (token === piExtensionToken) return true;
-      reply.code(401);
-      return false;
+      return token === piExtensionToken;
     };
+
+    app.addHook('onRequest', async (request, reply) => {
+      if (!hasLocalControlAuth(request)) {
+        return reply.code(401).send({ status: 'error', error: 'unauthorized' });
+      }
+    });
 
     // Session reports itself after creation
     typed.post('/session-started', {
@@ -104,6 +108,7 @@ export function startDaemonControlServer({
         name: z.string().max(512).optional(),
       }),
       event: z.record(z.string(), z.unknown()),
+      extensionInstanceId: z.string().min(1).max(256).optional(),
       eventId: z.number().int().positive().optional(),
       timestamp: z.number().optional(),
     });
@@ -144,8 +149,7 @@ export function startDaemonControlServer({
           401: z.object({ status: z.literal('error'), error: z.string() }),
         }
       }
-    }, async (request, reply) => {
-      if (!requirePiExtensionAuth(request, reply)) return { status: 'error' as const, error: 'unauthorized' };
+    }, async () => {
       return { status: 'ok' as const };
     });
 
@@ -159,9 +163,6 @@ export function startDaemonControlServer({
         }
       }
     }, async (request, reply) => {
-      if (!requirePiExtensionAuth(request, reply)) {
-        return { status: 'error' as const, error: 'unauthorized' };
-      }
       if (!onPiExtensionEvent) {
         return { status: 'ok' as const };
       }
@@ -176,11 +177,13 @@ export function startDaemonControlServer({
       schema: {
         body: z.object({
           session: PiExtensionSessionSchema,
+          extensionInstanceId: z.string().min(1).max(256).optional(),
           afterSeq: z.number().int().nonnegative().optional(),
         }),
         response: {
           200: z.object({
             status: z.literal('ok'),
+            queueEpoch: z.string().min(1).max(256).optional(),
             commands: z.array(z.object({
               seq: z.number().int().positive(),
               deliveryToken: z.string().min(1).max(256),
@@ -194,13 +197,10 @@ export function startDaemonControlServer({
         }
       }
     }, async (request, reply) => {
-      if (!requirePiExtensionAuth(request, reply)) {
-        return { status: 'error' as const, error: 'unauthorized' };
-      }
       if (!pollPiExtensionCommands) {
         return { status: 'ok' as const, commands: [] };
       }
-      const result = await pollPiExtensionCommands(request.body.session, request.body.afterSeq ?? 0);
+      const result = await pollPiExtensionCommands(request.body.session, request.body.afterSeq ?? 0, request.body.extensionInstanceId);
       if (result.status === 'error') {
         reply.code(500);
       }
@@ -213,6 +213,8 @@ export function startDaemonControlServer({
           session: PiExtensionSessionSchema,
           ack: z.object({
             seq: z.number().int().positive(),
+            extensionInstanceId: z.string().min(1).max(256).optional(),
+            queueEpoch: z.string().min(1).max(256).optional(),
             status: z.enum(['delivered_to_pi_extension', 'accepted_by_pi', 'failed']),
             deliveryToken: z.string().min(1).max(256).optional(),
             error: z.string().max(2048).optional(),
@@ -227,9 +229,6 @@ export function startDaemonControlServer({
         }
       }
     }, async (request, reply) => {
-      if (!requirePiExtensionAuth(request, reply)) {
-        return { status: 'error' as const, error: 'unauthorized' };
-      }
       if (!onPiExtensionCommandAck) {
         return { status: 'ok' as const };
       }
@@ -295,7 +294,15 @@ export function startDaemonControlServer({
           sessionId: z.string().optional(),
           agent: z.enum(['pi']).optional(),
           takeoverChoice: z.enum(['wait', 'stop', 'interrupt']).optional(),
-          environmentVariables: z.record(z.string(), z.string()).optional(),
+          environmentVariables: z.record(z.string(), z.string()).superRefine((environmentVariables, context) => {
+            for (const key of findBlockedSessionEnvironmentKeys(environmentVariables)) {
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: [key],
+                message: `Environment variable ${key} is reserved or unsafe`,
+              });
+            }
+          }).optional(),
         }),
         response: {
           200: z.object({

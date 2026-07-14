@@ -60,6 +60,10 @@ export function getUserMessagePresentation(message: UserTextMessage): UserMessag
     return {
         frame: block ? 'phonePromptCard' : 'phoneBubble',
         parseRawSlashCommands: localOptimistic,
-        sourceLabel: remoteCommandState === 'queued' ? 'Sending…' : null,
+        sourceLabel: remoteCommandState === 'queued'
+            ? 'Sending…'
+            : remoteCommandState === 'failed'
+                ? 'Not delivered'
+                : null,
     };
 }

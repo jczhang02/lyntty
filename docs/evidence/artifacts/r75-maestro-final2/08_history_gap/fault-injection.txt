@@ -1,0 +1,4 @@
+injected_file=temporary LYNTTY_HOME_DIR/pi-history-watermark/<sha256>.json
+injected_entry_id=fault-injection-missing-entry
+command=overwrite watermark, restart isolated daemon, run e2e/maestro/08_history_gap.yml
+expected=history_gap remediation visible

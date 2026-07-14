@@ -1,3 +1,4 @@
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { installLynttyPiExtension } from './piExtensionInstall';
@@ -68,6 +69,18 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('/pi-extension/command-ack');
       expect(source).toContain('X-Lyntty-Extension-Token');
       expect(source).toContain('deliveryToken');
+      expect(source).toContain('queueEpoch');
+      expect(source).toContain('commandQueueEpochs');
+      expect(source).toContain('commandPollInFlight.has(session.piSessionId)');
+      expect(source).toContain('commandPollInFlight.delete(session.piSessionId)');
+      expect(source).toContain('extensionInstanceId');
+      expect(source).toContain('pi-extension-command-ledger');
+      expect(source).toContain('persistExecutedCommandState(session.piSessionId, envelope.localKey, "executing")');
+      expect(source).toContain('getExecutedCommandState(session.piSessionId, envelope.localKey)');
+      expect(source).toContain('sendUserMessageAndWaitForAcceptance');
+      expect(source).toContain('pi.on("before_agent_start"');
+      expect(source).toContain('LYNTTY_PI_EXTENSION_DISABLED');
+      expect(source).toContain('lastAckedCommandSeq.set(session.piSessionId, 0)');
       expect(source).toContain('pi.sendUserMessage');
       expect(source).toContain('lyntty-mobile-context');
       expect(source).not.toContain('[lyntty] ');
@@ -77,7 +90,7 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('safePiCommands');
       expect(source).toContain('invoke_pi_command');
       expect(source).toContain('case "internal_shutdown"');
-      expect(source).toContain('deliverAs: "followUp"');
+      expect(source).toContain('sendUserMessageAndWaitForAcceptance(pi, command.text, "followUp")');
       expect(source).toContain('127.0.0.1');
       expect(source).toContain('RETRY_DELAY_MS');
       expect(source).toContain('HEARTBEAT_MS');
@@ -89,6 +102,11 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('void pollCommands(pi, ctx, session).catch');
       expect(source).not.toContain('void pollCommands(pi, ctx);');
       expect(source).not.toContain('send(ctx, { type: "remote_heartbeat" });');
+      const transpiled = ts.transpileModule(source, {
+        compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+        reportDiagnostics: true,
+      });
+      expect(transpiled.diagnostics?.filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error) ?? []).toEqual([]);
     } finally {
       await rm(home, { recursive: true, force: true });
     }

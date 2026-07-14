@@ -140,4 +140,96 @@ describe('daemon control server Pi extension endpoints', () => {
       await server.stop();
     }
   });
+
+  it('rejects unauthenticated access to every daemon control endpoint', async () => {
+    let calls = 0;
+    const server = await startDaemonControlServer({
+      getChildren: () => {
+        calls += 1;
+        return [];
+      },
+      stopSession: () => {
+        calls += 1;
+        return false;
+      },
+      spawnSession: async () => {
+        calls += 1;
+        return { type: 'error', errorMessage: 'not used' };
+      },
+      requestShutdown: () => {
+        calls += 1;
+      },
+      onLynttySessionWebhook: () => {
+        calls += 1;
+      },
+      piExtensionToken: 'secret-token',
+    });
+
+    const requests = [
+      ['/session-started', { sessionId: 'relay-1', metadata: {} }],
+      ['/pi-extension/status', {}],
+      ['/pi-extension/event', { session: { piSessionId: 'pi-1' }, event: { type: 'agent_start' } }],
+      ['/pi-extension/commands', { session: { piSessionId: 'pi-1' }, afterSeq: 0 }],
+      ['/pi-extension/command-ack', { session: { piSessionId: 'pi-1' }, ack: { seq: 1, status: 'accepted_by_pi' } }],
+      ['/list', {}],
+      ['/stop-session', { sessionId: 'relay-1' }],
+      ['/spawn-session', { directory: '/tmp/project', agent: 'pi' }],
+      ['/stop', {}],
+    ] as const;
+
+    try {
+      for (const [path, body] of requests) {
+        const response = await fetch(`http://127.0.0.1:${server.port}${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        expect(response.status, path).toBe(401);
+      }
+      const malformedResponse = await fetch(`http://127.0.0.1:${server.port}/spawn-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{',
+      });
+      expect(malformedResponse.status).toBe(401);
+      expect(calls).toBe(0);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('rejects dangerous environment variables before spawning a session', async () => {
+    let spawned = false;
+    const server = await startDaemonControlServer({
+      getChildren: () => [],
+      stopSession: () => false,
+      spawnSession: async () => {
+        spawned = true;
+        return { type: 'error', errorMessage: 'not used' };
+      },
+      requestShutdown: () => undefined,
+      onLynttySessionWebhook: noopSessionWebhook,
+      piExtensionToken: 'secret-token',
+    });
+
+    try {
+      for (const environmentVariables of [
+        { NODE_OPTIONS: '--require /tmp/attacker.cjs' },
+        { PATH: '/tmp/attacker-bin' },
+        { node_options: '--require /tmp/attacker.cjs' },
+        { lyntty_home_dir: '/tmp/attacker-home' },
+      ]) {
+        const response = await fetch(`http://127.0.0.1:${server.port}/spawn-session`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ directory: '/tmp/project', agent: 'pi', environmentVariables }),
+        });
+
+        expect(response.status, Object.keys(environmentVariables)[0]).toBe(400);
+      }
+      expect(spawned).toBe(false);
+    } finally {
+      await server.stop();
+    }
+  });
 });

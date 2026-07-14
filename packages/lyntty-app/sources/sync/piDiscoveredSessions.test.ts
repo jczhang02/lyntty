@@ -121,6 +121,25 @@ describe('mergePiDiscoveredSessions', () => {
         expect(sessions).toEqual([]);
     });
 
+    it('keeps history_gap sessions visible with an explicit control state', () => {
+        const sessions = mergePiDiscoveredSessions([], [{
+            machine,
+            sessions: [piRecord({
+                state: 'history_gap',
+                piSessionId: 'pi-gap',
+                messageCount: 2,
+                hasHistoryGap: true,
+            })],
+        }]);
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0].metadata).toMatchObject({
+            piDiscoveryState: 'history_gap',
+            piHasHistoryGap: true,
+            controlState: 'history_gap',
+        });
+    });
+
     it('hides missing-local and inactive zero-message Pi discovery rows', () => {
         const sessions = mergePiDiscoveredSessions([], [{
             machine,
@@ -131,6 +150,34 @@ describe('mergePiDiscoveredSessions', () => {
         }]);
 
         expect(sessions).toEqual([]);
+    });
+
+    it('preserves a persisted history_gap when active discovery refreshes the session', () => {
+        const sessions = mergePiDiscoveredSessions([relaySession({
+            metadata: {
+                path: '/repo',
+                host: 'thinkpad',
+                machineId: 'machine-1',
+                flavor: 'pi',
+                piSessionId: 'pi-registered',
+                piHasHistoryGap: true,
+                piRecoveryReason: 'cursor missing',
+                controlState: 'history_gap',
+            },
+        })], [{
+            machine,
+            sessions: [piRecord({
+                state: 'active_runtime',
+                relaySessionId: 'relay-1',
+                piSessionId: 'pi-registered',
+            })],
+        }]);
+
+        expect(sessions[0].metadata).toMatchObject({
+            piHasHistoryGap: true,
+            piRecoveryReason: 'cursor missing',
+            controlState: 'history_gap',
+        });
     });
 
     it('marks active runtime synthetic Pi rows as online active sessions', () => {

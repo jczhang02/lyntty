@@ -30,9 +30,6 @@ function shouldShowRelaySession(session: Omit<Session, 'presence'> & { presence?
     if (state === 'missing_local_history') {
         return false;
     }
-    if (state === 'history_gap' && session.seq <= 0) {
-        return false;
-    }
     return true;
 }
 
@@ -54,6 +51,8 @@ function resolvePiControlState(record: PiMachineSessionRecord): string {
             return 'missing_local_history';
         case 'stale_local':
             return 'computer_offline';
+        case 'history_gap':
+            return 'history_gap';
         default:
             return 'queued';
     }
@@ -100,6 +99,8 @@ export function enrichSessionWithPiDiscovery(
 ): Omit<Session, 'presence'> & { presence?: Session['presence'] } {
     const discoveredMetadata = buildPiMetadata(record, machine, false);
     const active = record.state === 'active_runtime';
+    const hasPersistedHistoryGap = session.metadata?.piHasHistoryGap === true
+        || session.metadata?.controlState === 'history_gap';
     const updatedAt = Math.max(session.updatedAt, resolvePiActivityTimestamp(record, session.updatedAt));
     return {
         ...session,
@@ -114,6 +115,11 @@ export function enrichSessionWithPiDiscovery(
             homeDir: session.metadata?.homeDir ?? discoveredMetadata.homeDir,
             lynttyHomeDir: session.metadata?.lynttyHomeDir ?? discoveredMetadata.lynttyHomeDir,
             summary: session.metadata?.summary,
+            piHasHistoryGap: hasPersistedHistoryGap || discoveredMetadata.piHasHistoryGap,
+            piRecoveryReason: hasPersistedHistoryGap
+                ? session.metadata?.piRecoveryReason
+                : discoveredMetadata.piRecoveryReason,
+            controlState: hasPersistedHistoryGap ? 'history_gap' : discoveredMetadata.controlState,
         },
     };
 }

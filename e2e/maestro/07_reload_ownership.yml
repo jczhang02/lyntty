@@ -1,0 +1,27 @@
+appId: ${APP_ID}
+name: Lyntty reload hands control to one Pi extension owner
+tags:
+  - reliability
+  - extension-reload
+  - ownership
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "${HISTORY_TITLE}"
+    timeout: 120000
+- tapOn: "${HISTORY_TITLE}"
+- extendedWaitUntil:
+    visible: "online"
+    timeout: 60000
+- tapOn:
+    id: "lyntty-session-input"
+- inputText: "${PROMPT}"
+- tapOn:
+    id: "lyntty-session-send"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "${PONG}"
+    direction: DOWN
+    timeout: 180000
+- assertNotVisible: "Session has been deleted"

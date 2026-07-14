@@ -71,6 +71,7 @@ export const MetadataSchema = z.object({
     controlState: z.string().optional(),
     sharedControlEnabled: z.boolean().optional(),
     remoteCommandAcceptedLocalKeys: z.array(z.string()).optional(),
+    remoteCommandFailedLocalKeys: z.array(z.string()).optional(),
     archivedBy: z.string().optional(),
     archiveReason: z.string().optional(),
     /**

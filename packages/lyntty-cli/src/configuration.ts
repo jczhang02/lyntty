@@ -5,7 +5,7 @@
  * Environment files should be loaded using Node's --env-file flag
  */
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import packageJson from '../package.json'
@@ -23,6 +23,9 @@ class Configuration {
   public readonly daemonStateFile: string
   public readonly daemonLockFile: string
   public readonly sessionsFile: string
+  public readonly piCommandLedgerDir: string
+  public readonly piCommandBoundaryDir: string
+  public readonly piHistoryWatermarkDir: string
   public readonly currentCliVersion: string
 
   public readonly isExperimentalEnabled: boolean
@@ -48,6 +51,9 @@ class Configuration {
     this.daemonStateFile = join(this.lynttyHomeDir, 'daemon.state.json')
     this.daemonLockFile = join(this.lynttyHomeDir, 'daemon.state.json.lock')
     this.sessionsFile = join(this.lynttyHomeDir, 'sessions.json')
+    this.piCommandLedgerDir = join(this.lynttyHomeDir, 'pi-command-ledger')
+    this.piCommandBoundaryDir = join(this.lynttyHomeDir, 'pi-command-boundary')
+    this.piHistoryWatermarkDir = join(this.lynttyHomeDir, 'pi-history-watermark')
 
     // URL precedence (both): LYNTTY_*_URL env > settings.<key> > default.
     // Settings are read sync here (avoid circular import with persistence.ts).
@@ -73,12 +79,13 @@ class Configuration {
       console.log('\x1b[33m🔧 DEV MODE\x1b[0m - Data: ' + this.lynttyHomeDir)
     }
 
-    if (!existsSync(this.lynttyHomeDir)) {
-      mkdirSync(this.lynttyHomeDir, { recursive: true })
-    }
-    // Ensure directories exist
-    if (!existsSync(this.logsDir)) {
-      mkdirSync(this.logsDir, { recursive: true })
+    mkdirSync(this.lynttyHomeDir, { recursive: true, mode: 0o700 })
+    mkdirSync(this.logsDir, { recursive: true, mode: 0o700 })
+    try {
+      chmodSync(this.lynttyHomeDir, 0o700)
+      chmodSync(this.logsDir, 0o700)
+    } catch {
+      // Best-effort hardening for platforms without POSIX permissions.
     }
   }
 }

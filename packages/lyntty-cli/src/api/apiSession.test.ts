@@ -763,7 +763,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         });
     });
 
-    it('fetchMessages uses after_seq=0 initially and routes user messages to callback', async () => {
+    it('replays unacked user commands from after_seq=0 after daemon client reconstruction', async () => {
         const client = new ApiSessionClient('fake-token', session);
         const onUserMessage = vi.fn();
         client.onUserMessage(onUserMessage);
@@ -803,8 +803,64 @@ describe('ApiSessionClient v3 messages API migration', () => {
             after_seq: 0,
             limit: 100
         });
-        expect(onUserMessage).toHaveBeenCalledWith(userMessage);
+        expect(onUserMessage).toHaveBeenCalledWith({ ...userMessage, localKey: 'msg-1' });
         expect((client as any).lastSeq).toBe(1);
+    });
+
+    it('skips only the fixed construction snapshot and still routes commands arriving during initialization', async () => {
+        const snapshot = { ...session, seq: 1 };
+        const client = new ApiSessionClient('fake-token', snapshot);
+        const onUserMessage = vi.fn();
+        client.onUserMessage(onUserMessage);
+        client.skipExistingMessages();
+        const oldMessage = {
+            role: 'session',
+            content: { id: 'existing-envelope', time: 1, role: 'agent', ev: { t: 'text', text: 'old' } },
+        };
+        const newMessage = { role: 'user', content: { type: 'text', text: 'new' } };
+        mockAxiosGet.mockResolvedValueOnce({
+            data: {
+                messages: [
+                    { id: 'msg-1', seq: 1, localId: 'old-key', content: { t: 'encrypted', c: encryptContent(session, oldMessage) } },
+                    { id: 'msg-2', seq: 2, localId: 'new-key', content: { t: 'encrypted', c: encryptContent(session, newMessage) } },
+                ],
+                hasMore: false,
+            },
+        });
+
+        await (client as any).fetchMessages();
+
+        expect(onUserMessage).toHaveBeenCalledTimes(1);
+        expect(onUserMessage).toHaveBeenCalledWith({ ...newMessage, localKey: 'new-key' });
+        expect(client.hasSessionProtocolEnvelope('existing-envelope')).toBe(true);
+        expect(client.getSessionProtocolCoveredThrough()).toBe(1);
+    });
+
+    it('fails relay history inventory on endpoint rejection', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        mockAxiosGet.mockRejectedValueOnce(new Error('inventory unavailable'));
+
+        await expect(client.syncExistingSessionProtocolEnvelopeIds(50)).rejects.toThrow('inventory unavailable');
+    });
+
+    it('bounds relay history inventory when the endpoint never settles', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        mockAxiosGet.mockImplementationOnce(() => new Promise(() => undefined));
+
+        await expect(client.syncExistingSessionProtocolEnvelopeIds(5)).rejects.toThrow('Relay history inventory timed out');
+    });
+
+    it('keeps initial replay at seq0 even when an outbox POST advances the known server seq first', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        (client as any).lastSeq = 10;
+        (client as any).receiveSeq = 0;
+        mockAxiosGet.mockResolvedValueOnce({ data: { messages: [], hasMore: false } });
+
+        await (client as any).fetchMessages();
+
+        expect(mockAxiosGet.mock.calls[0][1].params.after_seq).toBe(0);
+        expect((client as any).lastSeq).toBe(10);
+        expect((client as any).receiveSeq).toBe(0);
     });
 
     it('fetchMessages uses incremental cursor and paginates while hasMore is true', async () => {
@@ -813,6 +869,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         client.onUserMessage(onUserMessage);
 
         (client as any).lastSeq = 2;
+        (client as any).receiveSeq = 2;
 
         const message3 = {
             role: 'user',
@@ -867,6 +924,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
     it('fetchMessages stops pagination when hasMore is true but seq cursor does not advance', async () => {
         const client = new ApiSessionClient('fake-token', session);
         (client as any).lastSeq = 2;
+        (client as any).receiveSeq = 2;
 
         mockAxiosGet
             .mockResolvedValueOnce({
@@ -930,7 +988,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         await (client as any).fetchMessages();
 
         expect(onUserMessage).toHaveBeenCalledTimes(1);
-        expect(onUserMessage).toHaveBeenCalledWith(userMessage);
+        expect(onUserMessage).toHaveBeenCalledWith({ ...userMessage, localKey: 'msg-1' });
         expect(onMessage).toHaveBeenCalledTimes(1);
         expect(onMessage).toHaveBeenCalledWith(agentMessage);
     });
@@ -994,6 +1052,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         client.onFileEvent(onFileEvent);
 
         (client as any).lastSeq = 1;
+        (client as any).receiveSeq = 1;
         const fileMessage = {
             role: 'session',
             content: {
@@ -1032,6 +1091,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         client.onUserMessage(onUserMessage);
 
         (client as any).lastSeq = 1;
+        (client as any).receiveSeq = 1;
         const userMessage = {
             role: 'user',
             content: { type: 'text', text: 'fast-path' }
@@ -1040,7 +1100,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         emitSocketEvent('update', createNewMessageUpdate(2, encryptContent(session, userMessage)));
 
         expect(onUserMessage).toHaveBeenCalledTimes(1);
-        expect(onUserMessage).toHaveBeenCalledWith(userMessage);
+        expect(onUserMessage).toHaveBeenCalledWith({ ...userMessage, localKey: 'msg-2' });
         expect((client as any).lastSeq).toBe(2);
         expect(mockAxiosGet).not.toHaveBeenCalled();
     });
@@ -1048,6 +1108,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
     it('invalidates receive sync and fetches on seq gap', async () => {
         const client = new ApiSessionClient('fake-token', session);
         (client as any).lastSeq = 1;
+        (client as any).receiveSeq = 1;
 
         mockAxiosGet.mockResolvedValueOnce({
             data: {
@@ -1087,7 +1148,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
             emitSocketEvent('update', createNewMessageUpdate(1, encryptContent(session, firstMessage)));
 
             expect(onUserMessage).toHaveBeenCalledTimes(1);
-            expect(onUserMessage).toHaveBeenCalledWith(firstMessage);
+            expect(onUserMessage).toHaveBeenCalledWith({ ...firstMessage, localKey: 'msg-1' });
             expect((client as any).lastSeq).toBe(1);
             expect(mockAxiosGet).not.toHaveBeenCalled();
         } finally {
@@ -1098,6 +1159,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
     it('invalidates receive sync for duplicate and stale seq values', async () => {
         const client = new ApiSessionClient('fake-token', session);
         (client as any).lastSeq = 5;
+        (client as any).receiveSeq = 5;
 
         mockAxiosGet.mockResolvedValue({
             data: {
@@ -1184,6 +1246,37 @@ describe('ApiSessionClient v3 messages API migration', () => {
             expect(mockAxiosGet).toHaveBeenCalledTimes(1);
         });
         expect(mockAxiosGet.mock.calls[0][1].params.after_seq).toBe(0);
+    });
+
+    it('keeps session-protocol local ids stable across client reconstruction', () => {
+        const first = new ApiSessionClient('fake-token', session);
+        const second = new ApiSessionClient('fake-token', session);
+        const envelope = { id: 'stable-entry', role: 'agent', time: 1, turn: 'turn-1', ev: { t: 'text', text: 'hello' } } as const;
+
+        (first as any).enqueueSessionProtocolEnvelope(envelope, false);
+        (second as any).enqueueSessionProtocolEnvelope(envelope, false);
+
+        const firstLocalId = (first as any).pendingOutbox[0].localId;
+        const secondLocalId = (second as any).pendingOutbox[0].localId;
+        expect(firstLocalId).toBe('session:stable-entry');
+        expect(secondLocalId).toBe(firstLocalId);
+    });
+
+    it('never reconnects after close triggers a disconnect event', async () => {
+        vi.useFakeTimers();
+        try {
+            const client = new ApiSessionClient('fake-token', session);
+            mockSocket.connect.mockClear();
+            await client.close();
+
+            emitSocketEvent('disconnect', 'io client disconnect');
+            emitSocketEvent('connect_error', new Error('after close'));
+            await vi.advanceTimersByTimeAsync(10_000);
+
+            expect(mockSocket.connect).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('stops send and receive sync loops on close', async () => {
