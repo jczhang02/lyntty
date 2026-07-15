@@ -1,4 +1,4 @@
-import { Prisma, RelationshipStatus } from "@prisma/client";
+import { Prisma, RelationshipStatus } from "@/generated/prisma/client";
 import { feedPost } from "@/app/feed/feedPost";
 import { Context } from "@/context";
 import { afterTx } from "@/storage/inTx";

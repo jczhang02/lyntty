@@ -1,0 +1,21 @@
+diff --git a/scripts/get-app-config-android.gradle b/scripts/get-app-config-android.gradle
+index 77586724035f781b98bd79b3651c1b61294bc233..e5c6c80f5aea8d72c342273edbd71f81afe95c6b 100644
+--- a/scripts/get-app-config-android.gradle
++++ b/scripts/get-app-config-android.gradle
+@@ -3,13 +3,14 @@
+ import org.apache.tools.ant.taskdefs.condition.Os
+ 
+ 
++def jsRuntimeExecutable = System.getenv("BUN_EXECUTABLE") ?: "bun"
+ def expoConstantsDir = project.providers.exec {
+   workingDir(projectDir)
+-  commandLine("node", "-e", "console.log(require('path').dirname(require.resolve('expo-constants/package.json')));")
++  commandLine(jsRuntimeExecutable, "-e", "console.log(require('path').dirname(require.resolve('expo-constants/package.json')));")
+ }.standardOutput.asText.get().trim()
+ 
+ def config = project.hasProperty("react") ? project.react : [];
+-def nodeExecutableAndArgs = config.nodeExecutableAndArgs ?: ["node"]
++def nodeExecutableAndArgs = config.nodeExecutableAndArgs ?: [jsRuntimeExecutable]
+ 
+ afterEvaluate {
+   def expoGradleExtension = gradle.extensions.findByName("expoGradle")

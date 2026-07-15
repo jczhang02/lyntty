@@ -1,7 +1,7 @@
 import { Context } from "@/context";
 import { buildUserProfile, UserProfile } from "./type";
 import { inTx } from "@/storage/inTx";
-import { RelationshipStatus } from "@prisma/client";
+import { RelationshipStatus } from "@/generated/prisma/client";
 import { relationshipSet } from "./relationshipSet";
 import { relationshipGet } from "./relationshipGet";
 

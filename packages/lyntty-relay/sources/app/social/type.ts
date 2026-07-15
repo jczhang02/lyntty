@@ -1,5 +1,5 @@
 import { getPublicUrl, ImageRef } from "@/storage/files";
-import { RelationshipStatus } from "@prisma/client";
+import { RelationshipStatus } from "@/generated/prisma/client";
 import { GitHubProfile } from "../api/types";
 
 export type UserProfile = {

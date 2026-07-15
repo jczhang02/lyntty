@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Fastify } from "../types";
 import { db } from "@/storage/db";
-import { RelationshipStatus } from "@prisma/client";
+import { RelationshipStatus } from "@/generated/prisma/client";
 import { friendAdd } from "@/app/social/friendAdd";
 import { Context } from "@/context";
 import { friendRemove } from "@/app/social/friendRemove";

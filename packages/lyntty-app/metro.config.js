@@ -24,10 +24,14 @@ config.resolver.blockList = [
 // instances mean two `options` objects — preact/hooks patches one,
 // @pierre/trees renders against the other, currentComponent stays undefined,
 // `r.__H` crashes. Pin to the CJS bundles so everyone shares state.
+const wireSourcePath = path.resolve(__dirname, '../lyntty-wire/src/index.ts');
 const preactCjsPath = require.resolve('preact');
 const preactHooksCjsPath = require.resolve('preact/hooks');
 const baseResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === 'lyntty-wire') {
+    return { filePath: wireSourcePath, type: 'sourceFile' };
+  }
   if (moduleName === 'preact') {
     return { filePath: preactCjsPath, type: 'sourceFile' };
   }

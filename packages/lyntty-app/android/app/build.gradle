@@ -3,6 +3,9 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+def jsRuntimeExecutable = System.getenv('BUN_EXECUTABLE') ?: 'bun'
+def resolvedReactNativeDir = new File([jsRuntimeExecutable, "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
+ext.REACT_NATIVE_NODE_MODULES_DIR = resolvedReactNativeDir.absolutePath
 def lynttyVersionName = (findProperty('lynttyVersionName') ?: System.getenv('LYNTTY_ANDROID_VERSION_NAME') ?: '1.0.0').toString()
 def lynttyVersionCode = (findProperty('lynttyVersionCode') ?: System.getenv('LYNTTY_ANDROID_VERSION_CODE') ?: '1').toString().toInteger()
 def lynttyKeystoreFile = (findProperty('lynttyKeystoreFile') ?: System.getenv('LYNTTY_ANDROID_KEYSTORE_FILE'))?.toString()
@@ -36,16 +39,17 @@ if (hasLynttyGoogleServices) {
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
-    entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
-    reactNativeDir = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
-    hermesCommand = new File(["node", "--print", "require.resolve('hermes-compiler/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/hermesc/%OS-BIN%/hermesc"
-    codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
+    entryFile = file([jsRuntimeExecutable, "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
+    reactNativeDir = resolvedReactNativeDir
+    hermesCommand = new File([jsRuntimeExecutable, "--print", "require.resolve('hermes-compiler/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/hermesc/%OS-BIN%/hermesc"
+    codegenDir = new File([jsRuntimeExecutable, "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
 
     enableBundleCompression = (findProperty('android.enableBundleCompression') ?: false).toBoolean()
     // Use Expo CLI to bundle the app, this ensures the Metro config
     // works correctly with Expo projects.
-    cliFile = new File(["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim())
+    cliFile = new File([jsRuntimeExecutable, "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim())
     bundleCommand = "export:embed"
+    nodeExecutableAndArgs = [jsRuntimeExecutable]
 
     /* Folders */
      //   The root of your project, i.e. where "package.json" lives. Default is '../..'

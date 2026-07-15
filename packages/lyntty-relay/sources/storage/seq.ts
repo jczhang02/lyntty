@@ -1,5 +1,5 @@
 import { db } from "@/storage/db";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 
 type SeqClient = Pick<Prisma.TransactionClient, "account" | "session">;
 

@@ -1,0 +1,60 @@
+diff --git a/android/expo-gradle-plugin/expo-autolinking-plugin-shared/src/main/kotlin/expo/modules/plugin/AutolinkingCommandBuilder.kt b/android/expo-gradle-plugin/expo-autolinking-plugin-shared/src/main/kotlin/expo/modules/plugin/AutolinkingCommandBuilder.kt
+index 5368156107df1e4181200a26d8fd7305570c2469..84b61940e7dc3e99bb1a01f42687e30da0facf1c 100644
+--- a/android/expo-gradle-plugin/expo-autolinking-plugin-shared/src/main/kotlin/expo/modules/plugin/AutolinkingCommandBuilder.kt
++++ b/android/expo-gradle-plugin/expo-autolinking-plugin-shared/src/main/kotlin/expo/modules/plugin/AutolinkingCommandBuilder.kt
+@@ -8,7 +8,7 @@ class AutolinkingCommandBuilder {
+    * Command for finding and running `expo-modules-autolinking`.
+    */
+   private val baseCommand = listOf(
+-    "node",
++    System.getenv("BUN_EXECUTABLE") ?: "bun",
+     "--no-warnings",
+     "--eval",
+     "require('expo/bin/autolinking')",
+diff --git a/android/expo-gradle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/ExpoAutolinkingSettingsExtension.kt b/android/expo-gradle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/ExpoAutolinkingSettingsExtension.kt
+index 04601c1395fd5cb2f41e574a9a374e18f54102ff..5f0215b6ee30e2f354d40bc98a4ded686760b02b 100644
+--- a/android/expo-gradle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/ExpoAutolinkingSettingsExtension.kt
++++ b/android/expo-gradle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/ExpoAutolinkingSettingsExtension.kt
+@@ -11,6 +11,7 @@ open class ExpoAutolinkingSettingsExtension(
+   val settings: Settings,
+   @Inject val objects: ObjectFactory
+ ) {
++  private val jsRuntimeExecutable = System.getenv("BUN_EXECUTABLE") ?: "bun"
+   /**
+    * The root directory of the react native project.
+    * Should be used by projects that don't follow the /android folder structure.
+@@ -52,7 +53,7 @@ open class ExpoAutolinkingSettingsExtension(
+     File(
+       settings.providers.exec { env ->
+         env.workingDir(projectRoot)
+-        env.commandLine("node", "--print", "require.resolve('@react-native/gradle-plugin/package.json', { paths: [require.resolve('react-native/package.json')] })")
++        env.commandLine(jsRuntimeExecutable, "--print", "require.resolve('@react-native/gradle-plugin/package.json', { paths: [require.resolve('react-native/package.json')] })")
+       }.standardOutput.asText.get().trim(),
+     ).parentFile
+   }
+@@ -64,7 +65,7 @@ open class ExpoAutolinkingSettingsExtension(
+     File(
+       settings.providers.exec { env ->
+         env.workingDir(projectRoot)
+-        env.commandLine("node", "--print", "require.resolve('react-native/package.json')")
++        env.commandLine(jsRuntimeExecutable, "--print", "require.resolve('react-native/package.json')")
+       }.standardOutput.asText.get().trim(),
+     ).parentFile
+   }
+diff --git a/android/expo-gradle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/ExpoAutolinkingSettingsPlugin.kt b/android/expo-gradle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/ExpoAutolinkingSettingsPlugin.kt
+index d66e371744d2b8d92c37ad1c496527a7b71efef7..094852126469852f441d42c507b3c0e11bbb39d6 100644
+--- a/android/expo-gradle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/ExpoAutolinkingSettingsPlugin.kt
++++ b/android/expo-gradle-plugin/expo-autolinking-settings-plugin/src/main/kotlin/expo/modules/plugin/ExpoAutolinkingSettingsPlugin.kt
+@@ -48,10 +48,11 @@ open class ExpoAutolinkingSettingsPlugin : Plugin<Settings> {
+   }
+ 
+   private fun getExpoGradlePluginsFile(settings: Settings): File {
++    val jsRuntimeExecutable = System.getenv("BUN_EXECUTABLE") ?: "bun"
+     val expoModulesAutolinkingPath =
+       settings.providers.exec { env ->
+         env.workingDir(settings.rootDir)
+-        env.commandLine("node", "--print", "require.resolve('expo-modules-autolinking/package.json', { paths: [require.resolve('expo/package.json')] })")
++        env.commandLine(jsRuntimeExecutable, "--print", "require.resolve('expo-modules-autolinking/package.json', { paths: [require.resolve('expo/package.json')] })")
+       }.standardOutput.asText.get().trim()
+ 
+     val expoAutolinkingDir = File(expoModulesAutolinkingPath).parentFile

@@ -67,7 +67,7 @@
         "test:integration": "pnpm run build && vitest run --project integration-empty --project integration-plan-mode --project integration-authenticated",
         "cli:install": "node scripts/install-local.cjs",
         "prepublishOnly": "pnpm test",
-        "postinstall": "node scripts/unpack-tools.cjs"
+        "postinstall": "bun scripts/unpack-tools.cjs"
     },
     "dependencies": {
         "@agentclientprotocol/sdk": "^0.14.1",

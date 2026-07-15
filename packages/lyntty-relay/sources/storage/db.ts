@@ -1,61 +1,51 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PGlite } from "@electric-sql/pglite";
 import { PrismaPGlite } from "pglite-prisma-adapter";
-import * as fs from "fs";
-import * as path from "path";
+import { PrismaClient } from "@/generated/prisma/client";
+import { createPGlite } from "@/storage/pgliteLoader";
+import { resolveDatabaseProvider } from "@/storage/databaseProvider";
 
 let pgliteInstance: PGlite | null = null;
-
-type WebAssemblyModuleCtor = new (bytes: Buffer) => WebAssembly.Module;
-
-function getWebAssemblyModuleCtor(): WebAssemblyModuleCtor | null {
-    const moduleCtor = (globalThis as { WebAssembly?: { Module?: unknown } }).WebAssembly?.Module;
-    return typeof moduleCtor === "function"
-        ? (moduleCtor as WebAssemblyModuleCtor)
-        : null;
-}
-
-function findPGliteWasm(): { wasmModule: WebAssembly.Module; fsBundle: Blob } | null {
-    const wasmModuleCtor = getWebAssemblyModuleCtor();
-    if (!wasmModuleCtor) {
-        return null;
-    }
-    const searchPaths = [
-        process.cwd(),
-        path.dirname(process.execPath),
-    ];
-    for (const dir of searchPaths) {
-        const wasmPath = path.join(dir, "pglite.wasm");
-        const dataPath = path.join(dir, "pglite.data");
-        if (fs.existsSync(wasmPath) && fs.existsSync(dataPath)) {
-            const wasmModule = new wasmModuleCtor(fs.readFileSync(wasmPath));
-            const fsBundle = new Blob([fs.readFileSync(dataPath)]);
-            return { wasmModule, fsBundle };
-        }
-    }
-    return null;
-}
+let closePromise: Promise<void> | null = null;
 
 function createClient(): PrismaClient {
-    const provider = process.env.DB_PROVIDER || "postgres";
+    const provider = resolveDatabaseProvider();
 
     if (provider === "pglite") {
-        const pgliteDir = process.env.PGLITE_DIR || "./data/pglite";
-        const wasmOpts = findPGliteWasm();
-        if (wasmOpts) {
-            pgliteInstance = new PGlite({ dataDir: pgliteDir, ...wasmOpts });
-        } else {
-            pgliteInstance = new PGlite(pgliteDir);
-        }
-        const adapter = new PrismaPGlite(pgliteInstance);
-        return new PrismaClient({ adapter } as any);
+        const pgliteDir = process.env.PGLITE_DIR
+            ?? (process.env.NODE_ENV === "test" ? "memory://" : "./data/pglite");
+        pgliteInstance = createPGlite(pgliteDir);
+        return new PrismaClient({ adapter: new PrismaPGlite(pgliteInstance) });
     }
 
-    return new PrismaClient();
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+        throw new Error("DATABASE_URL is required when DB_PROVIDER=postgres");
+    }
+    return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 }
 
 export const db = createClient();
 
 export function getPGlite(): PGlite | null {
     return pgliteInstance;
+}
+
+export function closeDatabase(): Promise<void> {
+    if (closePromise) {
+        return closePromise;
+    }
+
+    closePromise = (async () => {
+        const embeddedDatabase = pgliteInstance;
+        pgliteInstance = null;
+        try {
+            await db.$disconnect();
+        } finally {
+            if (embeddedDatabase) {
+                await embeddedDatabase.close();
+            }
+        }
+    })();
+    return closePromise;
 }

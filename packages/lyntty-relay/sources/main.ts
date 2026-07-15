@@ -1,7 +1,7 @@
 import { startApi } from "@/app/api/api";
 import { log } from "@/utils/log";
 import { awaitShutdown, onShutdown } from "@/utils/shutdown";
-import { db } from './storage/db';
+import { closeDatabase, db } from './storage/db';
 import { startTimeout } from "./app/presence/timeout";
 import { startMetricsServer } from "@/app/monitoring/metrics";
 import { activityCache } from "@/app/presence/sessionCache";
@@ -15,8 +15,9 @@ async function main() {
 
     // Storage
     await db.$connect();
+    await db.$queryRaw`SELECT 1`;
     onShutdown('db', async () => {
-        await db.$disconnect();
+        await closeDatabase();
     });
     onShutdown('activity-cache', async () => {
         activityCache.shutdown();

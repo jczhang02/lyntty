@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { db } from "./storage/db";
+import { closeDatabase, db } from "./storage/db";
 import { initEncrypt } from "./modules/encrypt";
 import { initGithub } from "./modules/github";
 import { loadFiles } from "./storage/files";
@@ -20,13 +20,13 @@ export interface StartServerOptions extends StartApiOptions {
 }
 
 export async function startServer(opts: StartServerOptions): Promise<{ port: number; host: string }> {
-    process.env.DB_PROVIDER = process.env.DB_PROVIDER || "pglite";
     process.env.PGLITE_DIR = opts.pgliteDir;
     process.env.HANDY_MASTER_SECRET = opts.masterSecret;
 
     await db.$connect();
+    await db.$queryRaw`SELECT 1`;
     onShutdown("db", async () => {
-        await db.$disconnect();
+        await closeDatabase();
     });
     onShutdown("activity-cache", async () => {
         activityCache.shutdown();

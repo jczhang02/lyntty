@@ -1,5 +1,4 @@
-import { Prisma } from "@prisma/client";
-import { RelationshipStatus } from "@prisma/client";
+import { Prisma, RelationshipStatus } from "@/generated/prisma/client";
 
 export async function relationshipSet(tx: Prisma.TransactionClient, from: string, to: string, status: RelationshipStatus, lastNotifiedAt?: Date) {
     // Get existing relationship to preserve lastNotifiedAt

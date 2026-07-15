@@ -1,5 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
-import { RelationshipStatus } from "@prisma/client";
+import { Prisma, PrismaClient, RelationshipStatus } from "@/generated/prisma/client";
 
 export async function relationshipGet(tx: Prisma.TransactionClient | PrismaClient, from: string, to: string): Promise<RelationshipStatus> {
     const relationship = await tx.userRelationship.findFirst({

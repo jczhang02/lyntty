@@ -1,6 +1,6 @@
 import { Context } from "@/context";
 import { FeedOptions, FeedResult } from "./types";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { Tx } from "@/storage/inTx";
 
 /**

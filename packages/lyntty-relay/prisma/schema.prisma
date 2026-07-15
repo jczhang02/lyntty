@@ -2,17 +2,17 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider        = "prisma-client-js"
-    previewFeatures = ["metrics", "relationJoins", "driverAdapters"]
+    provider   = "prisma-client"
+    output     = "../sources/generated/prisma"
+    engineType = "client"
 }
 
 generator json {
-    provider = "prisma-json-types-generator"
+    provider = "bun ../../node_modules/prisma-json-types-generator/index.js"
 }
 
 datasource db {
     provider = "postgresql"
-    url      = env("DATABASE_URL")
 }
 
 //
