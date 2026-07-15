@@ -119,6 +119,99 @@ describe('Pi machine session ops', () => {
         }));
     });
 
+    it('first resumes Pi without takeover so an active extension runtime can be reused', async () => {
+        machineRPC.mockResolvedValue({ type: 'success', sessionId: 'active-relay-session' });
+
+        const chooseTakeover = vi.fn();
+        const { machineResumePiWithActivationChoice } = await import('./ops');
+        await expect(machineResumePiWithActivationChoice({
+            machineId: 'machine-1',
+            directory: '/repo',
+            piSessionId: 'pi-existing',
+        }, chooseTakeover)).resolves.toEqual({ type: 'success', sessionId: 'active-relay-session' });
+
+        expect(chooseTakeover).not.toHaveBeenCalled();
+        expect(machineRPC).toHaveBeenCalledTimes(1);
+        expect(machineRPC).toHaveBeenCalledWith('machine-1', 'spawn-lyntty-session', expect.objectContaining({
+            sessionId: 'pi-existing',
+            agent: 'pi',
+            takeoverChoice: undefined,
+        }));
+    });
+
+    it('recognizes only the daemon remediation that requires explicit takeover', async () => {
+        const { isPiResumeTakeoverRequired } = await import('./ops');
+
+        expect(isPiResumeTakeoverRequired('Waiting for Pi extension. Retry or choose an explicit takeover.')).toBe(true);
+        expect(isPiResumeTakeoverRequired('Waiting for Pi extension to finish reconnecting.')).toBe(true);
+        expect(isPiResumeTakeoverRequired('Machine is offline')).toBe(false);
+    });
+
+    it('requires an explicit choice before activating an inactive Pi session', async () => {
+        machineRPC
+            .mockResolvedValueOnce({ type: 'error', errorMessage: 'Waiting for Pi extension. Retry or choose an explicit takeover.' })
+            .mockResolvedValueOnce({ type: 'success', sessionId: 'resumed-relay-session' });
+        const chooseTakeover = vi.fn(async () => 'stop' as const);
+
+        const { machineResumePiWithActivationChoice } = await import('./ops');
+        await expect(machineResumePiWithActivationChoice({
+            machineId: 'machine-1',
+            directory: '/repo',
+            piSessionId: 'pi-existing',
+        }, chooseTakeover)).resolves.toEqual({ type: 'success', sessionId: 'resumed-relay-session' });
+
+        expect(chooseTakeover).toHaveBeenCalledTimes(1);
+        expect(machineRPC).toHaveBeenCalledTimes(2);
+        expect(machineRPC.mock.calls[0][2]).toMatchObject({ takeoverChoice: undefined });
+        expect(machineRPC.mock.calls[1][2]).toMatchObject({ takeoverChoice: 'stop' });
+    });
+
+    it('does not spawn a duplicate runtime when takeover selection is cancelled', async () => {
+        machineRPC.mockResolvedValueOnce({
+            type: 'error',
+            errorMessage: 'Waiting for Pi extension. Retry or choose an explicit takeover.',
+        });
+        const chooseTakeover = vi.fn(async () => null);
+
+        const { machineResumePiWithActivationChoice } = await import('./ops');
+        await expect(machineResumePiWithActivationChoice({
+            machineId: 'machine-1',
+            directory: '/repo',
+            piSessionId: 'pi-existing',
+        }, chooseTakeover)).resolves.toBeNull();
+
+        expect(chooseTakeover).toHaveBeenCalledTimes(1);
+        expect(machineRPC).toHaveBeenCalledTimes(1);
+    });
+
+    it('resumes Pi through the unified spawn activation path with explicit takeover', async () => {
+        machineRPC.mockResolvedValue({ type: 'success', sessionId: 'lyntty-1' });
+
+        const { machineResumeSession } = await import('./ops');
+        const result = await machineResumeSession({
+            machineId: 'machine-1',
+            directory: '/repo',
+            piSessionId: 'pi-existing',
+            takeoverChoice: 'interrupt',
+        });
+
+        expect(result).toEqual({ type: 'success', sessionId: 'lyntty-1' });
+        expect(machineRPC).toHaveBeenCalledWith('machine-1', 'spawn-lyntty-session', {
+            type: 'spawn-in-directory',
+            directory: '/repo',
+            sessionId: 'pi-existing',
+            approvedNewDirectoryCreation: false,
+            machineId: 'machine-1',
+            token: undefined,
+            agent: 'pi',
+            takeoverChoice: 'interrupt',
+            resumeClaudeSessionId: undefined,
+            resumeCodexThreadId: undefined,
+            parentSessionId: undefined,
+            forkedFromMessageId: undefined,
+        });
+    });
+
     it('loads Pi history pages through a narrow session RPC', async () => {
         sessionRPC.mockResolvedValue({ type: 'success', sent: 4, nextCursor: 'entry-1', hasMore: true, totalMessages: 20 });
 

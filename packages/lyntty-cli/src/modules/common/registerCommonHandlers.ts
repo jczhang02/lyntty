@@ -123,24 +123,6 @@ export interface SpawnSessionOptions {
     agent?: 'pi';
     takeoverChoice?: 'wait' | 'stop' | 'interrupt';
     environmentVariables?: Record<string, string>;
-    token?: string;
-    /**
-     * If set, the daemon spawns the agent with `--resume <id>` so the new
-     * Lyntty session continues from an existing Claude conversation file.
-     * Used by the session fork / duplicate flow: the fork RPC produces a
-     * new Claude JSONL on disk, the spawn RPC then attaches a fresh Lyntty
-     * session to it.
-     */
-    resumeClaudeSessionId?: string;
-    /**
-     * If set, the daemon spawns Codex with `--resume <id>` so a fresh Lyntty
-     * session attaches to a forked Codex app-server thread.
-     */
-    resumeCodexThreadId?: string;
-    /** Lyntty session id this fork was branched from (lineage). */
-    parentSessionId?: string;
-    /** Lyntty message id used as the rewind point (only set for "duplicate"). */
-    forkedFromMessageId?: string;
 }
 
 export type SpawnSessionResult =

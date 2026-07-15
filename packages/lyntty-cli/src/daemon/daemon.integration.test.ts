@@ -229,7 +229,7 @@ describe('Daemon Integration Tests', { timeout: 180_000 }, () => {
   it('should not allow starting a second daemon', async () => {
     // Daemon is already running from beforeEach
     // Try to start another daemon
-    const secondChild = spawn('pnpm', ['tsx', 'src/index.ts', 'daemon', 'start-sync'], {
+    const secondChild = spawn('bun', ['run', 'src/index.ts', 'daemon', 'start-sync'], {
       cwd: process.cwd(),
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -363,25 +363,24 @@ describe('Daemon Integration Tests', { timeout: 180_000 }, () => {
    *
    * 1. Test starts daemon with original version (e.g., 0.9.0-6) compiled into dist/
    * 2. Test modifies package.json to new version (e.g., 0.0.0-integration-test-*)
-   * 3. Test runs `yarn build` to recompile with new version
+   * 3. Test runs `bun run build` to recompile with the new version
    * 4. Daemon's heartbeat (every 30s) reads package.json and compares to its compiled version
    * 5. Daemon detects mismatch: package.json != configuration.currentCliVersion
    * 6. Daemon spawns new daemon via spawnLynttyCLI(['daemon', 'start'])
    * 7. New daemon starts, reads daemon.state.json, sees old version != its compiled version
    * 8. New daemon calls stopDaemon() to kill old daemon, then takes over
    *
-   * This simulates what happens during `npm upgrade lyntty`:
+   * This simulates replacing an installed development bundle:
    * - Running daemon has OLD version loaded in memory (configuration.currentCliVersion)
-   * - npm replaces node_modules/lyntty/ with NEW version files
+   * - The installed bundle is atomically replaced with NEW version files
    * - package.json on disk now has NEW version
-   * - Daemon reads package.json, detects mismatch, triggers self-update
-   * - Key difference: npm atomically replaces the entire module directory, while
-   *   our test must carefully rebuild to avoid missing entrypoint errors
+   * - Daemon reads package.json, detects mismatch, and restarts
+   * - The test must carefully rebuild to avoid missing entrypoint errors
    *
    * Critical timing constraints:
-   * - Heartbeat must be long enough (30s) for yarn build to complete before daemon tries to spawn
+   * - Heartbeat must be long enough (30s) for the build to complete before daemon tries to spawn
    * - If heartbeat fires during rebuild, spawn fails (dist/index.mjs missing) and test fails
-   * - pkgroll doesn't reliably update compiled version, must use full yarn build
+   * - pkgroll alone does not reliably update the compiled version; use the full Bun build
    * - Test modifies package.json BEFORE rebuild to ensure new version is compiled in
    *
    * Common failure modes:
@@ -391,7 +390,7 @@ describe('Daemon Integration Tests', { timeout: 180_000 }, () => {
    */
   // Keep this skipped. It is destructive (modifies package.json, rebuilds dist, restarts daemon)
   // and it exercises a hand-rolled self-restart path we probably do not want long-term anyway.
-  // A native system daemon model (like OpenClaw's) would make upgrades and startup/start-at-login
+  // A native system daemon model would make upgrades and startup/start-at-login
   // the OS's job instead of something we hand-roll and test this way.
   it.skip('[skipped] should detect version mismatch and kill old daemon', { timeout: 100_000 }, async () => {
     // Read current package.json to get version
@@ -418,7 +417,7 @@ describe('Daemon Integration Tests', { timeout: 180_000 }, () => {
       // The daemon's heartbeat will detect package.json != compiled version,
       // then spawn a new daemon which will use the rebuilt dist.
       console.log(`[TEST] Rebuilding CLI with test version ${testVersion}...`);
-      execSync('pnpm build', { stdio: 'pipe' });
+      execSync('bun run build', { stdio: 'pipe' });
 
       // Verify the build actually has the test version
       const distFiles = execSync('grep -rl "' + testVersion + '" dist/ || echo "NOT_FOUND"', { encoding: 'utf8' }).trim();
@@ -444,13 +443,13 @@ describe('Daemon Integration Tests', { timeout: 180_000 }, () => {
       console.log(`[TEST] Restored package.json version to ${originalVersion}`);
 
       // Lets rebuild it so we keep it as we found it
-      execSync('pnpm build', { stdio: 'ignore' });
+      execSync('bun run build', { stdio: 'ignore' });
     }
   });
 
   // TODO: Add a test to see if a corrupted file will work
 
-  // TODO: Test npm uninstall scenario - daemon should gracefully handle when lyntty is uninstalled
+  // TODO: Test binary removal - daemon should gracefully handle when Lyntty is uninstalled
   // Current behavior: daemon tries to spawn new daemon on version mismatch but dist/index.mjs is gone
   // Expected: daemon should detect missing entrypoint and either exit cleanly or at minimum not respawn infinitely
 });

@@ -11,47 +11,10 @@ export default defineConfig({
                 extends: true,
                 test: {
                     name: 'unit',
-                    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
+                    include: ['src/**/*.test.ts'],
                     exclude: ['src/**/*.integration.test.ts'],
                     sequence: {
                         groupOrder: 0,
-                    },
-                },
-            },
-            {
-                extends: true,
-                test: {
-                    name: 'integration-empty',
-                    fileParallelism: false,
-                    hookTimeout: 120_000,
-                    maxWorkers: 1,
-                    minWorkers: 1,
-                    testTimeout: 60_000,
-                    include: [
-                        'src/claude/claude.integration.test.ts',
-                        'src/codex/codex.integration.test.ts',
-                        'src/sandbox/network.integration.test.ts',
-                    ],
-                    setupFiles: ['./src/testing/integration.setup.empty.ts'],
-                    sequence: {
-                        groupOrder: 1,
-                    },
-                },
-            },
-            {
-                extends: true,
-                test: {
-                    name: 'integration-plan-mode',
-                    fileParallelism: false,
-                    hookTimeout: 120_000,
-                    maxWorkers: 1,
-                    minWorkers: 1,
-                    testTimeout: 180_000,
-                    include: [
-                        'src/claude/planMode.integration.test.ts',
-                    ],
-                    sequence: {
-                        groupOrder: 1,
                     },
                 },
             },
@@ -66,7 +29,6 @@ export default defineConfig({
                     testTimeout: 60_000,
                     include: [
                         'src/daemon/daemon.integration.test.ts',
-                        'src/openclaw/openclaw.integration.test.ts',
                     ],
                     setupFiles: ['./src/testing/integration.setup.authenticated.ts'],
                     sequence: {

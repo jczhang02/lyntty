@@ -59,11 +59,11 @@ describe('Pi command/event path smoke', () => {
       type: 'tool_execution_start',
       toolCallId: 'tool-1',
       toolName: 'bash',
-      args: { command: 'pnpm test' },
+      args: { command: 'bun test' },
     } as any);
     expect(toolStart.map((envelope) => envelope.ev.t)).toEqual(['text', 'tool-call-start']);
     expect(toolStart[0]).toMatchObject({ ev: { t: 'text', text: 'done' } });
-    expect(toolStart[1]).toMatchObject({ ev: { t: 'tool-call-start', name: 'bash', args: { command: 'pnpm test' } } });
+    expect(toolStart[1]).toMatchObject({ ev: { t: 'tool-call-start', name: 'bash', args: { command: 'bun test' } } });
 
     expect(mapper.mapEvent({
       type: 'tool_execution_end',

@@ -12,11 +12,11 @@ describe('session protocol schemas', () => {
         const events: SessionEvent[] = [
             { t: 'text', text: 'hello' },
             { t: 'text', text: 'thinking', thinking: true },
-            { t: 'service', text: '**Service:** restarting MCP bridge' },
+            { t: 'service', text: '**Service:** restarting Pi extension transport' },
             {
                 t: 'tool-call-start',
                 call: 'call-1',
-                name: 'CodexBash',
+                name: 'PiBash',
                 title: 'Run `ls`',
                 description: 'Run `ls -la` in the repo root',
                 args: { command: 'ls -la' },

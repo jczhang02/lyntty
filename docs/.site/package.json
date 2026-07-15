@@ -2,11 +2,12 @@
   "name": "lyntty-docs",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.3.14",
   "scripts": {
-    "docs:prepare": "node scripts/prepare-fumadocs-pages.mjs",
-    "docs:check": "npm run docs:prepare && fumadocs-mdx source.config.ts && tsc --noEmit",
-    "docs:build": "npm run docs:prepare && next build && node scripts/write-fumadocs-agent-files.mjs",
-    "docs:preview": "npx serve out"
+    "docs:prepare": "bun scripts/prepare-fumadocs-pages.mjs",
+    "docs:check": "bun run docs:prepare && bunx fumadocs-mdx source.config.ts && bunx tsc --noEmit",
+    "docs:build": "bun run docs:prepare && bunx next build && bun scripts/write-fumadocs-agent-files.mjs",
+    "docs:preview": "bunx serve out"
   },
   "devDependencies": {
     "@fontsource/lora": "^5.2.8",
@@ -23,6 +24,7 @@
     "postcss": "^8.5.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "serve": "14.2.5",
     "tailwindcss": "4.1.18",
     "typescript": "5.9.3"
   }

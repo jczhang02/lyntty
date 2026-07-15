@@ -42,7 +42,7 @@ export function getEnvironmentInfo(): Record<string, any> {
         serverUrl: configuration?.serverUrl,
         logsDir: configuration?.logsDir,
         processPid: process.pid,
-        nodeVersion: process.version,
+        bunVersion: process.versions.bun ?? 'unknown',
         platform: process.platform,
         arch: process.arch,
         user: process.env.USER,

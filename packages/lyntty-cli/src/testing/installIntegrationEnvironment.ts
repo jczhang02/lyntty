@@ -20,7 +20,6 @@ declare global {
 export async function installIntegrationEnvironment(profile: IntegrationEnvironmentProfile) {
     const previousEnv = {
         LYNTTY_SERVER_URL: process.env.LYNTTY_SERVER_URL,
-        LYNTTY_WEBAPP_URL: process.env.LYNTTY_WEBAPP_URL,
         LYNTTY_HOME_DIR: process.env.LYNTTY_HOME_DIR,
         LYNTTY_PROJECT_DIR: process.env.LYNTTY_PROJECT_DIR,
         LYNTTY_VARIANT: process.env.LYNTTY_VARIANT,

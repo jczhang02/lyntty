@@ -36,10 +36,6 @@ describe('resolvePiActivationLock', () => {
     expect(resolvePiActivationLock({ directory: '/repo', agent: 'pi' }, [])).toEqual({ type: 'allow' });
   });
 
-  it('ignores non-Pi sessions in the same directory', () => {
-    expect(resolvePiActivationLock({ directory: '/repo', agent: 'pi' }, [activePiSession({ agent: 'codex' })])).toEqual({ type: 'allow' });
-  });
-
   it('uses the Pi session lease before falling back to directory locks', () => {
     const active = activePiSession({
       lynttySessionMetadataFromLocalWebhook: { machineId: 'machine-1', piSessionId: 'pi-session-1' } as any,

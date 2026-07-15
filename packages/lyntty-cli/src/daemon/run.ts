@@ -28,8 +28,7 @@ import { projectPath } from '@/projectPath';
 import { getTmuxUtilities, isTmuxAvailable, parseTmuxSessionIdentifier, formatTmuxSessionIdentifier } from '@/utils/tmux';
 import { expandEnvironmentVariables } from '@/utils/expandEnvVars';
 import { detectCLIAvailability } from '@/utils/detectCLI';
-import { buildResumeLaunch } from '@/resume/handleResumeCommand';
-import { detectResumeSupport } from '@/resume/localLynttyAgentAuth';
+import { detectResumeSupport } from '@/resume/localRemoteAuth';
 import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
 import { resolveActivePiSessionReuse, resolvePiActivationLock } from './activationLock';
 import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
@@ -347,7 +346,7 @@ export async function startDaemon(): Promise<void> {
   if (!runningDaemonVersionMatches) {
     // TODO: This hand-rolled self-restart path is awkward to reason about and awkward to test.
     // We should probably migrate this daemon to native system service management
-    // (launchd/systemd, similar to OpenClaw's model), so startup/start-at-login and upgrades
+    // (launchd/systemd), so startup/start-at-login and upgrades
     // are owned by the OS instead of by the daemon trying to replace itself in-process.
     logger.debug('[DAEMON RUN] Daemon version mismatch detected, restarting daemon with current CLI version');
     await stopDaemon();
@@ -653,18 +652,7 @@ export async function startDaemon(): Promise<void> {
           pidToTrackedSession.delete(activationLock.activePid);
         }
 
-        // Build environment variables for session spawning
-        // Authentication tokens are resolved here
-
-        // Resolve authentication token if provided
-        const authEnv: Record<string, string> = {};
-        if (options.token) {
-          return {
-            type: 'error',
-            errorMessage: 'Lyntty pi runtime does not accept external agent tokens.',
-          };
-        }
-
+        // Build environment variables for the managed Pi session.
         const blockedEnvironmentKeys = findBlockedSessionEnvironmentKeys(options.environmentVariables);
         if (blockedEnvironmentKeys.length > 0) {
           return {
@@ -674,7 +662,6 @@ export async function startDaemon(): Promise<void> {
         }
 
         let extraEnv: Record<string, string> = {
-          ...authEnv,
           ...(options.environmentVariables ?? {}),
           // Managed SDK runtime owns relay command delivery; disable the global
           // ordinary-TUI extension in that child to prevent double consumption.
@@ -682,22 +669,6 @@ export async function startDaemon(): Promise<void> {
         };
         if (options.sessionId) {
           extraEnv.LYNTTY_PI_SESSION_ID = options.sessionId;
-        }
-        if (options.parentSessionId) {
-          extraEnv.LYNTTY_FORKED_FROM_SESSION_ID = options.parentSessionId;
-        }
-        if (options.forkedFromMessageId) {
-          extraEnv.LYNTTY_FORKED_FROM_MESSAGE_ID = options.forkedFromMessageId;
-        }
-        // For fork: spawned Lyntty CLI needs to know which Claude JSONL to
-        // backfill into the fresh Lyntty session row. Without this, the
-        // SDK reads the JSONL silently as context but never re-emits the
-        // historical messages, so the app shows an empty chat.
-        if (options.resumeClaudeSessionId) {
-          extraEnv.LYNTTY_FORK_CLAUDE_SESSION_ID = options.resumeClaudeSessionId;
-        }
-        if (options.resumeCodexThreadId) {
-          extraEnv.LYNTTY_FORK_CODEX_THREAD_ID = options.resumeCodexThreadId;
         }
         logger.debug(`[DAEMON RUN] Environment variable keys (before expansion) (${Object.keys(extraEnv).length}): ${Object.keys(extraEnv).join(', ')}`);
 
@@ -765,7 +736,7 @@ export async function startDaemon(): Promise<void> {
           // Construct command for the CLI
           const cliPath = join(projectPath(), 'dist', 'index.mjs');
           const agent = 'pi';
-          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --lyntty-starting-mode remote --started-by daemon`;
+          const fullCommand = `bun ${cliPath} ${agent} --started-by daemon`;
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:
@@ -855,7 +826,6 @@ export async function startDaemon(): Promise<void> {
           const agentCommand = 'pi';
           const args = [
             agentCommand,
-            '--lyntty-starting-mode', 'remote',
             '--started-by', 'daemon'
           ];
 
@@ -926,7 +896,7 @@ export async function startDaemon(): Promise<void> {
         pid: lynttyProcess.pid,
         childProcess: lynttyProcess,
         directory: cwd,
-        agent: args[0] === 'pi' ? 'pi' : (args[0] === 'codex' ? 'codex' : (args[0] === 'gemini' ? 'gemini' : (args[0] === 'openclaw' ? 'openclaw' : 'claude'))),
+        agent: 'pi',
         directoryCreated,
         message,
       };
@@ -1453,85 +1423,26 @@ export async function startDaemon(): Promise<void> {
       };
     };
 
-    const fetchServerSessionMetadata = async (sessionId: string, encryptionKey: Uint8Array, encryptionVariant: 'legacy' | 'dataKey'): Promise<Metadata | null> => {
-      try {
-        const response = await axios.get(`${configuration.serverUrl}/v1/sessions`, {
-          headers: { Authorization: `Bearer ${credentials.token}` },
-          timeout: 10_000,
-        });
-        const sessions = (response.data as { sessions: { id: string; metadata: string }[] }).sessions;
-        const matched = sessions.find(s => s.id === sessionId);
-        if (!matched) return null;
-        const decrypted = decrypt(encryptionKey, encryptionVariant, decodeBase64(matched.metadata));
-        return decrypted as Metadata | null;
-      } catch (error) {
-        logger.debug(`[DAEMON RUN] Failed to fetch session metadata from server: ${error instanceof Error ? error.message : error}`);
-        return null;
+    const resumeSession = async (lynttySessionId: string): Promise<SpawnSessionResult> => {
+      const tracked = findTrackedSessionById(lynttySessionId);
+      if (!tracked) {
+        return { type: 'error', errorMessage: `Session ${lynttySessionId} is not tracked by this daemon or belongs to another machine.` };
       }
-    };
-
-    const resumeSession = async (lynttySessionId: string, options?: { model?: string; permissionMode?: string }): Promise<SpawnSessionResult> => {
-      try {
-        const tracked = findTrackedSessionById(lynttySessionId);
-        if (!tracked) {
-          return { type: 'error', errorMessage: `Session ${lynttySessionId} is not tracked by this daemon. It may have been started before the daemon or on another machine.` };
-        }
-        if (!tracked.lynttySessionMetadataFromLocalWebhook) {
-          return { type: 'error', errorMessage: `Session ${lynttySessionId} has no metadata. Cannot resume.` };
-        }
-        if (!tracked.encryption) {
-          return { type: 'error', errorMessage: `Session ${lynttySessionId} has no stored encryption data. It was likely started before this feature was available. Restart the daemon and start a new session to enable resume.` };
-        }
-
-        // Webhook metadata may be stale (missing claudeSessionId/codexThreadId set after startup).
-        // Fetch fresh metadata from server if needed.
-        let metadata = tracked.lynttySessionMetadataFromLocalWebhook;
-        const needsFetch = (!metadata.claudeSessionId && (!metadata.flavor || metadata.flavor === 'claude'))
-          || (!metadata.codexThreadId && metadata.flavor === 'codex');
-        if (needsFetch) {
-          logger.debug(`[DAEMON RUN] Session ${lynttySessionId} missing agent session ID in webhook metadata, fetching from server`);
-          const serverMetadata = await fetchServerSessionMetadata(lynttySessionId, tracked.encryption.encryptionKey, tracked.encryption.encryptionVariant);
-          if (serverMetadata) {
-            metadata = serverMetadata;
-            tracked.lynttySessionMetadataFromLocalWebhook = serverMetadata;
-          }
-        }
-
-        const launch = buildResumeLaunch(
-          { id: lynttySessionId, active: true, metadata },
-          { startedBy: 'daemon', claudeStartingMode: 'remote' },
-        );
-
-        if (options?.model) {
-          launch.args.push('--model', options.model);
-        }
-        if (options?.permissionMode) {
-          launch.args.push('--permission-mode', options.permissionMode);
-        }
-
-        await fs.access(launch.cwd);
-
-        return spawnTrackedLynttyProcess({
-          args: launch.args,
-          cwd: launch.cwd,
-          env: {
-            ...process.env,
-            LYNTTY_RECONNECT_SESSION_ID: lynttySessionId,
-            LYNTTY_RECONNECT_ENCRYPTION_KEY: encodeBase64(tracked.encryption.encryptionKey),
-            LYNTTY_RECONNECT_ENCRYPTION_VARIANT: tracked.encryption.encryptionVariant,
-            LYNTTY_RECONNECT_SEQ: String(tracked.encryption.seq),
-            LYNTTY_RECONNECT_METADATA_VERSION: String(tracked.encryption.metadataVersion),
-            LYNTTY_RECONNECT_AGENT_STATE_VERSION: String(tracked.encryption.agentStateVersion),
-          },
-        });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : (error && typeof error === 'object' ? JSON.stringify(error) : String(error));
-        logger.debug(`[DAEMON RUN] Failed to resume session: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
-        return {
-          type: 'error',
-          errorMessage: `Failed to resume session: ${errorMessage}`,
-        };
+      const metadata = tracked.lynttySessionMetadataFromLocalWebhook;
+      if (!metadata || metadata.flavor !== 'pi' || !metadata.piSessionId) {
+        return { type: 'error', errorMessage: `Session ${lynttySessionId} is not a resumable Pi session.` };
       }
+
+      // Re-enter the same activation lease and extension-owner checks as a normal
+      // Pi spawn. Without an explicit takeover this can only reuse an active
+      // runtime; it must never start a duplicate SDK runtime behind a Pi TUI.
+      return spawnSession({
+        directory: metadata.path || tracked.directory || process.cwd(),
+        sessionId: metadata.piSessionId,
+        machineId,
+        agent: 'pi',
+        approvedNewDirectoryCreation: false,
+      });
     };
 
     // Stop a session by sessionId or PID fallback
@@ -1644,7 +1555,7 @@ export async function startDaemon(): Promise<void> {
     });
 
     // Capture the bundled CLI's mtime at startup so the heartbeat can detect
-    // when npm replaces `dist/index.mjs` on disk (= the user ran `npm i -g lyntty`).
+    // when an installed development bundle is replaced on disk.
     // We previously compared disk `package.json.version` to our bundled version,
     // but that produced infinite restart loops (#1107) when the manifest version
     // diverged from the bundled version (e.g. `lyntty-coder@0.13.1` deprecation
@@ -1655,7 +1566,7 @@ export async function startDaemon(): Promise<void> {
     try {
       initialBundleMtimeMs = statSync(bundlePath).mtimeMs;
     } catch {
-      // dist/index.mjs not present (e.g. dev mode via tsx) — skip upgrade detection.
+      // dist/index.mjs not present (e.g. dev mode via Bun) — skip upgrade detection.
       logger.debug(`[DAEMON RUN] Bundle at ${bundlePath} not found; self-restart on upgrade disabled`);
     }
 
@@ -2315,8 +2226,8 @@ export async function startDaemon(): Promise<void> {
         }
       }
 
-      // Check if daemon needs update by detecting whether `dist/index.mjs` was
-      // replaced on disk since the daemon started (npm install rewrites the file).
+      // Check if the daemon needs a development restart by detecting whether
+      // `dist/index.mjs` was replaced on disk since startup.
       // Skip if we never captured an initial mtime (dev mode).
       let bundleReplaced = false;
       if (initialBundleMtimeMs > 0) {

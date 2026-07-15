@@ -1,53 +1,19 @@
 import { logger } from '@/ui/logger'
 import { EventEmitter } from 'node:events'
 import { io, Socket } from 'socket.io-client'
-import { AgentState, ClientToServerEvents, FileEventMessage, FileEventMessageSchema, Metadata, ServerToClientEvents, Session, Update, UserMessage, UserMessageSchema, Usage } from './types'
+import { AgentState, ClientToServerEvents, FileEventMessage, FileEventMessageSchema, Metadata, ServerToClientEvents, Session, Update, UserMessage, UserMessageSchema } from './types'
 import { decodeBase64, decryptBlob, decrypt, encodeBase64, encrypt, encryptBlob } from './encryption';
 import { backoff, delay } from '@/utils/time';
 import { configuration } from '@/configuration';
-import { RawJSONLines } from '@/claude/types';
 import { randomUUID } from 'node:crypto';
 import { AsyncLock } from '@/utils/lock';
 import { deriveKey } from '@/utils/deriveKey';
 import { RpcHandlerManager } from './rpc/RpcHandlerManager';
 import { registerCommonHandlers } from '../modules/common/registerCommonHandlers';
-import { calculateCost } from '@/utils/pricing';
 import { shouldReconnect } from '@/utils/lidState';
-import { createEnvelope, type CreateEnvelopeOptions, type SessionEnvelope, type SessionTurnEndStatus } from 'lyntty-wire';
-import {
-    closeClaudeTurnWithStatus,
-    mapClaudeLogMessageToSessionEnvelopes,
-    type ClaudeSessionProtocolState,
-} from '@/claude/utils/sessionProtocolMapper';
+import { createEnvelope, type CreateEnvelopeOptions, type SessionEnvelope } from 'lyntty-wire';
 import { InvalidateSync } from '@/utils/sync';
 import axios from 'axios';
-
-/**
- * ACP (Agent Communication Protocol) message data types.
- * This is the unified format for all agent messages - CLI adapts each provider's format to ACP.
- */
-export type ACPMessageData =
-    // Core message types
-    | { type: 'message'; message: string }
-    | { type: 'reasoning'; message: string }
-    | { type: 'thinking'; text: string }
-    // Tool interactions
-    | { type: 'tool-call'; callId: string; name: string; input: unknown; id: string }
-    | { type: 'tool-result'; callId: string; output: unknown; id: string; isError?: boolean }
-    // File operations
-    | { type: 'file-edit'; description: string; filePath: string; diff?: string; oldContent?: string; newContent?: string; id: string }
-    // Terminal/command output
-    | { type: 'terminal-output'; data: string; callId: string }
-    // Task lifecycle events
-    | { type: 'task_started'; id: string }
-    | { type: 'task_complete'; id: string }
-    | { type: 'turn_aborted'; id: string }
-    // Permissions
-    | { type: 'permission-request'; permissionId: string; toolName: string; description: string; options?: unknown }
-    // Usage/metrics
-    | { type: 'token_count';[key: string]: unknown };
-
-export type ACPProvider = 'gemini' | 'codex' | 'claude' | 'opencode' | 'openclaw';
 
 type V3SessionMessage = {
     id: string;
@@ -85,70 +51,6 @@ export type LocalImageAttachment = {
     mimeType: string;
     name: string;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null;
-}
-
-function extensionForImageMime(mimeType: string): string {
-    switch (mimeType.toLowerCase()) {
-        case 'image/jpeg':
-        case 'image/jpg':
-            return 'jpg';
-        case 'image/gif':
-            return 'gif';
-        case 'image/webp':
-            return 'webp';
-        case 'image/png':
-        default:
-            return 'png';
-    }
-}
-
-function extractLocalTranscriptImageAttachments(body: RawJSONLines): LocalImageAttachment[] {
-    if (body.type !== 'user' || body.isMeta || body.isSidechain) {
-        return [];
-    }
-
-    const content = (body as { message?: { content?: unknown } }).message?.content;
-    if (!Array.isArray(content)) {
-        return [];
-    }
-
-    // Tool results are user-role messages from Claude's protocol, but they
-    // represent agent tool lifecycle, not human multimodal input.
-    if (content.some((block) => isRecord(block) && block.type === 'tool_result')) {
-        return [];
-    }
-
-    const attachments: LocalImageAttachment[] = [];
-    for (const block of content) {
-        if (!isRecord(block) || block.type !== 'image') {
-            continue;
-        }
-        const source = block.source;
-        if (!isRecord(source) || source.type !== 'base64' || typeof source.data !== 'string') {
-            continue;
-        }
-
-        const data = decodeBase64(source.data);
-        if (data.length === 0) {
-            continue;
-        }
-
-        const mimeType = typeof source.media_type === 'string' && source.media_type.startsWith('image/')
-            ? source.media_type
-            : 'image/png';
-        const index = attachments.length + 1;
-        attachments.push({
-            data,
-            mimeType,
-            name: `claude-image-${index}.${extensionForImageMime(mimeType)}`,
-        });
-    }
-
-    return attachments;
-}
 
 function escapeMultipartValue(value: string): string {
     return value.replaceAll('\r', '').replaceAll('\n', '').replaceAll('"', '%22');
@@ -216,17 +118,6 @@ export class ApiSessionClient extends EventEmitter {
     private ignoreArchiveSignal = false;
     private readonly initialServerSeq: number;
     private skipMessagesThroughSeq: number | null = null;
-    private claudeSessionProtocolState: ClaudeSessionProtocolState = {
-        currentTurnId: null,
-        uuidToProviderSubagent: new Map<string, string>(),
-        taskPromptToSubagents: new Map<string, string[]>(),
-        providerSubagentToSessionSubagent: new Map<string, string>(),
-        subagentTitles: new Map<string, string>(),
-        bufferedSubagentMessages: new Map<string, RawJSONLines[]>(),
-        hiddenParentToolCalls: new Set<string>(),
-        startedSubagents: new Set<string>(),
-        activeSubagents: new Set<string>(),
-    };
     private lastSeq = 0;
     // Receive cursor is independent from lastSeq because posting our own outbox
     // can advance the server sequence before the initial relay replay completes.
@@ -471,7 +362,7 @@ export class ApiSessionClient extends EventEmitter {
 
     async uploadLocalImageAttachmentEnvelope(
         attachment: LocalImageAttachment,
-        opts: Pick<CreateEnvelopeOptions, 'id' | 'time' | 'claudeUuid' | 'codexItemId'> = {},
+        opts: Pick<CreateEnvelopeOptions, 'id' | 'time'> = {},
     ): Promise<SessionEnvelope> {
         const blobKey = await this.getBlobKey();
         const encrypted = encryptBlob(attachment.data, blobKey);
@@ -726,95 +617,6 @@ export class ApiSessionClient extends EventEmitter {
         }
     }
 
-    private applyClaudeSessionMessageSideEffects(body: RawJSONLines) {
-        // Track usage from assistant messages
-        if (body.type === 'assistant' && body.message?.usage) {
-            try {
-                this.sendUsageData(body.message.usage, body.message.model);
-            } catch (error) {
-                logger.debug('[SOCKET] Failed to send usage data:', error);
-            }
-        }
-
-        // Update metadata with summary if this is a summary message
-        if (body.type === 'summary' && 'summary' in body && 'leafUuid' in body) {
-            this.updateMetadata((metadata) => ({
-                ...metadata,
-                summary: {
-                    text: body.summary,
-                    updatedAt: Date.now()
-                }
-            }));
-        }
-    }
-
-    /**
-     * Send message to session
-     * @param body - Message body (can be MessageContent or raw content for agent messages)
-     */
-    sendClaudeSessionMessage(body: RawJSONLines) {
-        const mapped = mapClaudeLogMessageToSessionEnvelopes(body, this.claudeSessionProtocolState);
-        this.claudeSessionProtocolState.currentTurnId = mapped.currentTurnId;
-        this.enqueueSessionProtocolEnvelopes(mapped.envelopes);
-        this.applyClaudeSessionMessageSideEffects(body);
-    }
-
-    async sendClaudeSessionMessageFromLocalTranscript(body: RawJSONLines): Promise<void> {
-        const attachments = extractLocalTranscriptImageAttachments(body);
-        if (attachments.length === 0) {
-            this.sendClaudeSessionMessage(body);
-            return;
-        }
-
-        const closeMapped = closeClaudeTurnWithStatus(this.claudeSessionProtocolState, 'completed');
-        this.claudeSessionProtocolState.currentTurnId = closeMapped.currentTurnId;
-        this.enqueueSessionProtocolEnvelopes(closeMapped.envelopes, false);
-
-        const claudeUuid = typeof (body as { uuid?: unknown }).uuid === 'string'
-            ? (body as { uuid: string }).uuid
-            : undefined;
-        for (const attachment of attachments) {
-            try {
-                const envelope = await this.uploadLocalImageAttachmentEnvelope(attachment, { claudeUuid });
-                this.enqueueSessionProtocolEnvelope(envelope, false);
-            } catch (error) {
-                logger.debug('[API] Failed to upload local Claude transcript image attachment', {
-                    sessionId: this.sessionId,
-                    name: attachment.name,
-                    error,
-                });
-            }
-        }
-
-        const mapped = mapClaudeLogMessageToSessionEnvelopes(body, this.claudeSessionProtocolState);
-        this.claudeSessionProtocolState.currentTurnId = mapped.currentTurnId;
-        this.enqueueSessionProtocolEnvelopes(mapped.envelopes, mapped.envelopes.length > 0);
-        if (mapped.envelopes.length === 0) {
-            this.sendSync.invalidate();
-        }
-        this.applyClaudeSessionMessageSideEffects(body);
-    }
-
-    closeClaudeSessionTurn(status: SessionTurnEndStatus = 'completed') {
-        const mapped = closeClaudeTurnWithStatus(this.claudeSessionProtocolState, status);
-        this.claudeSessionProtocolState.currentTurnId = mapped.currentTurnId;
-        this.enqueueSessionProtocolEnvelopes(mapped.envelopes);
-    }
-
-    sendCodexMessage(body: any) {
-        let content = {
-            role: 'agent',
-            content: {
-                type: 'codex',
-                data: body  // This wraps the entire Claude message
-            },
-            meta: {
-                sentFrom: 'cli'
-            }
-        };
-        this.enqueueMessage(content);
-    }
-
     private enqueueSessionProtocolEnvelope(envelope: SessionEnvelope, invalidate: boolean = true, meta?: Record<string, unknown>) {
         const content = {
             role: 'session',
@@ -901,31 +703,6 @@ export class ApiSessionClient extends EventEmitter {
         this.enqueueSessionProtocolEnvelope(envelope, true, meta);
     }
 
-    /**
-     * Send a generic agent message to the session using ACP (Agent Communication Protocol) format.
-     * Works for any agent type (Gemini, Codex, Claude, etc.) - CLI normalizes to unified ACP format.
-     *
-     * @param provider - The agent provider sending the message (e.g., 'gemini', 'codex', 'claude')
-     * @param body - The message payload (type: 'message' | 'reasoning' | 'tool-call' | 'tool-result')
-     */
-    sendAgentMessage(provider: ACPProvider, body: ACPMessageData) {
-        let content = {
-            role: 'agent',
-            content: {
-                type: 'acp',
-                provider,
-                data: body
-            },
-            meta: {
-                sentFrom: 'cli'
-            }
-        };
-
-        logger.debug(`[SOCKET] Sending ACP message from ${provider}:`, { type: body.type, hasMessage: 'message' in body });
-
-        this.enqueueMessage(content);
-    }
-
     sendSessionEvent(event: {
         type: 'switch', mode: 'local' | 'remote'
     } | {
@@ -966,36 +743,6 @@ export class ApiSessionClient extends EventEmitter {
      */
     sendSessionDeath() {
         this.socket.emit('session-end', { sid: this.sessionId, time: Date.now() });
-    }
-
-    /**
-     * Send usage data to the server
-     */
-    sendUsageData(usage: Usage, model?: string) {
-        // Calculate total tokens
-        const totalTokens = usage.input_tokens + usage.output_tokens + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0);
-
-        const costs = calculateCost(usage, model);
-
-        // Transform Claude usage format to backend expected format
-        const usageReport = {
-            key: 'claude-session',
-            sessionId: this.sessionId,
-            tokens: {
-                total: totalTokens,
-                input: usage.input_tokens,
-                output: usage.output_tokens,
-                cache_creation: usage.cache_creation_input_tokens || 0,
-                cache_read: usage.cache_read_input_tokens || 0
-            },
-            cost: {
-                total: costs.total,
-                input: costs.input,
-                output: costs.output
-            }
-        }
-        logger.debugLargeJson('[SOCKET] Sending usage data:', usageReport)
-        this.socket.emit('usage-report', usageReport);
     }
 
     /**

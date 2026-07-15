@@ -2,8 +2,6 @@ name: CLI Smoke Test
 
 on:
   workflow_dispatch:
-  # GitHub can create failed 0-job push runs for dispatch-only workflows.
-  # Declare push explicitly and run a no-op push job; real smoke jobs stay manual.
   push:
 
 permissions:
@@ -21,257 +19,67 @@ jobs:
     steps:
       - run: echo "CLI smoke is manual; push event intentionally no-ops."
 
-  smoke-test-linux:
+  smoke-linux:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    strategy:
-      matrix:
-        node-version: [26]
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Compile CLI and daemon
+        run: |
+          mkdir -p build/cli-smoke
+          bun build --compile packages/lyntty-cli/src/index.ts --outfile build/cli-smoke/lyntty
+          bun build --compile packages/lyntty-cli/src/daemon/entry.ts --outfile build/cli-smoke/lynttyd
+      - name: Exercise standalone binaries
+        run: |
+          set -euo pipefail
+          export HOME="$RUNNER_TEMP/lyntty-smoke-home"
+          export LYNTTY_HOME_DIR="$RUNNER_TEMP/lyntty-smoke-state"
+          mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
+          build/cli-smoke/lyntty --help
+          build/cli-smoke/lyntty --version
+          build/cli-smoke/lyntty doctor
+          build/cli-smoke/lyntty daemon status
+          build/cli-smoke/lyntty remote install
+          build/cli-smoke/lynttyd --version
+          test -s "$HOME/.pi/agent/extensions/lyntty/index.ts"
 
-    - name: Install pnpm
-      uses: pnpm/action-setup@v4
-
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-
-    - name: Build package
-      run: pnpm --filter lyntty-cli build
-
-    # `lyntty server` resolves the self-host runtime and bundled webapp from
-    # lyntty-relay. The server package is JS/TS and lets npm install
-    # platform-specific dependencies such as Prisma and sharp normally.
-    - name: Generate Prisma client + bundle lyntty-relay webapp
-      run: |
-        pnpm --filter lyntty-relay generate
-        pnpm --filter lyntty-relay run bundle:webapp
-
-    - name: Pack packages
-      run: |
-        pnpm --filter lyntty-cli pack --pack-destination packages/lyntty-cli
-        pnpm --filter lyntty-relay pack --pack-destination packages/lyntty-relay
-
-    - name: Install packed packages globally
-      run: |
-        LYNTTY_PACKAGE_FILE=$(ls packages/lyntty-cli/*.tgz)
-        SERVER_PACKAGE_FILE=$(ls packages/lyntty-relay/*.tgz)
-        npm install -g "./$SERVER_PACKAGE_FILE" "./$LYNTTY_PACKAGE_FILE"
-
-    - name: Test binary execution
-      run: |
-        export HOME="$RUNNER_TEMP/lyntty-smoke-home"
-        export LYNTTY_HOME_DIR="$RUNNER_TEMP/lyntty-home"
-        mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
-
-        # Test that the binary starts successfully
-        echo "Testing lyntty --help..."
-        timeout 30s lyntty --help || {
-          echo "Error: lyntty --help failed or timed out"
-          exit 1
-        }
-
-        echo "Testing lyntty --version..."
-        timeout 10s lyntty --version || {
-          echo "Error: lyntty --version failed or timed out"
-          exit 1
-        }
-
-        echo "Testing lyntty doctor..."
-        timeout 30s lyntty doctor || {
-          echo "Error: lyntty doctor failed or timed out"
-          exit 1
-        }
-
-        echo "Testing lyntty daemon status..."
-        timeout 10s lyntty daemon status || {
-          echo "Error: lyntty daemon status failed or timed out"
-          exit 1
-        }
-
-        echo "Binary smoke test passed on Linux!"
-
-    - name: Test packaged server (lyntty server)
-      run: |
-        export HOME="$RUNNER_TEMP/lyntty-server-home"
-        LYNTTY_HOME_DIR="$(mktemp -d)"
-        export LYNTTY_HOME_DIR
-        mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
-
-        timeout 90s lyntty server --port 4505 --host 127.0.0.1 --no-persist --reset > /tmp/lyntty-relay.log 2>&1 &
-        SERVER_PID=$!
-        UP=0
-        for i in $(seq 1 60); do
-          if curl -sf -m 2 http://127.0.0.1:4505/ -o /dev/null; then UP=1; echo "server up after ${i}s"; break; fi
-          sleep 1
-        done
-        # Exercise the Prisma native query engine via a DB-backed read.
-        PK=$(node -e "console.log(Buffer.alloc(32).toString('base64'))")
-        BODY=$(curl -s -m 5 -G http://127.0.0.1:4505/v1/auth/request/status --data-urlencode "publicKey=$PK" || true)
-        echo "auth/request/status -> $BODY"
-        kill "$SERVER_PID" 2>/dev/null || true
-        wait "$SERVER_PID" 2>/dev/null || true
-        echo "=== lyntty server log ==="; cat /tmp/lyntty-relay.log || true
-        if [ "$UP" != "1" ]; then echo "Error: lyntty server did not become healthy"; exit 1; fi
-        if ! echo "$BODY" | grep -q '"status"'; then echo "Error: Prisma-backed endpoint did not respond"; exit 1; fi
-        if grep -qiE 'PrismaClientInitializationError|could not locate.*Query Engine' /tmp/lyntty-relay.log; then echo "Error: Prisma query engine failed to load"; exit 1; fi
-        echo "lyntty server smoke test passed (booted + Prisma query engine OK)"
-
-  smoke-test-windows:
+  smoke-windows:
     if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 35
-    strategy:
-      matrix:
-        node-version: [26]
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install pnpm
-      uses: pnpm/action-setup@v4
-
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-
-    - name: Build package
-      run: pnpm --filter lyntty-cli build
-
-    - name: Pack package
-      run: pnpm --filter lyntty-cli pack --pack-destination packages/lyntty-cli
-
-    - name: Install packed package globally
-      shell: cmd
-      run: |
-        for %%f in (packages\lyntty-cli\*.tgz) do npm install -g "%%f"
-
-    - name: Debug npm global installation structure
-      shell: cmd
-      run: |
-        for /f "tokens=*" %%i in ('npm config get prefix') do set NPM_PREFIX=%%i
-        echo NPM_PREFIX: %NPM_PREFIX%
-        echo Listing npm prefix directory:
-        dir "%NPM_PREFIX%" 2>nul || echo Failed to list NPM_PREFIX
-        echo.
-        echo Checking for node_modules in npm prefix:
-        if exist "%NPM_PREFIX%\node_modules" (
-          echo Found node_modules directory
-          dir "%NPM_PREFIX%\node_modules" 2>nul
-          echo.
-          echo Checking for lyntty package:
-          if exist "%NPM_PREFIX%\node_modules\lyntty" (
-            echo Found lyntty package
-            dir "%NPM_PREFIX%\node_modules\lyntty" 2>nul
-            echo.
-            echo Checking for dist directory:
-            if exist "%NPM_PREFIX%\node_modules\lyntty\dist" (
-              echo Found dist directory
-              dir "%NPM_PREFIX%\node_modules\lyntty\dist" 2>nul
-            ) else (
-              echo No dist directory found
-            )
-          ) else (
-            echo No lyntty package found
-          )
-        ) else (
-          echo No node_modules directory found
-        )
-
-    - name: Test binary execution
-      shell: cmd
-      run: |
-        @echo on
-        set HOME=%RUNNER_TEMP%\lyntty-smoke-home
-        set LYNTTY_HOME_DIR=%RUNNER_TEMP%\lyntty-home
-        if not exist "%HOME%" mkdir "%HOME%"
-        if not exist "%LYNTTY_HOME_DIR%" mkdir "%LYNTTY_HOME_DIR%"
-
-        rem Get npm global prefix and add to PATH
-        for /f "tokens=*" %%i in ('npm config get prefix') do set NPM_PREFIX=%%i
-        set PATH=%NPM_PREFIX%;%PATH%
-        echo NPM_PREFIX: %NPM_PREFIX%
-        echo Current PATH: %PATH%
-
-        rem Debug: Check if lyntty exists in various locations
-        echo Checking for lyntty binary...
-        where lyntty 2>nul && echo Found lyntty in PATH || echo lyntty not found in PATH
-        if exist "%NPM_PREFIX%\lyntty.cmd" echo Found lyntty.cmd in NPM_PREFIX
-        if exist "%NPM_PREFIX%\node_modules\.bin\lyntty.cmd" echo Found lyntty.cmd in .bin directory
-        dir "%NPM_PREFIX%\*lyntty*" 2>nul || echo No lyntty files found in NPM_PREFIX
-
-        rem Debug: Check the actual contents and encoding of the installed file
-        if exist "%NPM_PREFIX%\lyntty.cmd" (
-          echo File size and type:
-          dir "%NPM_PREFIX%\lyntty.cmd"
-          echo.
-          echo First few lines of the file:
-          type "%NPM_PREFIX%\lyntty.cmd" | head -5
-          echo.
-          echo Hex dump of first 50 bytes to check line endings:
-          powershell -Command "Get-Content '%NPM_PREFIX%\lyntty.cmd' -Encoding Byte -TotalCount 50 | ForEach-Object { '{0:X2}' -f $_ } | Join-String -Separator ' '"
-          echo.
-          echo Testing with direct path...
-          "%NPM_PREFIX%\lyntty.cmd" --help
-        ) else (
-          echo Testing lyntty --help...
-          lyntty --help
-        )
-        if errorlevel 1 (
-          echo Error: lyntty --help failed
-          exit /b 1
-        )
-
-        rem Test version
-        if exist "%NPM_PREFIX%\lyntty.cmd" (
-          "%NPM_PREFIX%\lyntty.cmd" --version
-        ) else (
-          lyntty --version
-        )
-        if errorlevel 1 (
-          echo Error: lyntty --version failed
-          exit /b 1
-        )
-
-        rem Test doctor
-        echo Testing lyntty doctor...
-        if exist "%NPM_PREFIX%\lyntty.cmd" (
-          "%NPM_PREFIX%\lyntty.cmd" doctor
-        ) else (
-          lyntty doctor
-        )
-        if errorlevel 1 (
-          echo Error: lyntty doctor failed
-          exit /b 1
-        )
-
-        rem Test daemon status
-        echo Testing lyntty daemon status...
-        if exist "%NPM_PREFIX%\lyntty.cmd" (
-          "%NPM_PREFIX%\lyntty.cmd" daemon status
-        ) else (
-          lyntty daemon status
-        )
-        if errorlevel 1 (
-          echo Error: lyntty daemon status failed
-          exit /b 1
-        )
-
-        echo Smoke test passed on Windows!
-
-# We don't need a smoke test for macOS because most contributors are developing on macOS.
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Compile CLI and daemon
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/cli-smoke | Out-Null
+          bun build --compile packages/lyntty-cli/src/index.ts --outfile build/cli-smoke/lyntty.exe
+          bun build --compile packages/lyntty-cli/src/daemon/entry.ts --outfile build/cli-smoke/lynttyd.exe
+      - name: Exercise standalone binaries
+        shell: pwsh
+        run: |
+          $env:HOME = "$env:RUNNER_TEMP/lyntty-smoke-home"
+          $env:LYNTTY_HOME_DIR = "$env:RUNNER_TEMP/lyntty-smoke-state"
+          New-Item -ItemType Directory -Force $env:HOME, $env:LYNTTY_HOME_DIR | Out-Null
+          & build/cli-smoke/lyntty.exe --help
+          & build/cli-smoke/lyntty.exe --version
+          & build/cli-smoke/lyntty.exe doctor
+          & build/cli-smoke/lyntty.exe daemon status
+          & build/cli-smoke/lyntty.exe remote install
+          & build/cli-smoke/lynttyd.exe --version
+          if (-not (Test-Path "$env:HOME/.pi/agent/extensions/lyntty/index.ts")) { throw 'Pi extension was not installed' }

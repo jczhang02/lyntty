@@ -1,6 +1,7 @@
 {
   "name": "lyntty-wire",
   "version": "0.1.0",
+  "private": true,
   "description": "Shared message wire types and Zod schemas for Lyntty clients and services",
   "author": "Kirill Dubovitskiy",
   "license": "MIT",
@@ -15,11 +16,9 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit",
-    "test": "$npm_execpath run build && vitest run",
-    "prepublishOnly": "$npm_execpath run build && $npm_execpath run test",
-    "release": "npx --no-install release-it"
+    "typecheck": "bunx tsc --noEmit",
+    "build": "bunx tsc --noEmit",
+    "test": "bun run build && bunx vitest run"
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^2.2.2",
@@ -27,15 +26,7 @@
   },
   "devDependencies": {
     "@types/node": ">=20",
-    "pkgroll": "^2.14.2",
-    "release-it": "^19.0.6",
-    "shx": "^0.3.3",
     "typescript": "5.9.3",
     "vitest": "^3.2.4"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org"
-  },
-  "packageManager": "pnpm@10.11.0"
+  }
 }

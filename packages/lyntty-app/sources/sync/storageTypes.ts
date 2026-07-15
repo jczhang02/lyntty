@@ -227,18 +227,22 @@ export const MachineMetadataSchema = z.object({
     shutdownRequestedAt: z.number().optional(),
     shutdownSource: z.enum(['lyntty-app', 'lyntty-cli', 'os-signal', 'unknown']).optional(),
     cliAvailability: z.object({
-        claude: z.boolean(),
-        codex: z.boolean(),
-        gemini: z.boolean(),
-        openclaw: z.boolean(),
         pi: z.boolean(),
         detectedAt: z.number(),
+        // Read-only compatibility for machine metadata written before Pi-only migration.
+        claude: z.boolean().optional(),
+        codex: z.boolean().optional(),
+        gemini: z.boolean().optional(),
+        openclaw: z.boolean().optional(),
     }).optional(),
     resumeSupport: z.object({
         rpcAvailable: z.boolean(),
         requiresSameMachine: z.boolean(),
-        requiresLynttyAgentAuth: z.boolean(),
-        lynttyAgentAuthenticated: z.boolean(),
+        requiresRemoteAuth: z.boolean().optional(),
+        remoteAuthenticated: z.boolean().optional(),
+        // Read-only compatibility for older CLI metadata.
+        requiresLynttyAgentAuth: z.boolean().optional(),
+        lynttyAgentAuthenticated: z.boolean().optional(),
         detectedAt: z.number(),
     }).optional(),
 });

@@ -211,9 +211,13 @@ export type CodexListRewindPointsResult =
     | { type: 'success'; points: CodexRewindPoint[] }
     | { type: 'error'; errorMessage: string };
 
+export type PiResumeTakeoverChoice = 'wait' | 'stop' | 'interrupt';
+
 export interface ResumeSessionOptions {
     machineId: string;
-    sessionId: string;
+    directory: string;
+    piSessionId: string;
+    takeoverChoice?: PiResumeTakeoverChoice;
 }
 
 export type { PiMachineSessionRecord, PiRecoveryState };
@@ -448,22 +452,35 @@ export async function machineEnsurePiSessionMirror(options: { machineId: string;
     }
 }
 
-export async function machineResumeSession(options: ResumeSessionOptions & { model?: string; permissionMode?: string }): Promise<SpawnSessionResult> {
-    const { machineId, sessionId, model, permissionMode } = options;
+export function isPiResumeTakeoverRequired(errorMessage: string): boolean {
+    return errorMessage.startsWith('Waiting for Pi extension');
+}
 
-    try {
-        const result = await apiSocket.machineRPC<SpawnSessionResult, { sessionId: string; model?: string; permissionMode?: string }>(
-            machineId,
-            'resume-lyntty-session',
-            { sessionId, model, permissionMode },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to resume session',
-        };
+export async function machineResumeSession(options: ResumeSessionOptions): Promise<SpawnSessionResult> {
+    return machineSpawnNewSession({
+        machineId: options.machineId,
+        directory: options.directory,
+        sessionId: options.piSessionId,
+        approvedNewDirectoryCreation: false,
+        agent: 'pi',
+        takeoverChoice: options.takeoverChoice,
+    });
+}
+
+export async function machineResumePiWithActivationChoice(
+    options: Omit<ResumeSessionOptions, 'takeoverChoice'>,
+    chooseTakeover: () => Promise<PiResumeTakeoverChoice | null>,
+): Promise<SpawnSessionResult | null> {
+    const reuseResult = await machineResumeSession(options);
+    if (reuseResult.type !== 'error' || !isPiResumeTakeoverRequired(reuseResult.errorMessage)) {
+        return reuseResult;
     }
+
+    const takeoverChoice = await chooseTakeover();
+    if (!takeoverChoice) {
+        return null;
+    }
+    return machineResumeSession({ ...options, takeoverChoice });
 }
 
 /**

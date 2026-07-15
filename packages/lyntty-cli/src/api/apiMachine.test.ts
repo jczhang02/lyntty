@@ -62,19 +62,18 @@ vi.mock('@/api/rpc/RpcHandlerManager', () => ({
 
 vi.mock('@/utils/detectCLI', () => ({
     detectCLIAvailability: vi.fn(() => ({
-        claude: false,
-        codex: false,
-        gemini: false,
-        openclaw: false
+        pi: true,
+        detectedAt: 1,
     }))
 }));
 
-vi.mock('@/resume/localLynttyAgentAuth', () => ({
+vi.mock('@/resume/localRemoteAuth', () => ({
     detectResumeSupport: vi.fn(() => ({
         rpcAvailable: false,
-        requiresSameMachine: false,
-        requiresLynttyAgentAuth: false,
-        lynttyAgentAuthenticated: false
+        requiresSameMachine: true,
+        requiresRemoteAuth: true,
+        remoteAuthenticated: false,
+        detectedAt: 1
     }))
 }));
 
@@ -189,14 +188,11 @@ describe('ApiMachineClient socket reconnection', () => {
         await handler({
             directory: '/repo',
             agent: 'pi',
-            token: 'test-token-value',
             environmentVariables: { PROVIDER_KEY: 'provider-key-value' },
         });
 
         const logs = JSON.stringify(vi.mocked(logger.debug).mock.calls);
-        expect(logs).toContain('hasToken');
         expect(logs).toContain('hasEnvironmentVariables');
-        expect(logs).not.toContain('test-token-value');
         expect(logs).not.toContain('provider-key-value');
     });
 

@@ -90,7 +90,7 @@ describe('PiSessionProtocolMapper', () => {
     expect(final.map((envelope) => envelope.ev)).toEqual([{ t: 'text', text: 'full answer' }]);
   });
 
-  it('flushes text before tool envelopes and never emits ACP messages', () => {
+  it('flushes text before tool envelopes and emits only Pi session envelopes', () => {
     const mapper = new PiSessionProtocolMapper();
     mapper.mapEvent(event({ type: 'agent_start' }));
     mapper.mapEvent(event({
@@ -102,7 +102,7 @@ describe('PiSessionProtocolMapper', () => {
       type: 'tool_execution_start',
       toolCallId: 'tool-1',
       toolName: 'bash',
-      args: { command: 'pnpm test' },
+      args: { command: 'bun test' },
     }));
 
     expect(toolStart.map((envelope) => envelope.ev.t)).toEqual(['text', 'tool-call-start']);
@@ -114,7 +114,7 @@ describe('PiSessionProtocolMapper', () => {
         name: 'bash',
         title: 'bash',
         description: 'Running bash',
-        args: { command: 'pnpm test' },
+        args: { command: 'bun test' },
       },
     });
 

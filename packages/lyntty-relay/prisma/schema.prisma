@@ -8,7 +8,7 @@ generator client {
 }
 
 generator json {
-    provider = "bun ../../node_modules/prisma-json-types-generator/index.js"
+    provider = "bun ./node_modules/prisma-json-types-generator/index.js"
 }
 
 datasource db {

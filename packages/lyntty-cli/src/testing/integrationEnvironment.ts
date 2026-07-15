@@ -12,13 +12,11 @@ export type IntegrationEnvironment = {
     envDir: string;
     projectPath: string;
     serverPort: number;
-    expoPort: number;
 };
 
 type EnvironmentConfig = {
     projectPath: string;
     serverPort: number;
-    expoPort: number;
 };
 
 type EnvironmentsModule = {
@@ -58,7 +56,6 @@ export async function createIntegrationEnvironment(options?: { template?: Enviro
             envDir: environments.getEnvironmentDir(name),
             projectPath: config.projectPath,
             serverPort: config.serverPort,
-            expoPort: config.expoPort,
         };
     } catch (error) {
         try {
@@ -75,7 +72,6 @@ export async function createIntegrationEnvironment(options?: { template?: Enviro
 
 export function applyEnvironmentToProcess(env: IntegrationEnvironment) {
     process.env.LYNTTY_SERVER_URL = `http://localhost:${env.serverPort}`;
-    process.env.LYNTTY_WEBAPP_URL = `http://localhost:${env.expoPort}`;
     process.env.LYNTTY_HOME_DIR = join(env.envDir, 'cli', 'home');
     process.env.LYNTTY_PROJECT_DIR = env.projectPath;
     process.env.LYNTTY_VARIANT = 'dev';

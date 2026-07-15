@@ -1,15 +1,14 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import sodium from 'libsodium-wrappers';
 
-// Mock expo-crypto to use Node.js crypto
+// Mock expo-crypto with Bun's node:crypto compatibility API
 vi.mock('expo-crypto', () => ({
     getRandomBytes: (n: number) => {
-        const { randomBytes } = require('crypto');
+        const { randomBytes } = require('node:crypto');
         return new Uint8Array(randomBytes(n));
     },
 }));
 
-// Mock the libsodium.lib import to use the Node.js libsodium-wrappers
+// Use the CommonJS entry because the package's ESM wrapper is not Bun-compatible.
 vi.mock('@/encryption/libsodium.lib', () => {
     const s = require('libsodium-wrappers');
     return { default: s };
@@ -22,6 +21,7 @@ const TEST_KEY = new Uint8Array(32);
 for (let i = 0; i < 32; i++) TEST_KEY[i] = i;
 
 beforeAll(async () => {
+    const sodium = require('libsodium-wrappers');
     await sodium.ready;
 });
 

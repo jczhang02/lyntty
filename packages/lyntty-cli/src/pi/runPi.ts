@@ -14,7 +14,7 @@ import { Credentials, persistPiCommandBoundary, persistPiCommandOutcome, readPer
 import { createSessionMetadata } from '@/utils/createSessionMetadata';
 import { initialMachineMetadata } from '@/daemon/run';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
-import { registerKillSessionHandler } from '@/claude/registerKillSessionHandler';
+import { registerKillSessionHandler } from '@/api/registerKillSessionHandler';
 import { connectionState } from '@/utils/serverConnectionErrors';
 import { logger } from '@/ui/logger';
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
@@ -78,7 +78,6 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   // The managed SDK runtime is the sole relay command owner in this process.
   // Keep the globally installed ordinary-TUI bridge disabled, including reloads.
   process.env.LYNTTY_PI_EXTENSION_DISABLED = '1';
-  connectionState.setBackend('pi');
 
   const api = await ApiClient.create(opts.credentials);
   const settings = await readSettings();
@@ -109,7 +108,6 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     flavor: 'pi',
     machineId: settings.machineId,
     startedBy: opts.startedBy,
-    sandbox: settings.sandboxConfig,
   });
   metadata.models = [{ code: 'default', value: piRuntime.session.model?.name ?? 'pi default', description: null }];
   metadata.currentModelCode = 'default';

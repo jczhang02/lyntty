@@ -2,13 +2,12 @@ import * as React from 'react';
 import { useLynttyAction } from '@/hooks/useLynttyAction';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { Modal } from '@/modal';
-import { machineResumeSession, forkAndSpawn, type ForkSource } from '@/sync/ops';
+import { machineResumePiWithActivationChoice, forkAndSpawn, type ForkSource, type PiResumeTakeoverChoice } from '@/sync/ops';
 import { stopAndArchiveSession } from '@/sync/archiveSessionAction';
 import { maybeCleanupWorktree } from '@/hooks/useWorktreeCleanup';
 import { storage, useLocalSetting, useMachine, useSetting } from '@/sync/storage';
 import { Machine, Session } from '@/sync/storageTypes';
 import { sync } from '@/sync/sync';
-import { resolveMessageModeMeta } from '@/sync/messageMeta';
 import { t } from '@/text';
 import { LynttyError } from '@/utils/errors';
 import { copySessionMetadataToClipboard, copySessionMetadataAndLogsToClipboard } from '@/utils/copySessionMetadataToClipboard';
@@ -40,7 +39,34 @@ type ResumeAvailability = {
     message: string;
 };
 
-function getResumeAvailability(session: Session, machine: Machine | null | undefined, isConnected: boolean): ResumeAvailability {
+export function requestPiResumeTakeoverChoice(): Promise<PiResumeTakeoverChoice | null> {
+    return new Promise((resolve) => {
+        Modal.alert(
+            t('sessionInfo.resumeSession'),
+            t('sessionInfo.resumeTakeoverPrompt'),
+            [
+                { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
+                { text: t('sessionInfo.resumeWait'), onPress: () => resolve('wait') },
+                {
+                    text: t('sessionInfo.resumeTakeOver'),
+                    onPress: () => {
+                        Modal.alert(
+                            t('sessionInfo.resumeSession'),
+                            t('sessionInfo.resumeTakeoverPrompt'),
+                            [
+                                { text: t('common.cancel'), style: 'cancel', onPress: () => resolve(null) },
+                                { text: t('sessionInfo.resumeStop'), style: 'destructive', onPress: () => resolve('stop') },
+                                { text: t('sessionInfo.resumeInterrupt'), style: 'destructive', onPress: () => resolve('interrupt') },
+                            ],
+                        );
+                    },
+                },
+            ],
+        );
+    });
+}
+
+export function getResumeAvailability(session: Session, machine: Machine | null | undefined, isConnected: boolean): ResumeAvailability {
     if (isConnected) {
         return {
             canResume: false,
@@ -61,8 +87,8 @@ function getResumeAvailability(session: Session, machine: Machine | null | undef
         };
     }
 
-    const hasBackendResumeId = Boolean(session.metadata?.claudeSessionId || session.metadata?.codexThreadId);
-    if (!hasBackendResumeId) {
+    const hasPiSessionId = Boolean(session.metadata?.piSessionId);
+    if (!hasPiSessionId) {
         const message = t('sessionInfo.resumeSessionMissingBackendId');
         return {
             canResume: false,
@@ -169,13 +195,21 @@ export function useSessionQuickActions(
             throw new LynttyError(t('sessionInfo.resumeSessionMissingMachine'), false);
         }
 
-        const modeMeta = resolveMessageModeMeta(session, storage.getState().settings);
-        const result = await machineResumeSession({
-            machineId,
-            sessionId: session.id,
-            model: modeMeta.model ?? undefined,
-            permissionMode: modeMeta.permissionMode,
-        });
+        const piSessionId = session.metadata?.piSessionId;
+        const directory = session.metadata?.path;
+        if (!piSessionId) {
+            throw new LynttyError(t('sessionInfo.resumeSessionMissingBackendId'), false);
+        }
+        if (!directory) {
+            throw new LynttyError(t('sessionInfo.resumeSessionUnexpectedDirectoryPrompt'), false);
+        }
+        const result = await machineResumePiWithActivationChoice(
+            { machineId, directory, piSessionId },
+            requestPiResumeTakeoverChoice,
+        );
+        if (!result) {
+            return;
+        }
 
         switch (result.type) {
             case 'success': {

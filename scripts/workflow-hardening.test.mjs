@@ -21,12 +21,14 @@ test('relay deploy accepts only a full commit image tag and passes it as an argu
   assert.match(relayDeploy, /GITHUB_REF[^\n]*refs\/heads\/main/);
 });
 
-test('relay image publishes an immutable full-commit tag', () => {
-  assert.match(relayImage, /image_tag="sha-\$\{GITHUB_SHA\}"/);
-  assert.match(relayImage, /environment: production-relay/);
-  assert.match(relayImage, /packages: write/);
-  assert.doesNotMatch(relayImage, /workflow_dispatch/);
-  assert.doesNotMatch(relayImage, /GITHUB_SHA::12/);
+test('relay image verification never publishes from an ordinary main push', () => {
+  assert.match(relayImage, /workflow_dispatch/);
+  assert.match(relayImage, /pull_request/);
+  assert.match(relayImage, /push: false/);
+  assert.match(relayImage, /verify-\$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(relayImage, /packages: write/);
+  assert.doesNotMatch(relayImage, /docker\/login-action/);
+  assert.doesNotMatch(relayImage, /refs\/heads\/main/);
 });
 
 test('Android release is main-only, validates SemVer, and avoids expression injection', () => {

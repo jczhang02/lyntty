@@ -1,34 +1,19 @@
-import { decodeBase64, encodeBase64, encodeBase64Url } from "@/api/encryption";
-import { configuration } from "@/configuration";
-import { randomBytes } from "node:crypto";
+import { decodeBase64, encodeBase64, encodeBase64Url } from '@/api/encryption';
+import { configuration } from '@/configuration';
+import { randomBytes, randomUUID } from 'node:crypto';
 import tweetnacl from 'tweetnacl';
 import axios from 'axios';
-import { displayQRCode } from "./qrcode";
-import { delay } from "@/utils/time";
-import { writeCredentialsLegacy, readCredentials, updateSettings, Credentials, writeCredentialsDataKey } from "@/persistence";
-import { generateWebAuthUrl } from "@/api/webAuth";
-import { openBrowser } from "@/utils/browser";
-import { AuthSelector, AuthMethod } from "./ink/AuthSelector";
-import { render } from 'ink';
-import React from 'react';
-import { randomUUID } from 'node:crypto';
+import { displayQRCode } from './qrcode';
+import { delay } from '@/utils/time';
+import { writeCredentialsLegacy, readCredentials, updateSettings, type Credentials, writeCredentialsDataKey } from '@/persistence';
 import { logger } from './logger';
 
-export async function doAuth(preferredMethod?: AuthMethod): Promise<Credentials | null> {
+/** Authenticate the local Pi/lynttyd installation with the mobile app. */
+export async function doAuth(): Promise<Credentials | null> {
     console.clear();
-
-    // Show authentication method selector
-    const authMethod = preferredMethod ?? await selectAuthenticationMethod();
-    if (!authMethod) {
-        console.log('\nAuthentication cancelled.\n');
-        process.exit(0);
-    }
-
-    // Generating ephemeral key
     const secret = new Uint8Array(randomBytes(32));
     const keypair = tweetnacl.box.keyPair.fromSecretKey(secret);
 
-    // Create a new authentication request
     try {
         if (process.env.DEBUG) {
             console.log(`[AUTH DEBUG] Sending auth request to: ${configuration.serverUrl}/v1/auth/request`);
@@ -36,124 +21,36 @@ export async function doAuth(preferredMethod?: AuthMethod): Promise<Credentials 
         }
         await axios.post(`${configuration.serverUrl}/v1/auth/request`, {
             publicKey: encodeBase64(keypair.publicKey),
-            supportsV2: true
+            supportsV2: true,
         }, {
-            headers: {
-                'X-Lyntty-Client': `cli/${configuration.currentCliVersion}`
-            }
+            headers: { 'X-Lyntty-Client': `cli/${configuration.currentCliVersion}` },
         });
-        if (process.env.DEBUG) {
-            console.log(`[AUTH DEBUG] Auth request sent successfully`);
-        }
     } catch (error) {
-        if (process.env.DEBUG) {
-            console.log(`[AUTH DEBUG] Failed to send auth request:`, error);
-        }
+        if (process.env.DEBUG) console.log('[AUTH DEBUG] Failed to send auth request:', error);
         console.log(formatAuthRequestFailure(error, configuration.serverUrl));
         return null;
     }
 
-    // Handle authentication based on selected method
-    if (authMethod === 'mobile') {
-        return await doMobileAuth(keypair);
-    } else {
-        return await doWebAuth(keypair);
-    }
-}
-
-/**
- * Display authentication method selector and return user choice
- */
-function selectAuthenticationMethod(): Promise<AuthMethod | null> {
-    return new Promise((resolve) => {
-        let hasResolved = false;
-
-        const onSelect = (method: AuthMethod) => {
-            if (!hasResolved) {
-                hasResolved = true;
-                app.unmount();
-                resolve(method);
-            }
-        };
-
-        const onCancel = () => {
-            if (!hasResolved) {
-                hasResolved = true;
-                app.unmount();
-                resolve(null);
-            }
-        };
-
-        const app = render(React.createElement(AuthSelector, { onSelect, onCancel }), {
-            exitOnCtrlC: false,
-            patchConsole: false
-        });
-    });
-}
-
-/**
- * Handle mobile authentication flow
- */
-async function doMobileAuth(keypair: tweetnacl.BoxKeyPair): Promise<Credentials | null> {
     console.clear();
     console.log('\nMobile Authentication\n');
     console.log('Scan this QR code with your Lyntty mobile app:\n');
-
     const authUrl = 'lyntty://terminal?' + encodeBase64Url(keypair.publicKey);
     displayQRCode(authUrl);
-
     console.log('\nOr manually enter this URL:');
     console.log(authUrl);
     console.log('');
-
-    return await waitForAuthentication(keypair);
+    return waitForAuthentication(keypair);
 }
 
-/**
- * Handle web authentication flow
- */
-async function doWebAuth(keypair: tweetnacl.BoxKeyPair): Promise<Credentials | null> {
-    console.clear();
-    console.log('\nWeb Authentication\n');
-
-    const webUrl = generateWebAuthUrl(keypair.publicKey);
-    console.log('Opening your browser...');
-
-    const browserOpened = await openBrowser(webUrl);
-
-    if (browserOpened) {
-        console.log('✓ Browser opened\n');
-        console.log('Complete authentication in your browser window.');
-    } else {
-        console.log('Could not open browser automatically.');
-    }
-
-    // I changed this to always show the URL because we got a report from
-    // someone running lyntty inside a devcontainer that they saw the
-    // "Complete authentication in your browser window." but nothing opened.
-    // https://github.com/slopus/lyntty/issues/19
-    console.log('\nIf the browser did not open, please copy and paste this URL:');
-    console.log(webUrl);
-    console.log('');
-
-    return await waitForAuthentication(keypair);
-}
-
-/**
- * Wait for authentication to complete and return credentials
- */
 async function waitForAuthentication(keypair: tweetnacl.BoxKeyPair): Promise<Credentials | null> {
     process.stdout.write('Waiting for authentication');
     let dots = 0;
     let cancelled = false;
-
-    // Handle Ctrl-C during waiting
     const handleInterrupt = () => {
         cancelled = true;
         console.log('\n\nAuthentication cancelled.');
         process.exit(0);
     };
-
     process.on('SIGINT', handleInterrupt);
 
     try {
@@ -161,73 +58,53 @@ async function waitForAuthentication(keypair: tweetnacl.BoxKeyPair): Promise<Cre
             try {
                 const response = await axios.post(`${configuration.serverUrl}/v1/auth/request`, {
                     publicKey: encodeBase64(keypair.publicKey),
-                    supportsV2: true
+                    supportsV2: true,
                 }, {
-                    headers: {
-                        'X-Lyntty-Client': `cli/${configuration.currentCliVersion}`
-                    }
+                    headers: { 'X-Lyntty-Client': `cli/${configuration.currentCliVersion}` },
                 });
                 if (response.data.state === 'authorized') {
-                    let token = response.data.token as string;
-                    let r = decodeBase64(response.data.response);
-                    let decrypted = decryptWithEphemeralKey(r, keypair.secretKey);
-                    if (decrypted) {
-                        if (decrypted.length === 32) {
-                            const credentials = {
-                                secret: decrypted,
-                                token: token
-                            }
-                            await writeCredentialsLegacy(credentials);
-                            console.log('\n\n✓ Authentication successful\n');
-                            return {
-                                encryption: {
-                                    type: 'legacy',
-                                    secret: decrypted
-                                },
-                                token: token
-                            };
-                        } else {
-                            if (decrypted[0] === 0) {
-                                const credentials = {
-                                    publicKey: decrypted.slice(1, 33),
-                                    machineKey: randomBytes(32),
-                                    token: token
-                                }
-                                await writeCredentialsDataKey(credentials);
-                                console.log('\n\n✓ Authentication successful\n');
-                                return {
-                                    encryption: {
-                                        type: 'dataKey',
-                                        publicKey: credentials.publicKey,
-                                        machineKey: credentials.machineKey
-                                    },
-                                    token: token
-                                };
-                            } else {
-                                console.log('\n\nFailed to decrypt response. Please try again.');
-                                return null;
-                            }
-                        }
-                    } else {
+                    const token = response.data.token as string;
+                    const decrypted = decryptWithEphemeralKey(decodeBase64(response.data.response), keypair.secretKey);
+                    if (!decrypted) {
                         console.log('\n\nFailed to decrypt response. Please try again.');
                         return null;
                     }
+                    if (decrypted.length === 32) {
+                        await writeCredentialsLegacy({ secret: decrypted, token });
+                        console.log('\n\n✓ Authentication successful\n');
+                        return { encryption: { type: 'legacy', secret: decrypted }, token };
+                    }
+                    if (decrypted[0] === 0) {
+                        const credentials = {
+                            publicKey: decrypted.slice(1, 33),
+                            machineKey: randomBytes(32),
+                            token,
+                        };
+                        await writeCredentialsDataKey(credentials);
+                        console.log('\n\n✓ Authentication successful\n');
+                        return {
+                            encryption: {
+                                type: 'dataKey',
+                                publicKey: credentials.publicKey,
+                                machineKey: credentials.machineKey,
+                            },
+                            token,
+                        };
+                    }
+                    console.log('\n\nFailed to decrypt response. Please try again.');
+                    return null;
                 }
             } catch (error) {
                 console.log('\n\n' + formatAuthRequestFailure(error, configuration.serverUrl));
                 return null;
             }
-
-            // Animate waiting dots
             process.stdout.write('\rWaiting for authentication' + '.'.repeat((dots % 3) + 1) + '   ');
-            dots++;
-
+            dots += 1;
             await delay(1000);
         }
     } finally {
         process.off('SIGINT', handleInterrupt);
     }
-
     return null;
 }
 
@@ -237,7 +114,7 @@ export function formatAuthRequestFailure(error: unknown, serverUrl: string): str
         const code = error.code;
         const status = error.response?.status;
         if (code === 'ECONNREFUSED') {
-            return `${base}\nLyntty relay is not running or is not reachable at that address. Start your self-hosted relay, then retry:\n  lyntty server --host 0.0.0.0 --port 3005\n  lyntty auth login --force --method mobile`;
+            return `${base}\nLyntty relay is not running or is not reachable at that address. Start the standalone Relay, then retry:\n  lyntty-relay serve\n  lyntty auth login --force`;
         }
         if (code === 'ENOTFOUND' || code === 'EHOSTUNREACH' || code === 'ENETUNREACH' || code === 'ETIMEDOUT' || code === 'ECONNRESET') {
             return `${base}\nNetwork error ${code}. Check LYNTTY_SERVER_URL / saved serverUrl and relay connectivity, then retry auth.`;
@@ -251,67 +128,38 @@ export function formatAuthRequestFailure(error: unknown, serverUrl: string): str
         if (status && status >= 500) {
             return `${base}\nThe relay returned HTTP ${status}. Check relay logs and restart the relay if needed.`;
         }
-        if (status) {
-            return `${base}\nThe relay returned HTTP ${status}. Check the server URL and relay logs.`;
-        }
+        if (status) return `${base}\nThe relay returned HTTP ${status}. Check the server URL and relay logs.`;
     }
     return `${base}\nPlease check that the Lyntty relay is running and reachable, then retry.`;
 }
 
 export function decryptWithEphemeralKey(encryptedBundle: Uint8Array, recipientSecretKey: Uint8Array): Uint8Array | null {
-    // Extract components from bundle: ephemeral public key (32 bytes) + nonce (24 bytes) + encrypted data
+    if (encryptedBundle.length < 32 + tweetnacl.box.nonceLength) return null;
     const ephemeralPublicKey = encryptedBundle.slice(0, 32);
     const nonce = encryptedBundle.slice(32, 32 + tweetnacl.box.nonceLength);
     const encrypted = encryptedBundle.slice(32 + tweetnacl.box.nonceLength);
-
     const decrypted = tweetnacl.box.open(encrypted, nonce, ephemeralPublicKey, recipientSecretKey);
-    if (!decrypted) {
-        return null;
-    }
-
-    return decrypted;
+    return decrypted ? new Uint8Array(decrypted) : null;
 }
 
-
-/**
- * Ensure authentication and machine setup
- * This replaces the onboarding flow and ensures everything is ready
- */
-export async function authAndSetupMachineIfNeeded(options?: { authMethod?: AuthMethod }): Promise<{
-    credentials: Credentials;
-    machineId: string;
-}> {
+export async function authAndSetupMachineIfNeeded(): Promise<{ credentials: Credentials; machineId: string }> {
     logger.debug('[AUTH] Starting auth and machine setup...');
-
-    // Step 1: Handle authentication
     let credentials = await readCredentials();
     let newAuth = false;
-
     if (!credentials) {
-        logger.debug('[AUTH] No credentials found, starting authentication flow...');
-        const authResult = await doAuth(options?.authMethod);
-        if (!authResult) {
-            throw new Error('Authentication failed or was cancelled');
-        }
+        logger.debug('[AUTH] No credentials found, starting mobile authentication...');
+        const authResult = await doAuth();
+        if (!authResult) throw new Error('Authentication failed or was cancelled');
         credentials = authResult;
         newAuth = true;
     } else {
         logger.debug('[AUTH] Using existing credentials');
     }
 
-    // Make sure we have a machine ID
-    // Server machine entity will be created either by the daemon or by the CLI
-    const settings = await updateSettings(async s => {
-        if (newAuth || !s.machineId) {
-            return {
-                ...s,
-                machineId: randomUUID()
-            };
-        }
-        return s;
+    const settings = await updateSettings(current => {
+        if (newAuth || !current.machineId) return { ...current, machineId: randomUUID() };
+        return current;
     });
-
     logger.debug(`[AUTH] Machine ID: ${settings.machineId}`);
-
     return { credentials, machineId: settings.machineId! };
 }

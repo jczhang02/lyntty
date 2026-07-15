@@ -1,15 +1,15 @@
 # Lyntty CI matrix
 
-Date: 2026-07-08
-Status: active target for `lyntty-uu8`
+Date: 2026-07-14
+Status: active Bun-only target
 
 ## Goals
 
-- Keep pull-request gates fast, parallel, and deterministic.
-- Keep workflow permissions minimal by default.
-- Cancel stale PR runs when new commits arrive.
-- Run heavier package, Android, relay image, deploy, and CLI packaging checks only in explicit tiers.
-- Keep local developer commands close to CI commands.
+- Keep pull-request gates fast, parallel, deterministic, and limited to the four active workspaces.
+- Use the pinned Bun toolchain for install, scripts, tests, builds, and packaging.
+- Keep workflow permissions minimal and cancel stale runs.
+- Separate verification, component release, and production deployment.
+- Keep local commands equivalent to CI commands.
 
 ## Fast PR / main gate
 
@@ -17,33 +17,36 @@ Workflow: `.github/workflows/typecheck.yml`
 
 | Job | Command | Purpose |
 | --- | --- | --- |
-| `repo-hygiene` | `git diff --check` | whitespace/conflict-marker hygiene |
-| `wire` | `pnpm ci:wire` | shared schema build and tests |
-| `cli` | `pnpm ci:cli` | `lyntty` CLI typecheck and unit tests |
-| `relay` | `pnpm ci:relay` | relay typecheck, runtime build, tests |
-| `app` | `pnpm ci:app` | app typecheck, i18n ESLint guard, tests, Expo config inspection |
-| `agent` | `pnpm ci:agent` | retained agent package typecheck and tests |
+| `repo-hygiene` | `bun run test:repo-hardening` + Git whitespace check | workflow/evidence hardening and diff hygiene |
+| `wire` | `bun run ci:audit` + `bun run ci:wire` | dependency audit, shared protocol build and tests |
+| `cli` | `bun run ci:cli` | `lyntty`/`lynttyd` typecheck and tests |
+| `relay` | `bun run ci:relay` | Relay typecheck, compiled build, and tests |
+| `app` | `bun run ci:app` | Android app typecheck, i18n guard, tests, and Expo config inspection |
 
-This workflow uses `contents: read` and `cancel-in-progress: true`. The relay job installs Bun because `pnpm ci:relay` runs the runtime build script.
+Every package job installs with `bun install --frozen-lockfile`. Actions are pinned to full commit SHAs. The workflow has `contents: read` and `cancel-in-progress: true`.
 
 ## Manual / release tiers
 
 | Workflow | Trigger | Tier | Notes |
 | --- | --- | --- | --- |
-| `.github/workflows/cli-smoke-test.yml` | `workflow_dispatch` | CLI packaging smoke | Packs/install `lyntty`; Linux also boots packaged `lyntty server` with temp `LYNTTY_HOME_DIR`. |
-| `.github/workflows/relay-image.yml` | PR/main path changes + manual | Relay container smoke/release | PR builds image without pushing; main/manual on `main` push pinned GHCR tags. |
-| `.github/workflows/relay-deploy.yml` | `workflow_dispatch` | Production deploy | Requires pinned `sha-*` image tag; no floating deploy tags. |
-| `.github/workflows/android-release.yml` | `workflow_dispatch` | Android release APK | Signed production APK and `latest.json`; protected by Android secrets. |
-| `.github/workflows/docs.yml` | docs/main + manual | Docs | Builds Fumadocs site and deploys Pages. |
+| `.github/workflows/cli-smoke-test.yml` | manual | compiled CLI smoke | Builds standalone `lyntty` and `lynttyd` on Linux and Windows; uses temporary `HOME`/`LYNTTY_HOME_DIR` and verifies isolated Pi extension installation. |
+| `.github/workflows/relay-image.yml` | PR + manual | Relay image verification | Builds the compiled Relay image without publishing. Ordinary main pushes do not publish stable images. |
+| `.github/workflows/relay-deploy.yml` | manual | production deployment | Requires an explicitly pinned image and remains separate from release. |
+| `.github/workflows/android-release.yml` | manual | Android release APK | Builds the signed full APK; protected Android credentials are required. |
+| `.github/workflows/docs.yml` | docs/main + manual | docs | Checks/builds the Fumadocs site and deploys Pages. |
+
+Compatibility-BOM publication, component tags, installers, native signing, and release promotion belong to the dedicated release workflow; they must not be side effects of a normal main push.
 
 ## Local developer commands
 
-- `pnpm ci:fast` — run all fast checks sequentially plus `git diff --check`.
-- `pnpm ci:wire`, `pnpm ci:cli`, `pnpm ci:relay`, `pnpm ci:app`, `pnpm ci:agent` — package-scoped equivalents.
+- `bun run ci:fast` — repository hardening, audit, all four workspace gates, and `git diff --check`.
+- `bun run ci:wire`, `bun run ci:cli`, `bun run ci:relay`, `bun run ci:app` — workspace-scoped gates.
+- `bun install --frozen-lockfile` — prove the lockfile is complete.
+- `bun pm untrusted` — must report zero blocked lifecycle scripts.
 
 ## Deferrals / rationale
 
-- Android release-style APK build stays manual because it needs signing/Firebase secrets and is slow.
-- Full emulator/Maestro E2E remains evidence-driven/manual for now; flows are flaky without dedicated emulator state control.
-- Relay production deploy stays manual because it creates external side effects.
-- CLI packaging smoke stays manual because it installs global packages and boots a packaged server; fast PR gates still cover CLI build/tests.
+- Android release-style APK and Maestro E2E remain manual/evidence-driven because they require isolated emulator state and signing inputs.
+- Relay image verification does not publish; production deployment is a separate authorized operation.
+- CLI packaging smoke is manual because it compiles and exercises platform binaries, while the fast gate already covers source builds and tests.
+- iOS is best-effort and does not block Android releases.

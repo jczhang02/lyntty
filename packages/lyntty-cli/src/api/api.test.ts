@@ -319,7 +319,7 @@ describe('Api server error handling', () => {
             await expect(api.getOrCreateMachine({
                 machineId: 'test-machine',
                 metadata: testMachineMetadata
-            })).rejects.toThrow('lyntty auth login --force --method mobile');
+            })).rejects.toThrow('lyntty auth login --force');
         });
     });
 });

@@ -18,8 +18,8 @@ describe('formatAuthRequestFailure', () => {
         const message = formatAuthRequestFailure(axiosError('ECONNREFUSED'), 'http://127.0.0.1:3005');
 
         expect(message).toContain('Lyntty relay is not running');
-        expect(message).toContain('lyntty server --host 0.0.0.0 --port 3005');
-        expect(message).toContain('lyntty auth login --force --method mobile');
+        expect(message).toContain('lyntty-relay serve');
+        expect(message).toContain('lyntty auth login --force');
     });
 
     it('prints route mismatch guidance for incompatible relay URLs', () => {

@@ -116,8 +116,8 @@ Do not run `lynttyd`, Pi mirror, or Pi extension tests against live `~/.lyntty` 
 - `packages/lyntty-cli` — `lyntty` CLI, `lynttyd`, Pi SDK runtime adapter, Pi extension installer/source generation, local control server.
 - `packages/lyntty-relay` — self-hosted relay API, socket/RPC routing, auth, PGlite/Prisma storage, encrypted sync.
 - `packages/lyntty-wire` — shared session-protocol schemas and caps.
-- `packages/lyntty-agent` — local agent helper package retained from Happy architecture.
-- `packages/lyntty-app-logs`, `packages/codium` — inherited/development surfaces; do not make them product-critical without explicit scope.
+
+The Bun workspace contains only these four packages. Pi remote-control commands and the development app-log receiver live in `packages/lyntty-cli`; do not recreate removed agent, app-logs, or Codium workspaces.
 
 ## Testing and verification
 
@@ -126,18 +126,18 @@ Use the narrowest reliable check first, then broaden when behavior crosses layer
 Common checks:
 
 ```bash
-pnpm --filter ./packages/lyntty-app test
-pnpm --filter ./packages/lyntty-app typecheck
-pnpm --filter ./packages/lyntty-cli test
-pnpm --filter ./packages/lyntty-cli typecheck
-pnpm --filter ./packages/lyntty-relay test
-pnpm --filter ./packages/lyntty-relay typecheck
-pnpm --filter ./packages/lyntty-wire test
-pnpm --filter ./packages/lyntty-wire build
-pnpm --filter ./packages/lyntty-agent test
-pnpm --filter ./packages/lyntty-agent typecheck
+bun run ci:wire
+bun run ci:cli
+bun run ci:relay
+bun run ci:app
+bun run test:repo-hardening
+bun run ci:audit
+bun install --frozen-lockfile
+bun pm untrusted
 git diff --check
 ```
+
+Run the complete local gate with `bun run ci:fast`. Bun is pinned by `.bun-version` and the root `packageManager`; project scripts and deliverables must not invoke Node, npm, pnpm, npx, or tsx.
 
 Android/E2E notes:
 
