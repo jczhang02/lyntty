@@ -1,0 +1,8 @@
+actual forbidden JavaScript runtime exec counts (expected 0)
+clean-install=0
+android-clean-release=0
+cli=0
+relay-pglite-migrate=0
+relay-pglite-serve=0
+relay-postgres-migrate=0
+relay-postgres-serve=0

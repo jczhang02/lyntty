@@ -1,0 +1,3 @@
+lyntty-relay build:standalone:  [138ms]  bundle  1994 modules
+lyntty-relay build:standalone:  [189ms] compile  dist/lyntty-relay
+lyntty-relay build:standalone: Exited with code 0

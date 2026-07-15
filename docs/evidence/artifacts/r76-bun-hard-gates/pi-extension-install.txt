@@ -1,0 +1,1 @@
+Installed Lyntty Pi extension: /tmp/lyntty-bun-cli-gate-final/home/.pi/agent/extensions/lyntty/index.ts
