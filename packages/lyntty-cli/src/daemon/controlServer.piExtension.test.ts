@@ -45,8 +45,9 @@ describe('daemon control server Pi extension endpoints', () => {
     }
   });
 
-  it('serves whitelisted remote commands and accepts extension acks', async () => {
+  it('serves whitelisted remote commands with images and accepts extension acks', async () => {
     const acked: unknown[] = [];
+    const image = { type: 'image' as const, data: 'AQID', mimeType: 'image/png' };
     const server = await startDaemonControlServer({
       getChildren: () => [],
       stopSession: () => false,
@@ -56,7 +57,10 @@ describe('daemon control server Pi extension endpoints', () => {
       pollPiExtensionCommands: async (session, afterSeq) => ({
         status: 'ok',
         commands: session.piSessionId === 'pi-1' && afterSeq < 7
-          ? [{ seq: 7, deliveryToken: 'lease-7', localKey: 'mobile-local-7', mobileContext: true, command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }]
+          ? [
+              { seq: 7, deliveryToken: 'lease-7', localKey: 'mobile-local-7', mobileContext: true, command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards', images: [image] } },
+              { seq: 8, deliveryToken: 'lease-8', localKey: 'mobile-local-8', mobileContext: true, command: { type: 'send_user_message', text: '', images: [image] } },
+            ]
           : session.piSessionId === 'pi-stop' && afterSeq < 9
             ? [{ seq: 9, deliveryToken: 'lease-9', localKey: 'archive-stop-9', mobileContext: false, command: { type: 'internal_shutdown' } }]
             : [],
@@ -77,7 +81,10 @@ describe('daemon control server Pi extension endpoints', () => {
       expect(commandResponse.status).toBe(200);
       expect(await commandResponse.json()).toEqual({
         status: 'ok',
-        commands: [{ seq: 7, deliveryToken: 'lease-7', localKey: 'mobile-local-7', mobileContext: true, command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards' } }],
+        commands: [
+          { seq: 7, deliveryToken: 'lease-7', localKey: 'mobile-local-7', mobileContext: true, command: { type: 'invoke_pi_command', commandLine: '/skill:coding-standards', images: [image] } },
+          { seq: 8, deliveryToken: 'lease-8', localKey: 'mobile-local-8', mobileContext: true, command: { type: 'send_user_message', text: '', images: [image] } },
+        ],
       });
 
       const shutdownResponse = await fetch(`http://127.0.0.1:${server.port}/pi-extension/commands`, {

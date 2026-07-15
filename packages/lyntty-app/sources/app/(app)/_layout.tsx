@@ -14,7 +14,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
     // Use custom header on Android and Mac Catalyst, native header on iOS (non-Catalyst)
-    const shouldUseCustomHeader = Platform.OS === 'android' || isRunningOnMac() || Platform.OS === 'web';
+    const shouldUseCustomHeader = Platform.OS === 'android' || isRunningOnMac();
     const { theme } = useUnistyles();
 
     return (
@@ -110,12 +110,6 @@ export default function RootLayout() {
                 }}
             />
             <Stack.Screen
-                name="terminal/connect"
-                options={{
-                    headerTitle: t('navigation.connectTerminal'),
-                }}
-            />
-            <Stack.Screen
                 name="terminal/index"
                 options={{
                     headerTitle: t('navigation.connectTerminal'),
@@ -143,36 +137,6 @@ export default function RootLayout() {
                     headerShown: true,
                     headerTitle: t('navigation.whatsNew'),
                     headerBackTitle: t('common.back'),
-                }}
-            />
-            <Stack.Screen
-                name="artifacts/index"
-                options={{
-                    headerShown: true,
-                    headerTitle: t('artifacts.title'),
-                    headerBackTitle: t('common.back'),
-                }}
-            />
-            <Stack.Screen
-                name="artifacts/[id]"
-                options={{
-                    headerShown: false, // We'll set header dynamically
-                }}
-            />
-            <Stack.Screen
-                name="artifacts/new"
-                options={{
-                    headerShown: true,
-                    headerTitle: t('artifacts.new'),
-                    headerBackTitle: t('common.cancel'),
-                }}
-            />
-            <Stack.Screen
-                name="artifacts/edit/[id]"
-                options={{
-                    headerShown: true,
-                    headerTitle: t('artifacts.edit'),
-                    headerBackTitle: t('common.cancel'),
                 }}
             />
             <Stack.Screen

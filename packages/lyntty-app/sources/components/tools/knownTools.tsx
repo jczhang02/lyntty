@@ -7,6 +7,10 @@ import { Ionicons, Octicons } from '@expo/vector-icons';
 import React from 'react';
 import { t } from '@/text';
 
+// Non-Pi aliases below are passive display compatibility for encrypted
+// history created before the Pi-only product boundary. Tool control and
+// permission actions are restricted to Pi sessions in ToolView.
+
 // Icon factory functions
 const ICON_TASK = (size: number = 24, color: string = '#000') => <Octicons name="rocket" size={size} color={color} />;
 const ICON_TERMINAL = (size: number = 24, color: string = '#000') => <Octicons name="terminal" size={size} color={color} />;
@@ -192,7 +196,7 @@ export const knownTools = {
                 const path = resolvePath(opts.tool.input.file_path, opts.metadata);
                 return path;
             }
-            // Gemini uses 'locations' array with 'path' field
+            // Read-only history may use a nested `locations` field.
             if (opts.tool.input.locations && Array.isArray(opts.tool.input.locations) && opts.tool.input.locations[0]?.path) {
                 const path = resolvePath(opts.tool.input.locations[0].path, opts.metadata);
                 return path;
@@ -205,7 +209,7 @@ export const knownTools = {
             file_path: z.string().describe('The absolute path to the file to read'),
             limit: z.number().optional().describe('The number of lines to read'),
             offset: z.number().optional().describe('The line number to start reading from'),
-            // Gemini format
+            // Inherited nested history format.
             items: z.array(z.any()).optional(),
             locations: z.array(z.object({ path: z.string() }).passthrough()).optional()
         }).partial().passthrough(),
@@ -219,10 +223,10 @@ export const knownTools = {
             }).passthrough().optional()
         }).partial().passthrough()
     },
-    // Gemini uses lowercase 'read'
+    // Current Pi tool name; inherited records may still use `locations`.
     'read': {
         title: (opts: { metadata: Metadata | null, tool: ToolCall }) => {
-            // Gemini uses 'locations' array with 'path' field
+            // Read-only history may use a nested `locations` field.
             if (opts.tool.input.locations && Array.isArray(opts.tool.input.locations) && opts.tool.input.locations[0]?.path) {
                 const path = resolvePath(opts.tool.input.locations[0].path, opts.metadata);
                 return path;
@@ -590,7 +594,7 @@ export const knownTools = {
         }).partial().passthrough(),
         result: z.object({}).partial().passthrough()
     },
-    // Gemini internal tools - should be hidden (minimal)
+    // Inherited internal tools: decode for history without exposing controls.
     'search': {
         title: t('tools.names.search'),
         icon: ICON_SEARCH,
@@ -602,7 +606,7 @@ export const knownTools = {
     },
     'edit': {
         title: (opts: { metadata: Metadata | null, tool: ToolCall }) => {
-            // Gemini sends data in nested structure, try multiple locations
+            // Accept both current direct input and inherited nested input.
             let filePath: string | undefined;
 
             // 1. Check toolCall.content[0].path
@@ -645,7 +649,7 @@ export const knownTools = {
     },
     'execute': {
         title: (opts: { metadata: Metadata | null, tool: ToolCall }) => {
-            // Gemini sends nice title in toolCall.title
+            // Inherited nested records may provide a display title.
             if (opts.tool.input?.toolCall?.title) {
                 // Title is like "rm file.txt [cwd /path] (description)"
                 // Extract just the command part before [
@@ -918,7 +922,7 @@ export const knownTools = {
             return null;
         }
     },
-    // Internal Claude Code tool for loading deferred tools - no user-visible output
+    // Inherited internal tool for loading deferred tools; never user-visible.
     'Skill': {
         icon: ICON_TASK,
         hidden: true,

@@ -3,15 +3,8 @@ import { MMKV } from 'react-native-mmkv';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { AsyncLock } from './lock';
-import {
-    trackReviewPromptShown,
-    trackReviewPromptResponse,
-    trackReviewStoreShown,
-    trackReviewRetryScheduled
-} from '@/track';
 import { sync } from '@/sync/sync';
 import { storage as syncStorage } from '@/sync/storage';
-import { Platform } from 'react-native';
 
 const localStorage = new MMKV();
 
@@ -26,10 +19,6 @@ const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const lock = new AsyncLock();
 
 export function requestReview() {
-    if (Platform.OS === 'web') {
-        return;
-    }
-
     lock.inLock(async () => {
         try {
 
@@ -58,7 +47,6 @@ export function requestReview() {
                 }
 
                 await StoreReview.requestReview();
-                trackReviewStoreShown();
                 localStorage.set(LOCAL_KEYS.STORE_REVIEW_LAST_SHOWN, new Date().toISOString());
                 return;
             }
@@ -83,7 +71,6 @@ export function requestReview() {
             }
 
             // Pre-ask if they like the app (only shown once, ever)
-            trackReviewPromptShown();
             const likesApp = await Modal.confirm(
                 t('review.enjoyingApp'),
                 t('review.feedbackPrompt'),
@@ -92,7 +79,6 @@ export function requestReview() {
                     cancelText: t('review.notReally'),
                 }
             );
-            trackReviewPromptResponse(likesApp);
 
             // Store the answer in sync settings (synced across devices)
             sync.applySettings({
@@ -103,15 +89,11 @@ export function requestReview() {
             if (!likesApp) {
                 // User doesn't like the app, store the timestamp locally
                 localStorage.set(LOCAL_KEYS.DECLINED_AT, new Date().toISOString());
-
-                // Track that we'll retry in 30 days
-                trackReviewRetryScheduled(RETRY_DAYS);
                 return;
             }
 
             // Request the actual store review directly
             await StoreReview.requestReview();
-            trackReviewStoreShown();
 
             // Mark when we last showed the store review
             localStorage.set(LOCAL_KEYS.STORE_REVIEW_LAST_SHOWN, new Date().toISOString());

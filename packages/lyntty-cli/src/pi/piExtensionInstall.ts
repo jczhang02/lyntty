@@ -22,17 +22,19 @@ let extensionInstanceId = randomUUID();
 type SessionSnapshot = ReturnType<typeof sessionSnapshot>;
 type QueuedPayload = { session: SessionSnapshot; event: Record<string, unknown>; extensionInstanceId: string; eventId: number; timestamp: number; attempts?: number };
 type PiCommandInfo = { name: string; description?: string; source: string; sourceInfo?: Record<string, unknown> };
+type RemoteImage = { type: "image"; data: string; mimeType: string };
+type RemoteMessageContent = { type: "text"; text: string } | RemoteImage;
 type RemotePiCommand =
-  | { type: "send_user_message"; text: string }
-  | { type: "follow_up"; text: string }
-  | { type: "steer"; text: string }
+  | { type: "send_user_message"; text: string; images?: RemoteImage[] }
+  | { type: "follow_up"; text: string; images?: RemoteImage[] }
+  | { type: "steer"; text: string; images?: RemoteImage[] }
   | { type: "abort" }
   | { type: "compact"; instructions?: string }
   | { type: "reload" }
   | { type: "internal_shutdown" }
   | { type: "set_session_name"; name: string }
   | { type: "get_commands" }
-  | { type: "invoke_pi_command"; commandLine: string; deliverAs?: "followUp" }
+  | { type: "invoke_pi_command"; commandLine: string; deliverAs?: "followUp"; images?: RemoteImage[] }
   | { type: "set_label"; entryId: string; label?: string };
 type RemotePiCommandEnvelope = { seq: number; deliveryToken: string; localKey?: string; mobileContext?: boolean; command: RemotePiCommand };
 type CommandAck = { seq: number; extensionInstanceId?: string; queueEpoch?: string; deliveryToken: string; status: "accepted_by_pi" | "failed"; error?: string; resultText?: string; commands?: PiCommandInfo[] };
@@ -460,7 +462,7 @@ function safePiCommands(pi: ExtensionAPI): PiCommandInfo[] {
       name: command.name,
       description: command.description,
       source: command.source,
-      sourceInfo: command.sourceInfo as Record<string, unknown> | undefined,
+      sourceInfo: command.sourceInfo as unknown as Record<string, unknown> | undefined,
     }));
 }
 
@@ -505,12 +507,19 @@ function waitForPromptAcceptance(text: string): Promise<void> {
 async function sendUserMessageAndWaitForAcceptance(
   pi: ExtensionAPI,
   text: string,
+  images: RemoteImage[] | undefined,
   deliverAs?: "steer" | "followUp",
 ): Promise<void> {
   const acceptance = waitForPromptAcceptance(text);
+  const content: string | RemoteMessageContent[] = images?.length
+    ? [
+        ...(text ? [{ type: "text" as const, text }] : []),
+        ...images,
+      ]
+    : text;
   try {
-    if (deliverAs) pi.sendUserMessage(text, { deliverAs });
-    else pi.sendUserMessage(text);
+    if (deliverAs) pi.sendUserMessage(content, { deliverAs });
+    else pi.sendUserMessage(content);
   } catch (error) {
     settlePromptAcceptance(text, error instanceof Error ? error : new Error(String(error)));
   }
@@ -522,15 +531,15 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
   switch (command.type) {
     case "send_user_message":
       await injectMobileContext(pi, envelope);
-      await sendUserMessageAndWaitForAcceptance(pi, command.text);
+      await sendUserMessageAndWaitForAcceptance(pi, command.text, command.images);
       return;
     case "follow_up":
       await injectMobileContext(pi, envelope, "followUp");
-      await sendUserMessageAndWaitForAcceptance(pi, command.text, "followUp");
+      await sendUserMessageAndWaitForAcceptance(pi, command.text, command.images, "followUp");
       return;
     case "steer":
       await injectMobileContext(pi, envelope, "steer");
-      await sendUserMessageAndWaitForAcceptance(pi, command.text, "steer");
+      await sendUserMessageAndWaitForAcceptance(pi, command.text, command.images, "steer");
       return;
     case "abort":
       ctx.abort();
@@ -564,6 +573,7 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
     }
     case "set_session_name":
       pi.setSessionName(command.name);
+      send(ctx, { type: "session_info_changed", name: command.name });
       return;
     case "get_commands":
       return { commands: safePiCommands(pi) };
@@ -581,9 +591,9 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
       const expanded = await expandSkillCommand(pi, command.commandLine);
       await injectMobileContext(pi, envelope, command.deliverAs);
       if (command.deliverAs) {
-        await sendUserMessageAndWaitForAcceptance(pi, expanded, command.deliverAs);
+        await sendUserMessageAndWaitForAcceptance(pi, expanded, command.images, command.deliverAs);
       } else {
-        await sendUserMessageAndWaitForAcceptance(pi, expanded);
+        await sendUserMessageAndWaitForAcceptance(pi, expanded, command.images);
       }
       return { resultText: "Queued /" + name + "." };
     }
@@ -824,10 +834,6 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
     send(ctx, { type: "command_list", commands: safePiCommands(pi) });
   });
 
-  pi.on("session_info_changed", async (event, ctx) => {
-    send(ctx, { type: "session_info_changed", name: event.name });
-  });
-
   pi.on("before_agent_start", async (event) => {
     if (!settlePromptAcceptance(event.prompt)) settleAnyPromptAcceptance();
   });
@@ -876,7 +882,7 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
   });
 
   pi.on("tool_execution_end", async (event, ctx) => {
-    send(ctx, { type: "tool_execution_end", toolCallId: event.toolCallId, toolName: event.toolName, args: event.args, result: event.result, isError: event.isError });
+    send(ctx, { type: "tool_execution_end", toolCallId: event.toolCallId, toolName: event.toolName, result: event.result, isError: event.isError });
   });
 
   pi.on("agent_end", async (_event, ctx) => {

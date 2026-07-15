@@ -44,6 +44,16 @@ describe('userMessagePresentation', () => {
         });
     });
 
+    it('shows queued extension remediation instead of claiming delivery', () => {
+        expect(getUserMessagePresentation(userMessage({
+            localId: 'phone-local-1',
+            text: 'hello',
+            meta: { sentFrom: 'android', remoteCommandState: 'queued' },
+        }), 'waiting_extension')).toMatchObject({
+            sourceLabel: 'Waiting for Pi extension',
+        });
+    });
+
     it('removes the sending label once a mobile command is accepted by Pi', () => {
         expect(getUserMessagePresentation(userMessage({
             localId: 'phone-local-1',

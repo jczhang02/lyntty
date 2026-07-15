@@ -52,6 +52,10 @@ export type LocalImageAttachment = {
     name: string;
 };
 
+type PendingRemoteInputEvent =
+    | { type: 'user'; message: UserMessage }
+    | { type: 'file'; message: FileEventMessage };
+
 function escapeMultipartValue(value: string): string {
     return value.replaceAll('\r', '').replaceAll('\n', '').replaceAll('"', '%22');
 }
@@ -95,9 +99,8 @@ export class ApiSessionClient extends EventEmitter {
     private agentState: AgentState | null;
     private agentStateVersion: number;
     private socket: Socket<ServerToClientEvents, ClientToServerEvents>;
-    private pendingMessages: UserMessage[] = [];
+    private pendingRemoteInputEvents: PendingRemoteInputEvent[] = [];
     private pendingMessageCallback: ((message: UserMessage) => void) | null = null;
-    private pendingFileEvents: FileEventMessage[] = [];
     private pendingFileEventCallback: ((data: FileEventMessage) => void) | null = null;
     private blobKey: Uint8Array | null = null;
     /**
@@ -282,15 +285,26 @@ export class ApiSessionClient extends EventEmitter {
 
     onUserMessage(callback: (data: UserMessage) => void) {
         this.pendingMessageCallback = callback;
-        while (this.pendingMessages.length > 0) {
-            callback(this.pendingMessages.shift()!);
-        }
+        this.flushPendingRemoteInputEvents();
     }
 
     onFileEvent(callback: (data: FileEventMessage) => void) {
         this.pendingFileEventCallback = callback;
-        while (this.pendingFileEvents.length > 0) {
-            callback(this.pendingFileEvents.shift()!);
+        this.flushPendingRemoteInputEvents();
+    }
+
+    private flushPendingRemoteInputEvents(): void {
+        while (this.pendingRemoteInputEvents.length > 0) {
+            const next = this.pendingRemoteInputEvents[0];
+            if (next.type === 'user') {
+                if (!this.pendingMessageCallback) return;
+                this.pendingRemoteInputEvents.shift();
+                this.pendingMessageCallback(next.message);
+                continue;
+            }
+            if (!this.pendingFileEventCallback) return;
+            this.pendingRemoteInputEvents.shift();
+            this.pendingFileEventCallback(next.message);
         }
     }
 
@@ -476,11 +490,8 @@ export class ApiSessionClient extends EventEmitter {
             const userMessage = relayLocalId && !userResult.data.localKey
                 ? { ...userResult.data, localKey: relayLocalId }
                 : userResult.data;
-            if (this.pendingMessageCallback) {
-                this.pendingMessageCallback(userMessage);
-            } else {
-                this.pendingMessages.push(userMessage);
-            }
+            this.pendingRemoteInputEvents.push({ type: 'user', message: userMessage });
+            this.flushPendingRemoteInputEvents();
             return;
         }
 
@@ -492,11 +503,8 @@ export class ApiSessionClient extends EventEmitter {
                 size: ev.size,
                 hasMimeType: Boolean(ev.mimeType),
             });
-            if (this.pendingFileEventCallback) {
-                this.pendingFileEventCallback(fileResult.data);
-            } else {
-                this.pendingFileEvents.push(fileResult.data);
-            }
+            this.pendingRemoteInputEvents.push({ type: 'file', message: fileResult.data });
+            this.flushPendingRemoteInputEvents();
             return;
         }
 

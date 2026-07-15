@@ -1,6 +1,6 @@
 import * as z from 'zod';
 
-export const agentKeys = ['pi', 'claude', 'codex', 'gemini', 'openclaw'] as const;
+export const agentKeys = ['pi'] as const;
 export type AgentKey = typeof agentKeys[number];
 
 export const AgentDefaultOverrideSchema = z.object({
@@ -9,12 +9,10 @@ export const AgentDefaultOverrideSchema = z.object({
     effortLevel: z.string().optional(),
 }).passthrough();
 
+// Passthrough preserves inherited settings on read, while the active product
+// surface only reads and writes the Pi override.
 export const AgentDefaultOverridesSchema = z.object({
     pi: AgentDefaultOverrideSchema.optional(),
-    claude: AgentDefaultOverrideSchema.optional(),
-    codex: AgentDefaultOverrideSchema.optional(),
-    gemini: AgentDefaultOverrideSchema.optional(),
-    openclaw: AgentDefaultOverrideSchema.optional(),
 }).passthrough().default({});
 
 export type AgentDefaultOverride = z.infer<typeof AgentDefaultOverrideSchema>;
@@ -27,32 +25,26 @@ export type AgentDefaultConfig = {
     effortLevel: string | null;
 };
 
-const codeAgentDefaults: Record<AgentKey, AgentDefaultConfig> = {
-    pi: { permissionMode: 'default', modelMode: 'default', effortLevel: 'medium' },
-    // The Claude UI key for YOLO is `bypassPermissions`; the CLI also accepts
-    // `yolo` and maps it to the Claude SDK's bypass mode.
-    claude: { permissionMode: 'bypassPermissions', modelMode: 'opus', effortLevel: 'medium' },
-    codex: { permissionMode: 'yolo', modelMode: 'gpt-5.5', effortLevel: 'medium' },
-    gemini: { permissionMode: 'default', modelMode: 'gemini-2.5-pro', effortLevel: null },
-    openclaw: { permissionMode: 'default', modelMode: 'default', effortLevel: null },
+const piDefaults: AgentDefaultConfig = {
+    permissionMode: 'default',
+    modelMode: 'default',
+    // Remote model/thinking-level changes are intentionally outside v1 scope.
+    effortLevel: null,
 };
 
-export function normalizeAgentKey(flavor: string | null | undefined): AgentKey {
-    if (flavor === 'pi' || flavor === 'codex' || flavor === 'gemini' || flavor === 'openclaw') {
-        return flavor;
-    }
+export function normalizeAgentKey(_flavor: string | null | undefined): AgentKey {
     return 'pi';
 }
 
-export function getCodeAgentDefaults(flavor: string | null | undefined): AgentDefaultConfig {
-    return codeAgentDefaults[normalizeAgentKey(flavor)];
+export function getCodeAgentDefaults(_flavor: string | null | undefined): AgentDefaultConfig {
+    return piDefaults;
 }
 
 export function getAgentDefaultOverride(
     overrides: AgentDefaultOverrides | null | undefined,
-    flavor: string | null | undefined,
+    _flavor: string | null | undefined,
 ): AgentDefaultOverride {
-    return overrides?.[normalizeAgentKey(flavor)] ?? {};
+    return overrides?.pi ?? {};
 }
 
 export function resolveAgentDefaultConfig(
@@ -86,13 +78,12 @@ export function getAgentDefaultOverrideValue(
 
 export function setAgentDefaultOverride(
     overrides: AgentDefaultOverrides | null | undefined,
-    flavor: string | null | undefined,
+    _flavor: string | null | undefined,
     field: AgentDefaultField,
     value: string | null | undefined,
 ): AgentDefaultOverrides {
-    const key = normalizeAgentKey(flavor);
     const next: AgentDefaultOverrides = { ...(overrides ?? {}) };
-    const current: AgentDefaultOverride = { ...(next[key] ?? {}) };
+    const current: AgentDefaultOverride = { ...(next.pi ?? {}) };
 
     if (value === null || value === undefined) {
         delete current[field];
@@ -101,9 +92,9 @@ export function setAgentDefaultOverride(
     }
 
     if (current.permissionMode === undefined && current.modelMode === undefined && current.effortLevel === undefined) {
-        delete next[key];
+        delete next.pi;
     } else {
-        next[key] = current;
+        next.pi = current;
     }
 
     return next;

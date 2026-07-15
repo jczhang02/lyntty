@@ -7,7 +7,7 @@ import { AuthCredentials } from '@/auth/tokenStorage';
 import { clearRegisteredPushToken, loadRegisteredPushToken, saveRegisteredPushToken } from './persistence';
 import { registerPushToken, unregisterPushToken } from './apiPush';
 
-export type PushPermissionStatus = 'unsupported' | 'granted' | 'denied' | 'undetermined';
+export type PushPermissionStatus = 'granted' | 'denied' | 'undetermined';
 
 export interface PushPermissionInfo {
     status: PushPermissionStatus;
@@ -50,18 +50,11 @@ function normalizePushPermission(result: {
 }
 
 function getExpoProjectId(): string | null {
-    return Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId ?? null;
+    const projectId = Constants?.expoConfig?.extra?.app?.expoProjectId;
+    return typeof projectId === 'string' && projectId.length > 0 ? projectId : null;
 }
 
 export async function getPushPermissionInfo(): Promise<PushPermissionInfo> {
-    if (Platform.OS === 'web') {
-        return {
-            status: 'unsupported',
-            granted: false,
-            canAskAgain: false,
-        };
-    }
-
     try {
         return normalizePushPermission(await Notifications.getPermissionsAsync());
     } catch (error) {
@@ -75,18 +68,6 @@ export async function getPushPermissionInfo(): Promise<PushPermissionInfo> {
 }
 
 export async function requestPushPermissionOrOpenSettings(): Promise<PushPermissionRequestResult> {
-    if (Platform.OS === 'web') {
-        return {
-            granted: false,
-            openedSettings: false,
-            permission: {
-                status: 'unsupported',
-                granted: false,
-                canAskAgain: false,
-            }
-        };
-    }
-
     const existingPermission = await getPushPermissionInfo();
     if (existingPermission.granted) {
         return {
@@ -114,10 +95,6 @@ export async function requestPushPermissionOrOpenSettings(): Promise<PushPermiss
 }
 
 export async function getCurrentExpoPushToken(): Promise<string | null> {
-    if (Platform.OS === 'web') {
-        return null;
-    }
-
     const permission = await getPushPermissionInfo();
     if (!permission.granted) {
         return loadRegisteredPushToken();
@@ -138,18 +115,6 @@ export async function getCurrentExpoPushToken(): Promise<string | null> {
 }
 
 export async function syncCurrentPushToken(credentials: AuthCredentials): Promise<SyncCurrentPushTokenResult> {
-    if (Platform.OS === 'web') {
-        return {
-            registered: false,
-            token: null,
-            permission: {
-                status: 'unsupported',
-                granted: false,
-                canAskAgain: false,
-            }
-        };
-    }
-
     let permission = await getPushPermissionInfo();
     if (!permission.granted) {
         if (!permission.canAskAgain) {

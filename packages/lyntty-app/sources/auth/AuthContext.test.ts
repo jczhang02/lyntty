@@ -13,8 +13,6 @@ const mocks = vi.hoisted(() => ({
   clearPersistence: vi.fn(),
   loadRegisteredPushToken: vi.fn(),
   unregisterPushToken: vi.fn(),
-  reloadAsync: vi.fn(),
-  trackLogout: vi.fn(),
 }));
 
 vi.mock('./tokenStorage', () => ({
@@ -36,18 +34,6 @@ vi.mock('@/sync/persistence', () => ({
 
 vi.mock('@/sync/apiPush', () => ({
   unregisterPushToken: mocks.unregisterPushToken,
-}));
-
-vi.mock('expo-updates', () => ({
-  reloadAsync: mocks.reloadAsync,
-}));
-
-vi.mock('@/track', () => ({
-  trackLogout: mocks.trackLogout,
-}));
-
-vi.mock('react-native', () => ({
-  Platform: { OS: 'android' },
 }));
 
 function AuthProbe({ onAuth }: { onAuth: (auth: ReturnType<typeof useAuth>) => void }) {

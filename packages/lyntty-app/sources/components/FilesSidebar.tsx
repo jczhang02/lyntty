@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Text, ScrollView, Pressable, Platform, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { Octicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Animated, {
@@ -603,7 +603,7 @@ const styles = StyleSheet.create((theme) => ({
         marginHorizontal: 12,
         marginBottom: 6,
         paddingHorizontal: 10,
-        paddingVertical: Platform.select({ web: 6, default: 8 }),
+        paddingVertical: 8,
         borderRadius: 8,
         backgroundColor: theme.colors.surface,
         borderWidth: StyleSheet.hairlineWidth,
@@ -619,7 +619,6 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.text,
         ...Typography.default(),
         padding: 0,
-        ...(Platform.OS === 'web' ? { outlineStyle: 'none' as any } : null),
     },
     list: {
         flex: 1,

@@ -1,6 +1,6 @@
 import { MarkdownSpan, parseMarkdown } from './parseMarkdown';
 import * as React from 'react';
-import { Image, Pressable, View, Platform } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import { HorizontalScrollView } from '../HorizontalScrollView';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native-unistyles';
@@ -11,8 +11,6 @@ import { Modal } from '@/modal';
 import { useLocalSetting } from '@/sync/storage';
 import { storeTempText } from '@/sync/persistence';
 import { useRouter } from 'expo-router';
-import * as Clipboard from 'expo-clipboard';
-import * as WebBrowser from 'expo-web-browser';
 import { MermaidRenderer } from './MermaidRenderer';
 import { t } from '@/text';
 import { isHttpMarkdownLink } from './linkUtils';
@@ -33,11 +31,11 @@ export const MarkdownView = React.memo((props: {
 
     // Backwards compatibility: The original version just returned the view, wrapping the list of blocks.
     // It made each of the individual text elements selectable. When we enable the markdownCopyV2 feature,
-    // we disable the selectable property on individual text segments on mobile only. Instead, the long press
+    // we disable the selectable property on individual text segments. Instead, the long press
     // will be handled by a wrapper Pressable. If we don't disable the selectable property, then you will see
     // the native copy modal come up at the same time as the long press handler is fired.
     const markdownCopyV2 = useLocalSetting('markdownCopyV2');
-    const selectable = Platform.OS === 'web' || !markdownCopyV2;
+    const selectable = !markdownCopyV2;
     const router = useRouter();
 
     const handleLinkPress = React.useCallback((url: string) => {
@@ -90,10 +88,6 @@ export const MarkdownView = React.memo((props: {
     }
 
     if (!markdownCopyV2) {
-        return renderContent();
-    }
-
-    if (Platform.OS === 'web') {
         return renderContent();
     }
 
@@ -163,26 +157,8 @@ function RenderNumberedListBlock(props: { items: { number: number, depth: number
 }
 
 function RenderCodeBlock(props: { content: string, language: string | null, first: boolean, last: boolean, selectable: boolean }) {
-    const [isHovered, setIsHovered] = React.useState(false);
-
-    const copyCode = React.useCallback(async () => {
-        try {
-            await Clipboard.setStringAsync(props.content);
-            Modal.alert(t('common.success'), t('markdown.codeCopied'), [{ text: t('common.ok'), style: 'cancel' }]);
-        } catch (error) {
-            console.error('Failed to copy code:', error);
-            Modal.alert(t('common.error'), t('markdown.copyFailed'), [{ text: t('common.ok'), style: 'cancel' }]);
-        }
-    }, [props.content]);
-
     return (
-        <View
-            style={[style.codeBlock, props.first && style.first, props.last && style.last]}
-            // @ts-ignore - Web only events
-            onMouseEnter={() => setIsHovered(true)}
-            // @ts-ignore - Web only events
-            onMouseLeave={() => setIsHovered(false)}
-        >
+        <View style={[style.codeBlock, props.first && style.first, props.last && style.last]}>
             {props.language && <Text selectable={props.selectable} style={style.codeLanguage}>{props.language}</Text>}
             <HorizontalScrollView
                 contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}
@@ -193,17 +169,6 @@ function RenderCodeBlock(props: { content: string, language: string | null, firs
                     selectable={props.selectable}
                 />
             </HorizontalScrollView>
-            <View
-                style={[style.copyButtonWrapper, isHovered && style.copyButtonWrapperVisible]}
-                {...(Platform.OS === 'web' ? ({ className: 'copy-button-wrapper' } as any) : {})}
-            >
-                <Pressable
-                    style={style.copyButton}
-                    onPress={copyCode}
-                >
-                    <Text style={style.copyButtonText}>{t('common.copy')}</Text>
-                </Pressable>
-            </View>
         </View>
     );
 }
@@ -280,10 +245,7 @@ function RenderSpans(props: RenderSpanProps) {
                         span.styles.map(s => style[s]),
                         !isCode && run.script === 'cjk' && style.sessionCjk,
                     ]}
-                    {...(isExternalLink && Platform.OS === 'web' ? { onClick: () => props.onLinkPress(span.url!) } as any : {})}
-                    onPress={isExternalLink && Platform.OS !== 'web'
-                        ? () => props.onLinkPress(span.url!)
-                        : undefined}
+                    onPress={isExternalLink ? () => props.onLinkPress(span.url!) : undefined}
                 >
                     {run.text}
                 </Text>
@@ -538,19 +500,6 @@ const style = StyleSheet.create((theme) => ({
         zIndex: 1,
         width: '100%',
     },
-    copyButtonWrapper: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        opacity: 0,
-        zIndex: 10,
-        elevation: 10,
-        pointerEvents: 'none',
-    },
-    copyButtonWrapperVisible: {
-        opacity: 1,
-        pointerEvents: 'auto',
-    },
     codeLanguage: {
         ...Typography.mono(),
         color: theme.colors.textSecondary,
@@ -590,40 +539,6 @@ const style = StyleSheet.create((theme) => ({
         fontSize: 14,
         lineHeight: 20,
         color: theme.colors.textSecondary,
-    },
-    copyButtonContainer: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        zIndex: 10,
-        elevation: 10,
-        opacity: 1,
-    },
-    copyButtonContainerHidden: {
-        opacity: 0,
-    },
-    copyButton: {
-        backgroundColor: theme.colors.surfaceHighest,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: theme.colors.divider,
-        cursor: 'pointer',
-    },
-    copyButtonHidden: {
-        display: 'none',
-    },
-    copyButtonCopied: {
-        backgroundColor: theme.colors.success,
-        borderColor: theme.colors.success,
-        opacity: 1,
-    },
-    copyButtonText: {
-        ...Typography.default(),
-        color: theme.colors.text,
-        fontSize: 12,
-        lineHeight: 16,
     },
 
     //
@@ -703,10 +618,4 @@ const style = StyleSheet.create((theme) => ({
         fontSize: 16,
         lineHeight: 24,
     },
-
-    // Add global style for Web platform (Unistyles supports this via compiler plugin)
-    ...(Platform.OS === 'web' ? {
-        // Web-only CSS styles
-        _____web_global_styles: {}
-    } : {}),
 }));

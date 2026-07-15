@@ -51,8 +51,6 @@ export const MetadataSchema = z.object({
     piRecoveryReason: z.string().optional(),
     piHasHistoryGap: z.boolean().optional(),
     piSynthetic: z.boolean().optional(),
-    claudeSessionId: z.string().optional(), // Legacy Claude Code session ID
-    codexThreadId: z.string().optional(), // Legacy Codex app-server thread ID
     tools: z.array(z.string()).optional(),
     slashCommands: z.array(z.string()).optional(),
     mcpServers: z.array(z.object({ name: z.string(), status: z.string() })).optional(),
@@ -63,8 +61,6 @@ export const MetadataSchema = z.object({
     hostPid: z.number().optional(), // Process ID of the session
     startedBy: z.enum(['daemon', 'terminal']).optional(),
     flavor: z.string().nullish(), // Session flavor/variant identifier
-    sandbox: z.any().nullish(), // Sandbox config metadata from CLI (or null when disabled)
-    dangerouslySkipPermissions: z.boolean().nullish(), // Claude --dangerously-skip-permissions mode (or null when unknown)
     lifecycleState: z.string().optional(),
     lifecycleStateSince: z.number().optional(),
     runtimeOwner: z.string().optional(),
@@ -74,64 +70,9 @@ export const MetadataSchema = z.object({
     remoteCommandFailedLocalKeys: z.array(z.string()).optional(),
     archivedBy: z.string().optional(),
     archiveReason: z.string().optional(),
-    /**
-     * Lineage for sessions created via the fork / duplicate flow.
-     * `parentSessionId` is the Lyntty session this one was branched from.
-     * `forkedFromMessageId` is the in-app message id used as the rewind
-     * point (only set for "duplicate from message", not for plain fork).
-     * Both ride inside encrypted metadata so the server stays oblivious.
-     */
-    parentSessionId: z.string().optional(),
-    forkedFromMessageId: z.string().optional(),
 });
 
 export type Metadata = z.infer<typeof MetadataSchema>;
-
-export const AgentGoalSourceSchema = z.enum(['claude', 'codex']);
-
-export const AgentGoalProgressStepSchema = z.object({
-    text: z.string().trim().min(1),
-    status: z.enum(['pending', 'in_progress', 'completed']),
-}).strict();
-
-export const AgentGoalProgressSchema = z.object({
-    currentStep: z.number().int().positive().optional(),
-    totalSteps: z.number().int().positive().optional(),
-    steps: z.array(AgentGoalProgressStepSchema).optional(),
-}).strict();
-
-export const AgentGoalCapabilitiesSchema = z.object({
-    clear: z.boolean().optional(),
-    stop: z.boolean().optional(),
-    edit: z.boolean().optional(),
-}).strict();
-
-const AgentGoalStatusBaseSchema = z.object({
-    source: AgentGoalSourceSchema,
-    observedAt: z.number().int().nonnegative(),
-    sourceSessionId: z.string().trim().min(1).optional(),
-    sourceRevision: z.union([z.string().trim().min(1), z.number()]).optional(),
-});
-
-export const AgentGoalStatusSchema = z.discriminatedUnion('status', [
-    AgentGoalStatusBaseSchema.extend({
-        status: z.literal('unavailable'),
-        reason: z.enum(['unsupported', 'not_loaded', 'stale', 'malformed', 'error', 'unknown']).optional(),
-    }).strict(),
-    AgentGoalStatusBaseSchema.extend({
-        status: z.literal('inactive'),
-        reason: z.enum(['none', 'cleared', 'completed', 'unknown']).optional(),
-    }).strict(),
-    AgentGoalStatusBaseSchema.extend({
-        status: z.literal('active'),
-        sourceSessionId: z.string().trim().min(1),
-        text: z.string().trim().min(1),
-        capabilities: AgentGoalCapabilitiesSchema.optional(),
-        progress: AgentGoalProgressSchema.optional(),
-    }).strict(),
-]);
-
-export type AgentGoalStatus = z.infer<typeof AgentGoalStatusSchema>;
 
 export const AgentStateSchema = z.object({
     controlledByUser: z.boolean().nullish(),
@@ -151,7 +92,6 @@ export const AgentStateSchema = z.object({
         allowedTools: z.array(z.string()).nullish(),
         decision: z.enum(['approved', 'approved_for_session', 'denied', 'abort']).nullish()
     })).nullish(),
-    agentGoalStatus: AgentGoalStatusSchema.optional(),
 });
 
 export type AgentState = z.infer<typeof AgentStateSchema>;

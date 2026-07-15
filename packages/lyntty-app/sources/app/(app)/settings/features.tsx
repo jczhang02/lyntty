@@ -8,13 +8,10 @@ import { t } from '@/text';
 
 export default function FeaturesSettingsScreen() {
     const [experiments, setExperiments] = useSettingMutable('experiments');
-    const [commandPaletteEnabled, setCommandPaletteEnabled] = useLocalSettingMutable('commandPaletteEnabled');
     const [markdownCopyV2, setMarkdownCopyV2] = useLocalSettingMutable('markdownCopyV2');
     const [hideInactiveSessions, setHideInactiveSessions] = useSettingMutable('hideInactiveSessions');
-    const [expResumeSession, setExpResumeSession] = useSettingMutable('expResumeSession');
     const [fileDiffsSidebar, setFileDiffsSidebar] = useSettingMutable('fileDiffsSidebar');
     const [groupToolCalls, setGroupToolCalls] = useSettingMutable('groupToolCalls');
-    const [expImageUpload, setExpImageUpload] = useSettingMutable('expImageUpload');
     const [sendMobileContextToPi, setSendMobileContextToPi] = useSettingMutable('sendMobileContextToPi');
 
     return (
@@ -91,48 +88,13 @@ export default function FeaturesSettingsScreen() {
                     }
                     showChevron={false}
                 />
-                <Item
-                    title={t('appWide.resumePiSession')}
-                    subtitle={t('appWide.resumeDisconnectedPiSessionsThroughLynttyd')}
-                    icon={<Ionicons name="play-circle-outline" size={29} color="#30D158" />}
-                    rightElement={
-                        <Switch
-                            value={expResumeSession}
-                            onValueChange={setExpResumeSession}
-                        />
-                    }
-                    showChevron={false}
-                />
-                <Item
-                    title={t('settingsFeatures.imageUpload')}
-                    subtitle={t('settingsFeatures.imageUploadSubtitle')}
-                    icon={<Ionicons name="image-outline" size={29} color="#FF2D55" />}
-                    rightElement={
-                        <Switch
-                            value={expImageUpload}
-                            onValueChange={setExpImageUpload}
-                        />
-                    }
-                    showChevron={false}
-                />
+
             </ItemGroup>
 
             <ItemGroup
                 title={t('appWide.sessionRemote')}
                 footer={t('appWide.mobileSafeControlsForPiSessions')}
             >
-                <Item
-                    title={t('settingsFeatures.commandPalette')}
-                    subtitle={commandPaletteEnabled ? t('settingsFeatures.commandPaletteEnabled') : t('settingsFeatures.commandPaletteDisabled')}
-                    icon={<Ionicons name="keypad-outline" size={29} color="#007AFF" />}
-                    rightElement={
-                        <Switch
-                            value={commandPaletteEnabled}
-                            onValueChange={setCommandPaletteEnabled}
-                        />
-                    }
-                    showChevron={false}
-                />
                 <Item
                     title={t('appWide.sendMobileContextToPi')}
                     subtitle={t('appWide.letPiKnowMessagesComeFromLynttyMobileFor')}

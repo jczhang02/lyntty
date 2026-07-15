@@ -130,8 +130,8 @@ jobs:
         env:
           APP_ENV: production
           LYNTTY_BUILD_COMMIT_SHA: ${{ github.sha }}
-          LYNTTY_EAS_PROJECT_ID: ${{ vars.LYNTTY_EAS_PROJECT_ID }}
-          EXPO_PUBLIC_EAS_PROJECT_ID: ${{ vars.LYNTTY_EAS_PROJECT_ID }}
+          # Keep the pre-migration repository variable as a compatibility fallback.
+          LYNTTY_EXPO_PROJECT_ID: ${{ vars.LYNTTY_EXPO_PROJECT_ID || vars.LYNTTY_EAS_PROJECT_ID }}
           LYNTTY_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEYSTORE_PASSWORD }}
           LYNTTY_ANDROID_KEY_ALIAS: ${{ secrets.LYNTTY_ANDROID_KEY_ALIAS }}
           LYNTTY_ANDROID_KEY_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEY_PASSWORD }}
@@ -139,7 +139,11 @@ jobs:
           VERSION_CODE: ${{ steps.release.outputs.version_code }}
         run: |
           set -euo pipefail
-          : "${LYNTTY_EAS_PROJECT_ID:?Repository variable LYNTTY_EAS_PROJECT_ID is required for Expo push tokens}"
+          : "${LYNTTY_EXPO_PROJECT_ID:?Repository variable LYNTTY_EXPO_PROJECT_ID (or legacy LYNTTY_EAS_PROJECT_ID) is required for Expo push tokens}"
+          [[ "$LYNTTY_EXPO_PROJECT_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$ ]] || {
+            echo 'LYNTTY_EXPO_PROJECT_ID must be a UUID' >&2
+            exit 1
+          }
           ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
             -x lintVitalAnalyzeRelease \
             -x lintVitalRelease \

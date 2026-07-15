@@ -1,16 +1,7 @@
 import { AgentContentView } from '@/components/AgentContentView';
-import { AgentGoalBar, type AgentGoalAction } from '@/components/AgentGoalBar';
 import { AgentInput } from '@/components/AgentInput';
-import { resolveVisibleAgentGoalStatus } from '@/components/agentGoalStatus';
 import type { MultiTextInputHandle } from '@/components/MultiTextInput';
 import { layout } from '@/components/layout';
-import {
-    getAvailableModels,
-    getAvailablePermissionModes,
-    getEffortLevelsForModel,
-    resolveCurrentOption,
-    EffortLevel,
-} from '@/components/modelModeOptions';
 import { getSuggestions } from '@/components/autocomplete/suggestions';
 import { ChatHeaderView } from '@/components/ChatHeaderView';
 import { ChatList } from '@/components/ChatList';
@@ -22,10 +13,10 @@ import { useImagePicker } from '@/hooks/useImagePicker';
 import { Modal } from '@/modal';
 import { apiSocket } from '@/sync/apiSocket';
 import { gitStatusSync } from '@/sync/gitStatusSync';
-import { sessionGoalAction } from '@/sync/ops';
 import { storage, useIsDataReady, useLocalSetting, useMachine, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
 import { useSession } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
+import { canControlSession } from '@/sync/sessionControlPolicy';
 import { sync } from '@/sync/sync';
 import { t } from '@/text';
 import { isRunningOnMac } from '@/utils/platform';
@@ -36,10 +27,9 @@ import { FileViewPanel } from '@/components/FileViewPanel';
 import { prefetchPierreDiff } from '@/components/diff/PierreDiffView';
 import { GitFileStatus } from '@/sync/gitStatusFiles';
 import { useOverlayNav } from '@/-session/sessionOverlayNav';
-import { formatPathRelativeToHome, getResumeCommandBlock, getSessionAvatarId, getSessionName, shouldShowPiHistoryLoading, useSessionStatus } from '@/utils/sessionUtils';
+import { formatPathRelativeToHome, getSessionAvatarId, getSessionName, shouldShowPiHistoryLoading, useSessionStatus } from '@/utils/sessionUtils';
 import { useSessionQuickActions } from '@/hooks/useSessionQuickActions';
 import { isVersionSupported, MINIMUM_CLI_VERSION } from '@/utils/versionUtils';
-import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
@@ -48,9 +38,6 @@ import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUnistyles } from 'react-native-unistyles';
-import type { ModelMode, PermissionMode } from '@/components/PermissionModeSelector';
-import { resolveAgentDefaultConfig } from '@/sync/agentDefaults';
-import { performAgentGoalAction } from './agentGoalActionHandler';
 import { abortSessionFromMobile } from './sessionAbortAction';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -78,7 +65,7 @@ export const SessionView = React.memo((props: { id: string }) => {
 
     // Base condition: can we show the diff sidebar at all?
     const canShowSidebar = fileDiffsSidebarEnabled
-        && (isRunningOnMac() || Platform.OS === 'web')
+        && isRunningOnMac()
         && windowWidth >= SIDEBAR_MIN_WINDOW_WIDTH
         && isDataReady && !!session;
 
@@ -87,18 +74,11 @@ export const SessionView = React.memo((props: { id: string }) => {
     // Match left sidebar width: 30% of window, clamped to 250–360px
     const sidebarWidth = Math.min(Math.max(Math.floor(windowWidth * 0.3), 250), 360);
 
-    // Animate diff sidebar width.
-    //
-    // On web we snap the value (duration: 0). The animated `width` change
-    // triggers a flex-row reflow on every frame, which in turn re-measures
-    // the entire chat tree (FlatList rows, message blocks). At ~60fps that
-    // grinds to ~15fps on dev builds. Snapping skips the layout thrash —
-    // the chat reflows once instead of 60 times. Native keeps the smooth
-    // animation because it runs on Reanimated's UI thread.
+    // Animate the Mac Catalyst diff sidebar width on Reanimated's UI thread.
     const sidebarAnim = useSharedValue(showSidebar ? 1 : 0);
     React.useEffect(() => {
         sidebarAnim.value = withTiming(showSidebar ? 1 : 0, {
-            duration: Platform.OS === 'web' ? 0 : 250,
+            duration: 250,
             easing: Easing.out(Easing.cubic),
         });
     }, [showSidebar]);
@@ -110,7 +90,7 @@ export const SessionView = React.memo((props: { id: string }) => {
 
     const [sidebarMode, setSidebarMode] = React.useState<SidebarMode>('changes');
 
-    // Overlay state is managed as a browser-style history stack so the
+    // Overlay state is managed as a history stack so the
     // sidebar's back / forward arrows can navigate between chat ↔ diff ↔ file
     // without a per-overlay close button. Stack + cursor live in one piece
     // of state so functional updates stay coordinated.
@@ -178,7 +158,7 @@ export const SessionView = React.memo((props: { id: string }) => {
         return () => useOverlayNav.getState().reset();
     }, [canOverlayBack, canOverlayForward]);
 
-    // Warm Pierre's lazy web chunks while the user is still reading chat.
+    // Warm the lazy diff renderer while the user is still reading chat.
     React.useEffect(() => {
         prefetchPierreDiff();
     }, []);
@@ -201,7 +181,7 @@ export const SessionView = React.memo((props: { id: string }) => {
             isConnected,
         };
     }, [session, isDataReady]);
-    const headerRight = session && deviceType === 'phone' && Platform.OS !== 'web'
+    const headerRight = session && deviceType === 'phone'
         ? (
             <Pressable
                 onPress={() => router.push(`/session/${sessionId}/info`)}
@@ -240,8 +220,8 @@ export const SessionView = React.memo((props: { id: string }) => {
                 }} />
             )}
 
-            {/* Header - always shown on desktop/Mac, hidden in landscape mode only on actual phones */}
-            {!(isLandscape && deviceType === 'phone' && Platform.OS !== 'web') && (
+            {/* Header is hidden in landscape mode on phones. */}
+            {!(isLandscape && deviceType === 'phone') && (
                 <View style={{
                     position: 'absolute',
                     top: 0,
@@ -262,7 +242,7 @@ export const SessionView = React.memo((props: { id: string }) => {
             )}
 
             {/* Content based on state */}
-            <View style={{ flex: 1, paddingTop: !(isLandscape && deviceType === 'phone' && Platform.OS !== 'web') ? safeArea.top + headerHeight : 0 }}>
+            <View style={{ flex: 1, paddingTop: !(isLandscape && deviceType === 'phone') ? safeArea.top + headerHeight : 0 }}>
                 {!isDataReady ? (
                     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                         <ActivityIndicator size="small" color={theme.colors.textSecondary} />
@@ -290,15 +270,7 @@ export const SessionView = React.memo((props: { id: string }) => {
     return (
         <View style={{ flex: 1, flexDirection: 'row' }}>
             <View
-                style={{
-                    flex: 1,
-                    // Web-only: isolate the chat subtree's layout from the
-                    // parent flex-row. If we ever bring back a width
-                    // animation on the right sidebar, `contain` prevents
-                    // layout work from leaking up to the chat tree on
-                    // every frame.
-                    ...(Platform.OS === 'web' ? { contain: 'layout style paint' as any } : {}),
-                }}
+                style={{ flex: 1 }}
             >
                 {mainContent}
                 {diffViewOpen && canShowSidebar && (
@@ -437,7 +409,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const { messages, isLoaded } = useSessionMessages(sessionId);
     const acknowledgedCliVersions = useLocalSetting('acknowledgedCliVersions');
     const zenMode = useLocalSetting('zenMode');
-    const sessionInputHorizontalPadding = Platform.OS === 'web' || isRunningOnMac() || isTablet ? 12 : 8;
+    const sessionInputHorizontalPadding = isRunningOnMac() || isTablet ? 12 : 8;
 
     // Check if CLI version is outdated and not already acknowledged
     const cliVersion = session.metadata?.version;
@@ -445,59 +417,17 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const isCliOutdated = cliVersion && !isVersionSupported(cliVersion, MINIMUM_CLI_VERSION);
     const isAcknowledged = machineId && acknowledgedCliVersions[machineId] === cliVersion;
     const shouldShowCliWarning = isCliOutdated && !isAcknowledged;
-    const flavor = session.metadata?.flavor;
-    const availableModels = React.useMemo(() => (
-        getAvailableModels(flavor, session.metadata, t)
-    ), [flavor, session.metadata]);
-    const availableModes = React.useMemo(() => (
-        getAvailablePermissionModes(flavor, session.metadata, t)
-    ), [flavor, session.metadata]);
-    const agentDefaultOverrides = useSetting('agentDefaultOverrides');
-    const effectiveAgentDefaults = React.useMemo(() => (
-        resolveAgentDefaultConfig(agentDefaultOverrides, flavor)
-    ), [agentDefaultOverrides, flavor]);
-
-    const permissionMode = React.useMemo<PermissionMode | null>(() => (
-        resolveCurrentOption(availableModes, [
-            session.permissionMode,
-            effectiveAgentDefaults.permissionMode,
-            session.metadata?.currentOperatingModeCode,
-        ])
-    ), [availableModes, session.permissionMode, effectiveAgentDefaults.permissionMode, session.metadata?.currentOperatingModeCode]);
-
-    const modelMode = React.useMemo<ModelMode | null>(() => (
-        resolveCurrentOption(availableModels, [
-            session.modelMode,
-            effectiveAgentDefaults.modelMode,
-            session.metadata?.currentModelCode,
-        ])
-    ), [availableModels, session.modelMode, effectiveAgentDefaults.modelMode, session.metadata?.currentModelCode]);
-
-    // Effort level state
-    const modelKey = modelMode?.key ?? 'default';
-    const availableEffortLevels = React.useMemo<EffortLevel[]>(() => (
-        getEffortLevelsForModel(flavor, modelKey)
-    ), [flavor, modelKey]);
-    const effortLevel = React.useMemo<EffortLevel | null>(() => (
-        resolveCurrentOption(availableEffortLevels, [
-            session.effortLevel,
-            effectiveAgentDefaults.effortLevel,
-        ])
-    ), [availableEffortLevels, session.effortLevel, effectiveAgentDefaults.effortLevel]);
+    const sessionIsControllable = canControlSession(session.metadata);
 
     const sessionStatus = useSessionStatus(session);
     const machine = useMachine(session.metadata?.machineId ?? '');
     const sessionUsage = useSessionUsage(sessionId);
     const alwaysShowContextSize = useSetting('alwaysShowContextSize');
     const experiments = useSetting('experiments');
-    const expResumeSession = useSetting('expResumeSession');
     const { canResume, resumeSession, resumingSession } = useSessionQuickActions(session);
     const isDisconnected = !sessionStatus.isConnected;
-    const resumeCommandBlock = getResumeCommandBlock(session);
 
-    // Image attachment state (expImageUpload feature flag)
-    const expImageUpload = useSetting('expImageUpload');
-    const { selectedImages, pickImages, removeImage, clearImages, addImages } = useImagePicker();
+    const { selectedImages, pickImages, removeImage, clearImages } = useImagePicker();
 
     // ChatComposer owns the message state + useDraft subscription. We only
     // hold an imperative handle so handleSend can read the live text and
@@ -518,19 +448,6 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         }
     }, [machineId, cliVersion, acknowledgedCliVersions]);
 
-    // Function to update permission mode
-    const updatePermissionMode = React.useCallback((mode: PermissionMode) => {
-        storage.getState().updateSessionPermissionMode(sessionId, mode.key);
-    }, [sessionId]);
-
-    const updateModelMode = React.useCallback((mode: ModelMode) => {
-        storage.getState().updateSessionModelMode(sessionId, mode.key);
-    }, [sessionId]);
-
-    const updateEffortLevel = React.useCallback((level: EffortLevel) => {
-        storage.getState().updateSessionEffortLevel(sessionId, level.key);
-    }, [sessionId]);
-
     // Memoize header-dependent styles to prevent re-renders
     const headerDependentStyles = React.useMemo(() => ({
         contentContainer: {
@@ -546,19 +463,19 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const handleSend = React.useCallback(() => {
         if (sendInFlightRef.current) return;
         const liveMessage = composerHandleRef.current?.getMessage() ?? '';
-        if (!liveMessage.trim() && !(expImageUpload && selectedImages.length > 0)) return;
-        const attachments = expImageUpload ? selectedImages : undefined;
+        if (!liveMessage.trim() && selectedImages.length === 0) return;
+        const attachments = selectedImages;
         sendInFlightRef.current = true;
         void sync.sendMessage(sessionId, liveMessage, { source: 'chat', attachments }).then((queued) => {
             if (!queued) return;
             composerHandleRef.current?.clearMessageIfUnchanged(liveMessage);
-            if (expImageUpload) clearImages();
+            clearImages();
         }).catch(() => {
             Modal.alert(t('common.error'), t('appWide.messageFailed'));
         }).finally(() => {
             sendInFlightRef.current = false;
         });
-    }, [sessionId, expImageUpload, selectedImages, clearImages]);
+    }, [sessionId, selectedImages, clearImages]);
 
     const handleAbort = React.useCallback(async () => {
         storage.getState().resetSessionAgentOverrides(sessionId);
@@ -591,31 +508,6 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             contextSize: source.contextSize,
         };
     }, [sessionUsage, session.latestUsage]);
-
-    const visibleAgentGoal = React.useMemo(() => (
-        resolveVisibleAgentGoalStatus(session)
-    ), [
-        session.agentState?.agentGoalStatus,
-        session.presence,
-        session.metadata?.claudeSessionId,
-        session.metadata?.codexThreadId,
-    ]);
-    const [goalActionInFlight, setGoalActionInFlight] = React.useState<AgentGoalAction | null>(null);
-    const handleGoalAction = React.useCallback(async (action: AgentGoalAction) => {
-        await performAgentGoalAction({
-            action,
-            currentGoalText: visibleAgentGoal?.text ?? '',
-            promptEditGoal: (currentGoalText) => Modal.prompt(t('components.agentGoalBar.editGoal'), undefined, {
-                placeholder: t('components.agentGoalBar.currentGoal'),
-                defaultValue: currentGoalText,
-                cancelText: t('common.cancel'),
-                confirmText: t('common.save'),
-            }),
-            dispatchGoalAction: (nextAction, objective) => sessionGoalAction(sessionId, nextAction, objective),
-            setInFlight: setGoalActionInFlight,
-            onError: (error) => console.error('Failed to perform goal action', error),
-        });
-    }, [sessionId, visibleAgentGoal?.text]);
 
     // Trigger session visibility and initialize git status sync
     React.useLayoutEffect(() => {
@@ -666,54 +558,50 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         </>
     ) : null;
 
-    const composer = (
+    const composer = sessionIsControllable ? (
         <ChatComposer
             composerHandleRef={composerHandleRef}
             placeholder={t('session.inputPlaceholder')}
             sessionId={sessionId}
-            permissionMode={permissionMode}
-            onPermissionModeChange={updatePermissionMode}
-            availableModes={availableModes}
-            modelMode={modelMode}
-            availableModels={availableModels}
-            onModelModeChange={updateModelMode}
-            effortLevel={effortLevel}
-            availableEffortLevels={availableEffortLevels}
-            onEffortLevelChange={updateEffortLevel}
-            metadata={session.metadata}
             connectionStatus={connectionStatus}
             blockSend={false}
             onSend={handleSend}
             onAbort={isDisconnected ? undefined : handleAbort}
             showAbortButton={sessionStatus.state === 'thinking' || sessionStatus.state === 'waiting'}
             onFileViewerPress={experiments && !isTablet ? handleFileViewerPress : undefined}
-            selectedImages={expImageUpload ? selectedImages : undefined}
-            onPickImages={expImageUpload ? pickImages : undefined}
-            onRemoveImage={expImageUpload ? removeImage : undefined}
-            onAddImages={expImageUpload ? addImages : undefined}
+            selectedImages={selectedImages}
+            onPickImages={pickImages}
+            onRemoveImage={removeImage}
             autocompletePrefixes={AGENT_INPUT_AUTOCOMPLETE_PREFIXES}
             autocompleteSuggestions={handleAutocompleteSuggestions}
             usageData={usageData}
             alwaysShowContextSize={alwaysShowContextSize}
             zenMode={zenMode}
         />
-    );
+    ) : null;
 
-    // Disconnected sessions get the full Resume affordance regardless of
-    // whether they were explicitly archived or just lost their CLI (e.g.
-    // Ctrl-C in terminal — lifecycleState stays 'running', server flips
-    // active=false). InactiveArchivedHint handles both cases: shows the
-    // Resume button when canResume is true, falls back to the
-    // copy-this-command hint when the experiments toggle is off or the
-    // machine isn't reachable.
-    const inactiveHint = isDisconnected && !showPiHistoryLoading ? (
+    const waitingForExtension = session.metadata?.controlState === 'waiting_extension';
+    const shouldShowInactiveHint = !sessionIsControllable || (isDisconnected && !showPiHistoryLoading);
+    const showInstallExtensionHelp = waitingForExtension && sessionIsControllable;
+    const showInstallExtensionInstructions = React.useCallback(() => {
+        Modal.alert(
+            t('session.installPiExtension'),
+            t('session.installPiExtensionInstructions'),
+            [{ text: t('common.ok'), style: 'cancel' }],
+        );
+    }, []);
+
+    // Disconnected Pi sessions resume only through lynttyd's activation path.
+    const inactiveHint = shouldShowInactiveHint ? (
         <CenteredInputWidth horizontalPadding={sessionInputHorizontalPadding}>
             <InactiveArchivedHint
-                resumeCommandBlock={expResumeSession ? resumeCommandBlock : null}
                 hintText={resolveInactiveSessionHint(session, machine ? machine.active === true : null)}
-                canResume={canResume}
+                canResume={sessionIsControllable && canResume}
                 resuming={resumingSession}
+                actionLabel={waitingForExtension ? t('common.retry') : t('sessionInfo.resumeSession')}
                 onResume={resumeSession}
+                canInstallExtension={showInstallExtensionHelp}
+                onInstallExtension={showInstallExtensionInstructions}
             />
         </CenteredInputWidth>
     ) : null;
@@ -721,15 +609,6 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const input = (
         <>
             {inactiveHint}
-            {visibleAgentGoal && (
-                <CenteredInputWidth horizontalPadding={sessionInputHorizontalPadding}>
-                    <AgentGoalBar
-                        goal={visibleAgentGoal}
-                        onAction={handleGoalAction}
-                        inFlightAction={goalActionInFlight}
-                    />
-                </CenteredInputWidth>
-            )}
             {composer}
         </>
     );
@@ -772,7 +651,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             )}
 
             {/* Main content area - no padding since header is overlay */}
-            <View style={{ flexBasis: 0, flexGrow: 1, paddingBottom: safeArea.bottom + ((isRunningOnMac() || Platform.OS === 'web') ? 8 : 0) }}>
+            <View style={{ flexBasis: 0, flexGrow: 1, paddingBottom: safeArea.bottom + (isRunningOnMac() ? 8 : 0) }}>
                 <AgentContentView
                     content={content}
                     input={input}
@@ -823,6 +702,9 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
 function resolveInactiveSessionHint(session: Session, machineOnline: boolean | null): string {
     const metadata = session.metadata;
+    if (!canControlSession(metadata)) {
+        return t('session.legacyHistoryOnly');
+    }
     if (metadata?.lifecycleState === 'archived' || metadata?.archivedBy) {
         return t('session.inactiveArchived');
     }
@@ -830,17 +712,22 @@ function resolveInactiveSessionHint(session: Session, machineOnline: boolean | n
         if (machineOnline === false) {
             return t('session.computerOffline');
         }
+        if (metadata.controlState === 'waiting_extension') {
+            return t('session.waitingForPiExtension');
+        }
         return t('session.historyOnly');
     }
     return t('session.inactiveArchived');
 }
 
 function InactiveArchivedHint(props: {
-    resumeCommandBlock: NonNullable<ReturnType<typeof getResumeCommandBlock>> | null;
     hintText: string;
     canResume: boolean;
     resuming: boolean;
+    actionLabel: string;
     onResume: () => void;
+    canInstallExtension: boolean;
+    onInstallExtension: () => void;
 }) {
     const { theme } = useUnistyles();
     const hintTextStyle = {
@@ -861,11 +748,6 @@ function InactiveArchivedHint(props: {
                 <Text style={hintTextStyle}>
                     {props.hintText}
                 </Text>
-                {props.canResume ? null : props.resumeCommandBlock && (
-                    <Text style={hintTextStyle}>
-                        {t('session.resumeFromTerminal')}
-                    </Text>
-                )}
             </View>
             {props.canResume ? (
                 <Pressable
@@ -885,63 +767,31 @@ function InactiveArchivedHint(props: {
                         <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
                     ) : (
                         <Text style={{ color: theme.colors.button.primary.tint, fontSize: 15, fontWeight: '600' }}>
-                            {t('sessionInfo.resumeSession')}
+                            {props.actionLabel}
                         </Text>
                     )}
                 </Pressable>
-            ) : props.resumeCommandBlock && (
-                <ResumeCommandCopyBlock resumeCommandBlock={props.resumeCommandBlock} />
-            )}
-        </View>
-    );
-}
-
-function ResumeCommandCopyBlock({ resumeCommandBlock }: {
-    resumeCommandBlock: NonNullable<ReturnType<typeof getResumeCommandBlock>>;
-}) {
-    const { theme } = useUnistyles();
-    const [copied, setCopied] = React.useState(false);
-
-    return (
-        <Pressable
-            onPress={async () => {
-                await Clipboard.setStringAsync(resumeCommandBlock.copyText);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            }}
-            style={{
-                minHeight: 48,
-                borderRadius: 14,
-                backgroundColor: theme.colors.surfaceHigh,
-                flexDirection: 'row',
-                gap: 8,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                alignItems: 'flex-start',
-            }}
-        >
-            <View style={{ flex: 1 }}>
-                {resumeCommandBlock.lines.map((line, index) => (
-                    <Text
-                        key={`${line}-${index}`}
-                        style={{
-                            color: theme.colors.text,
-                            fontSize: 13,
-                            lineHeight: 18,
-                            fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                        }}
-                    >
-                        {line}
+            ) : null}
+            {props.canInstallExtension ? (
+                <Pressable
+                    onPress={props.onInstallExtension}
+                    style={({ pressed }) => ({
+                        height: 40,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: theme.colors.divider,
+                        opacity: pressed ? 0.7 : 1,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginHorizontal: 8,
+                    })}
+                >
+                    <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '600' }}>
+                        {t('session.installPiExtension')}
                     </Text>
-                ))}
-            </View>
-            <Ionicons
-                name={copied ? 'checkmark' : 'copy-outline'}
-                size={16}
-                color={copied ? '#30D158' : theme.colors.textSecondary}
-                style={{ marginTop: 1 }}
-            />
-        </Pressable>
+                </Pressable>
+            ) : null}
+        </View>
     );
 }
 

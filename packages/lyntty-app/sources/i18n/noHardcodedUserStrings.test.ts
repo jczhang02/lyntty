@@ -50,7 +50,7 @@ describe('no-hardcoded-user-strings', () => {
                     code: "const view = <Text>$ npm i -g lyntty</Text>;",
                 },
                 {
-                    code: "const view = <>{Platform.OS === 'web' && <Text>{t('common.ok')}</Text>}</>;",
+                    code: "const view = <>{Platform.OS === 'ios' && <Text>{t('common.ok')}</Text>}</>;",
                 },
             ],
             invalid: [

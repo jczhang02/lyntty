@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { getNewSessionSidebarLayout } from './newSessionSidebarLayout';
 
 describe('getNewSessionSidebarLayout', () => {
-    it('enables the right sidebar on supported wide web layouts', () => {
+    it('enables the right sidebar on supported wide Mac Catalyst layouts', () => {
         expect(getNewSessionSidebarLayout({
-            platform: 'web',
-            isMac: false,
+            isMac: true,
             fileDiffsSidebarEnabled: true,
             zenMode: false,
             windowWidth: 1200,
@@ -18,8 +17,7 @@ describe('getNewSessionSidebarLayout', () => {
 
     it('disables the sidebar when the setting is off', () => {
         expect(getNewSessionSidebarLayout({
-            platform: 'web',
-            isMac: false,
+            isMac: true,
             fileDiffsSidebarEnabled: false,
             zenMode: false,
             windowWidth: 1200,
@@ -28,8 +26,7 @@ describe('getNewSessionSidebarLayout', () => {
 
     it('disables the sidebar in zen mode', () => {
         expect(getNewSessionSidebarLayout({
-            platform: 'web',
-            isMac: false,
+            isMac: true,
             fileDiffsSidebarEnabled: true,
             zenMode: true,
             windowWidth: 1200,
@@ -38,17 +35,15 @@ describe('getNewSessionSidebarLayout', () => {
 
     it('disables the sidebar below the minimum width', () => {
         expect(getNewSessionSidebarLayout({
-            platform: 'web',
-            isMac: false,
+            isMac: true,
             fileDiffsSidebarEnabled: true,
             zenMode: false,
             windowWidth: 1099,
         }).showSidebar).toBe(false);
     });
 
-    it('disables the sidebar on unsupported native platforms', () => {
+    it('disables the sidebar on phones and tablets', () => {
         expect(getNewSessionSidebarLayout({
-            platform: 'ios',
             isMac: false,
             fileDiffsSidebarEnabled: true,
             zenMode: false,

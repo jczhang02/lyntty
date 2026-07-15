@@ -53,7 +53,7 @@ export const useNewSessionDraft = create<NewSessionDraftState>()((set, get) => (
     input: initial?.input ?? '',
     selectedMachineId: initial?.selectedMachineId ?? null,
     selectedPath: initial?.selectedPath ?? null,
-    agentType: initial?.agentType ?? 'claude',
+    agentType: initial?.agentType ?? 'pi',
     permissionMode: initial?.permissionMode ?? 'default',
     modelMode: initial?.modelMode ?? 'default',
     sessionType: initial?.sessionType ?? 'simple',

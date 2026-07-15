@@ -40,7 +40,6 @@ export const ItemList = React.memo<ItemListProps>((props) => {
     } = props;
 
     const isIOS = Platform.OS === 'ios';
-    const isWeb = Platform.OS === 'web';
 
     // Override background for non-inset grouped lists on iOS
     const backgroundColor = (isIOS && !insetGrouped) ? '#FFFFFF' : theme.colors.groupped.background;
@@ -59,7 +58,7 @@ export const ItemList = React.memo<ItemListProps>((props) => {
             showsVerticalScrollIndicator={scrollViewProps.showsVerticalScrollIndicator !== undefined
                 ? scrollViewProps.showsVerticalScrollIndicator
                 : true}
-            contentInsetAdjustmentBehavior={(isIOS && !isWeb) ? 'automatic' : undefined}
+            contentInsetAdjustmentBehavior={isIOS ? 'automatic' : undefined}
             {...scrollViewProps}
         >
             {children}

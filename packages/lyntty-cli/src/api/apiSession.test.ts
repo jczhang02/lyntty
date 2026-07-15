@@ -677,6 +677,34 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect(onMessage).toHaveBeenCalledWith(agentMessage);
     });
 
+    it('preserves pre-binding file/text order for attachment ownership', () => {
+        const client = new ApiSessionClient('fake-token', session);
+        const order: string[] = [];
+        const fileMessage = (id: string) => ({
+            role: 'session',
+            content: {
+                type: 'session',
+                data: {
+                    id: `file-${id}`,
+                    time: 1000,
+                    role: 'user',
+                    ev: { t: 'file', ref: `ref-${id}`, name: `${id}.png`, size: 3, mimeType: 'image/png' },
+                },
+            },
+        });
+        const userMessage = (text: string) => ({ role: 'user', content: { type: 'text', text } });
+
+        (client as any).routeIncomingMessage(fileMessage('a'), 'file-a');
+        (client as any).routeIncomingMessage(userMessage('text-a'), 'text-a');
+        (client as any).routeIncomingMessage(fileMessage('b'), 'file-b');
+        (client as any).routeIncomingMessage(userMessage('text-b'), 'text-b');
+
+        client.onFileEvent((message) => order.push(message.content.data.ev.ref));
+        client.onUserMessage((message) => order.push(message.content.text));
+
+        expect(order).toEqual(['ref-a', 'text-a', 'ref-b', 'text-b']);
+    });
+
     it('routes file events without logging sensitive names or refs', async () => {
         const client = new ApiSessionClient('fake-token', session);
         const onFileEvent = vi.fn();

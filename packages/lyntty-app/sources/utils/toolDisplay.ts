@@ -90,10 +90,6 @@ export function isTerminalToolName(name: string): boolean {
     return TERMINAL_TOOL_NAMES.has(name);
 }
 
-export function shouldRenderToolCardHeader(toolName: string, platformOS: string): boolean {
-    return !(platformOS === 'web' && toolName === 'CodexPatch');
-}
-
 export function getToolSummaryCategory(toolName: string): ToolSummaryCategory {
     if (TERMINAL_TOOL_NAMES.has(toolName)) {
         return 'terminal';

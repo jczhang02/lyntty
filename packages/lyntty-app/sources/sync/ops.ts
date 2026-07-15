@@ -7,6 +7,8 @@ import { apiSocket } from './apiSocket';
 import { sync } from './sync';
 import type { MachineMetadata, PiMachineSessionRecord, PiRecoveryState } from './storageTypes';
 import type { PiHistoryPageResult } from './piHistoryPage';
+import { storage } from './storage';
+import { canControlSession } from './sessionControlPolicy';
 
 // Strict type definitions for all operations
 
@@ -24,11 +26,6 @@ interface SessionPermissionRequest {
 // Mode change operation types
 interface SessionModeChangeRequest {
     to: 'remote' | 'local';
-}
-
-interface SessionGoalActionRequest {
-    action: 'clear' | 'stop' | 'edit';
-    objective?: string;
 }
 
 // Bash operation types
@@ -147,69 +144,9 @@ export interface SpawnSessionOptions {
     sessionId?: string;
     approvedNewDirectoryCreation?: boolean;
     token?: string;
-    agent?: 'pi' | 'codex' | 'claude' | 'gemini' | 'openclaw';
+    agent?: 'pi';
     takeoverChoice?: 'wait' | 'stop' | 'interrupt';
-    /**
-     * If set, the daemon spawns the agent with `--resume <id>` so the new
-     * Lyntty session attaches to a pre-existing on-disk Claude conversation
-     * file. Used by the session fork / duplicate flow.
-     */
-    resumeClaudeSessionId?: string;
-    /**
-     * If set, the daemon spawns Codex with `--resume <id>` so the new Lyntty
-     * session attaches to an app-server thread created by fork / duplicate.
-     */
-    resumeCodexThreadId?: string;
-    /** Lyntty session id this fork was branched from (lineage). */
-    parentSessionId?: string;
-    /** Lyntty message id used as the rewind point (only set for "duplicate"). */
-    forkedFromMessageId?: string;
 }
-
-// Options for forking a Claude session on a machine
-export interface ClaudeForkSessionOptions {
-    machineId: string;
-    /** Working directory of the source session — used to derive the Claude project dir. */
-    directory: string;
-    /** Source Claude session UUID (Session.metadata.claudeSessionId on the parent). */
-    claudeSessionId: string;
-}
-
-export type ClaudeForkSessionResult =
-    | { type: 'success'; newClaudeSessionId: string }
-    | { type: 'error'; errorMessage: string };
-
-export interface ClaudeRewindPoint {
-    uuid: string;
-    text: string;
-    timestamp: number;
-}
-
-export type ClaudeListRewindPointsResult =
-    | { type: 'success'; points: ClaudeRewindPoint[] }
-    | { type: 'error'; errorMessage: string };
-
-export interface CodexForkThreadOptions {
-    machineId: string;
-    /** Working directory of the source session, passed to Codex thread/fork. */
-    directory: string;
-    /** Source Codex app-server thread id (Session.metadata.codexThreadId). */
-    codexThreadId: string;
-}
-
-export type CodexForkThreadResult =
-    | { type: 'success'; newCodexThreadId: string }
-    | { type: 'error'; errorMessage: string };
-
-export interface CodexRewindPoint {
-    itemId: string;
-    text: string;
-    timestamp: number;
-}
-
-export type CodexListRewindPointsResult =
-    | { type: 'success'; points: CodexRewindPoint[] }
-    | { type: 'error'; errorMessage: string };
 
 export type PiResumeTakeoverChoice = 'wait' | 'stop' | 'interrupt';
 
@@ -237,7 +174,7 @@ export type EnsurePiSessionMirrorResult =
  */
 export async function machineSpawnNewSession(options: SpawnSessionOptions): Promise<SpawnSessionResult> {
 
-    const { machineId, directory, sessionId, approvedNewDirectoryCreation = false, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId } = options;
+    const { machineId, directory, sessionId, approvedNewDirectoryCreation = false, token, agent, takeoverChoice } = options;
 
     try {
         const result = await apiSocket.machineRPC<SpawnSessionResult, {
@@ -247,16 +184,12 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
             approvedNewDirectoryCreation?: boolean,
             machineId?: string,
             token?: string,
-            agent?: 'pi' | 'codex' | 'claude' | 'gemini' | 'openclaw',
+            agent?: 'pi',
             takeoverChoice?: 'wait' | 'stop' | 'interrupt',
-            resumeClaudeSessionId?: string,
-            resumeCodexThreadId?: string,
-            parentSessionId?: string,
-            forkedFromMessageId?: string,
         }>(
             machineId,
             'spawn-lyntty-session',
-            { type: 'spawn-in-directory', directory, sessionId, approvedNewDirectoryCreation, machineId, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId }
+            { type: 'spawn-in-directory', directory, sessionId, approvedNewDirectoryCreation, machineId, token, agent, takeoverChoice }
         );
         return result;
     } catch (error) {
@@ -264,157 +197,6 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
         return {
             type: 'error',
             errorMessage: error instanceof Error ? error.message : 'Failed to spawn session'
-        };
-    }
-}
-
-/**
- * Copy the source session's Claude JSONL on the daemon machine and return
- * the new Claude session UUID. Caller then spawns a fresh Lyntty session
- * with `resumeClaudeSessionId` set to that UUID to attach a new Lyntty
- * session row to the copied conversation.
- */
-export async function claudeForkSession(options: ClaudeForkSessionOptions): Promise<ClaudeForkSessionResult> {
-    const { machineId, directory, claudeSessionId } = options;
-    try {
-        const result = await apiSocket.machineRPC<ClaudeForkSessionResult, {
-            directory: string;
-            claudeSessionId: string;
-        }>(
-            machineId,
-            'claude-fork-session',
-            { directory, claudeSessionId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to fork session',
-        };
-    }
-}
-
-/**
- * Read the on-disk Claude JSONL on the daemon machine and return user-text
- * messages with their underlying claudeUuid + timestamp. Disk is the
- * source of truth for the rewind picker — server-side envelopes miss
- * claudeUuid for any user message that travelled via the legacy
- * `sentFrom: 'web'` path.
- */
-export async function claudeListRewindPoints(
-    options: ClaudeForkSessionOptions,
-): Promise<ClaudeListRewindPointsResult> {
-    const { machineId, directory, claudeSessionId } = options;
-    try {
-        const result = await apiSocket.machineRPC<ClaudeListRewindPointsResult, {
-            directory: string;
-            claudeSessionId: string;
-        }>(
-            machineId,
-            'claude-list-rewind-points',
-            { directory, claudeSessionId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to list rewind points',
-        };
-    }
-}
-
-/**
- * Same as claudeForkSession, but truncates the copied JSONL right after the
- * line with `cutAfterUuid` (keeping the chosen message as the last entry,
- * dropping every line after — including the agent's response). Use this
- * for "rewind to message N and try again" flows. Daemon hard-fails if the
- * UUID isn't present in the source — never silently produces a
- * non-truncated copy.
- */
-export async function claudeDuplicateSession(
-    options: ClaudeForkSessionOptions & { cutAfterUuid: string },
-): Promise<ClaudeForkSessionResult> {
-    const { machineId, directory, claudeSessionId, cutAfterUuid } = options;
-    try {
-        const result = await apiSocket.machineRPC<ClaudeForkSessionResult, {
-            directory: string;
-            claudeSessionId: string;
-            cutAfterUuid: string;
-        }>(
-            machineId,
-            'claude-duplicate-session',
-            { directory, claudeSessionId, cutAfterUuid },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to duplicate session',
-        };
-    }
-}
-
-export async function codexForkThread(options: CodexForkThreadOptions): Promise<CodexForkThreadResult> {
-    const { machineId, directory, codexThreadId } = options;
-    try {
-        const result = await apiSocket.machineRPC<CodexForkThreadResult, {
-            directory: string;
-            codexThreadId: string;
-        }>(
-            machineId,
-            'codex-fork-thread',
-            { directory, codexThreadId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to fork Codex thread',
-        };
-    }
-}
-
-export async function codexDuplicateThread(
-    options: CodexForkThreadOptions & { cutAfterItemId: string },
-): Promise<CodexForkThreadResult> {
-    const { machineId, directory, codexThreadId, cutAfterItemId } = options;
-    try {
-        const result = await apiSocket.machineRPC<CodexForkThreadResult, {
-            directory: string;
-            codexThreadId: string;
-            cutAfterItemId: string;
-        }>(
-            machineId,
-            'codex-duplicate-thread',
-            { directory, codexThreadId, cutAfterItemId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to duplicate Codex thread',
-        };
-    }
-}
-
-export async function codexListRewindPoints(
-    options: CodexForkThreadOptions,
-): Promise<CodexListRewindPointsResult> {
-    const { machineId, directory, codexThreadId } = options;
-    try {
-        const result = await apiSocket.machineRPC<CodexListRewindPointsResult, {
-            directory: string;
-            codexThreadId: string;
-        }>(
-            machineId,
-            'codex-list-rewind-points',
-            { directory, codexThreadId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to list Codex rewind points',
         };
     }
 }
@@ -477,7 +259,10 @@ export async function machineResumePiWithActivationChoice(
     }
 
     const takeoverChoice = await chooseTakeover();
-    if (!takeoverChoice) {
+    // Wait is the safe no-takeover choice: leave the session queued for its
+    // Pi extension. It must never start a managed runtime merely because no
+    // current owner was observable at this instant.
+    if (!takeoverChoice || takeoverChoice === 'wait') {
         return null;
     }
     return machineResumeSession({ ...options, takeoverChoice });
@@ -703,10 +488,18 @@ export async function sessionAbort(sessionId: string): Promise<void> {
     });
 }
 
+function assertSessionControllable(sessionId: string): void {
+    const session = storage.getState().sessions[sessionId];
+    if (!session || !canControlSession(session.metadata)) {
+        throw new Error('This session is available as history only');
+    }
+}
+
 /**
  * Allow a permission request
  */
 export async function sessionAllow(sessionId: string, id: string, mode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan', allowedTools?: string[], decision?: 'approved' | 'approved_for_session', updatedInput?: Record<string, unknown>): Promise<void> {
+    assertSessionControllable(sessionId);
     const request: SessionPermissionRequest = { id, approved: true, mode, allowTools: allowedTools, decision, updatedInput };
     await apiSocket.sessionRPC(sessionId, 'permission', request);
 }
@@ -715,6 +508,7 @@ export async function sessionAllow(sessionId: string, id: string, mode?: 'defaul
  * Deny a permission request
  */
 export async function sessionDeny(sessionId: string, id: string, mode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan', allowedTools?: string[], decision?: 'denied' | 'abort'): Promise<void> {
+    assertSessionControllable(sessionId);
     const request: SessionPermissionRequest = { id, approved: false, mode, allowTools: allowedTools, decision };
     await apiSocket.sessionRPC(sessionId, 'permission', request);
 }
@@ -730,20 +524,6 @@ export async function sessionSwitch(sessionId: string, to: 'remote' | 'local'): 
         request,
     );
     return response;
-}
-
-/**
- * Request an agent-owned goal action.
- */
-export async function sessionGoalAction(
-    sessionId: string,
-    action: SessionGoalActionRequest['action'],
-    objective?: string,
-): Promise<void> {
-    await apiSocket.sessionRPC(sessionId, 'goal-action', {
-        action,
-        ...(objective !== undefined ? { objective } : {}),
-    } satisfies SessionGoalActionRequest);
 }
 
 /**
@@ -958,129 +738,6 @@ export async function sessionDelete(sessionId: string): Promise<{ success: boole
             message: error instanceof Error ? error.message : 'Unknown error'
         };
     }
-}
-
-type ClaudeForkSource = {
-    kind?: 'claude';
-    sessionId: string;
-    machineId: string;
-    directory: string;
-    claudeSessionId: string;
-};
-
-type CodexForkSource = {
-    kind: 'codex';
-    sessionId: string;
-    machineId: string;
-    directory: string;
-    codexThreadId: string;
-};
-
-// Forking source description used by forkAndSpawn.
-export type ForkSource = ClaudeForkSource | CodexForkSource;
-
-type ForkOptions = {
-    cutAfterUuid?: string;
-    cutAfterItemId?: string;
-    forkedFromMessageId?: string;
-};
-
-/**
- * Two-step orchestrator for the session fork / duplicate flow:
- *   1. Ask the daemon to copy (and optionally truncate) the source Claude
- *      JSONL — returns a fresh Claude session UUID.
- *   2. Spawn a new Lyntty session on the same machine with
- *      `resumeClaudeSessionId` set to that UUID so `claude --resume` picks
- *      up the copied conversation.
- *
- * Lineage (parentSessionId, forkedFromMessageId) rides through the spawn
- * RPC into env vars, then into the new Lyntty session's metadata at start
- * — so the parent link survives without any server-side schema change.
- */
-export async function forkAndSpawn(
-    source: ForkSource,
-    opts: ForkOptions = {},
-): Promise<SpawnSessionResult> {
-    if (source.kind === 'codex') {
-        const forkResult = opts.cutAfterItemId
-            ? await codexDuplicateThread({
-                machineId: source.machineId,
-                directory: source.directory,
-                codexThreadId: source.codexThreadId,
-                cutAfterItemId: opts.cutAfterItemId,
-            })
-            : await codexForkThread({
-                machineId: source.machineId,
-                directory: source.directory,
-                codexThreadId: source.codexThreadId,
-            });
-
-        if (forkResult.type !== 'success') {
-            return { type: 'error', errorMessage: forkResult.errorMessage };
-        }
-
-        const spawnResult = await machineSpawnNewSession({
-            machineId: source.machineId,
-            directory: source.directory,
-            agent: 'codex',
-            approvedNewDirectoryCreation: false,
-            resumeCodexThreadId: forkResult.newCodexThreadId,
-            parentSessionId: source.sessionId,
-            forkedFromMessageId: opts.forkedFromMessageId,
-        });
-
-        if (spawnResult.type === 'success') {
-            try {
-                await sync.refreshSessions();
-            } catch {
-                // Refresh is best-effort; broadcast sync will still hydrate.
-            }
-        }
-
-        return spawnResult;
-    }
-
-    const forkResult = opts.cutAfterUuid
-        ? await claudeDuplicateSession({
-            machineId: source.machineId,
-            directory: source.directory,
-            claudeSessionId: source.claudeSessionId,
-            cutAfterUuid: opts.cutAfterUuid,
-        })
-        : await claudeForkSession({
-            machineId: source.machineId,
-            directory: source.directory,
-            claudeSessionId: source.claudeSessionId,
-        });
-
-    if (forkResult.type !== 'success') {
-        return { type: 'error', errorMessage: forkResult.errorMessage };
-    }
-
-    const spawnResult = await machineSpawnNewSession({
-        machineId: source.machineId,
-        directory: source.directory,
-        agent: 'claude',
-        approvedNewDirectoryCreation: false,
-        resumeClaudeSessionId: forkResult.newClaudeSessionId,
-        parentSessionId: source.sessionId,
-        forkedFromMessageId: opts.forkedFromMessageId,
-    });
-
-    // Pull the newly-created session row into local sync state before we
-    // hand control back to the caller — otherwise router.replace into the
-    // new session id races the broadcast and the app screams
-    // "Session X not found" until the next sync tick lands.
-    if (spawnResult.type === 'success') {
-        try {
-            await sync.refreshSessions();
-        } catch {
-            // Refresh is best-effort; the broadcast will still hydrate the
-            // session shortly even if this fetch flaked.
-        }
-    }
-
-    return spawnResult;
 }
 
 // Export types for external use

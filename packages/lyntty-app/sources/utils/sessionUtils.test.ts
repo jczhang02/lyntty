@@ -10,11 +10,6 @@ vi.mock('@/text', () => ({
     },
 }));
 
-vi.mock('./resumeCommand', () => ({
-    buildResumeCommand: vi.fn(),
-    buildResumeCommandBlock: vi.fn(),
-}));
-
 function session(overrides: Partial<Session> = {}): Session {
     return {
         id: 'session-1',

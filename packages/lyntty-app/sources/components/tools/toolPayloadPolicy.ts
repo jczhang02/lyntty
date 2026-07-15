@@ -4,5 +4,5 @@ export function shouldHideGenericToolPayload(metadata: Metadata | null, hasSpeci
     if (hasSpecializedFullView) {
         return false;
     }
-    return metadata?.flavor === 'pi' || metadata?.flavor === 'gemini';
+    return metadata?.flavor === 'pi';
 }

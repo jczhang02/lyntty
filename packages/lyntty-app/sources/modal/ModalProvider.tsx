@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ModalState, ModalConfig, ModalContextValue } from './types';
 import { Modal } from './ModalManager';
-import { WebAlertModal } from './components/WebAlertModal';
-import { WebPromptModal } from './components/WebPromptModal';
+import { PromptModal } from './components/PromptModal';
 import { CustomModal } from './components/CustomModal';
 
 const ModalContext = createContext<ModalContextValue | undefined>(undefined);
@@ -46,9 +45,7 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const dismissModal = useCallback((modal: ModalConfig) => {
-        if (modal.type === 'confirm') {
-            Modal.resolveConfirm(modal.id, false);
-        } else if (modal.type === 'prompt') {
+        if (modal.type === 'prompt') {
             Modal.resolvePrompt(modal.id, null);
         }
         hideModal(modal.id);
@@ -83,24 +80,8 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
             {children}
             {currentModal && (
                 <>
-                    {currentModal.type === 'alert' && (
-                        <WebAlertModal
-                            config={currentModal}
-                            onClose={() => hideModal(currentModal.id)}
-                        />
-                    )}
-                    {currentModal.type === 'confirm' && (
-                        <WebAlertModal
-                            config={currentModal}
-                            onClose={() => hideModal(currentModal.id)}
-                            onConfirm={(value) => {
-                                Modal.resolveConfirm(currentModal.id, value);
-                                hideModal(currentModal.id);
-                            }}
-                        />
-                    )}
                     {currentModal.type === 'prompt' && (
-                        <WebPromptModal
+                        <PromptModal
                             config={currentModal}
                             onClose={() => hideModal(currentModal.id)}
                             onConfirm={(value) => {

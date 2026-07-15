@@ -71,7 +71,7 @@ describe('translation coverage', () => {
     });
 
     it('keeps the app-wide i18n guard dictionary populated', () => {
-        expect(Object.keys(en.appWide)).toHaveLength(181);
+        expect(Object.keys(en.appWide)).toHaveLength(150);
     });
 
     it('localizes app-wide Simplified and Traditional Chinese strings', () => {

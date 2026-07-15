@@ -181,31 +181,21 @@ describe('settings', () => {
                 showLineNumbersInToolViews: false,
                 wrapLinesInDiffs: true,
                 diffStyle: 'unified',
-                analyticsOptOut: false,
-                inferenceOpenAIKey: null,
                 experiments: false,
                 alwaysShowContextSize: false,
-                agentInputEnterToSend: true,
                 avatarStyle: 'gradient',
-                showFlavorIcons: false,
                 hideInactiveSessions: false,
-                expResumeSession: false,
                 fileDiffsSidebar: false,
                 groupToolCalls: false,
-                expImageUpload: false,
                 sendMobileContextToPi: true,
                 reviewPromptAnswered: false,
                 reviewPromptLikedApp: null,
-                voiceAssistantLanguage: null,
-                voiceCustomAgentId: null,
-                voiceBypassToken: false,
                 preferredLanguage: null,
                 recentMachinePaths: [],
                 lastUsedAgent: null,
                 lastUsedPermissionMode: null,
                 lastUsedModelMode: null,
                 agentDefaultOverrides: {},
-                dismissedCLIWarnings: { perMachine: {}, global: {} },
             });
         });
 
@@ -346,13 +336,13 @@ describe('settings', () => {
 
             const pendingChanges: Partial<Settings> = {
                 experiments: true,
-                analyticsOptOut: true,
+                hideInactiveSessions: true,
             };
 
             const merged = applySettings(serverSettings, pendingChanges);
 
             expect(merged.experiments).toBe(true);
-            expect(merged.analyticsOptOut).toBe(true);
+            expect(merged.hideInactiveSessions).toBe(true);
             expect(merged.viewInline).toBe(false);
         });
 
@@ -417,41 +407,39 @@ describe('settings', () => {
             const serverSettings = settingsParse({
                 viewInline: false,
                 experiments: false,
-                analyticsOptOut: false
+                hideInactiveSessions: false
             });
 
             const pendingChanges: Partial<Settings> = {
                 viewInline: true,
-                analyticsOptOut: true
+                hideInactiveSessions: true
             };
 
             const merged = applySettings(serverSettings, pendingChanges);
 
             expect(merged.viewInline).toBe(true);
-            expect(merged.analyticsOptOut).toBe(true);
+            expect(merged.hideInactiveSessions).toBe(true);
             expect(merged.experiments).toBe(false);
         });
 
         it('should preserve complex nested structures during merge', () => {
             const serverSettings = settingsParse({
-                dismissedCLIWarnings: {
-                    perMachine: { 'machine-1': { claude: true } },
-                    global: { codex: true }
+                agentDefaultOverrides: {
+                    pi: { permissionMode: 'default' },
                 }
             });
 
             const pendingChanges: Partial<Settings> = {
                 experiments: true,
-                dismissedCLIWarnings: {
-                    perMachine: { 'machine-2': { claude: true } },
-                    global: {}
+                agentDefaultOverrides: {
+                    pi: { permissionMode: 'safe-yolo', modelMode: 'default' },
                 }
             };
 
             const merged = applySettings(serverSettings, pendingChanges);
 
             expect(merged.experiments).toBe(true);
-            expect(merged.dismissedCLIWarnings).toEqual(pendingChanges.dismissedCLIWarnings);
+            expect(merged.agentDefaultOverrides).toEqual(pendingChanges.agentDefaultOverrides);
         });
     });
 });

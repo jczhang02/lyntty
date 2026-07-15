@@ -30,7 +30,7 @@ import { expandEnvironmentVariables } from '@/utils/expandEnvVars';
 import { detectCLIAvailability } from '@/utils/detectCLI';
 import { detectResumeSupport } from '@/resume/localRemoteAuth';
 import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
-import { resolveActivePiSessionReuse, resolvePiActivationLock } from './activationLock';
+import { resolveActivePiSessionReuse, resolvePiActivationLock, shouldKeepWaitingForPiExtension } from './activationLock';
 import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
 import { discoverLocalPiSessions, discoverLocalPiSessionsPage, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
 import { mapPiSessionHistoryPageToEnvelopes, mapPiSessionHistoryToEnvelopes } from '@/pi/runPiHistory';
@@ -38,13 +38,15 @@ import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalM
 import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
 import { PiSessionProtocolMapper } from '@/pi/runPiSessionProtocol';
 import { createEnvelope, type SessionEnvelope } from 'lyntty-wire';
-import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiCommandInfo, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
+import { attachImagesToPiRemoteCommand, isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiCommandInfo, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
 import { consumePiCompletionNotificationDecision, PiCompletionNotificationTracker, sendPiDoneNotification } from '@/pi/piCompletionNotifications';
 import { applyPiCommandFailure, isStalePiCommandAck, removeTerminalPiCommandPrefix, resolvePiCommandAdmission, selectNextQueuedPiCommand } from './piCommandQueue';
 import { PiActivationLeaseRegistry } from './activationLeaseRegistry';
 import { isExternalPiMirrorActive, resolveExternalPiActivationLease, resolveStalePiMirrorCleanup } from './externalPiActivation';
 import { applyPiExtensionSequence } from './piExtensionSequence';
 import { claimPiExtensionInstance, isPiExtensionCommandOwner } from './piExtensionOwnership';
+import { bindPiRemoteInput, type PiRemoteImage } from '@/pi/piRemoteInput';
+import { resolvePiSessionDisplayName } from '@/pi/piSessionDisplayName';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -597,6 +599,12 @@ export async function startDaemon(): Promise<void> {
       const activationLeaseKey = `${targetMachineId}:${sessionId ?? `cwd:${directory}`}`;
       return piActivationLeases.run(activationLeaseKey, async () => {
         try {
+        if (shouldKeepWaitingForPiExtension(sessionId, options.takeoverChoice)) {
+          return {
+            type: 'error',
+            errorMessage: 'Waiting for Pi extension. No replacement runtime was started.',
+          };
+        }
         const externalActivation = await resolveExternalPiActivation(spawnOptions);
         if (externalActivation.type === 'reuse') {
           logger.debug(`[DAEMON RUN] Reusing extension-backed Pi runtime ${externalActivation.sessionId} for Pi session ${sessionId}`);
@@ -1120,7 +1128,11 @@ export async function startDaemon(): Promise<void> {
       sendRemoteCommandNotice(mirror, reason);
     };
 
-    const queueRemotePiCommand = (mirror: ExternalPiMirrorState, message: { localKey?: string; content: { text: string }; meta?: { sentFrom?: string; sendMobileContextToPi?: boolean } }): void => {
+    const queueRemotePiCommand = (
+      mirror: ExternalPiMirrorState,
+      message: { localKey?: string; content: { text: string }; meta?: { sentFrom?: string; sendMobileContextToPi?: boolean } },
+      images: PiRemoteImage[],
+    ): void => {
       const localKey = message.localKey ?? `remote:${mirror.nextCommandSeq}`;
       const admission = resolvePiCommandAdmission({
         queuedCount: mirror.commands.length,
@@ -1135,12 +1147,16 @@ export async function startDaemon(): Promise<void> {
         markRemotePiCommandFailed(mirror, localKey, 'Pi command queue is full. Message was not delivered; retry after the queued commands finish.');
         return;
       }
-      const command = parseLynttyPiRemoteCommand(message.content.text, { isStreaming: mirror.isStreaming });
-      if (!command) {
+      const parsedCommand = parseLynttyPiRemoteCommand(message.content.text, {
+        isStreaming: mirror.isStreaming,
+        hasImages: images.length > 0,
+      });
+      if (!parsedCommand) {
         logger.debug('[pi] Rejected unsupported remote Pi command', { sessionId: mirror.sessionId, localKey });
         markRemotePiCommandFailed(mirror, localKey, remoteCommandRejectionText(message.content.text));
         return;
       }
+      const command = attachImagesToPiRemoteCommand(parsedCommand, images);
       if (command.type === 'abort') {
         mirror.completionNotifications.suppressCurrentTurn();
       }
@@ -1614,7 +1630,8 @@ export async function startDaemon(): Promise<void> {
 
       const local = await findPiSessionNearDirectory(piSessionId, options.directory, options.sessionFile);
       if (!local && !options.sessionFile) {
-        return { type: 'error' as const, errorMessage: `Pi session ${piSessionId} was not found on this node` };
+        logger.warn('[pi] Requested session was not found on this node', { piSessionId });
+        return { type: 'error' as const, errorMessage: 'This Pi session was not found on this node.' };
       }
 
       const sessionFile = local?.path ?? options.sessionFile;
@@ -1641,7 +1658,7 @@ export async function startDaemon(): Promise<void> {
         sharedControlEnabled: true,
         flavor: 'pi',
         piSessionId,
-        name: local?.name ?? local?.firstMessage ?? piSessionId,
+        name: resolvePiSessionDisplayName(local?.name, local?.firstMessage),
         piMessageCount: local?.messageCount ?? 0,
         piFirstMessage: local?.firstMessage,
         piHistoryCursor: page.nextCursor,
@@ -1875,8 +1892,16 @@ export async function startDaemon(): Promise<void> {
           recentAcceptedRemoteCommands: [],
         };
         externalPiMirrors.set(mirrorKey, mirrorState);
-        sessionClient.onUserMessage((message) => {
-          queueRemotePiCommand(mirrorState!, message);
+        bindPiRemoteInput(sessionClient, ({ message, images }) => {
+          queueRemotePiCommand(mirrorState!, message, images);
+        }, (error) => {
+          logger.warn('[pi] Failed to prepare terminal Pi attachments', {
+            sessionId: response.id,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          });
+        }, ({ message, reason }) => {
+          const localKey = message.localKey ?? `rejected:${randomUUID()}`;
+          markRemotePiCommandFailed(mirrorState!, localKey, reason);
         });
         sessionClient.rpcHandlerManager.registerHandler('killSession', async () => {
           const state = mirrorState;

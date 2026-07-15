@@ -30,10 +30,10 @@ tr '\0' ' ' < "/proc/$pane_pid/cmdline" | grep -Eq 'pi .*--session '
 baseline_occurrences="$(tmux capture-pane -p -S -1200 -t "$pane_id" | grep -F -c "$LYNTTY_MAESTRO_PONG" || true)"
 [[ "$baseline_occurrences" -eq 0 ]]
 
-daemon_pid="$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync(process.argv[1]));process.stdout.write(String(p.pid))" "$node_home/daemon.state.json")"
+daemon_pid="$(bun -e 'const p = await Bun.file(process.argv[1]).json(); process.stdout.write(String(p.pid))' "$node_home/daemon.state.json")"
 tr '\0' '\n' < "/proc/$daemon_pid/environ" | grep -Fqx "HOME=$pi_home"
 tr '\0' '\n' < "/proc/$daemon_pid/environ" | grep -Fqx "LYNTTY_HOME_DIR=$node_home"
-daemon_log="$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync(process.argv[1]));process.stdout.write(p.daemonLogPath)" "$node_home/daemon.state.json")"
+daemon_log="$(bun -e 'const p = await Bun.file(process.argv[1]).json(); process.stdout.write(p.daemonLogPath)' "$node_home/daemon.state.json")"
 baseline_lines="$(wc -l < "$daemon_log")"
 baseline_instance="$(grep "activeExtensionInstanceId:" "$daemon_log" | tail -1 | cut -d"'" -f2)"
 [[ -n "$baseline_instance" ]]
@@ -44,7 +44,7 @@ tmux send-keys -t "$pane_id" Enter
 deadline=$((SECONDS + 60))
 until tail -n "+$((baseline_lines + 1))" "$daemon_log" | grep -q "eventReason: 'reload'"; do
   (( SECONDS < deadline )) || exit 1
-  sleep 1
+  read -r -t 1 _ || true
 done
 
 maestro test "$ROOT/e2e/maestro/07_reload_ownership.yml" \

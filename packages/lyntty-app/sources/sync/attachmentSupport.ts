@@ -7,8 +7,18 @@ export type ImageAttachmentSendPlan = {
     shouldSendText: boolean;
 };
 
+export function isCompleteImageAttachmentUpload(opts: {
+    requested: number;
+    uploaded: number;
+    failed: number;
+}): boolean {
+    return opts.requested > 0
+        && opts.failed === 0
+        && opts.uploaded === opts.requested;
+}
+
 export function supportsImageAttachmentsForFlavor(flavor: ImageAttachmentFlavor): boolean {
-    return !flavor || flavor === 'claude' || flavor === 'codex';
+    return !flavor || flavor === 'pi';
 }
 
 export function getImageAttachmentSendPlan(opts: {

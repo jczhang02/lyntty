@@ -154,14 +154,6 @@ describe('responsive utilities', () => {
             expect(result).toBe('phone');
         });
 
-        it('should handle web platform', () => {
-            const result = determineDeviceType({
-                diagonalInches: 15, // Large monitor
-                platform: 'web'
-            });
-
-            expect(result).toBe('tablet'); // Large screens are considered tablets
-        });
     });
 
     describe('integration scenarios', () => {

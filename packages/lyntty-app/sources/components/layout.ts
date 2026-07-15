@@ -1,4 +1,4 @@
-import { Dimensions, Platform } from 'react-native';
+import { Dimensions } from 'react-native';
 import { getDeviceType } from '@/utils/responsive';
 import { isRunningOnMac } from '@/utils/platform';
 
@@ -7,7 +7,7 @@ function getMaxWidth(): number {
     const deviceType = getDeviceType();
 
     // For phones, use the max dimension (width or height)
-    if (deviceType === 'phone' && Platform.OS !== 'web') {
+    if (deviceType === 'phone') {
         const { width, height } = Dimensions.get('window');
         return Math.max(width, height);
     }
@@ -16,7 +16,7 @@ function getMaxWidth(): number {
         return Number.POSITIVE_INFINITY;
     }
 
-    // For tablets and web, use 700px
+    // Keep tablet content comfortably readable.
     return 800;
 }
 
@@ -25,7 +25,7 @@ function getMaxLayoutWidth(): number {
     const deviceType = getDeviceType();
 
     // For phones, use the max dimension (width or height)
-    if (deviceType === 'phone' && Platform.OS !== 'web') {
+    if (deviceType === 'phone') {
         const { width, height } = Dimensions.get('window');
         return Math.max(width, height);
     }
@@ -34,7 +34,7 @@ function getMaxLayoutWidth(): number {
         return 1400;
     }
 
-    // For tablets and web, use 700px
+    // Keep tablet content comfortably readable.
     return 800;
 }
 

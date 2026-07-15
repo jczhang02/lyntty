@@ -2,9 +2,10 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { installLynttyPiExtension } from './piExtensionInstall';
-import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent } from './piExtensionEvent';
+import { attachImagesToPiRemoteCommand, isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent } from './piExtensionEvent';
 
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -54,6 +55,27 @@ describe('Pi extension event bridge', () => {
     expect(parseLynttyPiRemoteCommand('x'.repeat(50_001), { isStreaming: false })).toBeNull();
   });
 
+  it('preserves image-only and image-plus-text commands for Pi extension delivery', () => {
+    const image = { type: 'image' as const, data: 'AQID', mimeType: 'image/png' };
+    expect(parseLynttyPiRemoteCommand('', { isStreaming: false, hasImages: true })).toEqual({
+      type: 'send_user_message',
+      text: '',
+    });
+    expect(attachImagesToPiRemoteCommand(
+      parseLynttyPiRemoteCommand('inspect', { isStreaming: true, hasImages: true })!,
+      [image],
+    )).toEqual({ type: 'follow_up', text: 'inspect', images: [image] });
+    expect(attachImagesToPiRemoteCommand(
+      parseLynttyPiRemoteCommand('/skill:coding-standards inspect', { isStreaming: false, hasImages: true })!,
+      [image],
+    )).toEqual({
+      type: 'invoke_pi_command',
+      commandLine: '/skill:coding-standards inspect',
+      images: [image],
+    });
+    expect(parseLynttyPiRemoteCommand('/abort', { isStreaming: false, hasImages: true })).toBeNull();
+  });
+
   it('installs a global Pi extension that defaults to local lynttyd sync', async () => {
     const home = await mkdtemp(join(tmpdir(), 'lyntty-pi-extension-'));
     try {
@@ -90,7 +112,9 @@ describe('Pi extension event bridge', () => {
       expect(source).toContain('safePiCommands');
       expect(source).toContain('invoke_pi_command');
       expect(source).toContain('case "internal_shutdown"');
-      expect(source).toContain('sendUserMessageAndWaitForAcceptance(pi, command.text, "followUp")');
+      expect(source).toContain('sendUserMessageAndWaitForAcceptance(pi, command.text, command.images, "followUp")');
+      expect(source).toContain('type RemoteImage = { type: "image"; data: string; mimeType: string }');
+      expect(source).toContain('pi.sendUserMessage(content, { deliverAs })');
       expect(source).toContain('127.0.0.1');
       expect(source).toContain('RETRY_DELAY_MS');
       expect(source).toContain('HEARTBEAT_MS');
@@ -107,6 +131,26 @@ describe('Pi extension event bridge', () => {
         reportDiagnostics: true,
       });
       expect(transpiled.diagnostics?.filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error) ?? []).toEqual([]);
+
+      await symlink(join(process.cwd(), 'node_modules'), join(home, 'node_modules'));
+      const typecheck = await new Promise<{ exitCode: number | null; output: string }>((resolve) => {
+        const child = spawn('bunx', [
+          'tsc',
+          '--noEmit',
+          '--target', 'ES2022',
+          '--module', 'NodeNext',
+          '--moduleResolution', 'NodeNext',
+          '--skipLibCheck',
+          '--types', 'node',
+          first.path,
+        ], { cwd: process.cwd() });
+        let output = '';
+        child.stdout.on('data', (chunk) => { output += chunk.toString(); });
+        child.stderr.on('data', (chunk) => { output += chunk.toString(); });
+        child.on('close', (exitCode) => resolve({ exitCode, output }));
+      });
+      expect(typecheck.output).toBe('');
+      expect(typecheck.exitCode).toBe(0);
     } finally {
       await rm(home, { recursive: true, force: true });
     }

@@ -1,6 +1,5 @@
 import { Link } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
 import { openExternalUrl } from '@/utils/openExternalUrl';
 
 export function ExternalLink(
@@ -12,10 +11,8 @@ export function ExternalLink(
       {...props}
       href={props.href as any}
       onPress={(e) => {
-        if (Platform.OS !== 'web') {
-          e.preventDefault();
-          void openExternalUrl(props.href as string);
-        }
+        e.preventDefault();
+        void openExternalUrl(props.href as string);
       }}
     />
   );

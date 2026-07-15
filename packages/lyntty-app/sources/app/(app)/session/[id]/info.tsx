@@ -8,8 +8,7 @@ import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
 import { Avatar } from '@/components/Avatar';
 import { useSession, useIsDataReady } from '@/sync/storage';
-import { getSessionName, useSessionStatus, formatOSPlatform, formatPathRelativeToHome, getSessionAvatarId, getResumeCommand } from '@/utils/sessionUtils';
-import * as Clipboard from 'expo-clipboard';
+import { getSessionName, useSessionStatus, formatPathRelativeToHome, getSessionAvatarId } from '@/utils/sessionUtils';
 import { Modal } from '@/modal';
 import { sessionKill, sessionDelete } from '@/sync/ops';
 import { stopAndArchiveSession } from '@/sync/archiveSessionAction';
@@ -18,11 +17,9 @@ import { useUnistyles } from 'react-native-unistyles';
 import { layout } from '@/components/layout';
 import { t } from '@/text';
 import { isVersionSupported, MINIMUM_CLI_VERSION } from '@/utils/versionUtils';
-import { CodeView } from '@/components/CodeView';
 import { Session } from '@/sync/storageTypes';
 import { useLynttyAction } from '@/hooks/useLynttyAction';
 import { useSessionQuickActions } from '@/hooks/useSessionQuickActions';
-import { copySessionMetadataToClipboard, copySessionMetadataAndLogsToClipboard } from '@/utils/copySessionMetadataToClipboard';
 import { LynttyError } from '@/utils/errors';
 import { navigateAfterSessionArchive } from '@/utils/archiveNavigation';
 
@@ -65,63 +62,9 @@ function StatusDot({ color, isPulsing, size = 8 }: { color: string; isPulsing?: 
     );
 }
 
-function formatSandboxMetadata(sandbox: unknown, homeDir?: string): string {
-    if (sandbox === null || sandbox === undefined) {
-        return 'Disabled';
-    }
-
-    if (typeof sandbox === 'string') {
-        return sandbox;
-    }
-
-    if (typeof sandbox !== 'object') {
-        return String(sandbox);
-    }
-
-    const value = sandbox as Record<string, unknown>;
-    if (value.enabled === false) {
-        return 'Disabled';
-    }
-
-    const parts: string[] = ['Enabled'];
-    const isolation = typeof value.sessionIsolation === 'string' ? value.sessionIsolation : undefined;
-    const networkMode = typeof value.networkMode === 'string' ? value.networkMode : undefined;
-    const workspaceRoot = typeof value.workspaceRoot === 'string' ? value.workspaceRoot : undefined;
-
-    if (isolation) {
-        parts.push(`isolation=${isolation}`);
-    }
-    if (networkMode) {
-        parts.push(`network=${networkMode}`);
-    }
-    if (workspaceRoot) {
-        parts.push(`workspace=${formatPathRelativeToHome(workspaceRoot, homeDir)}`);
-    }
-
-    return parts.join(' | ');
-}
-
-function formatDangerouslySkipPermissionsMetadata(
-    value: unknown,
-    flavor: string | null | undefined,
-    permissionMode: Session['permissionMode'],
-    sandbox: unknown,
-): string {
-    if (typeof value === 'boolean') {
-        return value ? 'Enabled' : 'Disabled';
-    }
-
-    if (permissionMode === 'bypassPermissions' || permissionMode === 'yolo') {
-        return 'Enabled';
-    }
-
-    return 'Unknown';
-}
-
 function SessionInfoContent({ session }: { session: Session }) {
     const { theme } = useUnistyles();
     const router = useRouter();
-    const devModeEnabled = __DEV__;
     const sessionName = getSessionName(session);
     const sessionStatus = useSessionStatus(session);
     const {
@@ -132,24 +75,6 @@ function SessionInfoContent({ session }: { session: Session }) {
 
     // Check if CLI version is outdated
     const isCliOutdated = session.metadata?.version && !isVersionSupported(session.metadata.version, MINIMUM_CLI_VERSION);
-
-    const handleCopySessionId = useCallback(async () => {
-        if (!session) return;
-        try {
-            await Clipboard.setStringAsync(session.id);
-            Modal.alert(t('common.success'), t('appWide.lynttySessionIdCopied'));
-        } catch (error) {
-            Modal.alert(t('common.error'), t('sessionInfo.failedToCopySessionId'));
-        }
-    }, [session]);
-
-    const handleCopyMetadata = useCallback(() => {
-        void copySessionMetadataToClipboard(session);
-    }, [session]);
-
-    const handleCopyMetadataAndLogs = useCallback(() => {
-        void copySessionMetadataAndLogsToClipboard(session);
-    }, [session]);
 
     // Archive through the shared action helper so recoverable errors surface consistently.
     const [archivingSession, performArchive] = useLynttyAction(async () => {
@@ -206,16 +131,6 @@ function SessionInfoContent({ session }: { session: Session }) {
         return new Date(timestamp).toLocaleString();
     }, []);
 
-    const handleCopyUpdateCommand = useCallback(async () => {
-        const updateCommand = 'npm install -g lyntty@latest';
-        try {
-            await Clipboard.setStringAsync(updateCommand);
-            Modal.alert(t('common.success'), updateCommand);
-        } catch (error) {
-            Modal.alert(t('common.error'), t('common.error'));
-        }
-    }, []);
-
     return (
         <>
             <ItemList>
@@ -255,28 +170,12 @@ function SessionInfoContent({ session }: { session: Session }) {
                             subtitle={t('sessionInfo.updateCliInstructions')}
                             icon={<Ionicons name="warning-outline" size={29} color="#FF9500" />}
                             showChevron={false}
-                            onPress={handleCopyUpdateCommand}
                         />
                     </ItemGroup>
                 )}
 
                 {/* Session Details */}
                 <ItemGroup>
-                    <Item
-                        title={t('appWide.lynttySessionId')}
-                        subtitle={`${session.id.substring(0, 8)}...${session.id.substring(session.id.length - 8)}`}
-                        icon={<Ionicons name="finger-print-outline" size={29} color="#007AFF" />}
-                        onPress={handleCopySessionId}
-                    />
-                    {/* Resume command — shown for disconnected sessions with a backend session ID */}
-                    {!sessionStatus.isConnected && getResumeCommand(session) && (
-                        <CopyableItem
-                            title={t('appWide.resumeCommand')}
-                            subtitle={getResumeCommand(session)!}
-                            icon={<Ionicons name="play-circle-outline" size={29} color="#30D158" />}
-                            copyText={getResumeCommand(session)!}
-                        />
-                    )}
                     <Item
                         title={t('sessionInfo.connectionStatus')}
                         detail={sessionStatus.isConnected ? t('status.online') : t('status.offline')}
@@ -293,12 +192,6 @@ function SessionInfoContent({ session }: { session: Session }) {
                         title={t('sessionInfo.lastUpdated')}
                         subtitle={formatDate(session.updatedAt)}
                         icon={<Ionicons name="time-outline" size={29} color="#007AFF" />}
-                        showChevron={false}
-                    />
-                    <Item
-                        title={t('sessionInfo.sequence')}
-                        detail={session.seq.toString()}
-                        icon={<Ionicons name="git-commit-outline" size={29} color="#007AFF" />}
                         showChevron={false}
                     />
                 </ItemGroup>
@@ -319,14 +212,6 @@ function SessionInfoContent({ session }: { session: Session }) {
                             subtitle={resumeSessionSubtitle}
                             icon={<Ionicons name="play-circle-outline" size={29} color="#007AFF" />}
                             onPress={resumeSession}
-                        />
-                    )}
-                    {session.metadata?.parentSessionId && (
-                        <Item
-                            title={t('session.forkedFromLabel')}
-                            subtitle={t('session.forkedFromSubtitle')}
-                            icon={<Ionicons name="return-up-back-outline" size={29} color="#5856D6" />}
-                            onPress={() => router.push(`/session/${session.metadata!.parentSessionId}`)}
                         />
                     )}
                     <Item
@@ -358,179 +243,6 @@ function SessionInfoContent({ session }: { session: Session }) {
                             icon={<Ionicons name="folder-outline" size={29} color="#5856D6" />}
                             showChevron={false}
                         />
-                        {session.metadata.version && (
-                            <Item
-                                title={t('sessionInfo.cliVersion')}
-                                subtitle={session.metadata.version}
-                                detail={isCliOutdated ? '⚠️' : undefined}
-                                icon={<Ionicons name="git-branch-outline" size={29} color={isCliOutdated ? "#FF9500" : "#5856D6"} />}
-                                showChevron={false}
-                            />
-                        )}
-                        {session.metadata.os && (
-                            <Item
-                                title={t('sessionInfo.operatingSystem')}
-                                subtitle={formatOSPlatform(session.metadata.os)}
-                                icon={<Ionicons name="hardware-chip-outline" size={29} color="#5856D6" />}
-                                showChevron={false}
-                            />
-                        )}
-                        <Item
-                            title={t('appWide.runtime')}
-                            subtitle="pi"
-                            icon={<Ionicons name="sparkles-outline" size={29} color="#5856D6" />}
-                            showChevron={false}
-                        />
-                        <Item
-                            title={t('appWide.sandbox')}
-                            subtitle={formatSandboxMetadata(session.metadata.sandbox, session.metadata.homeDir)}
-                            icon={<Ionicons name="shield-outline" size={29} color="#5856D6" />}
-                            showChevron={false}
-                        />
-                        <Item
-                            title={t('appWide.dangerouslySkipPermissions')}
-                            subtitle={formatDangerouslySkipPermissionsMetadata(
-                                session.metadata.dangerouslySkipPermissions,
-                                session.metadata.flavor,
-                                session.permissionMode,
-                                session.metadata.sandbox,
-                            )}
-                            icon={<Ionicons name="warning-outline" size={29} color="#5856D6" />}
-                            showChevron={false}
-                        />
-                        {session.metadata.hostPid && (
-                            <Item
-                                title={t('sessionInfo.processId')}
-                                subtitle={session.metadata.hostPid.toString()}
-                                icon={<Ionicons name="terminal-outline" size={29} color="#5856D6" />}
-                                showChevron={false}
-                            />
-                        )}
-                        {session.metadata.lynttyHomeDir && (
-                            <Item
-                                title={t('sessionInfo.lynttyHome')}
-                                subtitle={formatPathRelativeToHome(session.metadata.lynttyHomeDir, session.metadata.homeDir)}
-                                icon={<Ionicons name="home-outline" size={29} color="#5856D6" />}
-                                showChevron={false}
-                            />
-                        )}
-                        <Item
-                            title={t('sessionInfo.copyMetadata')}
-                            icon={<Ionicons name="copy-outline" size={29} color="#007AFF" />}
-                            onPress={handleCopyMetadata}
-                        />
-                        <Item
-                            title={t('sessionInfo.copyMetadata') + t('appWide.clientLogs')}
-                            icon={<Ionicons name="document-text-outline" size={29} color="#007AFF" />}
-                            onPress={handleCopyMetadataAndLogs}
-                        />
-                    </ItemGroup>
-                )}
-
-                {/* Agent State */}
-                {session.agentState && (
-                    <ItemGroup title={t('sessionInfo.agentState')}>
-                        <Item
-                            title={t('sessionInfo.controlledByUser')}
-                            detail={session.agentState.controlledByUser ? t('common.yes') : t('common.no')}
-                            icon={<Ionicons name="person-outline" size={29} color="#FF9500" />}
-                            showChevron={false}
-                        />
-                        {session.agentState.requests && Object.keys(session.agentState.requests).length > 0 && (
-                            <Item
-                                title={t('sessionInfo.pendingRequests')}
-                                detail={Object.keys(session.agentState.requests).length.toString()}
-                                icon={<Ionicons name="hourglass-outline" size={29} color="#FF9500" />}
-                                showChevron={false}
-                            />
-                        )}
-                    </ItemGroup>
-                )}
-
-                {/* Activity */}
-                <ItemGroup title={t('sessionInfo.activity')}>
-                    <Item
-                        title={t('sessionInfo.thinking')}
-                        detail={session.thinking ? t('common.yes') : t('common.no')}
-                        icon={<Ionicons name="bulb-outline" size={29} color={session.thinking ? "#FFCC00" : "#8E8E93"} />}
-                        showChevron={false}
-                    />
-                    {session.thinking && (
-                        <Item
-                            title={t('sessionInfo.thinkingSince')}
-                            subtitle={formatDate(session.thinkingAt)}
-                            icon={<Ionicons name="timer-outline" size={29} color="#FFCC00" />}
-                            showChevron={false}
-                        />
-                    )}
-                </ItemGroup>
-
-                {/* Raw JSON (Dev Mode Only) */}
-                {devModeEnabled && (
-                    <ItemGroup title={t('appWide.rawJsonDevMode')}>
-                        {session.agentState && (
-                            <>
-                                <Item
-                                    title={t('appWide.agentState')}
-                                    icon={<Ionicons name="code-working-outline" size={29} color="#FF9500" />}
-                                    showChevron={false}
-                                />
-                                <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
-                                    <CodeView
-                                        code={JSON.stringify(session.agentState, null, 2)}
-                                        language="json"
-                                    />
-                                </View>
-                            </>
-                        )}
-                        {session.metadata && (
-                            <>
-                                <Item
-                                    title={t('appWide.metadata')}
-                                    icon={<Ionicons name="information-circle-outline" size={29} color="#5856D6" />}
-                                    showChevron={false}
-                                />
-                                <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
-                                    <CodeView
-                                        code={JSON.stringify(session.metadata, null, 2)}
-                                        language="json"
-                                    />
-                                </View>
-                            </>
-                        )}
-                        {sessionStatus && (
-                            <>
-                                <Item
-                                    title={t('appWide.sessionStatus')}
-                                    icon={<Ionicons name="analytics-outline" size={29} color="#007AFF" />}
-                                    showChevron={false}
-                                />
-                                <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
-                                    <CodeView
-                                        code={JSON.stringify({
-                                            isConnected: sessionStatus.isConnected,
-                                            statusText: sessionStatus.statusText,
-                                            statusColor: sessionStatus.statusColor,
-                                            statusDotColor: sessionStatus.statusDotColor,
-                                            isPulsing: sessionStatus.isPulsing
-                                        }, null, 2)}
-                                        language="json"
-                                    />
-                                </View>
-                            </>
-                        )}
-                        {/* Full Session Object */}
-                        <Item
-                            title={t('appWide.fullSessionObject')}
-                            icon={<Ionicons name="document-text-outline" size={29} color="#34C759" />}
-                            showChevron={false}
-                        />
-                        <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
-                            <CodeView
-                                code={JSON.stringify(session, null, 2)}
-                                language="json"
-                            />
-                        </View>
                     </ItemGroup>
                 )}
             </ItemList>
@@ -568,21 +280,3 @@ export default React.memo(() => {
 
     return <SessionInfoContent session={session} />;
 });
-
-function CopyableItem({ title, subtitle, icon, copyText }: { title: string; subtitle: string; icon: React.ReactNode; copyText: string }) {
-    const [copied, setCopied] = React.useState(false);
-    return (
-        <Item
-            title={title}
-            subtitle={subtitle}
-            icon={icon}
-            showChevron={false}
-            rightElement={<Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={18} color={copied ? '#30D158' : '#8E8E93'} />}
-            onPress={async () => {
-                await Clipboard.setStringAsync(copyText);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            }}
-        />
-    );
-}

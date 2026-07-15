@@ -63,6 +63,7 @@ const sessionFileEventSchema = z.object({
     ref: z.string(),
     name: z.string(),
     size: z.number(),
+    mimeType: z.string().optional(),
     image: z.object({
         width: z.number(),
         height: z.number(),
@@ -111,12 +112,6 @@ const sessionEnvelopeSchema = z.object({
     subagent: z.string().refine((value) => isCuid(value), {
         message: 'subagent must be a cuid2 value',
     }).optional(),
-    // Underlying agent-protocol message id (Claude's `uuid` in the JSONL)
-    // — used as the rewind point for fork / duplicate. Optional for back-
-    // compat with envelopes emitted before this field was wired through.
-    claudeUuid: z.string().min(1).optional(),
-    // Codex app-server item id for precise thread rollback points.
-    codexItemId: z.string().min(1).optional(),
     ev: sessionEventSchema,
 }).superRefine((envelope, ctx) => {
     if (envelope.ev.t === 'service' && envelope.role !== 'agent') {
@@ -274,6 +269,10 @@ const rawAgentContentSchema = z.union([
 ]);
 export type RawAgentContent = z.infer<typeof rawAgentContentSchema>;
 
+// `session` is the only current Pi protocol. The inherited `output`, `codex`,
+// and `acp` variants below are read-only decode compatibility for encrypted
+// history written before the Pi-only boundary; they are never used to choose
+// or start a runtime.
 const rawAgentRecordSchema = z.discriminatedUnion('type', [z.object({
     type: z.literal('output'),
     data: z.intersection(z.discriminatedUnion('type', [
@@ -531,13 +530,6 @@ export type NormalizedMessage = ({
     isSidechain: boolean,
     meta?: MessageMeta,
     usage?: UsageData,
-    /**
-     * Underlying Claude `uuid` for this message — used as the rewind point
-     * for the session fork / duplicate flow. Optional because some message
-     * sources (legacy events, server-emitted control messages) have none.
-     */
-    claudeUuid?: string,
-    codexItemId?: string,
 };
 
 function skillCommandDisplayText(text: string): string | undefined {
@@ -627,8 +619,6 @@ function normalizeSessionEnvelope(
                     ...meta,
                     ...(skillCommandDisplayText(envelope.ev.text) ? { displayText: skillCommandDisplayText(envelope.ev.text) } : {}),
                 },
-                claudeUuid: envelope.claudeUuid,
-                codexItemId: envelope.codexItemId,
             } satisfies NormalizedMessage;
         }
 
@@ -657,8 +647,6 @@ function normalizeSessionEnvelope(
                 }
             ],
             meta,
-            claudeUuid: envelope.claudeUuid,
-            codexItemId: envelope.codexItemId,
         } satisfies NormalizedMessage;
     }
 
@@ -736,6 +724,7 @@ function normalizeSessionEnvelope(
                         ref: envelope.ev.ref,
                         name: envelope.ev.name,
                         size: envelope.ev.size,
+                        mimeType: envelope.ev.mimeType,
                         ...maybeImageMetadata
                     },
                     description: envelope.ev.image
@@ -909,7 +898,6 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
                         meta: skillCommandDisplayText(raw.content.data.message.content)
                             ? { displayText: skillCommandDisplayText(raw.content.data.message.content) }
                             : undefined,
-                        claudeUuid: raw.content.data.uuid,
                     };
                 }
 

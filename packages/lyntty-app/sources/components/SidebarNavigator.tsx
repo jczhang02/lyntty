@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useIsTablet, useHeaderHeight } from '@/utils/responsive';
 import { SidebarView } from './SidebarView';
-import { useWindowDimensions, View, Pressable, Platform } from 'react-native';
+import { useWindowDimensions, View, Pressable } from 'react-native';
 import { useLocalSetting, useLocalSettingMutable } from '@/sync/storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -11,13 +11,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
-import { isTauri } from '@/utils/isTauri';
 import { useOverlayNav } from '@/-session/sessionOverlayNav';
-import { DEFAULT_APP_ZOOM } from '@/hooks/useTauriZoom';
-import { canRouteForward, canUseRouteBack, getNavigatorCanGoBack } from '@/navigation/browserNavigation';
-import { useBrowserNavigationStore } from '@/navigation/browserNavigationStore';
-
-const TAURI_HEADER_CONTROL_LEFT = Math.ceil(92 / DEFAULT_APP_ZOOM);
 
 export const SidebarNavigator = React.memo(() => {
     const auth = useAuth();
@@ -50,12 +44,6 @@ export const SidebarNavigator = React.memo(() => {
         }
 
         // Tablet: always permanent, just collapse width in zen mode.
-        //
-        // We deliberately do NOT animate `width` on web. A CSS transition on
-        // the drawer width re-flowed the chat flex-1 sibling on every frame,
-        // re-measuring the entire FlatList tree at ~15fps. Snapping the
-        // width change makes the chat reflow exactly once. Native already
-        // snaps because RN doesn't honor CSS transition properties.
         return {
             lazy: false,
             headerShown: false,
@@ -100,16 +88,8 @@ const PersistentHeader = React.memo(() => {
     const headerHeight = useHeaderHeight();
     const router = useRouter();
     const [zenMode, setZenMode] = useLocalSettingMutable('zenMode');
-    const inTauri = isTauri();
-    const isMacTauri = inTauri && typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
-
-    const routeHistory = useBrowserNavigationStore((s) => s.routeHistory);
-    const canGoForward = useBrowserNavigationStore((s) => s.routeHistory ? canRouteForward(s.routeHistory) : false);
     const overlayCanBack = useOverlayNav((s) => s.canBack);
-    const overlayCanForward = useOverlayNav((s) => s.canForward);
-    const canGoBack = routeHistory
-        ? canUseRouteBack(routeHistory, getNavigatorCanGoBack(router))
-        : false;
+    const canGoBack = router.canGoBack();
 
     const handleZenToggle = React.useCallback(() => {
         setZenMode(!zenMode);
@@ -119,24 +99,12 @@ const PersistentHeader = React.memo(() => {
         // Intra-session overlay (file diff / file view) consumes back first,
         // so the chat → diff → file flow can be unwound without a close X.
         if (useOverlayNav.getState().back()) return;
-        const nav = useBrowserNavigationStore.getState();
-        if (!nav.routeHistory || !canUseRouteBack(nav.routeHistory, getNavigatorCanGoBack(router))) return;
-        nav.markRouteBack();
-        router.back();
+        if (router.canGoBack()) {
+            router.back();
+        }
     }, [router]);
 
-    const handleForward = React.useCallback(() => {
-        if (useOverlayNav.getState().forward()) return;
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            const nav = useBrowserNavigationStore.getState();
-            if (!nav.routeHistory || !canRouteForward(nav.routeHistory)) return;
-            nav.markRouteForward();
-            window.history.forward();
-        }
-    }, []);
-
     const canGoBackEffective = canGoBack || overlayCanBack;
-    const canGoForwardEffective = canGoForward || overlayCanForward;
 
     return (
         <View
@@ -146,7 +114,7 @@ const PersistentHeader = React.memo(() => {
                 left: 0,
                 right: 0,
                 paddingTop: safeArea.top,
-                paddingLeft: isMacTauri ? TAURI_HEADER_CONTROL_LEFT : 16,
+                paddingLeft: 16,
                 paddingRight: 16,
                 height: safeArea.top + headerHeight,
                 flexDirection: 'row',
@@ -154,13 +122,11 @@ const PersistentHeader = React.memo(() => {
                 zIndex: 1100,
             }}
             pointerEvents="box-none"
-            {...(inTauri ? { dataSet: { tauriDragRegion: 'true' } } : {})}
         >
-            {/* Zen / Back / Forward buttons */}
+            {/* Zen / Back buttons */}
             <View
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
                 pointerEvents="auto"
-                {...(inTauri ? { dataSet: { tauriDragRegion: 'false' } } : {})}
             >
                 <Pressable
                     onPress={handleZenToggle}
@@ -178,11 +144,6 @@ const PersistentHeader = React.memo(() => {
                 <Pressable onPress={handleBack} disabled={!canGoBackEffective} hitSlop={10} style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center', opacity: canGoBackEffective ? 1 : 0.3 }}>
                     <Ionicons name="chevron-back" size={20} color={theme.colors.header.tint} />
                 </Pressable>
-                {Platform.OS === 'web' && (
-                    <Pressable onPress={handleForward} disabled={!canGoForwardEffective} hitSlop={10} style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center', opacity: canGoForwardEffective ? 1 : 0.3 }}>
-                        <Ionicons name="chevron-forward" size={20} color={theme.colors.header.tint} />
-                    </Pressable>
-                )}
             </View>
         </View>
     );

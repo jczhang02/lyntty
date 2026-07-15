@@ -1,30 +1,23 @@
 import { Ionicons, Octicons } from '@expo/vector-icons';
 import * as React from 'react';
-import { View, Platform, useWindowDimensions, ViewStyle, Text, ActivityIndicator, TouchableWithoutFeedback, Image as RNImage, Pressable } from 'react-native';
+import { View, Platform, useWindowDimensions, ViewStyle, Text, ActivityIndicator, Pressable } from 'react-native';
 import { AgentInputAttachmentStrip } from './AgentInputAttachmentStrip';
 import type { AttachmentPreview } from '@/sync/attachmentTypes';
-import { generateThumbhash } from '@/utils/thumbhash';
 import { layout } from './layout';
 import { MultiTextInput, KeyPressEvent } from './MultiTextInput';
 import { Typography } from '@/constants/Typography';
-import { PermissionMode, ModelMode } from './PermissionModeSelector';
-import { EffortLevel } from './modelModeOptions';
 import { hapticsLight, hapticsError } from './haptics';
 import { Shaker, ShakeInstance } from './Shaker';
 import { StatusDot } from './StatusDot';
 import { useActiveWord } from './autocomplete/useActiveWord';
 import { useActiveSuggestions } from './autocomplete/useActiveSuggestions';
 import { AgentInputAutocomplete } from './AgentInputAutocomplete';
-import { FloatingOverlay } from './FloatingOverlay';
 import { TextInputState, MultiTextInputHandle } from './MultiTextInput';
 import { applySuggestion } from './autocomplete/applySuggestion';
 import { GitStatusBadge, useHasMeaningfulGitStatus } from './GitStatusBadge';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { useSetting } from '@/sync/storage';
-import { hackMode, hackModes } from '@/sync/modeHacks';
 import { Theme } from '@/theme';
 import { t } from '@/text';
-import { Metadata } from '@/sync/storageTypes';
 import { shouldShowAbortControl } from './agentInputControls';
 
 interface AgentInputProps {
@@ -39,18 +32,6 @@ interface AgentInputProps {
     sessionId?: string;
     onSend: () => void;
     sendIcon?: React.ReactNode;
-    onMicPress?: () => void;
-    isMicActive?: boolean;
-    permissionMode?: PermissionMode | null;
-    availableModes?: PermissionMode[];
-    onPermissionModeChange?: (mode: PermissionMode) => void;
-    modelMode?: ModelMode | null;
-    availableModels?: ModelMode[];
-    onModelModeChange?: (mode: ModelMode) => void;
-    effortLevel?: EffortLevel | null;
-    availableEffortLevels?: EffortLevel[];
-    onEffortLevelChange?: (level: EffortLevel) => void;
-    metadata?: Metadata | null;
     onAbort?: () => void | Promise<void>;
     showAbortButton?: boolean;
     connectionStatus?: {
@@ -58,12 +39,6 @@ interface AgentInputProps {
         color: string;
         dotColor: string;
         isPulsing?: boolean;
-        cliStatus?: {
-            claude: boolean | null;
-            codex: boolean | null;
-            gemini?: boolean | null;
-            pi?: boolean | null;
-        };
     };
     autocompletePrefixes: string[];
     autocompleteSuggestions: (query: string) => Promise<{ key: string, text: string, component: React.ElementType }[]>;
@@ -76,7 +51,7 @@ interface AgentInputProps {
     };
     alwaysShowContextSize?: boolean;
     onFileViewerPress?: () => void;
-    agentType?: 'pi' | 'claude' | 'codex' | 'gemini' | 'openclaw';
+    agentType?: 'pi';
     onAgentClick?: () => void;
     machineName?: string | null;
     onMachineClick?: () => void;
@@ -87,11 +62,10 @@ interface AgentInputProps {
     isSending?: boolean;
     minHeight?: number;
     zenMode?: boolean;
-    /** Image attachments waiting to be sent (expImageUpload feature). */
+    /** Image attachments waiting to be sent to Pi. */
     selectedImages?: AttachmentPreview[];
     onPickImages?: () => void;
     onRemoveImage?: (id: string) => void;
-    onAddImages?: (images: AttachmentPreview[]) => void;
 }
 
 const MAX_CONTEXT_SIZE = 190000;
@@ -133,112 +107,6 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
         marginBottom: 8,
         zIndex: 1000,
     },
-    settingsOverlay: {
-        position: 'absolute',
-        bottom: '100%',
-        left: 0,
-        right: 0,
-        marginBottom: 8,
-        zIndex: 1000,
-    },
-    overlayBackdrop: {
-        position: 'absolute',
-        top: -1000,
-        left: -1000,
-        right: -1000,
-        bottom: -1000,
-        zIndex: 999,
-    },
-    overlaySection: {
-        paddingVertical: 8,
-    },
-    overlaySectionTitle: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: theme.colors.textSecondary,
-        paddingHorizontal: 16,
-        paddingBottom: 4,
-        ...Typography.default('semiBold'),
-    },
-    overlayDivider: {
-        height: 1,
-        backgroundColor: theme.colors.divider,
-        marginHorizontal: 16,
-    },
-
-    // Selection styles
-    selectionItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: 'transparent',
-    },
-    selectionItemPressed: {
-        backgroundColor: theme.colors.surfacePressed,
-    },
-    radioButton: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        borderWidth: 2,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    radioButtonActive: {
-        borderColor: theme.colors.radio.active,
-    },
-    radioButtonInactive: {
-        borderColor: theme.colors.radio.inactive,
-    },
-    radioButtonDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: theme.colors.radio.dot,
-    },
-    selectionLabel: {
-        fontSize: 14,
-        ...Typography.default(),
-    },
-    selectionLabelActive: {
-        color: theme.colors.radio.active,
-    },
-    selectionLabelInactive: {
-        color: theme.colors.text,
-    },
-
-    // Status styles
-    statusContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingBottom: 4,
-    },
-    statusRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    statusText: {
-        fontSize: 11,
-        ...Typography.default(),
-    },
-    permissionModeContainer: {
-        flexDirection: 'column',
-        alignItems: 'flex-end',
-    },
-    permissionModeText: {
-        fontSize: 11,
-        ...Typography.default(),
-    },
-    contextWarningText: {
-        fontSize: 11,
-        marginLeft: 8,
-        ...Typography.default(),
-    },
-
     // Button styles
     actionButtonsContainer: {
         flexDirection: 'row',
@@ -324,20 +192,10 @@ const getContextWarning = (contextSize: number, alwaysShow: boolean = false, the
 type StatusRowProps = {
     connectionStatus?: AgentInputProps['connectionStatus'];
     contextWarning: { text: string; color: string } | null;
-    displayPermissionMode: ReturnType<typeof hackMode> | null;
-    permissionModeKey: string;
-    isSandboxedYoloMode: boolean;
-    permissionLabel: string | null;
-    zenMode?: boolean;
 };
 
 const AgentInputStatusRow = React.memo(function AgentInputStatusRow(p: StatusRowProps) {
-    const { theme } = useUnistyles();
-    const showPermissionBadge = !!p.displayPermissionMode
-        && p.permissionModeKey !== 'default'
-        && !p.zenMode
-        && !!p.permissionLabel;
-    if (!p.connectionStatus && !p.contextWarning && !showPermissionBadge) {
+    if (!p.connectionStatus && !p.contextWarning) {
         return null;
     }
     return (
@@ -366,60 +224,6 @@ const AgentInputStatusRow = React.memo(function AgentInputStatusRow(p: StatusRow
                                 {p.connectionStatus.text}
                             </Text>
                         </View>
-                        {p.connectionStatus.cliStatus && (
-                            <>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <Text style={{
-                                        fontSize: 11,
-                                        color: p.connectionStatus.cliStatus.claude ? theme.colors.success : theme.colors.textDestructive,
-                                        ...Typography.default()
-                                    }}>
-                                        {p.connectionStatus.cliStatus.claude ? '✓' : '✗'}
-                                    </Text>
-                                    <Text style={{
-                                        fontSize: 11,
-                                        color: p.connectionStatus.cliStatus.claude ? theme.colors.success : theme.colors.textDestructive,
-                                        ...Typography.default()
-                                    }}>
-                                        claude
-                                    </Text>
-                                </View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <Text style={{
-                                        fontSize: 11,
-                                        color: p.connectionStatus.cliStatus.codex ? theme.colors.success : theme.colors.textDestructive,
-                                        ...Typography.default()
-                                    }}>
-                                        {p.connectionStatus.cliStatus.codex ? '✓' : '✗'}
-                                    </Text>
-                                    <Text style={{
-                                        fontSize: 11,
-                                        color: p.connectionStatus.cliStatus.codex ? theme.colors.success : theme.colors.textDestructive,
-                                        ...Typography.default()
-                                    }}>
-                                        codex
-                                    </Text>
-                                </View>
-                                {p.connectionStatus.cliStatus.gemini !== undefined && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                        <Text style={{
-                                            fontSize: 11,
-                                            color: p.connectionStatus.cliStatus.gemini ? theme.colors.success : theme.colors.textDestructive,
-                                            ...Typography.default()
-                                        }}>
-                                            {p.connectionStatus.cliStatus.gemini ? '✓' : '✗'}
-                                        </Text>
-                                        <Text style={{
-                                            fontSize: 11,
-                                            color: p.connectionStatus.cliStatus.gemini ? theme.colors.success : theme.colors.textDestructive,
-                                            ...Typography.default()
-                                        }}>
-                                            gemini
-                                        </Text>
-                                    </View>
-                                )}
-                            </>
-                        )}
                     </>
                 )}
                 {p.contextWarning && (
@@ -433,31 +237,7 @@ const AgentInputStatusRow = React.memo(function AgentInputStatusRow(p: StatusRow
                     </Text>
                 )}
             </View>
-            {showPermissionBadge && (() => {
-                const permColor = p.isSandboxedYoloMode ? '#4169E1' :
-                    p.permissionModeKey === 'acceptEdits' ? theme.colors.permission.acceptEdits :
-                        p.permissionModeKey === 'bypassPermissions' ? theme.colors.permission.bypass :
-                            p.permissionModeKey === 'plan' ? theme.colors.permission.plan :
-                                p.permissionModeKey === 'read-only' ? theme.colors.permission.readOnly :
-                                    p.permissionModeKey === 'safe-yolo' ? theme.colors.permission.safeYolo :
-                                        p.permissionModeKey === 'yolo' ? theme.colors.permission.yolo :
-                                            theme.colors.textSecondary;
-                const permIcon: 'play-forward' | 'pause' =
-                    p.permissionModeKey === 'plan' || p.permissionModeKey === 'read-only'
-                        ? 'pause' : 'play-forward';
-                return (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Ionicons name={permIcon} size={11} color={permColor} />
-                        <Text style={{
-                            fontSize: 11,
-                            color: permColor,
-                            ...Typography.default()
-                        }}>
-                            {p.permissionLabel}
-                        </Text>
-                    </View>
-                );
-            })()}
+
         </View>
     );
 });
@@ -559,48 +339,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
         && !props.isSendDisabled
         && (hasText || hasImages);
 
-    // Lyntty product scope exposes only pi. Legacy provider branches are removed from UI.
-    const displayPermissionMode = React.useMemo(() => (
-        props.permissionMode ? hackMode(props.permissionMode) : null
-    ), [props.permissionMode]);
-    const permissionModeKey = displayPermissionMode?.key ?? 'default';
-    const availableModes = React.useMemo(() => (
-        hackModes(props.availableModes ?? [])
-    ), [props.availableModes]);
-    const availableModels = props.availableModels ?? [];
-    const availableEffortLevels = props.availableEffortLevels ?? [];
     const showAbortControl = shouldShowAbortControl(props.showAbortButton, !!props.onAbort);
-    const isSandboxEnabled = React.useMemo(() => {
-        const sandbox = props.metadata?.sandbox as unknown;
-        if (!sandbox) {
-            return false;
-        }
-        if (typeof sandbox === 'object' && sandbox !== null && 'enabled' in sandbox) {
-            return Boolean((sandbox as { enabled?: unknown }).enabled);
-        }
-        return true;
-    }, [props.metadata?.sandbox]);
-    const isSandboxedYoloMode = isSandboxEnabled && (
-        permissionModeKey === 'bypassPermissions' || permissionModeKey === 'yolo'
-    );
-
-    const withSandboxSuffix = React.useCallback((label: string, modeKey?: string) => {
-        if (!isSandboxEnabled) {
-            return label;
-        }
-        if (modeKey === 'bypassPermissions' || modeKey === 'yolo') {
-            return `${label} (sandboxed)`;
-        }
-        return label;
-    }, [isSandboxEnabled]);
 
     // Calculate context warning
     const contextWarning = props.usageData?.contextSize
         ? getContextWarning(props.usageData.contextSize, props.alwaysShowContextSize ?? false, theme)
         : null;
-
-    const agentInputEnterToSend = useSetting('agentInputEnterToSend');
-
 
     // Abort button state
     const [isAborting, setIsAborting] = React.useState(false);
@@ -610,83 +354,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
     // Forward ref to the MultiTextInput
     React.useImperativeHandle(ref, () => inputRef.current!, []);
-
-    // Web paste/drag — intercept image pastes and file drops for the
-    // attachment feature. Both handlers funnel through props.onAddImages.
-    React.useEffect(() => {
-        if (Platform.OS !== 'web' || !props.onAddImages) return;
-
-        const handlePaste = async (e: ClipboardEvent) => {
-            // Only handle pastes targeted at a focused text-editable element.
-            // The listener is attached to document, so without this guard a
-            // paste in the URL bar, another modal, or any focused-elsewhere
-            // input would steal images intended for somewhere else.
-            const active = document.activeElement;
-            const isEditableTarget = active instanceof HTMLInputElement
-                || active instanceof HTMLTextAreaElement
-                || (active instanceof HTMLElement && active.isContentEditable);
-            if (!isEditableTarget) return;
-
-            const { getImagesFromClipboard, fileToAttachmentPreview } = await import('@/utils/pasteImages.web');
-            const files = getImagesFromClipboard(e);
-            if (!files.length) return;
-            e.preventDefault();
-            const previews = (await Promise.all(
-                files.map((f) => fileToAttachmentPreview(f, generateThumbhash))
-            )).filter(Boolean) as Omit<AttachmentPreview, 'id'>[];
-            if (previews.length) {
-                props.onAddImages!(previews.map((p) => ({
-                    ...p,
-                    id: `paste_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-                })));
-            }
-        };
-
-        // dragover must call preventDefault for drop to fire; we gate on
-        // `types.includes('Files')` so we don't hijack drag-text/HTML in the
-        // rest of the app.
-        const isFileDrag = (e: DragEvent) => {
-            const types = e.dataTransfer?.types;
-            if (!types) return false;
-            // DataTransferItemList vs DOMStringList — both expose .includes-ish.
-            for (let i = 0; i < types.length; i++) {
-                if (types[i] === 'Files') return true;
-            }
-            return false;
-        };
-
-        const handleDragOver = (e: DragEvent) => {
-            if (!isFileDrag(e)) return;
-            e.preventDefault();
-            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-        };
-
-        const handleDrop = async (e: DragEvent) => {
-            if (!isFileDrag(e)) return;
-            e.preventDefault();
-            const { getImagesFromDrop, fileToAttachmentPreview } = await import('@/utils/pasteImages.web');
-            const files = getImagesFromDrop(e);
-            if (!files.length) return;
-            const previews = (await Promise.all(
-                files.map((f) => fileToAttachmentPreview(f, generateThumbhash))
-            )).filter(Boolean) as Omit<AttachmentPreview, 'id'>[];
-            if (previews.length) {
-                props.onAddImages!(previews.map((p) => ({
-                    ...p,
-                    id: `drop_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-                })));
-            }
-        };
-
-        document.addEventListener('paste', handlePaste as any);
-        document.addEventListener('dragover', handleDragOver);
-        document.addEventListener('drop', handleDrop);
-        return () => {
-            document.removeEventListener('paste', handlePaste as any);
-            document.removeEventListener('dragover', handleDragOver);
-            document.removeEventListener('drop', handleDrop);
-        };
-    }, [props.onAddImages]);
 
     // Autocomplete state — text + selection. Updated via startTransition so
     // typing renders the character immediately and the autocomplete pipeline
@@ -755,22 +422,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
         hapticsLight();
     }, [suggestions, inputState, props.autocompletePrefixes]);
 
-    // Settings modal state
-    const [showSettings, setShowSettings] = React.useState(false);
-
-    // Handle settings button press
-    const handleSettingsPress = React.useCallback(() => {
-        hapticsLight();
-        setShowSettings(prev => !prev);
-    }, []);
-
-    // Handle settings selection
-    const handleSettingsSelect = React.useCallback((mode: PermissionMode) => {
-        hapticsLight();
-        props.onPermissionModeChange?.(mode);
-        setShowSettings(false);
-    }, [props.onPermissionModeChange]);
-
     // Handle abort button press
     const handleAbortPress = React.useCallback(async () => {
         if (!props.onAbort) return;
@@ -814,10 +465,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
         const liveHasText = (inputRef.current?.getText() ?? '').trim().length > 0;
         if (liveHasText || hasImages) {
             props.onSend();
-        } else {
-            props.onMicPress?.();
         }
-    }, [handleBlockedSendAttempt, hasImages, isSendBlocked, props.isSendDisabled, props.isSending, props.onSend, props.onMicPress]);
+    }, [handleBlockedSendAttempt, hasImages, isSendBlocked, props.isSendDisabled, props.isSending, props.onSend]);
 
     // Handle keyboard navigation
     const handleKeyPress = React.useCallback((event: KeyPressEvent): boolean => {
@@ -854,38 +503,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
             return true;
         }
 
-        // Original key handling
-        if (Platform.OS === 'web') {
-            // On mobile web (touch devices), Enter should insert a newline since
-            // there's no Shift key available. Users send via the send button instead.
-            // Use pointer:coarse media query instead of ontouchstart/maxTouchPoints
-            // to avoid false positives on Windows touch-screen laptops with keyboards.
-            const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-            if (agentInputEnterToSend && event.key === 'Enter' && !event.shiftKey && !isTouchDevice) {
-                // Read live text from the textarea — `hasText` is debounced via
-                // startTransition and would lag behind a quick type-then-Enter.
-                const liveText = inputRef.current?.getText() ?? '';
-                if (liveText.trim()) {
-                    if (isSendBlocked) {
-                        handleBlockedSendAttempt();
-                    } else if (!props.isSendDisabled) {
-                        props.onSend();
-                    }
-                    return true; // Key was handled
-                }
-            }
-            // Handle Shift+Tab for permission mode switching
-            if (event.key === 'Tab' && event.shiftKey && props.onPermissionModeChange && availableModes.length > 0) {
-                const currentIndex = availableModes.findIndex((mode) => mode.key === permissionModeKey);
-                const nextIndex = ((currentIndex >= 0 ? currentIndex : 0) + 1) % availableModes.length;
-                props.onPermissionModeChange(availableModes[nextIndex]);
-                hapticsLight();
-                return true; // Key was handled, prevent default tab behavior
-            }
-
-        }
         return false; // Key was not handled
-    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, showAbortControl, isAborting, handleAbortPress, agentInputEnterToSend, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, isSendBlocked, handleBlockedSendAttempt, props.isSendDisabled]);
+    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, showAbortControl, isAborting, handleAbortPress, inputState.selection.start, inputState.text]);
 
 
 
@@ -917,271 +536,9 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                     </View>
                 )}
 
-                {/* Settings overlay */}
-                {showSettings && (
-                    <>
-                        <TouchableWithoutFeedback onPress={() => setShowSettings(false)}>
-                            <View style={styles.overlayBackdrop} />
-                        </TouchableWithoutFeedback>
-                        <View style={[
-                            styles.settingsOverlay,
-                            { paddingHorizontal: screenWidth > 700 ? 0 : 8 }
-                        ]}>
-                            <FloatingOverlay maxHeight={400} keyboardShouldPersistTaps="always">
-                                {/* Permission Mode Section */}
-                                <View style={styles.overlaySection}>
-                                    <Text style={styles.overlaySectionTitle}>
-                                        {t('agentInput.permissionMode.title')}
-                                    </Text>
-                                    {availableModes.map((mode) => {
-                                        const isSelected = permissionModeKey === mode.key;
-
-                                        return (
-                                            <Pressable
-                                                key={mode.key}
-                                                onPress={() => handleSettingsSelect(mode)}
-                                                style={({ pressed }) => ({
-                                                    flexDirection: 'row',
-                                                    alignItems: 'flex-start',
-                                                    paddingHorizontal: 16,
-                                                    paddingVertical: 8,
-                                                    backgroundColor: pressed ? theme.colors.surfacePressed : 'transparent'
-                                                })}
-                                            >
-                                                <View style={{
-                                                    width: 16,
-                                                    height: 16,
-                                                    borderRadius: 8,
-                                                    borderWidth: 2,
-                                                    borderColor: isSelected ? theme.colors.radio.active : theme.colors.radio.inactive,
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    marginRight: 12,
-                                                    marginTop: 2,
-                                                }}>
-                                                    {isSelected && (
-                                                        <View style={{
-                                                            width: 6,
-                                                            height: 6,
-                                                            borderRadius: 3,
-                                                            backgroundColor: theme.colors.radio.dot
-                                                        }} />
-                                                    )}
-                                                </View>
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={{
-                                                        fontSize: 14,
-                                                        color: isSelected ? theme.colors.radio.active : theme.colors.text,
-                                                        ...Typography.default()
-                                                    }}>
-                                                        {withSandboxSuffix(mode.name, mode.key)}
-                                                    </Text>
-                                                    {!!mode.description && (
-                                                        <Text style={{
-                                                            fontSize: 11,
-                                                            color: theme.colors.textSecondary,
-                                                            ...Typography.default()
-                                                        }}>
-                                                            {mode.description}
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                            </Pressable>
-                                        );
-                                    })}
-                                </View>
-
-                                {/* Divider */}
-                                <View style={{
-                                    height: 1,
-                                    backgroundColor: theme.colors.divider,
-                                    marginHorizontal: 16
-                                }} />
-
-                                {/* Model + Effort side by side */}
-                                <View style={{ flexDirection: 'row' }}>
-                                    {/* Model Section */}
-                                    <View style={{ paddingVertical: 8, flex: 1 }}>
-                                        <Text style={{
-                                            fontSize: 12,
-                                            fontWeight: '600',
-                                            color: theme.colors.textSecondary,
-                                            paddingHorizontal: 16,
-                                            paddingBottom: 4,
-                                            ...Typography.default('semiBold')
-                                        }}>
-                                            {t('agentInput.model.title')}
-                                        </Text>
-                                        {availableModels.length > 0 ? (
-                                            availableModels.map((model) => {
-                                                const isSelected = props.modelMode?.key === model.key;
-
-                                                return (
-                                                    <Pressable
-                                                        key={model.key}
-                                                        onPress={() => {
-                                                            hapticsLight();
-                                                            props.onModelModeChange?.(model);
-                                                            setShowSettings(false);
-                                                        }}
-                                                        style={({ pressed }) => ({
-                                                            flexDirection: 'row',
-                                                            alignItems: 'flex-start',
-                                                            paddingHorizontal: 16,
-                                                            paddingVertical: 8,
-                                                            backgroundColor: pressed ? theme.colors.surfacePressed : 'transparent'
-                                                        })}
-                                                    >
-                                                        <View style={{
-                                                            width: 16,
-                                                            height: 16,
-                                                            borderRadius: 8,
-                                                            borderWidth: 2,
-                                                            borderColor: isSelected ? theme.colors.radio.active : theme.colors.radio.inactive,
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            marginRight: 12,
-                                                            marginTop: 2,
-                                                        }}>
-                                                            {isSelected && (
-                                                                <View style={{
-                                                                    width: 6,
-                                                                    height: 6,
-                                                                    borderRadius: 3,
-                                                                    backgroundColor: theme.colors.radio.dot
-                                                                }} />
-                                                            )}
-                                                        </View>
-                                                        <View>
-                                                            <Text style={{
-                                                                fontSize: 14,
-                                                                color: isSelected ? theme.colors.radio.active : theme.colors.text,
-                                                                ...Typography.default()
-                                                            }}>
-                                                                {model.name}
-                                                            </Text>
-                                                            {!!model.description && (
-                                                                <Text style={{
-                                                                    fontSize: 11,
-                                                                    color: theme.colors.textSecondary,
-                                                                    ...Typography.default()
-                                                                }}>
-                                                                    {model.description}
-                                                                </Text>
-                                                            )}
-                                                        </View>
-                                                    </Pressable>
-                                                );
-                                            })
-                                        ) : (
-                                            <Text style={{
-                                                fontSize: 13,
-                                                color: theme.colors.textSecondary,
-                                                paddingHorizontal: 16,
-                                                paddingVertical: 8,
-                                                ...Typography.default()
-                                            }}>
-                                                {t('agentInput.model.configureInCli')}
-                                            </Text>
-                                        )}
-                                    </View>
-
-                                    {/* Effort Level Section — second column */}
-                                    {availableEffortLevels.length > 0 && props.onEffortLevelChange && (
-                                        <>
-                                            <View style={{
-                                                width: 1,
-                                                backgroundColor: theme.colors.divider,
-                                                marginVertical: 8,
-                                            }} />
-                                            <View style={{ paddingVertical: 8, flex: 1 }}>
-                                                <Text style={{
-                                                    fontSize: 12,
-                                                    fontWeight: '600',
-                                                    color: theme.colors.textSecondary,
-                                                    paddingHorizontal: 16,
-                                                    paddingBottom: 4,
-                                                    ...Typography.default('semiBold')
-                                                }}>
-                                                    {t('agentInput.effort.title')}
-                                                </Text>
-                                                {availableEffortLevels.map((level) => {
-                                                    const isSelected = props.effortLevel?.key === level.key;
-
-                                                    return (
-                                                        <Pressable
-                                                            key={level.key}
-                                                            onPress={() => {
-                                                                hapticsLight();
-                                                                props.onEffortLevelChange?.(level);
-                                                                setShowSettings(false);
-                                                            }}
-                                                            style={({ pressed }) => ({
-                                                                flexDirection: 'row',
-                                                                alignItems: 'flex-start',
-                                                                paddingHorizontal: 16,
-                                                                paddingVertical: 8,
-                                                                backgroundColor: pressed ? theme.colors.surfacePressed : 'transparent'
-                                                            })}
-                                                        >
-                                                            <View style={{
-                                                                width: 16,
-                                                                height: 16,
-                                                                borderRadius: 8,
-                                                                borderWidth: 2,
-                                                                borderColor: isSelected ? theme.colors.radio.active : theme.colors.radio.inactive,
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                marginRight: 12,
-                                                                marginTop: 2,
-                                                            }}>
-                                                                {isSelected && (
-                                                                    <View style={{
-                                                                        width: 6,
-                                                                        height: 6,
-                                                                        borderRadius: 3,
-                                                                        backgroundColor: theme.colors.radio.dot
-                                                                    }} />
-                                                                )}
-                                                            </View>
-                                                            <View>
-                                                                <Text style={{
-                                                                    fontSize: 14,
-                                                                    color: isSelected ? theme.colors.radio.active : theme.colors.text,
-                                                                    ...Typography.default()
-                                                                }}>
-                                                                    {level.name}
-                                                                </Text>
-                                                                {!!level.description && (
-                                                                    <Text style={{
-                                                                        fontSize: 11,
-                                                                        color: theme.colors.textSecondary,
-                                                                        ...Typography.default()
-                                                                    }}>
-                                                                        {level.description}
-                                                                    </Text>
-                                                                )}
-                                                            </View>
-                                                        </Pressable>
-                                                    );
-                                                })}
-                                            </View>
-                                        </>
-                                    )}
-                                </View>
-                            </FloatingOverlay>
-                        </View>
-                    </>
-                )}
-
                 <AgentInputStatusRow
                     connectionStatus={props.connectionStatus}
                     contextWarning={contextWarning}
-                    displayPermissionMode={displayPermissionMode}
-                    permissionModeKey={permissionModeKey}
-                    isSandboxedYoloMode={isSandboxedYoloMode}
-                    permissionLabel={displayPermissionMode ? withSandboxSuffix(displayPermissionMode.name, permissionModeKey) : null}
-                    zenMode={props.zenMode}
                 />
 
                 <AgentInputContextChips
@@ -1208,47 +565,23 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                             testID="lyntty-session-input"
                             accessibilityLabel={t('appWide.lynttySessionMessageInput')}
                             defaultValue={props.initialValue}
-                            paddingTop={Platform.OS === 'web' ? 10 : 8}
-                            paddingBottom={Platform.OS === 'web' ? 10 : 8}
+                            paddingTop={8}
+                            paddingBottom={8}
                             onChangeText={handleTextChange}
                             placeholder={props.placeholder}
                             onKeyPress={handleKeyPress}
                             onStateChange={handleInputStateChange}
-                            maxHeight={Platform.OS === 'web' ? 480 : 120}
+                            maxHeight={120}
                         />
                     </View>
 
                     {/* Action buttons below input */}
                     <View style={styles.actionButtonsContainer}>
                         <View style={{ flexDirection: 'column', flex: 1, gap: 2 }}>
-                            {/* Row 1: Settings, Profile (FIRST), Agent, Abort, Git Status */}
+                            {/* Row 1: Agent, Abort, Git Status, attachments */}
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                 {props.zenMode && <View style={{ flex: 1 }} />}
                                 {!props.zenMode && <View style={styles.actionButtonsLeft}>
-
-                                {/* Settings button */}
-                                {props.onPermissionModeChange && (
-                                    <Pressable
-                                        onPress={handleSettingsPress}
-                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
-                                        style={(p) => ({
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            borderRadius: Platform.select({ default: 16, android: 20 }),
-                                            paddingHorizontal: 8,
-                                            paddingVertical: 6,
-                                            justifyContent: 'center',
-                                            height: 32,
-                                            opacity: p.pressed ? 0.7 : 1,
-                                        })}
-                                    >
-                                        <Octicons
-                                            name={'gear'}
-                                            size={16}
-                                            color={theme.colors.button.secondary.tint}
-                                        />
-                                    </Pressable>
-                                )}
 
                                 {/* Agent selector button */}
                                 {props.agentType && props.onAgentClick && (
@@ -1281,7 +614,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             fontWeight: '600',
                                             ...Typography.default('semiBold'),
                                         }}>
-                                            {props.agentType === 'pi' ? 'pi' : props.agentType === 'claude' ? t('agentInput.agent.claude') : props.agentType === 'codex' ? t('agentInput.agent.codex') : props.agentType === 'openclaw' ? t('agentInput.agent.openclaw') : t('agentInput.agent.gemini')}
+                                            pi
                                         </Text>
                                     </Pressable>
                                 )}
@@ -1325,7 +658,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                 {/* Git Status Badge */}
                                 <GitStatusButton sessionId={props.sessionId} onPress={props.onFileViewerPress} />
 
-                                {/* Image picker button (expImageUpload) */}
+                                {/* Pi image attachment picker */}
                                 {props.onPickImages && (
                                     <Pressable
                                         onPress={props.onPickImages}
@@ -1352,12 +685,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                 )}
                                 </View>}
 
-                                {/* Send/Voice button - aligned with first row */}
+                                {/* Send button - aligned with first row */}
                                 <View
                                     style={[
                                         styles.sendButton,
                                         isSendBlocked ? styles.sendButtonLocked :
-                                        (hasText || props.isSending || (props.onMicPress && !props.isMicActive))
+                                        (hasText || hasImages || props.isSending)
                                             ? styles.sendButtonActive
                                             : styles.sendButtonInactive
                                     ]}
@@ -1394,7 +727,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                 color={theme.colors.button.primary.tint}
                                                 style={[
                                                     styles.sendButtonIcon,
-                                                    { marginTop: Platform.OS === 'web' ? 2 : 0 }
+                                                    { marginTop: 0 }
                                                 ]}
                                             />
                                         ) : (
@@ -1404,7 +737,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                 color={theme.colors.button.primary.tint}
                                                 style={[
                                                     styles.sendButtonIcon,
-                                                    { marginTop: Platform.OS === 'web' ? 2 : 0 }
+                                                    { marginTop: 0 }
                                                 ]}
                                             />
                                         )}

@@ -19,23 +19,12 @@ import { isMachineOnline } from '@/utils/machineUtils';
 import { getSessionName, getSessionSubtitle, getSessionAvatarId, type SessionState } from '@/utils/sessionUtils';
 import { applySettings, Settings } from "./settings";
 import { LocalSettings, applyLocalSettings } from "./localSettings";
-import { Purchases, customerInfoToPurchases } from "./purchases";
-import { Profile } from "./profile";
-import { UserProfile, RelationshipUpdatedEvent } from "./friendTypes";
-import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadSessionPermissionModes, saveSessionPermissionModes, loadSessionModelModes, saveSessionModelModes, loadSessionEffortLevels, saveSessionEffortLevels } from "./persistence";
-import type { CustomerInfo } from './revenueCat/types';
+import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadSessionDrafts, saveSessionDrafts, loadSessionPermissionModes, saveSessionPermissionModes, loadSessionModelModes, saveSessionModelModes, loadSessionEffortLevels, saveSessionEffortLevels } from "./persistence";
 import React from "react";
 import { sync } from "./sync";
 import { getSyntheticPiSessionId } from './piDiscoveredSessions';
 import { compareSessionsByRecencyDesc, nextSessionUpdatedAt, sessionRecencyAt } from './sessionRecency';
-import { getCurrentRealtimeSessionId, getVoiceSession } from '@/realtime/RealtimeSession';
 import { isMutableTool } from "@/components/tools/knownTools";
-import { DecryptedArtifact } from "./artifactTypes";
-import { FeedItem } from "./feedTypes";
-
-// Debounce timer for realtimeMode changes
-let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-const REALTIME_MODE_DEBOUNCE_MS = 150;
 
 /**
  * Centralized session online state resolver
@@ -74,9 +63,6 @@ function normalizePiSharedControlSession<T extends Omit<Session, 'presence'> & {
         },
     };
 }
-
-// Known entitlement IDs
-export type KnownEntitlements = 'pro';
 
 interface SessionMessages {
     messages: Message[];
@@ -184,8 +170,6 @@ interface StorageState {
     settings: Settings;
     settingsVersion: number | null;
     localSettings: LocalSettings;
-    purchases: Purchases;
-    profile: Profile;
     sessions: Record<string, Session>;
     sessionsData: SessionListItem[] | null;  // Legacy - to be removed
     sessionListViewData: SessionListViewItem[] | null;
@@ -195,18 +179,6 @@ interface StorageState {
     pathProjectFiles: Record<string, ProjectFilesList | null>;  // keyed by "machineId:path"
     sessionFileCache: Record<string, Record<string, { content: string | null; diff: string | null; isBinary: boolean; cachedAt: number }>>;
     machines: Record<string, Machine>;
-    artifacts: Record<string, DecryptedArtifact>;  // New artifacts storage
-    friends: Record<string, UserProfile>;  // All relationships (friends, pending, requested, etc.)
-    users: Record<string, UserProfile | null>;  // Global user cache, null = 404/failed fetch
-    feedItems: FeedItem[];  // Simple list of feed items
-    feedHead: string | null;  // Newest cursor
-    feedTail: string | null;  // Oldest cursor
-    feedHasMore: boolean;
-    feedLoaded: boolean;  // True after initial feed fetch
-    friendsLoaded: boolean;  // True after initial friends fetch
-    realtimeStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
-    realtimeMode: 'idle' | 'agent-speaking' | 'user-speaking';
-    voiceSessionGeneration: number;
     socketStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
     socketLastConnectedAt: number | null;
     socketLastDisconnectedAt: number | null;
@@ -225,8 +197,6 @@ interface StorageState {
     applySettings: (settings: Settings, version: number) => void;
     applySettingsLocal: (settings: Partial<Settings>) => void;
     applyLocalSettings: (settings: Partial<LocalSettings>) => void;
-    applyPurchases: (customerInfo: CustomerInfo) => void;
-    applyProfile: (profile: Profile) => void;
     applyGitStatus: (pathKey: string, status: GitStatus | null) => void;
     applyGitStatusFiles: (pathKey: string, files: GitStatusFiles | null) => void;
     applyProjectFiles: (pathKey: string, files: ProjectFilesList | null) => void;
@@ -234,10 +204,6 @@ interface StorageState {
     applyFileCache: (sessionId: string, filePath: string, content: string | null, diff: string | null, isBinary: boolean) => void;
     applyNativeUpdateStatus: (status: { available: boolean; updateUrl?: string; versionName?: string; versionCode?: number; sha256?: string; notes?: string } | null) => void;
     isMutableToolCall: (sessionId: string, callId: string) => boolean;
-    setRealtimeStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'error') => void;
-    setRealtimeMode: (mode: 'idle' | 'agent-speaking' | 'user-speaking', immediate?: boolean) => void;
-    clearRealtimeModeDebounce: () => void;
-    incrementVoiceSessionGeneration: () => void;
     setSocketStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'error') => void;
     getActiveSessions: () => Session[];
     updateSessionDraft: (sessionId: string, draft: string | null) => void;
@@ -245,24 +211,7 @@ interface StorageState {
     updateSessionModelMode: (sessionId: string, mode: string | null) => void;
     updateSessionEffortLevel: (sessionId: string, level: string | null) => void;
     resetSessionAgentOverrides: (sessionId: string) => void;
-    // Artifact methods
-    applyArtifacts: (artifacts: DecryptedArtifact[]) => void;
-    addArtifact: (artifact: DecryptedArtifact) => void;
-    updateArtifact: (artifact: DecryptedArtifact) => void;
-    deleteArtifact: (artifactId: string) => void;
     deleteSession: (sessionId: string) => void;
-    // Friend management methods
-    applyFriends: (friends: UserProfile[]) => void;
-    applyRelationshipUpdate: (event: RelationshipUpdatedEvent) => void;
-    getFriend: (userId: string) => UserProfile | undefined;
-    getAcceptedFriends: () => UserProfile[];
-    // User cache methods
-    applyUsers: (users: Record<string, UserProfile | null>) => void;
-    getUser: (userId: string) => UserProfile | null | undefined;
-    assumeUsers: (userIds: string[]) => Promise<void>;
-    // Feed methods
-    applyFeedItems: (items: FeedItem[]) => void;
-    clearFeed: () => void;
     // Unread session tracking (memory-only)
     unreadSessionIds: Set<string>;
     currentViewingSessionId: string | null;
@@ -372,8 +321,6 @@ function buildSessionListViewData(
 export const storage = create<StorageState>()((set, get) => {
     let { settings, version } = loadSettings();
     let localSettings = loadLocalSettings();
-    let purchases = loadPurchases();
-    let profile = loadProfile();
     let sessionDrafts = loadSessionDrafts();
     let sessionPermissionModes = loadSessionPermissionModes();
     let sessionModelModes = loadSessionModelModes();
@@ -382,19 +329,8 @@ export const storage = create<StorageState>()((set, get) => {
         settings,
         settingsVersion: version,
         localSettings,
-        purchases,
-        profile,
         sessions: {},
         machines: {},
-        artifacts: {},  // Initialize artifacts
-        friends: {},  // Initialize relationships cache
-        users: {},  // Initialize global user cache
-        feedItems: [],  // Initialize feed items list
-        feedHead: null,
-        feedTail: null,
-        feedHasMore: false,
-        feedLoaded: false,  // Initialize as false
-        friendsLoaded: false,  // Initialize as false
         sessionsData: null,  // Legacy - to be removed
         sessionListViewData: null,
         sessionMessages: {},
@@ -402,9 +338,6 @@ export const storage = create<StorageState>()((set, get) => {
         pathGitStatusFiles: {},
         pathProjectFiles: {},
         sessionFileCache: {},
-        realtimeStatus: 'disconnected',
-        realtimeMode: 'idle',
-        voiceSessionGeneration: 0,
         socketStatus: 'disconnected',
         socketLastConnectedAt: null,
         socketLastDisconnectedAt: null,
@@ -542,36 +475,6 @@ export const storage = create<StorageState>()((set, get) => {
                 if (existingSessionMessages && newSession.agentState &&
                     (!oldSession || newSession.agentStateVersion > (oldSession.agentStateVersion || 0))) {
 
-                    // Check for NEW permission requests before processing
-                    const currentRealtimeSessionId = getCurrentRealtimeSessionId();
-                    const voiceSession = getVoiceSession();
-
-                    // console.log('[REALTIME DEBUG] Permission check:', {
-                    //     currentRealtimeSessionId,
-                    //     sessionId: session.id,
-                    //     match: currentRealtimeSessionId === session.id,
-                    //     hasVoiceSession: !!voiceSession,
-                    //     oldRequests: Object.keys(oldSession?.agentState?.requests || {}),
-                    //     newRequests: Object.keys(newSession.agentState?.requests || {})
-                    // });
-
-                    if (currentRealtimeSessionId === session.id && voiceSession) {
-                        const oldRequests = oldSession?.agentState?.requests || {};
-                        const newRequests = newSession.agentState?.requests || {};
-
-                        // Find NEW permission requests only
-                        for (const [requestId, request] of Object.entries(newRequests)) {
-                            if (!oldRequests[requestId]) {
-                                // This is a NEW permission request
-                                const toolName = request.tool;
-                                // console.log('[REALTIME DEBUG] Sending permission notification for:', toolName);
-                                voiceSession.sendTextMessage(
-                                    `Claude is requesting permission to use the ${toolName} tool`
-                                );
-                            }
-                        }
-                    }
-
                     // Process new AgentState through reducer
                     const reducerResult = reducer(existingSessionMessages.reducerState, [], newSession.agentState);
                     const processedMessages = reducerResult.messages;
@@ -675,15 +578,6 @@ export const storage = create<StorageState>()((set, get) => {
             ...state,
             sessions: {},
             machines: {},
-            artifacts: {},
-            friends: {},
-            users: {},
-            feedItems: [],
-            feedHead: null,
-            feedTail: null,
-            feedHasMore: false,
-            feedLoaded: false,
-            friendsLoaded: false,
             sessionsData: null,
             sessionListViewData: null,
             sessionMessages: {},
@@ -691,8 +585,6 @@ export const storage = create<StorageState>()((set, get) => {
             pathGitStatusFiles: {},
             pathProjectFiles: {},
             sessionFileCache: {},
-            realtimeStatus: 'disconnected',
-            realtimeMode: 'idle',
             socketStatus: 'disconnected',
             socketLastConnectedAt: null,
             socketLastDisconnectedAt: null,
@@ -1006,25 +898,6 @@ export const storage = create<StorageState>()((set, get) => {
                 localSettings: updatedLocalSettings
             };
         }),
-        applyPurchases: (customerInfo: CustomerInfo) => set((state) => {
-            // Transform CustomerInfo to our Purchases format
-            const purchases = customerInfoToPurchases(customerInfo);
-
-            // Always save and update - no need for version checks
-            savePurchases(purchases);
-            return {
-                ...state,
-                purchases
-            };
-        }),
-        applyProfile: (profile: Profile) => set((state) => {
-            // Always save and update profile
-            saveProfile(profile);
-            return {
-                ...state,
-                profile
-            };
-        }),
         applyGitStatus: (pathKey: string, status: GitStatus | null) => set((state) => ({
             ...state,
             pathGitStatus: {
@@ -1071,39 +944,6 @@ export const storage = create<StorageState>()((set, get) => {
         applyNativeUpdateStatus: (status: { available: boolean; updateUrl?: string; versionName?: string; versionCode?: number; sha256?: string; notes?: string } | null) => set((state) => ({
             ...state,
             nativeUpdateStatus: status
-        })),
-        setRealtimeStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'error') => set((state) => ({
-            ...state,
-            realtimeStatus: status
-        })),
-        setRealtimeMode: (mode: 'idle' | 'agent-speaking' | 'user-speaking', immediate?: boolean) => {
-            if (immediate) {
-                // Clear any pending debounce and set immediately
-                if (realtimeModeDebounceTimer) {
-                    clearTimeout(realtimeModeDebounceTimer);
-                    realtimeModeDebounceTimer = null;
-                }
-                set((state) => ({ ...state, realtimeMode: mode }));
-            } else {
-                // Debounce mode changes to avoid flickering
-                if (realtimeModeDebounceTimer) {
-                    clearTimeout(realtimeModeDebounceTimer);
-                }
-                realtimeModeDebounceTimer = setTimeout(() => {
-                    realtimeModeDebounceTimer = null;
-                    set((state) => ({ ...state, realtimeMode: mode }));
-                }, REALTIME_MODE_DEBOUNCE_MS);
-            }
-        },
-        clearRealtimeModeDebounce: () => {
-            if (realtimeModeDebounceTimer) {
-                clearTimeout(realtimeModeDebounceTimer);
-                realtimeModeDebounceTimer = null;
-            }
-        },
-        incrementVoiceSessionGeneration: () => set((state) => ({
-            ...state,
-            voiceSessionGeneration: state.voiceSessionGeneration + 1
         })),
         setSocketStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'error') => set((state) => {
             const now = Date.now();
@@ -1319,50 +1159,6 @@ export const storage = create<StorageState>()((set, get) => {
                 sessionListViewData: buildSessionListViewData(state.sessions)
             };
         }),
-        // Artifact methods
-        applyArtifacts: (artifacts: DecryptedArtifact[]) => set((state) => {
-            console.log(`🗂️ Storage.applyArtifacts: Applying ${artifacts.length} artifacts`);
-            const mergedArtifacts = { ...state.artifacts };
-            artifacts.forEach(artifact => {
-                mergedArtifacts[artifact.id] = artifact;
-            });
-            console.log(`🗂️ Storage.applyArtifacts: Total artifacts after merge: ${Object.keys(mergedArtifacts).length}`);
-
-            return {
-                ...state,
-                artifacts: mergedArtifacts
-            };
-        }),
-        addArtifact: (artifact: DecryptedArtifact) => set((state) => {
-            const updatedArtifacts = {
-                ...state.artifacts,
-                [artifact.id]: artifact
-            };
-
-            return {
-                ...state,
-                artifacts: updatedArtifacts
-            };
-        }),
-        updateArtifact: (artifact: DecryptedArtifact) => set((state) => {
-            const updatedArtifacts = {
-                ...state.artifacts,
-                [artifact.id]: artifact
-            };
-
-            return {
-                ...state,
-                artifacts: updatedArtifacts
-            };
-        }),
-        deleteArtifact: (artifactId: string) => set((state) => {
-            const { [artifactId]: _, ...remainingArtifacts } = state.artifacts;
-
-            return {
-                ...state,
-                artifacts: remainingArtifacts
-            };
-        }),
         deleteSession: (sessionId: string) => set((state) => {
             // Remove session from sessions
             const { [sessionId]: deletedSession, ...remainingSessions } = state.sessions;
@@ -1400,129 +1196,6 @@ export const storage = create<StorageState>()((set, get) => {
                 sessionListViewData
             };
         }),
-        // Friend management methods
-        applyFriends: (friends: UserProfile[]) => set((state) => {
-            const mergedFriends = { ...state.friends };
-            friends.forEach(friend => {
-                mergedFriends[friend.id] = friend;
-            });
-            return {
-                ...state,
-                friends: mergedFriends,
-                friendsLoaded: true  // Mark as loaded after first fetch
-            };
-        }),
-        applyRelationshipUpdate: (event: RelationshipUpdatedEvent) => set((state) => {
-            const { fromUserId, toUserId, status, action, fromUser, toUser } = event;
-            const currentUserId = state.profile.id;
-
-            // Update friends cache
-            const updatedFriends = { ...state.friends };
-
-            // Determine which user profile to update based on perspective
-            const otherUserId = fromUserId === currentUserId ? toUserId : fromUserId;
-            const otherUser = fromUserId === currentUserId ? toUser : fromUser;
-
-            if (action === 'deleted' || status === 'none') {
-                // Remove from friends if deleted or status is none
-                delete updatedFriends[otherUserId];
-            } else if (otherUser) {
-                // Update or add the user profile with current status
-                updatedFriends[otherUserId] = otherUser;
-            }
-
-            return {
-                ...state,
-                friends: updatedFriends
-            };
-        }),
-        getFriend: (userId: string) => {
-            return get().friends[userId];
-        },
-        getAcceptedFriends: () => {
-            const friends = get().friends;
-            return Object.values(friends).filter(friend => friend.status === 'friend');
-        },
-        // User cache methods
-        applyUsers: (users: Record<string, UserProfile | null>) => set((state) => ({
-            ...state,
-            users: { ...state.users, ...users }
-        })),
-        getUser: (userId: string) => {
-            return get().users[userId];  // Returns UserProfile | null | undefined
-        },
-        assumeUsers: async (userIds: string[]) => {
-            // This will be implemented in sync.ts as it needs access to credentials
-            // Just a placeholder here for the interface
-            const { sync } = await import('./sync');
-            return sync.assumeUsers(userIds);
-        },
-        // Feed methods
-        applyFeedItems: (items: FeedItem[]) => set((state) => {
-            // Always mark feed as loaded even if empty
-            if (items.length === 0) {
-                return {
-                    ...state,
-                    feedLoaded: true  // Mark as loaded even when empty
-                };
-            }
-
-            // Create a map of existing items for quick lookup
-            const existingMap = new Map<string, FeedItem>();
-            state.feedItems.forEach(item => {
-                existingMap.set(item.id, item);
-            });
-
-            // Process new items
-            const updatedItems = [...state.feedItems];
-            let head = state.feedHead;
-            let tail = state.feedTail;
-
-            items.forEach(newItem => {
-                // Remove items with same repeatKey if it exists
-                if (newItem.repeatKey) {
-                    const indexToRemove = updatedItems.findIndex(item =>
-                        item.repeatKey === newItem.repeatKey
-                    );
-                    if (indexToRemove !== -1) {
-                        updatedItems.splice(indexToRemove, 1);
-                    }
-                }
-
-                // Add new item if it doesn't exist
-                if (!existingMap.has(newItem.id)) {
-                    updatedItems.push(newItem);
-                }
-
-                // Update head/tail cursors
-                if (!head || newItem.counter > parseInt(head.substring(2), 10)) {
-                    head = newItem.cursor;
-                }
-                if (!tail || newItem.counter < parseInt(tail.substring(2), 10)) {
-                    tail = newItem.cursor;
-                }
-            });
-
-            // Sort by counter (desc - newest first)
-            updatedItems.sort((a, b) => b.counter - a.counter);
-
-            return {
-                ...state,
-                feedItems: updatedItems,
-                feedHead: head,
-                feedTail: tail,
-                feedLoaded: true  // Mark as loaded after first fetch
-            };
-        }),
-        clearFeed: () => set((state) => ({
-            ...state,
-            feedItems: [],
-            feedHead: null,
-            feedTail: null,
-            feedHasMore: false,
-            feedLoaded: false,  // Reset loading flag
-            friendsLoaded: false  // Reset loading flag
-        })),
         markSessionRead: (sessionId: string) => set((state) => {
             if (!state.unreadSessionIds.has(sessionId)) return state;
             const next = new Set(state.unreadSessionIds);
@@ -1664,62 +1337,6 @@ export function useIsSessionUnread(sessionId: string): boolean {
     return storage((state) => state.unreadSessionIds.has(sessionId));
 }
 
-// Artifact hooks
-export function useArtifacts(): DecryptedArtifact[] {
-    return storage(useShallow((state) => {
-        if (!state.isDataReady) return [];
-        // Filter out draft artifacts from the main list
-        return Object.values(state.artifacts)
-            .filter(artifact => !artifact.draft)
-            .sort((a, b) => b.updatedAt - a.updatedAt);
-    }));
-}
-
-export function useAllArtifacts(): DecryptedArtifact[] {
-    return storage(useShallow((state) => {
-        if (!state.isDataReady) return [];
-        // Return all artifacts including drafts
-        return Object.values(state.artifacts).sort((a, b) => b.updatedAt - a.updatedAt);
-    }));
-}
-
-export function useDraftArtifacts(): DecryptedArtifact[] {
-    return storage(useShallow((state) => {
-        if (!state.isDataReady) return [];
-        // Return only draft artifacts
-        return Object.values(state.artifacts)
-            .filter(artifact => artifact.draft === true)
-            .sort((a, b) => b.updatedAt - a.updatedAt);
-    }));
-}
-
-export function useArtifact(artifactId: string): DecryptedArtifact | null {
-    return storage(useShallow((state) => state.artifacts[artifactId] ?? null));
-}
-
-export function useArtifactsCount(): number {
-    return storage(useShallow((state) => {
-        // Count only non-draft artifacts
-        return Object.values(state.artifacts).filter(a => !a.draft).length;
-    }));
-}
-
-export function useEntitlement(id: KnownEntitlements): boolean {
-    return storage(useShallow((state) => state.purchases.entitlements[id] ?? false));
-}
-
-export function useRealtimeStatus(): 'disconnected' | 'connecting' | 'connected' | 'error' {
-    return storage(useShallow((state) => state.realtimeStatus));
-}
-
-export function useRealtimeMode(): 'idle' | 'agent-speaking' | 'user-speaking' {
-    return storage(useShallow((state) => state.realtimeMode));
-}
-
-export function useVoiceSessionGeneration(): number {
-    return storage(useShallow((state) => state.voiceSessionGeneration));
-}
-
 export function useSocketStatus() {
     return storage(useShallow((state) => ({
         status: state.socketStatus,
@@ -1755,50 +1372,4 @@ export function useSessionFileCache(sessionId: string, filePath: string) {
 
 export function useIsDataReady(): boolean {
     return storage(useShallow((state) => state.isDataReady));
-}
-
-export function useProfile() {
-    return storage(useShallow((state) => state.profile));
-}
-
-export function useFriends() {
-    return storage(useShallow((state) => state.friends));
-}
-
-export function useFriendRequests() {
-    return storage(useShallow((state) => {
-        // Filter friends to get pending requests (where status is 'pending')
-        return Object.values(state.friends).filter(friend => friend.status === 'pending');
-    }));
-}
-
-export function useAcceptedFriends() {
-    return storage(useShallow((state) => {
-        return Object.values(state.friends).filter(friend => friend.status === 'friend');
-    }));
-}
-
-export function useFeedItems() {
-    return storage(useShallow((state) => state.feedItems));
-}
-export function useFeedLoaded() {
-    return storage((state) => state.feedLoaded);
-}
-export function useFriendsLoaded() {
-    return storage((state) => state.friendsLoaded);
-}
-
-export function useFriend(userId: string | undefined) {
-    return storage(useShallow((state) => userId ? state.friends[userId] : undefined));
-}
-
-export function useUser(userId: string | undefined) {
-    return storage(useShallow((state) => userId ? state.users[userId] : undefined));
-}
-
-export function useRequestedFriends() {
-    return storage(useShallow((state) => {
-        // Filter friends to get sent requests (where status is 'requested')
-        return Object.values(state.friends).filter(friend => friend.status === 'requested');
-    }));
 }

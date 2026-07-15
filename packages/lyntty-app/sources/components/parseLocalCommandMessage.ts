@@ -1,5 +1,6 @@
 /**
- * Parses Claude Agent SDK's local-slash-command wrapper messages.
+ * Parses inherited local-slash-command wrappers for read-only history display,
+ * plus plain slash commands emitted by current Pi sessions.
  *
  * When a `/foo` command runs, the SDK injects synthetic user messages whose
  * content is XML-like tags such as:

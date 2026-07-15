@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveActivePiSessionReuse, resolvePiActivationLock } from './activationLock';
+import { resolveActivePiSessionReuse, resolvePiActivationLock, shouldKeepWaitingForPiExtension } from './activationLock';
 import type { TrackedSession } from './types';
 
 const activePiSession = (overrides: Partial<TrackedSession> = {}): TrackedSession => ({
@@ -28,6 +28,14 @@ describe('resolveActivePiSessionReuse', () => {
     });
     expect(resolveActivePiSessionReuse('pi-session-2', [session], 'machine-1')).toBeNull();
     expect(resolveActivePiSessionReuse('pi-session-1', [session], 'machine-2')).toBeNull();
+  });
+});
+
+describe('shouldKeepWaitingForPiExtension', () => {
+  it('treats wait as a no-spawn choice for an existing Pi session', () => {
+    expect(shouldKeepWaitingForPiExtension('pi-session-1', 'wait')).toBe(true);
+    expect(shouldKeepWaitingForPiExtension('pi-session-1', 'stop')).toBe(false);
+    expect(shouldKeepWaitingForPiExtension(undefined, 'wait')).toBe(false);
   });
 });
 

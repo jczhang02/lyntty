@@ -11,20 +11,19 @@ const bundleId = {
     preview: "dev.jczhang.lyntty.preview",
     production: "dev.jczhang.lyntty"
 }[variant];
-// const stagingElevenLabsAgentId = 'agent_7801k2c0r5hjfraa1kdbytpvs6yt';
-const productionElevenLabsAgentId = 'agent_6701k211syvvegba4kt7m68nxjmw';
-const elevenLabsAgentId = {
-    development: productionElevenLabsAgentId,
-    preview: productionElevenLabsAgentId,
-    production: productionElevenLabsAgentId,
-}[variant];
 const consoleLoggingDefault = {
     development: true,
     preview: true,
     production: false,
 }[variant];
-const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || process.env.LYNTTY_EAS_PROJECT_ID || process.env.EAS_PROJECT_ID;
-const expoOwner = process.env.EXPO_PUBLIC_EXPO_OWNER || process.env.LYNTTY_EXPO_OWNER || process.env.EXPO_OWNER;
+const releaseExpoProjectId = process.env.LYNTTY_EXPO_PROJECT_ID
+    || process.env.LYNTTY_EAS_PROJECT_ID;
+const expoProjectId = releaseExpoProjectId
+    || (variant === 'production' ? undefined : process.env.EXPO_PUBLIC_PROJECT_ID);
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+if (variant === 'production' && (!expoProjectId || !uuidPattern.test(expoProjectId))) {
+    throw new Error('Production builds require LYNTTY_EXPO_PROJECT_ID (or legacy LYNTTY_EAS_PROJECT_ID) as a UUID');
+}
 
 function git(args) {
     try {
@@ -40,7 +39,6 @@ function git(args) {
 function loadBuildMetadata() {
     const commitSha =
         process.env.LYNTTY_BUILD_COMMIT_SHA ||
-        process.env.EAS_BUILD_GIT_COMMIT_HASH ||
         process.env.GITHUB_SHA ||
         git(['rev-parse', 'HEAD']);
     const commitTimestamp =
@@ -56,21 +54,13 @@ function loadBuildMetadata() {
 }
 
 const buildMetadata = loadBuildMetadata();
-const updates = variant === 'development' || !easProjectId
-    ? { enabled: false }
-    : {
-        url: `https://u.expo.dev/${easProjectId}`,
-        requestHeaders: {
-            "expo-channel-name": variant === 'preview' ? "preview" : "production"
-        }
-    };
 
 export default {
     expo: {
         name,
         slug: "lyntty",
+        platforms: ["android", "ios"],
         version: "1.0.0",
-        runtimeVersion: "21",
         orientation: "default",
         icon: "./sources/assets/images/icon.png",
         scheme: "lyntty",
@@ -82,7 +72,6 @@ export default {
                 usesNonExemptEncryption: false
             },
             infoPlist: {
-                NSMicrophoneUsageDescription: "Allow $(PRODUCT_NAME) to access your microphone only when a future Lyntty feature explicitly needs audio input.",
                 NSLocalNetworkUsageDescription: "Allow $(PRODUCT_NAME) to find and connect to local devices on your network.",
                 NSBonjourServices: ["_http._tcp", "_https._tcp"],
                 // ATS:
@@ -106,14 +95,15 @@ export default {
                 backgroundColor: "#0B1020"
             },
             permissions: [
-                "android.permission.RECORD_AUDIO",
-                "android.permission.MODIFY_AUDIO_SETTINGS",
                 "android.permission.ACCESS_NETWORK_STATE",
                 "android.permission.POST_NOTIFICATIONS",
                 "android.permission.REQUEST_INSTALL_PACKAGES",
             ],
             blockedPermissions: [
                 "android.permission.ACTIVITY_RECOGNITION",
+                "android.permission.RECORD_AUDIO",
+                "android.permission.USE_BIOMETRIC",
+                "android.permission.USE_FINGERPRINT",
                 // Not using external storage/media access for now — blocks Google Play photo/video permission declaration
                 "android.permission.READ_EXTERNAL_STORAGE",
                 "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -139,11 +129,6 @@ export default {
                 }
             ] : []
         },
-        web: {
-            bundler: "metro",
-            output: "single",
-            favicon: "./sources/assets/images/favicon.png"
-        },
         plugins: [
             require("./plugins/withEinkCompatibility.js"),
             [
@@ -152,43 +137,15 @@ export default {
                     root: "./sources/app"
                 }
             ],
-            "expo-updates",
             "expo-asset",
             "expo-localization",
-            "expo-mail-composer",
             "expo-secure-store",
-            "expo-web-browser",
-            "react-native-vision-camera",
             "@more-tech/react-native-libsodium",
-            "react-native-audio-api",
-            "@livekit/react-native-expo-plugin",
-            "@config-plugins/react-native-webrtc",
-            [
-                "expo-audio",
-                {
-                    microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone only when a future Lyntty feature explicitly needs audio input."
-                }
-            ],
-            [
-                "expo-location",
-                {
-                    locationAlwaysAndWhenInUsePermission: "Allow $(PRODUCT_NAME) to use location only for explicit local-network diagnostics.",
-                    locationAlwaysPermission: "Allow $(PRODUCT_NAME) to use location only for explicit local-network diagnostics.",
-                    locationWhenInUsePermission: "Allow $(PRODUCT_NAME) to use location only for explicit local-network diagnostics."
-                }
-            ],
-            [
-                "expo-calendar",
-                {
-                    "calendarPermission": "Allow $(PRODUCT_NAME) to access your calendar only if a future explicit integration requires it."
-                }
-            ],
             [
                 "expo-camera",
                 {
                     cameraPermission: "Allow $(PRODUCT_NAME) to access your camera to scan pairing QR codes.",
-                    microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone only when a future Lyntty feature explicitly needs audio input.",
-                    recordAudioAndroid: true
+                    recordAudioAndroid: false
                 }
             ],
             [
@@ -218,7 +175,6 @@ export default {
                 }
             ]
         ],
-        updates,
         experiments: {
             typedRoutes: true
         },
@@ -226,23 +182,13 @@ export default {
             router: {
                 root: "./sources/app"
             },
-            ...(easProjectId ? {
-                eas: {
-                    projectId: easProjectId
-                }
-            } : {}),
             app: {
-                postHogKey: process.env.EXPO_PUBLIC_POSTHOG_API_KEY,
-                revenueCatAppleKey: process.env.EXPO_PUBLIC_REVENUE_CAT_APPLE,
-                revenueCatGoogleKey: process.env.EXPO_PUBLIC_REVENUE_CAT_GOOGLE,
-                revenueCatStripeKey: process.env.EXPO_PUBLIC_REVENUE_CAT_STRIPE,
-                elevenLabsAgentId,
                 consoleLoggingDefault,
                 appEnv: variant,
+                expoProjectId,
                 buildCommitSha: buildMetadata.commitSha,
                 buildCommitTimestamp: buildMetadata.commitTimestamp,
             }
-        },
-        ...(expoOwner ? { owner: expoOwner } : {})
+        }
     }
 };

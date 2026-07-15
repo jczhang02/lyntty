@@ -4,21 +4,19 @@ import { getAgentPickerItems, getModePickerItems } from './newSessionPickerItems
 describe('new session picker items', () => {
     it('maps agents to picker item labels', () => {
         expect(getAgentPickerItems([
-            { key: 'claude', label: 'claude code' },
-            { key: 'codex', label: 'codex' },
+            { key: 'pi', label: 'pi' },
         ])).toEqual([
-            { key: 'claude', label: 'claude code' },
-            { key: 'codex', label: 'codex' },
+            { key: 'pi', label: 'pi' },
         ]);
     });
 
     it('maps model, effort, and permission options with descriptions', () => {
         expect(getModePickerItems([
             { key: 'default', name: 'default model', description: null },
-            { key: 'opus', name: 'opus 4.7', description: 'larger context' },
+            { key: 'fast', name: 'fast model', description: 'lower latency' },
         ])).toEqual([
             { key: 'default', label: 'default model' },
-            { key: 'opus', label: 'opus 4.7', subtitle: 'larger context' },
+            { key: 'fast', label: 'fast model', subtitle: 'lower latency' },
         ]);
     });
 });

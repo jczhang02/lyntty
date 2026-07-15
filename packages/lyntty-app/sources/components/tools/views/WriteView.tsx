@@ -8,7 +8,7 @@ import { useSetting } from '@/sync/storage';
 export const WriteView = React.memo<ToolViewProps>(({ tool }) => {
     const showLineNumbersInToolViews = useSetting('showLineNumbersInToolViews');
 
-    let contents: string = '<no contents>';
+    let contents: string = typeof tool.input?.content === 'string' ? tool.input.content : '<no contents>';
     const parsed = knownTools.Write.input.safeParse(tool.input);
     if (parsed.success && typeof parsed.data.content === 'string') {
         contents = parsed.data.content;

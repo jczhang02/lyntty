@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, ScrollView, ActivityIndicator, Pressable, Platform } from 'react-native';
+import { View, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/StyledText';
 import { Typography } from '@/constants/Typography';
@@ -7,7 +7,7 @@ import { FileIcon } from '@/components/FileIcon';
 import { PierreDiffView } from '@/components/diff/PierreDiffView';
 import { getPatchDiffStats } from '@/components/diff/calculateDiff';
 import { sessionBash, sessionReadFile } from '@/sync/ops';
-import { storage, useSessionGitStatusFiles, useSettingMutable } from '@/sync/storage';
+import { storage, useSessionGitStatusFiles, useSetting } from '@/sync/storage';
 import { resolveSessionFilePath } from '@/utils/sessionFileLinks';
 import { GitFileStatus } from '@/sync/gitStatusFiles';
 import { layout } from '@/components/layout';
@@ -18,7 +18,7 @@ interface AllFilesDiffViewProps {
     sessionId: string;
     /** When set, auto-scroll to this file */
     scrollToFile?: string | null;
-    /** Publishes the right-side controls (file count + diff style toggle) into the chat header. */
+    /** Publishes the changed-file count into the chat header. */
     onHeaderRightSlotChange: (slot: React.ReactNode) => void;
 }
 
@@ -43,7 +43,7 @@ export const AllFilesDiffView = React.memo(function AllFilesDiffView({
 }: AllFilesDiffViewProps) {
     const { theme } = useUnistyles();
     const gitStatusFiles = useSessionGitStatusFiles(sessionId);
-    const [diffStyle, setDiffStyle] = useSettingMutable('diffStyle');
+    const diffStyle = useSetting('diffStyle');
     const scrollRef = React.useRef<ScrollView>(null);
     const fileOffsets = React.useRef<Map<string, number>>(new Map());
 
@@ -248,17 +248,13 @@ export const AllFilesDiffView = React.memo(function AllFilesDiffView({
         };
     }, [scrollToFile, loading]);
 
-    // Publish header right-slot controls (file count + diff style toggle) into the chat header.
+    // Publish the changed-file count into the chat header.
     React.useEffect(() => {
         onHeaderRightSlotChange(
-            <DiffHeaderRight
-                fileCount={files.length}
-                diffStyle={diffStyle}
-                onDiffStyleChange={setDiffStyle}
-            />
+            <DiffHeaderRight fileCount={files.length} />
         );
         return () => onHeaderRightSlotChange(null);
-    }, [files.length, diffStyle, setDiffStyle, onHeaderRightSlotChange]);
+    }, [files.length, onHeaderRightSlotChange]);
 
     if (files.length === 0 && !loading) {
         return (
@@ -299,26 +295,17 @@ export const AllFilesDiffView = React.memo(function AllFilesDiffView({
     );
 });
 
-/** Right-side header controls for the diff overlay: file count + (web-only) Unified | Split toggle. */
+/** Right-side header control for the diff overlay. */
 const DiffHeaderRight = React.memo(function DiffHeaderRight({
     fileCount,
-    diffStyle,
-    onDiffStyleChange,
 }: {
     fileCount: number;
-    diffStyle: 'unified' | 'split';
-    onDiffStyleChange: (v: 'unified' | 'split') => void;
 }) {
     const { theme } = useUnistyles();
     return (
-        <>
-            <Text style={[styles.headerRightCount, { color: theme.colors.textSecondary }]}>
-                {t('files.changedFiles', { count: fileCount })}
-            </Text>
-            {Platform.OS === 'web' && (
-                <DiffStyleToggle value={diffStyle} onChange={onDiffStyleChange} />
-            )}
-        </>
+        <Text style={[styles.headerRightCount, { color: theme.colors.textSecondary }]}>
+            {t('files.changedFiles', { count: fileCount })}
+        </Text>
     );
 });
 
@@ -421,41 +408,6 @@ const FileDiffSection = React.memo(function FileDiffSection({
             )}
         </View>
     );
-});
-
-const DiffStyleToggle = React.memo<{ value: 'unified' | 'split'; onChange: (v: 'unified' | 'split') => void }>(({ value, onChange }) => {
-    const { theme } = useUnistyles();
-    const buttonStyle = (active: boolean) => ({
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
-        backgroundColor: active ? theme.colors.surface : 'transparent',
-    });
-    const textStyle = (active: boolean) => ({
-        fontSize: 12,
-        ...Typography.default(active ? 'semiBold' : undefined),
-        color: active ? theme.colors.text : theme.colors.textSecondary,
-    });
-    return (
-        <View style={[toggleStyles.container, { backgroundColor: theme.colors.groupped.background, borderColor: theme.colors.divider }]}>
-            <Pressable onPress={() => onChange('unified')} style={buttonStyle(value === 'unified')}>
-                <Text style={textStyle(value === 'unified')}>{t('appWide.unified')}</Text>
-            </Pressable>
-            <Pressable onPress={() => onChange('split')} style={buttonStyle(value === 'split')}>
-                <Text style={textStyle(value === 'split')}>{t('appWide.split')}</Text>
-            </Pressable>
-        </View>
-    );
-});
-
-const toggleStyles = StyleSheet.create({
-    container: {
-        flexDirection: 'row',
-        gap: 2,
-        padding: 2,
-        borderRadius: 8,
-        borderWidth: StyleSheet.hairlineWidth,
-    },
 });
 
 const styles = StyleSheet.create({

@@ -17,8 +17,7 @@
     "e2e:maestro:first-run": "scripts/e2e/run-maestro.sh e2e/maestro/01_first_run.yml",
     "e2e:maestro:pair": "scripts/e2e/run-maestro.sh e2e/maestro/02_pair_node.yml",
     "e2e:maestro:history": "scripts/e2e/run-maestro.sh e2e/maestro/03_history_send_reply.yml",
-    "e2e:maestro:reconnect": "scripts/e2e/run-maestro.sh e2e/maestro/04_reconnect_smoke.yml",
-    "e2e:release-matrix": "scripts/e2e/release-matrix.sh"
+    "e2e:maestro:reconnect": "scripts/e2e/run-maestro.sh e2e/maestro/04_reconnect_smoke.yml"
   },
   "workspaces": [
     "packages/lyntty-app",
@@ -30,7 +29,7 @@
     "whatwg-url": "14.2.0",
     "parse-path": "7.0.3",
     "@types/parse-path": "7.0.3",
-    "@hono/node-server": "1.19.10",
+    "@hono/node-server": "1.19.13",
     "defu": "6.1.5",
     "@prisma/config>effect": "3.20.0",
     "@electric-sql/pglite": "0.3.15",
@@ -45,7 +44,8 @@
     "socket.io-parser": "4.2.6",
     "react-devtools-core>ws": "7.5.11",
     "engine.io>ws": "8.21.0",
-    "engine.io-client>ws": "8.21.0"
+    "engine.io-client>ws": "8.21.0",
+    "uuid": "11.1.1"
   },
   "trustedDependencies": [
     "@more-tech/react-native-libsodium",
@@ -54,7 +54,6 @@
     "@shopify/react-native-skia",
     "@tailwindcss/oxide",
     "esbuild",
-    "lyntty-app",
     "lyntty-cli",
     "lyntty-relay",
     "prisma",

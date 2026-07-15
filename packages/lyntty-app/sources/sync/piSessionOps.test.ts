@@ -13,6 +13,10 @@ vi.mock('./sync', () => ({
     sync: {},
 }));
 
+vi.mock('./storage', () => ({
+    storage: { getState: () => ({ sessions: {} }) },
+}));
+
 describe('Pi session open helpers', () => {
     it('builds spawn requests for synthetic Pi history rows', async () => {
         const { buildPiSessionSpawnRequest, resolveOptimisticPiPath } = await import('./piSessionOpenRequest');
@@ -149,7 +153,7 @@ describe('Pi machine session ops', () => {
 
     it('requires an explicit choice before activating an inactive Pi session', async () => {
         machineRPC
-            .mockResolvedValueOnce({ type: 'error', errorMessage: 'Waiting for Pi extension. Retry or choose an explicit takeover.' })
+            .mockRejectedValueOnce(new Error('Waiting for Pi extension. Retry or choose an explicit takeover.'))
             .mockResolvedValueOnce({ type: 'success', sessionId: 'resumed-relay-session' });
         const chooseTakeover = vi.fn(async () => 'stop' as const);
 
@@ -166,11 +170,23 @@ describe('Pi machine session ops', () => {
         expect(machineRPC.mock.calls[1][2]).toMatchObject({ takeoverChoice: 'stop' });
     });
 
+    it('keeps waiting without spawning a duplicate runtime', async () => {
+        machineRPC.mockRejectedValueOnce(new Error('Waiting for Pi extension. Retry or choose an explicit takeover.'));
+        const chooseTakeover = vi.fn(async () => 'wait' as const);
+
+        const { machineResumePiWithActivationChoice } = await import('./ops');
+        await expect(machineResumePiWithActivationChoice({
+            machineId: 'machine-1',
+            directory: '/repo',
+            piSessionId: 'pi-existing',
+        }, chooseTakeover)).resolves.toBeNull();
+
+        expect(chooseTakeover).toHaveBeenCalledTimes(1);
+        expect(machineRPC).toHaveBeenCalledTimes(1);
+    });
+
     it('does not spawn a duplicate runtime when takeover selection is cancelled', async () => {
-        machineRPC.mockResolvedValueOnce({
-            type: 'error',
-            errorMessage: 'Waiting for Pi extension. Retry or choose an explicit takeover.',
-        });
+        machineRPC.mockRejectedValueOnce(new Error('Waiting for Pi extension. Retry or choose an explicit takeover.'));
         const chooseTakeover = vi.fn(async () => null);
 
         const { machineResumePiWithActivationChoice } = await import('./ops');
@@ -205,10 +221,6 @@ describe('Pi machine session ops', () => {
             token: undefined,
             agent: 'pi',
             takeoverChoice: 'interrupt',
-            resumeClaudeSessionId: undefined,
-            resumeCodexThreadId: undefined,
-            parentSessionId: undefined,
-            forkedFromMessageId: undefined,
         });
     });
 
