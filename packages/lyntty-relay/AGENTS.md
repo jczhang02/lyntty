@@ -40,8 +40,8 @@ This package is the self-hosted relay API/socket server. It routes encrypted syn
 Preferred checks:
 
 ```bash
-pnpm --filter ./packages/lyntty-relay test
-pnpm --filter ./packages/lyntty-relay typecheck
+bun run --cwd packages/lyntty-relay test
+bun run --cwd packages/lyntty-relay typecheck
 ```
 
 Focus tests for socket authorization, payload caps, idempotency, auth request lifecycle, artifact conflict handling, and presence races.

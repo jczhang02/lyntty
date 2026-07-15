@@ -66,8 +66,10 @@ LYNTTY_GOOGLE_SERVICES_JSON_BASE64
 GitHub Actions Variables:
 
 ```text
-LYNTTY_EAS_PROJECT_ID
+LYNTTY_EXPO_PROJECT_ID
 ```
+
+The workflow also accepts the existing `LYNTTY_EAS_PROJECT_ID` repository variable as a temporary migration fallback. Production config validates the selected value as a UUID and never lets a generic `EXPO_PUBLIC_PROJECT_ID` override it.
 
 Manual generation example, only when intentionally creating the permanent key:
 
@@ -128,7 +130,7 @@ Build outline:
 printf '%s' "$LYNTTY_ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lyntty-release.jks"
 printf '%s' "$LYNTTY_GOOGLE_SERVICES_JSON_BASE64" | base64 -d > packages/lyntty-app/android/app/google-services.json
 cd packages/lyntty-app/android
-APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
+APP_ENV=production LYNTTY_EXPO_PROJECT_ID="$LYNTTY_EXPO_PROJECT_ID" ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
   -x lintVitalAnalyzeRelease \
   -x lintVitalRelease \
   -PreactNativeArchitectures=arm64-v8a \
@@ -273,12 +275,9 @@ Important limits:
 - Expo has no reliable first-version preflight for `canRequestPackageInstalls()`, so UX must handle installer failure and provide remediation.
 - Reading full APK into memory is accepted for first version; low-memory failure must show clear error and not open installer.
 
-## EAS relationship
+## Expo push identity
 
-- `EAS Build`: cloud builds native binaries. Not main path.
-- `EAS Update`: OTA JS/assets update. Not native APK update path.
-- `EAS projectId`: still required by Expo push token registration on Android.
-- FCM v1 service-account credentials are uploaded to Expo/EAS for Expo Push Service delivery; they are not stored in GitHub.
+Lyntty does not use EAS Build, Submit, or Update. The Expo project id remains only because Android push-token registration requires that identity. The release workflow embeds `google-services.json` in the APK, but that file does not authorize Expo Push Service delivery. Operators must separately provision the FCM v1 service-account credential for the same Expo project; it stays outside Git and outside the APK.
 
 Lyntty main path:
 
@@ -286,17 +285,15 @@ Lyntty main path:
 GitHub Actions Gradle build -> GitHub Release APK/latest.json -> relay /v1/version -> app download/hash -> Android Package Installer
 ```
 
-EAS Update may remain secondary for small JS/resource hotfixes if explicitly enabled with the Lyntty EAS project id, but it must not be the core release/update mechanism.
-
 ## Test plan
 
 Unit/focused:
 
 ```bash
-pnpm --filter ./packages/lyntty-app test
-pnpm --filter ./packages/lyntty-app typecheck
-pnpm --filter ./packages/lyntty-relay test
-pnpm --filter ./packages/lyntty-relay typecheck
+bun run --filter lyntty-app test
+bun run --filter lyntty-app typecheck
+bun run --filter lyntty-relay test
+bun run --filter lyntty-relay typecheck
 git diff --check
 ```
 
@@ -306,7 +303,7 @@ Release workflow checks:
 - Gradle production release fails without required signing/version properties.
 - APK asset exists and hash matches generated `latest.json`.
 - GitHub Release contains both APK and `latest.json`.
-- Production APK can register an Expo push token with `LYNTTY_EAS_PROJECT_ID` and Firebase Android config.
+- Production APK can register an Expo push token with `LYNTTY_EXPO_PROJECT_ID` and Firebase Android config.
 
 Device/emulator checks:
 
@@ -342,4 +339,4 @@ Device/emulator checks:
 - [x] Hash mismatch blocks install.
 - [x] Android Package Installer confirmation appears.
 - [x] No native updater shim added.
-- [x] EAS Update is not required for native updates.
+- [x] EAS/OTA update surfaces are absent; signed full APKs are the only App update unit.

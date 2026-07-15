@@ -1,0 +1,9 @@
+APK=packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk
+6cf796c1715650cf2d02cb1222af9ad8c3562f52c727ab8fa1daae9fbd563eee  packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk
+size_bytes=198343201
+build=BUILD SUCCESSFUL in 1m 45s
+tasks=1005 actionable tasks: 156 executed, 849 up-to-date (clean App build directories; shared dependency caches retained)
+runtime_sentinel=node/npm/pnpm/npx/tsx each exits 97; build completed without sentinel invocation
+isolated_home=/tmp/lyntty-bun-app-release-gate/home
+isolated_gradle_cache=/tmp/lyntty-bun-app-release-gate/gradle
+temporary_maven_init=/tmp/lyntty-bun-app-release-gate/mirror.init.gradle

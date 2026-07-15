@@ -14,8 +14,8 @@ This package defines shared protocol/schema boundaries used by app, relay, and C
 ## Verification
 
 ```bash
-pnpm --filter ./packages/lyntty-wire test
-pnpm --filter ./packages/lyntty-wire build
+bun run --cwd packages/lyntty-wire test
+bun run --cwd packages/lyntty-wire build
 ```
 
 Run app/CLI/relay focused tests too when schema changes affect runtime behavior.

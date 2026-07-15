@@ -1,0 +1,56 @@
+Verifies
+apk_sha256=6cf796c1715650cf2d02cb1222af9ad8c3562f52c727ab8fa1daae9fbd563eee
+size_bytes=198343201
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=Lyntty Preview, OU=Development, O=Lyntty, L=Local, ST=Local, C=US
+Signer #1 certificate SHA-256 digest: ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c
+Signer #1 certificate SHA-1 digest: 85afffb5441364974f7e9a0fab42b1dc3fb3de60
+Signer #1 certificate MD5 digest: ec78f03e82e7b7bb5f4d6c14d68368f8
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 2048
+Signer #1 public key SHA-256 digest: 27953b92f802d6cb89f68a88fff9213087586ed0a129625dbd922294fbd4d87a
+Signer #1 public key SHA-1 digest: c503a90abcfcc2f1aec22ff655668e46f1ad79e0
+Signer #1 public key MD5 digest: 24410eeee5a84ab28bacaf6330773bdb
+
+application-id=dev.jczhang.lyntty.dev
+version-name=1.0.0
+version-code=1
+abis=arm64-v8a,armeabi-v7a,x86,x86_64
+
+permissions:
+android.permission.ACCESS_NETWORK_STATE
+android.permission.CAMERA
+android.permission.INTERNET
+android.permission.POST_NOTIFICATIONS
+android.permission.READ_APP_BADGE
+android.permission.RECEIVE_BOOT_COMPLETED
+android.permission.REQUEST_INSTALL_PACKAGES
+android.permission.VIBRATE
+android.permission.WAKE_LOCK
+com.anddoes.launcher.permission.UPDATE_COUNT
+com.google.android.c2dm.permission.RECEIVE
+com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE
+com.htc.launcher.permission.READ_SETTINGS
+com.htc.launcher.permission.UPDATE_SHORTCUT
+com.huawei.android.launcher.permission.CHANGE_BADGE
+com.huawei.android.launcher.permission.READ_SETTINGS
+com.huawei.android.launcher.permission.WRITE_SETTINGS
+com.majeur.launcher.permission.UPDATE_BADGE
+com.oppo.launcher.permission.READ_SETTINGS
+com.oppo.launcher.permission.WRITE_SETTINGS
+com.sec.android.provider.badge.permission.READ
+com.sec.android.provider.badge.permission.WRITE
+com.sonyericsson.home.permission.BROADCAST_BADGE
+com.sonymobile.home.permission.PROVIDER_INSERT_BADGE
+dev.jczhang.lyntty.dev.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+me.everything.badger.permission.BADGE_COUNT_READ
+me.everything.badger.permission.BADGE_COUNT_WRITE
+
+forbidden manifest/file scan:
+none
