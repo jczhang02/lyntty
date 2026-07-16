@@ -1,16 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import type { Session } from './storageTypes';
 import { shouldStopBeforeArchive, stopAndArchiveSession } from './archiveSessionAction';
-import { sessionArchive, sessionKill } from './ops';
+
+const mockedSessionKill = vi.fn();
+const mockedSessionArchive = vi.fn();
 
 vi.mock('./ops', () => ({
-    sessionArchive: vi.fn(),
-    sessionKill: vi.fn(),
+    sessionArchive: mockedSessionArchive,
+    sessionKill: mockedSessionKill,
 }));
-
-const mockedSessionKill = vi.mocked(sessionKill);
-const mockedSessionArchive = vi.mocked(sessionArchive);
 
 function session(overrides: Partial<Session> = {}): Session {
     return {
@@ -87,10 +86,21 @@ describe('archive session action', () => {
         expect(mockedSessionArchive).not.toHaveBeenCalled();
     });
 
+    it('archives active legacy history without executing a runtime stop', async () => {
+        const result = await stopAndArchiveSession(session({
+            active: true,
+            metadata: { path: '/repo', host: 'thinkpad', flavor: 'claude' },
+        }));
+
+        expect(result).toEqual({ success: true, stopped: false, archived: true });
+        expect(mockedSessionKill).not.toHaveBeenCalled();
+        expect(mockedSessionArchive).toHaveBeenCalledWith('session-1');
+    });
+
     it('does not require stop for unavailable synthetic recovery states', () => {
         expect(shouldStopBeforeArchive(session({
             active: true,
-            metadata: { path: '/repo', host: 'thinkpad', controlState: 'missing_local_history' },
+            metadata: { path: '/repo', host: 'thinkpad', flavor: 'pi', controlState: 'missing_local_history' },
         }))).toBe(false);
     });
 });

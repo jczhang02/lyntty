@@ -29,7 +29,8 @@ export function parseMessageAsEvent(msg: NormalizedMessage): AgentEvent | null {
     // Check for agent messages that should become events
     if (msg.role === 'agent') {
         for (const content of msg.content) {
-            // Check for Claude AI usage limit messages
+            // Passive compatibility for historical encrypted provider records;
+            // current Pi sessions do not emit this sentinel.
             if (content.type === 'text') {
                 const limitMatch = content.text.match(/^Claude AI usage limit reached\|(\d+)$/);
                 if (limitMatch) {
@@ -55,7 +56,7 @@ export function parseMessageAsEvent(msg: NormalizedMessage): AgentEvent | null {
                 }
             }
 
-            // Check for EnterPlanMode tool calls
+            // Passive compatibility for historical plan-mode tool records.
             if (content.type === 'tool-call' && (content.name === 'EnterPlanMode' || content.name === 'enter_plan_mode')) {
                 return {
                     type: 'message',

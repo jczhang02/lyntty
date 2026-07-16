@@ -1,15 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { canControlSession } from './sessionControlPolicy';
 
 describe('canControlSession', () => {
-    it('allows current Pi and flavorless legacy Pi sessions', () => {
+    it('allows only explicit current Pi sessions', () => {
         expect(canControlSession({ flavor: 'pi' })).toBe(true);
-        expect(canControlSession({})).toBe(true);
-        expect(canControlSession(null)).toBe(true);
+        expect(canControlSession({ flavor: ' PI ' })).toBe(true);
     });
 
-    it('keeps explicit legacy provider sessions history-only', () => {
+    it('keeps unidentified and legacy provider sessions history-only', () => {
+        expect(canControlSession({})).toBe(false);
+        expect(canControlSession({ flavor: '' })).toBe(false);
+        expect(canControlSession(null)).toBe(false);
         expect(canControlSession({ flavor: 'claude' })).toBe(false);
         expect(canControlSession({ flavor: 'codex' })).toBe(false);
         expect(canControlSession({ flavor: 'gemini' })).toBe(false);

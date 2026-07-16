@@ -1,7 +1,6 @@
 import { MMKV } from 'react-native-mmkv';
 import { Settings, settingsDefaults, settingsParse, settingsToSyncPayload, SettingsSchema } from './settings';
 import { LocalSettings, localSettingsDefaults, localSettingsParse } from './localSettings';
-import type { PermissionModeKey } from '@/components/PermissionModeSelector';
 
 const mmkv = new MMKV();
 const NEW_SESSION_DRAFT_KEY = 'new-session-draft-v1';
@@ -98,16 +97,12 @@ export function savePendingSyntheticOutbox(outbox: Map<string, PersistedSyntheti
     mmkv.set(PENDING_SYNTHETIC_OUTBOX_KEY, JSON.stringify(Object.fromEntries(outbox)));
 }
 
-export type NewSessionAgentType = 'pi';
 export type NewSessionSessionType = 'simple' | 'worktree';
 
 export interface NewSessionDraft {
     input: string;
     selectedMachineId: string | null;
     selectedPath: string | null;
-    agentType: NewSessionAgentType;
-    permissionMode: PermissionModeKey;
-    modelMode: string;
     sessionType: NewSessionSessionType;
     worktreeKey: string | null;
     updatedAt: number;
@@ -213,12 +208,6 @@ export function loadNewSessionDraft(): NewSessionDraft | null {
         const input = typeof parsed.input === 'string' ? parsed.input : '';
         const selectedMachineId = typeof parsed.selectedMachineId === 'string' ? parsed.selectedMachineId : null;
         const selectedPath = typeof parsed.selectedPath === 'string' ? parsed.selectedPath : null;
-        // Normalize inherited runtime choices at the persistence boundary.
-        const agentType: NewSessionAgentType = 'pi';
-        const permissionMode: PermissionModeKey = typeof parsed.permissionMode === 'string'
-            ? parsed.permissionMode
-            : 'default';
-        const modelMode: string = typeof parsed.modelMode === 'string' ? parsed.modelMode : 'default';
         const sessionType: NewSessionSessionType = parsed.sessionType === 'worktree' ? 'worktree' : 'simple';
         const worktreeKey = typeof parsed.worktreeKey === 'string' ? parsed.worktreeKey : null;
         const updatedAt = typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now();
@@ -227,9 +216,6 @@ export function loadNewSessionDraft(): NewSessionDraft | null {
             input,
             selectedMachineId,
             selectedPath,
-            agentType,
-            permissionMode,
-            modelMode,
             sessionType,
             worktreeKey,
             updatedAt,

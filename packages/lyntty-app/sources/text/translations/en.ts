@@ -32,16 +32,8 @@ function plural({ count, singular, plural }: { count: number; singular: string; 
 export const en: TranslationStructure = {
     tabs: {
         // Tab navigation labels
-        inbox: 'Inbox',
         sessions: 'Sessions',
         settings: 'Settings',
-    },
-
-    inbox: {
-        // Inbox screen
-        emptyTitle: 'Empty Inbox',
-        emptyDescription: 'Connect with nodes to start sharing sessions',
-        updates: 'Updates',
     },
 
     common: {
@@ -355,24 +347,6 @@ stopAndArchiveSession: 'Stop & Archive',
     },
 
     agentInput: {
-        permissionMode: {
-            title: 'PERMISSION MODE',
-            default: 'default permissions',
-            acceptEdits: 'accept edits',
-            plan: 'plan',
-            dontAsk: "don't ask",
-            bypassPermissions: 'yolo',
-            badgeAcceptAllEdits: 'accept all edits',
-            badgeBypassAllPermissions: 'yolo',
-            badgePlanMode: 'plan mode',
-        },
-        model: {
-            title: 'MODEL',
-            configureInCli: 'Configure models in CLI settings',
-        },
-        effort: {
-            title: 'EFFORT',
-        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% left`,
         },

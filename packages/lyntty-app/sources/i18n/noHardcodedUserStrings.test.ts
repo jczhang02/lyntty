@@ -1,6 +1,6 @@
 import { RuleTester } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
-import { describe, it } from 'vitest';
+import { describe, it } from 'bun:test';
 
 // Local ESLint rule is authored as an ESM config module for direct ESLint loading.
 import rule from '../../scripts/eslint-rules/no-hardcoded-user-strings.mjs';
@@ -17,6 +17,12 @@ const ruleTester = new RuleTester({
         },
     },
 });
+
+// ESLint's RuleTester registers nested Mocha suites by default. Bun does not
+// allow suite registration from inside a running test, so execute those
+// callbacks synchronously within the single test below.
+RuleTester.describe = (_name: string, callback: () => void) => callback();
+RuleTester.it = (_name: string, callback: () => void) => callback();
 
 describe('no-hardcoded-user-strings', () => {
     it('accepts i18n calls and technical literals while rejecting UI copy', () => {

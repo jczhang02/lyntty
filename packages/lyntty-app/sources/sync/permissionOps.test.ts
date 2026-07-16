@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
     sessionRPC: vi.fn(),
     sessions: {} as Record<string, { metadata?: { flavor?: string } }>,
-}));
+};
 
 vi.mock('./apiSocket', () => ({
     apiSocket: { sessionRPC: mocks.sessionRPC, machineRPC: vi.fn() },
@@ -42,6 +42,44 @@ describe('permission session operations', () => {
 
         await expect(sessionAllow('legacy-session', 'permission-1')).rejects.toThrow('history only');
         await expect(sessionDeny('missing-session', 'permission-2')).rejects.toThrow('history only');
+        expect(mocks.sessionRPC).not.toHaveBeenCalled();
+    });
+
+    it('rejects every runtime control operation for flavorless history sessions', async () => {
+        mocks.sessions['history-session'] = { metadata: {} };
+        const {
+            sessionAbort,
+            sessionAllow,
+            sessionBash,
+            sessionDeny,
+            sessionGetDirectoryTree,
+            sessionKill,
+            sessionListDirectory,
+            sessionLoadPiHistoryPage,
+            sessionReadFile,
+            sessionRipgrep,
+            sessionSwitch,
+            sessionWriteFile,
+        } = await import('./ops');
+
+        const operations = [
+            () => sessionAbort('history-session'),
+            () => sessionAllow('history-session', 'permission-1'),
+            () => sessionDeny('history-session', 'permission-2'),
+            () => sessionSwitch('history-session', 'local'),
+            () => sessionBash('history-session', { command: 'pwd' }),
+            () => sessionReadFile('history-session', '/tmp/a'),
+            () => sessionWriteFile('history-session', '/tmp/a', 'YQ=='),
+            () => sessionListDirectory('history-session', '/tmp'),
+            () => sessionGetDirectoryTree('history-session', '/tmp', 1),
+            () => sessionRipgrep('history-session', ['needle']),
+            () => sessionKill('history-session'),
+            () => sessionLoadPiHistoryPage('history-session'),
+        ];
+
+        for (const operation of operations) {
+            await expect(operation()).rejects.toThrow('history only');
+        }
         expect(mocks.sessionRPC).not.toHaveBeenCalled();
     });
 });

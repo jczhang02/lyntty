@@ -1,11 +1,11 @@
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { AuthProvider, useAuth } from './AuthContext';
 import type { AuthCredentials } from './tokenStorage';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
   setCredentials: vi.fn(),
   removeCredentials: vi.fn(),
   syncCreate: vi.fn(),
@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   clearPersistence: vi.fn(),
   loadRegisteredPushToken: vi.fn(),
   unregisterPushToken: vi.fn(),
-}));
+};
 
 vi.mock('./tokenStorage', () => ({
   TokenStorage: {

@@ -1,29 +1,10 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
-
-// Mock expo-crypto with Bun's node:crypto compatibility API
-vi.mock('expo-crypto', () => ({
-    getRandomBytes: (n: number) => {
-        const { randomBytes } = require('node:crypto');
-        return new Uint8Array(randomBytes(n));
-    },
-}));
-
-// Use the CommonJS entry because the package's ESM wrapper is not Bun-compatible.
-vi.mock('@/encryption/libsodium.lib', () => {
-    const s = require('libsodium-wrappers');
-    return { default: s };
-});
+import { describe, it, expect } from 'bun:test';
 
 import { encryptBlob, decryptBlob } from './blob';
 
 // 32-byte key for crypto_secretbox (NaCl symmetric encryption)
 const TEST_KEY = new Uint8Array(32);
 for (let i = 0; i < 32; i++) TEST_KEY[i] = i;
-
-beforeAll(async () => {
-    const sodium = require('libsodium-wrappers');
-    await sodium.ready;
-});
 
 describe('blob encryption', () => {
     it('should encrypt and decrypt a small blob', () => {

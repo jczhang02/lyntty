@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { Machine, PiMachineSessionRecord, Session } from './storageTypes';
 import { mergePiDiscoveredSessions } from './piDiscoveredSessions';

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { getUserMessagePresentation, isBlockUserMessageText, isLocalOptimisticUserMessage } from './userMessagePresentation';
 import type { UserTextMessage } from '@/sync/typesMessage';
 

@@ -16,6 +16,7 @@ import { machineWorktreeStatus } from '@/sync/ops';
 import { isWorktreePath, removeWorktree } from '@/utils/worktree';
 import { Modal } from '@/modal';
 import { t } from '@/text';
+import { canControlSession } from '@/sync/sessionControlPolicy';
 
 /**
  * Check whether any *other* active session shares the same worktree path,
@@ -29,6 +30,11 @@ export async function maybeCleanupWorktree(
     machineId: string | undefined,
 ): Promise<void> {
     if (!sessionPath || !machineId || !isWorktreePath(sessionPath)) {
+        return;
+    }
+
+    const session = storage.getState().sessions[sessionId];
+    if (!session || !canControlSession(session.metadata)) {
         return;
     }
 

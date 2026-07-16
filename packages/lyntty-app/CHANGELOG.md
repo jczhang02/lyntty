@@ -4,7 +4,7 @@ Improves the Android launcher icon scale for clearer One UI home-screen presenta
 
 ## Fixed
 
-- Reduced the `Ly` launcher mark size so Samsung One UI shows more dark background breathing room, closer to the Happy-style visual target.
+- Reduced the `Ly` launcher mark size so Samsung One UI shows more dark background breathing room and matches the established Lyntty visual target.
 - Regenerated shared Expo icon assets and native Android launcher resources used by development and production APK builds.
 
 ## Verification
@@ -24,9 +24,9 @@ First clean Lyntty Android release line.
 
 ## Fixed
 
-- Replaced stale Happy launcher and splash assets with Lyntty assets.
+- Refreshed launcher and splash assets with the current Lyntty identity.
 - Settings now shows native app version and build, for example `1.0.0 (4)`.
-- Replaced inherited Happy changelog text with fixed Lyntty release notes.
+- Standardized the in-app changelog on fixed Lyntty release notes.
 - Session prose uses Source Serif 4 for English and LXGW Neo ZhiSong for Chinese.
 
 ## Known gaps

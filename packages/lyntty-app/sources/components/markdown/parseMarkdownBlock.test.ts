@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { parseMarkdown } from './parseMarkdown';
 
 const spans = (text: string) => text ? [{ styles: [], text, url: null }] : [];

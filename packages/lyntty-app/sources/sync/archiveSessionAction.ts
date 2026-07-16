@@ -1,8 +1,9 @@
 import type { Session } from './storageTypes';
 import { sessionArchive, sessionKill } from './ops';
+import { canControlSession } from './sessionControlPolicy';
 
 type ArchiveableSession = Pick<Session, 'id' | 'active'> & {
-    metadata?: Pick<NonNullable<Session['metadata']>, 'controlState' | 'runtimeOwner'> | null;
+    metadata?: Pick<NonNullable<Session['metadata']>, 'controlState' | 'runtimeOwner' | 'flavor'> | null;
 };
 
 export type StopAndArchiveSessionResult = {
@@ -13,6 +14,10 @@ export type StopAndArchiveSessionResult = {
 };
 
 export function shouldStopBeforeArchive(session: ArchiveableSession): boolean {
+    if (!canControlSession(session.metadata)) {
+        return false;
+    }
+
     const controlState = session.metadata?.controlState;
     if (controlState === 'missing_local_history' || controlState === 'computer_offline') {
         return false;

@@ -69,9 +69,11 @@ export interface WorktreeInfo {
 export async function listWorktrees(
     machineId: string,
     basePath: string
-): Promise<WorktreeInfo[]> {
-    const result = await machineWorktreeList(machineId, basePath);
-    return result.worktrees;
+): Promise<
+    | { success: true; worktrees: WorktreeInfo[] }
+    | { success: false; error: string }
+> {
+    return machineWorktreeList(machineId, basePath);
 }
 
 export async function removeWorktree(

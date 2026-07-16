@@ -163,7 +163,12 @@ class ApiSocket {
     /**
      * RPC call for machines - uses legacy/global encryption (for now)
      */
-    async machineRPC<R, A>(machineId: string, method: string, params: A): Promise<R> {
+    async machineRPC<R, A>(
+        machineId: string,
+        method: string,
+        params: A,
+        parseResult: (value: unknown) => R,
+    ): Promise<R> {
         const machineEncryption = this.encryption!.getMachineEncryption(machineId);
         if (!machineEncryption) {
             throw new Error(`Machine encryption not found for ${machineId}`);
@@ -175,7 +180,8 @@ class ApiSocket {
         });
 
         if (result.ok) {
-            return unwrapRpcHandlerResponse<R>(await machineEncryption.decryptRaw(result.result));
+            const value = unwrapRpcHandlerResponse<unknown>(await machineEncryption.decryptRaw(result.result));
+            return parseResult(value);
         }
         throw new Error(result.error || 'RPC call failed');
     }

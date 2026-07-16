@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@/dev/testRunner';
+import { describe, it, expect } from 'bun:test';
 import { decryptAESGCM, decryptAESGCMString, encryptAESGCM, encryptAESGCMString } from './aes';
 import { getRandomBytes } from 'expo-crypto';
 import { encodeBase64 } from '@/encryption/base64';
@@ -8,10 +8,8 @@ describe('AES Tests', () => {
         const key = encodeBase64(getRandomBytes(32));
         const encrypted = await encryptAESGCMString(JSON.stringify('Hello, World!'), key);
         expect(typeof encrypted).toEqual('string');
-        console.log(`Encrypted: ${encrypted}`);
         const decrypted = await decryptAESGCMString(encrypted, key);
         expect(typeof decrypted).toEqual('string');
-        console.log(`Decrypted: ${decrypted}`);
         expect(decrypted).toEqual(JSON.stringify('Hello, World!'));
     });
     it('should encrypt and decrypt a Uint8Array', async () => {

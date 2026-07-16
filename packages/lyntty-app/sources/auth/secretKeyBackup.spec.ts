@@ -5,7 +5,7 @@ import {
     normalizeSecretKey
 } from './secretKeyBackup';
 import { encodeBase64, decodeBase64 } from '@/encryption/base64';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 
 describe('secretKeyBackup', () => {
     // Test data: a valid 32-byte secret key

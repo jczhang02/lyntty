@@ -1,5 +1,5 @@
 import { createEnvelope } from 'lyntty-wire';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { createReducer, reducer } from './reducer/reducer';
 import { normalizeRawMessage } from './typesRaw';

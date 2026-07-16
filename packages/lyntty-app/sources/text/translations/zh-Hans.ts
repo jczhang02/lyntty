@@ -19,16 +19,8 @@ function plural({ count, singular, plural }: { count: number; singular: string; 
 export const zhHans: TranslationStructure = {
     tabs: {
         // Tab navigation labels
-        inbox: '收件箱',
         sessions: 'Sessions',
         settings: '设置',
-    },
-
-    inbox: {
-        // Inbox screen
-        emptyTitle: '收件箱为空',
-        emptyDescription: '与好友建立连接，开始共享会话',
-        updates: '更新',
     },
 
     common: {
@@ -341,24 +333,6 @@ export const zhHans: TranslationStructure = {
     },
 
     agentInput: {
-        permissionMode: {
-            title: '权限模式',
-            default: '默认',
-            acceptEdits: '接受编辑',
-            plan: '计划模式',
-            dontAsk: '不再询问',
-            bypassPermissions: 'Yolo 模式',
-            badgeAcceptAllEdits: '接受所有编辑',
-            badgeBypassAllPermissions: '绕过所有权限',
-            badgePlanMode: '计划模式',
-        },
-        model: {
-            title: '模型',
-            configureInCli: '在 CLI 设置中配置模型',
-        },
-        effort: {
-            title: '工作量',
-        },
         context: {
             remaining: ({ percent }: { percent: number }) => `剩余 ${percent}%`,
         },

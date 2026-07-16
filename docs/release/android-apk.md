@@ -50,7 +50,7 @@ Rules:
 - Store CI copy in GitHub Secrets as base64 plus passwords.
 - Android background push notifications require a first-party Firebase project for `dev.jczhang.lyntty`.
 - Store `google-services.json` as a base64 GitHub Secret; keep the file out of git.
-- Store the Expo/EAS project id as a GitHub Actions repository variable so `expo-notifications` can request Expo push tokens.
+- Store the Expo project id as a GitHub Actions repository variable so `expo-notifications` can request Expo push tokens.
 - Do not print secret values in CI logs.
 
 GitHub Secrets:
@@ -97,7 +97,7 @@ Accepted direction: use checked-in `packages/lyntty-app/android/` as release sou
 Implemented behavior:
 
 - debug Gradle builds use dev identity (`dev.jczhang.lyntty.dev`) via `applicationIdSuffix`;
-- release Gradle builds use production identity (`dev.jczhang.lyntty`) so EAS credentials reads the correct native package id;
+- release Gradle builds use production identity (`dev.jczhang.lyntty`) and the matching permanent release keystore;
 - production release fails if signing/version properties are missing;
 - production release fails if Firebase `google-services.json` is missing;
 - release signing uses injected keystore only in release workflow.
@@ -330,7 +330,7 @@ Device/emulator checks:
 - [x] Dev APK uses `dev.jczhang.lyntty.dev`.
 - [x] Production release uses permanent release keystore.
 - [x] Production APK includes Firebase Android config from GitHub Secret for push notifications.
-- [x] Production APK embeds Lyntty EAS project id for Expo push token registration.
+- [x] Production APK embeds the Lyntty Expo project id for Expo push token registration.
 - [x] APK release workflow is manual.
 - [x] `versionCode` is monotonic and included in `latest.json`.
 - [x] `latest.json` is CI-generated.

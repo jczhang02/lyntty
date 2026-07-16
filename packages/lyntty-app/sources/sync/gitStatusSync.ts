@@ -11,6 +11,7 @@ import { parseStatusSummary, getStatusCounts, isDirty } from './git-parsers/pars
 import { parseStatusSummaryV2, getStatusCountsV2, isDirtyV2, getCurrentBranchV2, getTrackingInfoV2 } from './git-parsers/parseStatusV2';
 import { parseCurrentBranch } from './git-parsers/parseBranch';
 import { parseNumStat, mergeDiffSummaries } from './git-parsers/parseDiff';
+import { canControlSession } from './sessionControlPolicy';
 
 
 export class GitStatusSync {
@@ -26,7 +27,11 @@ export class GitStatusSync {
      */
     private getProjectKeyForSession(sessionId: string): string | null {
         const session = storage.getState().sessions[sessionId];
-        if (!session?.metadata?.machineId || !session?.metadata?.path) {
+        if (
+            !session?.metadata?.machineId
+            || !session.metadata.path
+            || !canControlSession(session.metadata)
+        ) {
             return null;
         }
         return `${session.metadata.machineId}:${session.metadata.path}`;
@@ -47,7 +52,7 @@ export class GitStatusSync {
 
         let sync = this.projectSyncMap.get(projectKey);
         if (!sync) {
-            sync = new InvalidateSync(() => this.fetchGitStatusForProject(sessionId, projectKey));
+            sync = new InvalidateSync(() => this.fetchGitStatusForProject(projectKey));
             this.projectSyncMap.set(projectKey, sync);
         }
         return sync;
@@ -120,23 +125,38 @@ export class GitStatusSync {
         }
     }
 
-    /**
-     * Fetch git status for a project using any session in that project
-     */
-    private async fetchGitStatusForProject(sessionId: string, projectKey: string): Promise<void> {
-        try {
-            // Check if we have a session with valid metadata
-            const session = storage.getState().sessions[sessionId];
-            if (!session?.metadata?.path) {
-                return;
+    private getControllableSessionForProject(projectKey: string): { sessionId: string; path: string } | null {
+        for (const [sessionId, candidateProjectKey] of this.sessionToProjectKey.entries()) {
+            if (candidateProjectKey !== projectKey) continue;
+            const candidate = storage.getState().sessions[sessionId];
+            if (candidate?.metadata?.path && canControlSession(candidate.metadata)) {
+                return { sessionId, path: candidate.metadata.path };
             }
+        }
+        return null;
+    }
 
-            // First check if we're in a git repository
-            const gitCheckResult = await sessionBash(sessionId, {
-                command: 'git rev-parse --is-inside-work-tree',
-                cwd: session.metadata.path,
-                timeout: 5000
+    /**
+     * Fetch git status using a currently registered controllable Pi session.
+     * Re-resolve before every RPC so unmounting one shared-path view cannot
+     * leave the rest of the refresh bound to a stale session.
+     */
+    private async fetchGitStatusForProject(projectKey: string): Promise<void> {
+        let lastSessionId: string | undefined;
+        const runCommand = async (command: string, timeout: number) => {
+            const target = this.getControllableSessionForProject(projectKey);
+            if (!target) return null;
+            lastSessionId = target.sessionId;
+            return sessionBash(target.sessionId, {
+                command,
+                cwd: target.path,
+                timeout,
             });
+        };
+
+        try {
+            const gitCheckResult = await runCommand('git rev-parse --is-inside-work-tree', 5000);
+            if (!gitCheckResult) return;
 
             if (!gitCheckResult.success || gitCheckResult.exitCode !== 0) {
                 // Not a git repository, clear any existing status
@@ -146,11 +166,11 @@ export class GitStatusSync {
 
             // Get git status in porcelain v2 format (includes branch info)
             // --untracked-files=all ensures we get individual files, not directories
-            const statusResult = await sessionBash(sessionId, {
-                command: 'git -c core.quotepath=false status --porcelain=v2 --branch --show-stash --untracked-files=all',
-                cwd: session.metadata.path,
-                timeout: 10000
-            });
+            const statusResult = await runCommand(
+                'git -c core.quotepath=false status --porcelain=v2 --branch --show-stash --untracked-files=all',
+                10000,
+            );
+            if (!statusResult) return;
 
             if (!statusResult.success) {
                 console.error('Failed to get git status:', statusResult.error);
@@ -158,18 +178,18 @@ export class GitStatusSync {
             }
 
             // Get git diff statistics for unstaged changes
-            const diffStatResult = await sessionBash(sessionId, {
-                command: 'git -c core.quotepath=false diff --numstat',
-                cwd: session.metadata.path,
-                timeout: 10000
-            });
+            const diffStatResult = await runCommand(
+                'git -c core.quotepath=false diff --numstat',
+                10000,
+            );
+            if (!diffStatResult) return;
 
             // Get git diff statistics for staged changes
-            const stagedDiffStatResult = await sessionBash(sessionId, {
-                command: 'git -c core.quotepath=false diff --cached --numstat',
-                cwd: session.metadata.path,
-                timeout: 10000
-            });
+            const stagedDiffStatResult = await runCommand(
+                'git -c core.quotepath=false diff --cached --numstat',
+                10000,
+            );
+            if (!stagedDiffStatResult) return;
 
             // Parse the git status output with diff statistics
             const gitStatus = this.parseGitStatusV2(
@@ -182,7 +202,7 @@ export class GitStatusSync {
             storage.getState().applyGitStatus(projectKey, gitStatus);
 
         } catch (error) {
-            console.error('Error fetching git status for session', sessionId, ':', error);
+            console.error('Error fetching git status for session', lastSessionId ?? projectKey, ':', error);
             // Don't apply error state, just skip this update
         }
     }

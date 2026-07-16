@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { formatSessionRpcFailure, unwrapRpcHandlerResponse } from './apiSocketErrors';
 
@@ -9,11 +9,11 @@ describe('unwrapRpcHandlerResponse', () => {
     });
 
     it('preserves typed business results that contain error details', () => {
-        expect(unwrapRpcHandlerResponse({ type: 'error', errorMessage: 'typed error' })).toEqual({
+        expect(unwrapRpcHandlerResponse<{ type: 'error'; errorMessage: string }>({ type: 'error', errorMessage: 'typed error' })).toEqual({
             type: 'error',
             errorMessage: 'typed error',
         });
-        expect(unwrapRpcHandlerResponse({ success: false, error: 'worktree error' })).toEqual({
+        expect(unwrapRpcHandlerResponse<{ success: false; error: string }>({ success: false, error: 'worktree error' })).toEqual({
             success: false,
             error: 'worktree error',
         });

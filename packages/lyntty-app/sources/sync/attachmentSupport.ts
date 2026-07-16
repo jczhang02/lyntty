@@ -18,7 +18,7 @@ export function isCompleteImageAttachmentUpload(opts: {
 }
 
 export function supportsImageAttachmentsForFlavor(flavor: ImageAttachmentFlavor): boolean {
-    return !flavor || flavor === 'pi';
+    return flavor?.trim().toLowerCase() === 'pi';
 }
 
 export function getImageAttachmentSendPlan(opts: {

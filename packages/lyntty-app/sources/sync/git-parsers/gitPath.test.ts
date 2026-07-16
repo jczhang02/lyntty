@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { decodeGitPath } from './gitPath';
 import { parseNumStat } from './parseDiff';
 import { parseStatusSummaryV2 } from './parseStatusV2';

@@ -1,6 +1,10 @@
-import { describe, it, expect } from '@/dev/testRunner';
+import { describe, it, expect } from 'bun:test';
 import { SecretBoxEncryption, BoxEncryption, AES256Encryption } from './encryptor';
 import { getRandomBytes } from 'expo-crypto';
+
+function expectSerializedBytes(actual: unknown, expected: Uint8Array): void {
+    expect(Object.values(actual as Record<string, number>)).toEqual(Array.from(expected));
+}
 
 describe('SecretBoxEncryption', () => {
     it('should encrypt and decrypt single Uint8Array', async () => {
@@ -12,7 +16,7 @@ describe('SecretBoxEncryption', () => {
         const decrypted = await encryptor.decrypt(encrypted);
 
         expect(decrypted.length).toBe(1);
-        expect(decrypted[0]).toEqual(originalData);
+        expectSerializedBytes(decrypted[0], originalData);
     });
 
     it('should encrypt and decrypt multiple Uint8Arrays', async () => {
@@ -27,9 +31,9 @@ describe('SecretBoxEncryption', () => {
         const decrypted = await encryptor.decrypt(encrypted);
 
         expect(decrypted.length).toBe(3);
-        expect(decrypted[0]).toEqual(data1);
-        expect(decrypted[1]).toEqual(data2);
-        expect(decrypted[2]).toEqual(data3);
+        expectSerializedBytes(decrypted[0], data1);
+        expectSerializedBytes(decrypted[1], data2);
+        expectSerializedBytes(decrypted[2], data3);
     });
 
     it('should handle empty arrays', async () => {
@@ -58,8 +62,8 @@ describe('SecretBoxEncryption', () => {
         const decrypted1 = await encryptor.decrypt(encrypted1);
         const decrypted2 = await encryptor.decrypt(encrypted2);
 
-        expect(decrypted1[0]).toEqual(originalData);
-        expect(decrypted2[0]).toEqual(originalData);
+        expectSerializedBytes(decrypted1[0], originalData);
+        expectSerializedBytes(decrypted2[0], originalData);
     });
 
     it('should fail decryption with wrong key', async () => {
@@ -90,7 +94,7 @@ describe('SecretBoxEncryption', () => {
         const decrypted = await encryptor.decrypt(encrypted);
 
         expect(decrypted.length).toBe(1);
-        expect(decrypted[0]).toEqual(largeData);
+        expectSerializedBytes(decrypted[0], largeData);
     });
 
     it('should handle 500 individual items separately', async () => {
@@ -120,7 +124,7 @@ describe('SecretBoxEncryption', () => {
         // Verify all items match
         expect(decryptedItems.length).toBe(500);
         for (let i = 0; i < 500; i++) {
-            expect(decryptedItems[i]).toEqual(originalItems[i]);
+            expectSerializedBytes(decryptedItems[i], originalItems[i]);
         }
     });
 });
@@ -135,7 +139,7 @@ describe('BoxEncryption', () => {
         const decrypted = await encryptor.decrypt(encrypted);
 
         expect(decrypted.length).toBe(1);
-        expect(decrypted[0]).toEqual(originalData);
+        expectSerializedBytes(decrypted[0], originalData);
     });
 
     it('should encrypt and decrypt multiple Uint8Arrays', async () => {
@@ -150,9 +154,9 @@ describe('BoxEncryption', () => {
         const decrypted = await encryptor.decrypt(encrypted);
 
         expect(decrypted.length).toBe(3);
-        expect(decrypted[0]).toEqual(data1);
-        expect(decrypted[1]).toEqual(data2);
-        expect(decrypted[2]).toEqual(data3);
+        expectSerializedBytes(decrypted[0], data1);
+        expectSerializedBytes(decrypted[1], data2);
+        expectSerializedBytes(decrypted[2], data3);
     });
 
     it('should handle empty arrays', async () => {
@@ -178,7 +182,7 @@ describe('BoxEncryption', () => {
         const encrypted = await encryptor1.encrypt([originalData]);
         const decrypted = await encryptor2.decrypt(encrypted);
 
-        expect(decrypted[0]).toEqual(originalData);
+        expectSerializedBytes(decrypted[0], originalData);
     });
 
     it('should produce different ciphertext for same plaintext (ephemeral keys)', async () => {
@@ -196,8 +200,8 @@ describe('BoxEncryption', () => {
         const decrypted1 = await encryptor.decrypt(encrypted1);
         const decrypted2 = await encryptor.decrypt(encrypted2);
 
-        expect(decrypted1[0]).toEqual(originalData);
-        expect(decrypted2[0]).toEqual(originalData);
+        expectSerializedBytes(decrypted1[0], originalData);
+        expectSerializedBytes(decrypted2[0], originalData);
     });
 
     it('should fail decryption with wrong key', async () => {
@@ -228,7 +232,7 @@ describe('BoxEncryption', () => {
         const decrypted = await encryptor.decrypt(encrypted);
 
         expect(decrypted.length).toBe(1);
-        expect(decrypted[0]).toEqual(largeData);
+        expectSerializedBytes(decrypted[0], largeData);
     });
 
     it('should handle mixed data sizes in batch', async () => {
@@ -249,9 +253,9 @@ describe('BoxEncryption', () => {
         const decrypted = await encryptor.decrypt(encrypted);
 
         expect(decrypted.length).toBe(3);
-        expect(decrypted[0]).toEqual(small);
-        expect(decrypted[1]).toEqual(medium);
-        expect(decrypted[2]).toEqual(large);
+        expectSerializedBytes(decrypted[0], small);
+        expectSerializedBytes(decrypted[1], medium);
+        expectSerializedBytes(decrypted[2], large);
     });
 
     it('should handle 500 individual items separately', async () => {
@@ -281,7 +285,7 @@ describe('BoxEncryption', () => {
         // Verify all items match
         expect(decryptedItems.length).toBe(500);
         for (let i = 0; i < 500; i++) {
-            expect(decryptedItems[i]).toEqual(originalItems[i]);
+            expectSerializedBytes(decryptedItems[i], originalItems[i]);
         }
     });
 });

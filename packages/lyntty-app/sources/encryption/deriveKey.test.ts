@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@/dev/testRunner';
+import { describe, it, expect } from 'bun:test';
 import { deriveKey, deriveSecretKeyTreeRoot, deriveSecretKeyTreeChild } from './deriveKey';
 import { encodeUTF8 } from './text';
 import { encodeHex } from './hex';

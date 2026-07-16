@@ -470,7 +470,7 @@ function isLegacyPiHistoryToolOutputText(msg: Message): boolean {
 }
 
 function isInvisibleMessage(msg: Message): boolean {
-    // Hidden tools (ToolSearch, CodexReasoning, etc.)
+    // Hidden current or historical compatibility tools.
     if (msg.kind === 'tool-call') {
         const known = knownTools[msg.tool.name as keyof typeof knownTools] as any;
         return known?.hidden === true;

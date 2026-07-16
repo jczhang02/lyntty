@@ -9,6 +9,17 @@ import type { MachineMetadata, PiMachineSessionRecord, PiRecoveryState } from '.
 import type { PiHistoryPageResult } from './piHistoryPage';
 import { storage } from './storage';
 import { canControlSession } from './sessionControlPolicy';
+import {
+    ensurePiSessionMirrorResultSchema,
+    listPiSessionsResultSchema,
+    parseMachineRpcResult,
+    spawnSessionResultSchema,
+    stopDaemonResultSchema,
+    worktreeCreateResultSchema,
+    worktreeListResultSchema,
+    worktreeRemoveResultSchema,
+    worktreeStatusResultSchema,
+} from './machineRpcSchemas';
 
 // Strict type definitions for all operations
 
@@ -189,7 +200,8 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
         }>(
             machineId,
             'spawn-lyntty-session',
-            { type: 'spawn-in-directory', directory, sessionId, approvedNewDirectoryCreation, machineId, token, agent, takeoverChoice }
+            { type: 'spawn-in-directory', directory, sessionId, approvedNewDirectoryCreation, machineId, token, agent, takeoverChoice },
+            parseMachineRpcResult('spawn-lyntty-session', spawnSessionResultSchema),
         );
         return result;
     } catch (error) {
@@ -209,6 +221,7 @@ export async function machineListPiSessions(options: { machineId: string; cwd?: 
             machineId,
             'list-pi-sessions',
             { cwd, scope, limit, cursor },
+            parseMachineRpcResult('list-pi-sessions', listPiSessionsResultSchema),
         );
     } catch (error) {
         return {
@@ -225,6 +238,7 @@ export async function machineEnsurePiSessionMirror(options: { machineId: string;
             machineId,
             'ensure-pi-session-mirror',
             { machineId, piSessionId, directory },
+            parseMachineRpcResult('ensure-pi-session-mirror', ensurePiSessionMirrorResultSchema),
         );
     } catch (error) {
         return {
@@ -297,7 +311,8 @@ export async function machineStopDaemon(machineId: string): Promise<{ message: s
     const result = await apiSocket.machineRPC<{ message: string }, {}>(
         machineId,
         'stop-daemon',
-        {}
+        {},
+        parseMachineRpcResult('stop-daemon', stopDaemonResultSchema),
     );
     return result;
 }
@@ -317,6 +332,7 @@ export async function machineWorktreeCreate(
             machineId,
             'worktree-create',
             { basePath, branchName },
+            parseMachineRpcResult('worktree-create', worktreeCreateResultSchema),
         );
     } catch (error) {
         return {
@@ -331,18 +347,27 @@ export async function machineWorktreeCreate(
 export async function machineWorktreeList(
     machineId: string,
     basePath: string,
-): Promise<{ worktrees: Array<{ path: string; branch: string }> }> {
+): Promise<
+    | { success: true; worktrees: Array<{ path: string; branch: string }> }
+    | { success: false; error: string }
+> {
     try {
         const result = await apiSocket.machineRPC<
-            { worktrees?: Array<{ path: string; branch: string }> } | Array<{ path: string; branch: string }>,
+            | { success: true; worktrees: Array<{ path: string; branch: string }> }
+            | { success: false; error: string },
             { basePath: string }
-        >(machineId, 'worktree-list', { basePath });
-        if (Array.isArray(result)) {
-            return { worktrees: result };
-        }
-        return { worktrees: Array.isArray(result.worktrees) ? result.worktrees : [] };
-    } catch {
-        return { worktrees: [] };
+        >(
+            machineId,
+            'worktree-list',
+            { basePath },
+            parseMachineRpcResult('worktree-list', worktreeListResultSchema),
+        );
+        return result;
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to list worktrees',
+        };
     }
 }
 
@@ -351,7 +376,12 @@ export async function machineWorktreeRemove(
     worktreePath: string,
 ): Promise<{ success: boolean; error?: string }> {
     try {
-        return await apiSocket.machineRPC(machineId, 'worktree-remove', { worktreePath });
+        return await apiSocket.machineRPC(
+            machineId,
+            'worktree-remove',
+            { worktreePath },
+            parseMachineRpcResult('worktree-remove', worktreeRemoveResultSchema),
+        );
     } catch (error) {
         return {
             success: false,
@@ -365,51 +395,17 @@ export async function machineWorktreeStatus(
     worktreePath: string,
 ): Promise<{ success: boolean; clean: boolean; error?: string }> {
     try {
-        return await apiSocket.machineRPC(machineId, 'worktree-status', { worktreePath });
+        return await apiSocket.machineRPC(
+            machineId,
+            'worktree-status',
+            { worktreePath },
+            parseMachineRpcResult('worktree-status', worktreeStatusResultSchema),
+        );
     } catch (error) {
         return {
             success: false,
             clean: false,
             error: error instanceof Error ? error.message : 'Unknown error',
-        };
-    }
-}
-
-/**
- * Execute a bash command on a specific machine.
- * Legacy compatibility only: relay denies generic machine bash for Lyntty UI.
- */
-export async function machineBash(
-    machineId: string,
-    command: string,
-    cwd: string
-): Promise<{
-    success: boolean;
-    stdout: string;
-    stderr: string;
-    exitCode: number;
-}> {
-    try {
-        const result = await apiSocket.machineRPC<{
-            success: boolean;
-            stdout: string;
-            stderr: string;
-            exitCode: number;
-        }, {
-            command: string;
-            cwd: string;
-        }>(
-            machineId,
-            'bash',
-            { command, cwd }
-        );
-        return result;
-    } catch (error) {
-        return {
-            success: false,
-            stdout: '',
-            stderr: error instanceof Error ? error.message : 'Unknown error',
-            exitCode: -1
         };
     }
 }
@@ -483,6 +479,7 @@ export async function machineUpdateMetadata(
  * Abort the current session operation
  */
 export async function sessionAbort(sessionId: string): Promise<void> {
+    assertSessionControllable(sessionId);
     await apiSocket.sessionRPC(sessionId, 'abort', {
         reason: `The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.`
     });
@@ -517,6 +514,7 @@ export async function sessionDeny(sessionId: string, id: string, mode?: 'default
  * Request mode change for a session
  */
 export async function sessionSwitch(sessionId: string, to: 'remote' | 'local'): Promise<boolean> {
+    assertSessionControllable(sessionId);
     const request: SessionModeChangeRequest = { to };
     const response = await apiSocket.sessionRPC<boolean, SessionModeChangeRequest>(
         sessionId,
@@ -530,6 +528,7 @@ export async function sessionSwitch(sessionId: string, to: 'remote' | 'local'): 
  * Execute a bash command in the session
  */
 export async function sessionBash(sessionId: string, request: SessionBashRequest): Promise<SessionBashResponse> {
+    assertSessionControllable(sessionId);
     try {
         const response = await apiSocket.sessionRPC<SessionBashResponse, SessionBashRequest>(
             sessionId,
@@ -552,6 +551,7 @@ export async function sessionBash(sessionId: string, request: SessionBashRequest
  * Read a file from the session
  */
 export async function sessionReadFile(sessionId: string, path: string): Promise<SessionReadFileResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionReadFileRequest = { path };
         const response = await apiSocket.sessionRPC<SessionReadFileResponse, SessionReadFileRequest>(
@@ -577,6 +577,7 @@ export async function sessionWriteFile(
     content: string,
     expectedHash?: string | null
 ): Promise<SessionWriteFileResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionWriteFileRequest = { path, content, expectedHash };
         const response = await apiSocket.sessionRPC<SessionWriteFileResponse, SessionWriteFileRequest>(
@@ -597,6 +598,7 @@ export async function sessionWriteFile(
  * List directory contents in the session
  */
 export async function sessionListDirectory(sessionId: string, path: string): Promise<SessionListDirectoryResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionListDirectoryRequest = { path };
         const response = await apiSocket.sessionRPC<SessionListDirectoryResponse, SessionListDirectoryRequest>(
@@ -621,6 +623,7 @@ export async function sessionGetDirectoryTree(
     path: string,
     maxDepth: number
 ): Promise<SessionGetDirectoryTreeResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionGetDirectoryTreeRequest = { path, maxDepth };
         const response = await apiSocket.sessionRPC<SessionGetDirectoryTreeResponse, SessionGetDirectoryTreeRequest>(
@@ -645,6 +648,7 @@ export async function sessionRipgrep(
     args: string[],
     cwd?: string
 ): Promise<SessionRipgrepResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionRipgrepRequest = { args, cwd };
         const response = await apiSocket.sessionRPC<SessionRipgrepResponse, SessionRipgrepRequest>(
@@ -665,6 +669,7 @@ export async function sessionRipgrep(
  * Kill the session process immediately
  */
 export async function sessionKill(sessionId: string): Promise<SessionKillResponse> {
+    assertSessionControllable(sessionId);
     try {
         const response = await apiSocket.sessionRPC<SessionKillResponse, {}>(
             sessionId,
@@ -686,6 +691,7 @@ export async function sessionLoadPiHistoryPage(
     sessionId: string,
     beforeEntryId?: string,
 ): Promise<PiHistoryPageResult> {
+    assertSessionControllable(sessionId);
     return apiSocket.sessionRPC<PiHistoryPageResult, { beforeEntryId?: string }>(
         sessionId,
         'pi-history-page',

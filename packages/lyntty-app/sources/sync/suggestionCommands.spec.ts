@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'bun:test';
 import type { Session } from './storageTypes';
 
 const mockSessions: Record<string, Partial<Session>> = {};

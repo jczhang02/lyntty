@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
     ensureMirror: vi.fn(),
     spawn: vi.fn(),
     alert: vi.fn(),
@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
     refreshSessions: vi.fn(),
     flushSyntheticMessages: vi.fn(),
     applyOptimistic: vi.fn(),
-}));
+};
 
 vi.mock('react', () => ({
     default: { useCallback: (callback: unknown) => callback },

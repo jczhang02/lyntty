@@ -1,11 +1,9 @@
 import type { Metadata } from './storageTypes';
 
 /**
- * Only current Pi sessions are controllable. Flavorless rows predate explicit
- * Pi metadata and remain controllable for backward compatibility; an explicit
- * non-Pi flavor is encrypted-history compatibility only.
+ * Control fails closed unless the session carries explicit current Pi identity.
+ * Flavorless and non-Pi rows remain encrypted-history compatibility only.
  */
 export function canControlSession(metadata: Pick<Metadata, 'flavor'> | null | undefined): boolean {
-    const flavor = metadata?.flavor?.trim().toLowerCase();
-    return !flavor || flavor === 'pi';
+    return metadata?.flavor?.trim().toLowerCase() === 'pi';
 }

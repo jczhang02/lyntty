@@ -124,14 +124,13 @@ export function parseLocalCommandMessage(text: string, options: ParseLocalComman
 
 /**
  * True when this user-text message is the user's OWN echoed slash-command
- * input (e.g. `/superpowers:brainstorming do the thing`) that the Claude
- * Agent SDK will re-emit as a `<command-message>/<command-name>` wrapper.
+ * input (e.g. `/superpowers:brainstorming do the thing`) that older persisted
+ * agent records may echo as a `<command-message>/<command-name>` wrapper.
  *
  * Lyntty shows the user's sent message optimistically (it carries a
  * `localId`); the SDK then injects the canonical wrapper (no `localId`,
  * rendered as a chip). Showing both looks like a duplicate, so we hide
- * the raw echo and let the wrapper chip stand in — matching how the
- * Claude Code terminal renders slash commands.
+ * the raw echo and let the wrapper chip stand in for compatibility.
  *
  * Gated on `hasLocalId` so we only ever hide a message the user actually
  * sent from Lyntty, never an agent/SDK-originated one.

@@ -67,16 +67,6 @@ export const ApiUpdateAccountSchema = z.object({
     }).nullish(),
 });
 
-// KV batch update schema for real-time KV updates
-export const ApiKvBatchUpdateSchema = z.object({
-    t: z.literal('kv-batch-update'),
-    changes: z.array(z.object({
-        key: z.string(),
-        value: z.string().nullable(),
-        version: z.number()
-    }))
-});
-
 // Use a plain union here to avoid runtime discriminator extraction issues
 // when some schemas come from shared package exports.
 export const ApiUpdateSchema = z.union([
@@ -87,12 +77,10 @@ export const ApiUpdateSchema = z.union([
     ApiUpdateAccountSchema,
     ApiUpdateMachineStateSchema,
     ApiUpdateNewMachineSchema,
-    ApiDeleteMachineSchema,
-    ApiKvBatchUpdateSchema
+    ApiDeleteMachineSchema
 ]);
 
 export type ApiUpdateNewMessage = z.infer<typeof ApiUpdateNewMessageSchema>;
-export type ApiKvBatchUpdate = z.infer<typeof ApiKvBatchUpdateSchema>;
 export type ApiUpdate = z.infer<typeof ApiUpdateSchema>;
 
 //
@@ -120,25 +108,6 @@ export const ApiEphemeralActivityUpdateSchema = z.object({
     thinking: z.boolean(),
 });
 
-export const ApiEphemeralUsageUpdateSchema = z.object({
-    type: z.literal('usage'),
-    id: z.string(),
-    key: z.string(),
-    timestamp: z.number(),
-    tokens: z.object({
-        total: z.number(),
-        input: z.number(),
-        output: z.number(),
-        cache_creation: z.number(),
-        cache_read: z.number(),
-    }),
-    cost: z.object({
-        total: z.number(),
-        input: z.number(),
-        output: z.number(),
-    }),
-});
-
 export const ApiEphemeralMachineActivityUpdateSchema = z.object({
     type: z.literal('machine-activity'),
     id: z.string(), // machine id
@@ -157,7 +126,6 @@ export const ApiEphemeralSessionEventUpdateSchema = z.object({
 
 export const ApiEphemeralUpdateSchema = z.union([
     ApiEphemeralActivityUpdateSchema,
-    ApiEphemeralUsageUpdateSchema,
     ApiEphemeralMachineActivityUpdateSchema,
     ApiEphemeralSessionEventUpdateSchema,
 ]);

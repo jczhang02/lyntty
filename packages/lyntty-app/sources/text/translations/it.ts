@@ -17,16 +17,8 @@ function plural({ count, singular, plural }: { count: number; singular: string; 
 export const it: TranslationStructure = {
     tabs: {
         // Tab navigation labels
-        inbox: 'Posta',
         sessions: 'Sessions',
         settings: 'Impostazioni',
-    },
-
-    inbox: {
-        // Inbox screen
-        emptyTitle: 'Posta vuota',
-        emptyDescription: 'Connettiti con amici per iniziare a condividere sessioni',
-        updates: 'Aggiornamenti',
     },
 
     common: {
@@ -340,24 +332,6 @@ export const it: TranslationStructure = {
     },
 
     agentInput: {
-        permissionMode: {
-            title: 'MODALITÀ PERMESSI',
-            default: 'Predefinito',
-            acceptEdits: 'Accetta modifiche',
-            plan: 'Modalità piano',
-            dontAsk: 'Non chiedere',
-            bypassPermissions: 'Modalità YOLO',
-            badgeAcceptAllEdits: 'Accetta tutte le modifiche',
-            badgeBypassAllPermissions: 'Bypassa tutti i permessi',
-            badgePlanMode: 'Modalità piano',
-        },
-        model: {
-            title: 'MODELLO',
-            configureInCli: 'Configura i modelli nelle impostazioni CLI',
-        },
-        effort: {
-            title: 'IMPEGNO',
-        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% restante`,
         },

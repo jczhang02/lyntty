@@ -65,9 +65,7 @@ react {
     //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
     // debuggableVariants = ["liteDebug", "prodDebug"]
 
-    /* Bundling */
-    //   A list containing the node command and its flags. Default is just 'node'.
-    // nodeExecutableAndArgs = ["node"]
+    /* Bundling uses the Bun executable configured above. */
 
     //
     //   The path to the CLI configuration file. Default is empty.

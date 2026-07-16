@@ -20,16 +20,8 @@ function plural({ count, singular, plural }: { count: number; singular: string; 
 export const ja: TranslationStructure = {
     tabs: {
         // Tab navigation labels
-        inbox: '受信トレイ',
         sessions: 'Sessions',
         settings: '設定',
-    },
-
-    inbox: {
-        // Inbox screen
-        emptyTitle: '受信トレイは空です',
-        emptyDescription: '友達と接続してセッションを共有しましょう',
-        updates: '更新',
     },
 
     common: {
@@ -342,24 +334,6 @@ export const ja: TranslationStructure = {
     },
 
     agentInput: {
-        permissionMode: {
-            title: '権限モード',
-            default: 'デフォルト',
-            acceptEdits: '編集を許可',
-            plan: 'プランモード',
-            dontAsk: '確認しない',
-            bypassPermissions: 'Yoloモード',
-            badgeAcceptAllEdits: 'すべての編集を許可',
-            badgeBypassAllPermissions: 'すべての権限をバイパス',
-            badgePlanMode: 'プランモード',
-        },
-        model: {
-            title: 'モデル',
-            configureInCli: 'CLIの設定でモデルを構成',
-        },
-        effort: {
-            title: 'エフォート',
-        },
         context: {
             remaining: ({ percent }: { percent: number }) => `残り ${percent}%`,
         },

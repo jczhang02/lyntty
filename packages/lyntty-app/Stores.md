@@ -1,85 +1,67 @@
-# App Store & Google Play Store Information
+# Android Store Information
 
-## App Name
-Lyntty Coder
+> Draft metadata for a future Android store listing. GitHub Releases remains the current signed-APK distribution channel.
 
-## Subtitle / Short Description
-Claude Code on the go
+## App name
 
-## Categories
-- **App Store Primary**: Developer Tools
-- **App Store Secondary**: Productivity
-- **Google Play**: Productivity > Developer Tools
+Lyntty
+
+## Short description
+
+Control local `pi` sessions securely from Android.
+
+## Category
+
+Developer Tools / Productivity
 
 ## Keywords
-claude, code, ai, programming, developer, tools, encrypted, secure, coding, assistant, mobile, sync, offline, notifications, privacy
 
-## App Description / Full Description
+pi, developer tools, coding, self-hosted, encrypted, remote control, Android, session history, notifications
 
-Lyntty Coder is the secure mobile companion for Claude Code that lets you continue your AI coding sessions anywhere (not affiliated with Anthropic). Built by developers who needed to check on Claude's progress during coffee breaks, this app brings the full Claude Code experience to your phone with military-grade encryption.
+## Full description
 
-**Important**: This app requires Claude Code to be installed on your computer. Lyntty Coder is a companion app that connects to your existing Claude Code setup.
+Lyntty is an open-source, Android-first remote control for `pi` sessions running on your own computer.
 
-**Key Features:**
+Pair the App with `lynttyd`, connect both through your self-hosted `relay`, and open Session Remote to follow progress, send input, review tool activity, and answer permission requests. Pi JSONL remains canonical history on your computer; the relay routes encrypted sync state and does not replace that history.
 
-• Continue Claude Code sessions seamlessly between desktop and mobile
-• Push notifications for permission requests and task completion
-• Access conversation history even when your terminal is offline
-• End-to-end encryption - your code stays private
-• Real-time streaming of Claude's responses
-• Zero-knowledge architecture - we can't read your data
+Key features:
 
-**How It Works:**
-1. Install the lyntty CLI on your computer
-2. Scan a QR code to securely pair your devices
-3. Use 'lyntty' instead of 'claude' to start encrypted sessions
-4. Switch between desktop and mobile instantly
+- Shared control of ordinary computer-running `pi` sessions
+- Encrypted synchronization through a self-hosted relay
+- Fast historical-session opening with progressive history loading
+- Android notifications for completion and attention-required events
+- Explicit activation lock and takeover choices to prevent duplicate runtimes
+- Full signed-APK updates with SHA-256 verification
+- No ads, subscriptions, social feed, product analytics, or hosted AI service
 
-Perfect for developers who:
-- Want to monitor long-running tasks on the go
-- Need secure access to proprietary code discussions
-- Value privacy and open-source transparency
-- Work from coffee shops, trains, or anywhere
+Requirements:
 
-Lyntty Coder uses the same encryption as Signal (TweetNaCl) and is completely open source. Your encryption keys never leave your device, and all data is encrypted before transmission.
+1. A supported `pi` installation on the computer
+2. The compiled `lyntty`/`lynttyd` release and Lyntty Pi extension
+3. Access to a compatible self-hosted Lyntty Relay
+4. A pairing flow initiated from the trusted computer
 
-Built by Bay Area engineers who believe the best tools come from scratching your own itch. We needed a way to securely check on our AI coding assistant while away from our desks - so we built it and shared it with the community.
+Lyntty does not provide an AI model or hosted relay account. You remain responsible for the security, cost, and operation of your computer, Pi setup, and relay.
 
-Your code. Your privacy. Your Claude Code companion.
+## Promotional text
 
-## Promotional Text
-**App Store (170 chars)**: Securely continue your Claude Code sessions on mobile. End-to-end encrypted, open source, with push notifications for completed tasks. Your AI coding assistant, anywhere.
+Open and control local `pi` sessions from Android through your encrypted, self-hosted Lyntty setup.
 
-**Google Play (80 chars)**: Secure mobile Claude Code companion. Encrypted, open source, with notifications.
+## What's new
 
-## What's New (for updates)
-- Initial release
-- End-to-end encryption for all messages
-- Push notifications for permissions and task completion
-- Offline access to conversation history
-- Real-time sync with desktop sessions
+- Pi-only shared control through `lynttyd`
+- Progressive Pi JSONL history replay
+- Permission and completion notifications
+- Signed full-APK update flow
 
 ## URLs
 
-### Privacy Policy
-https://github.com/slopus/lyntty/blob/main/PRIVACY.md
+- Privacy Policy: https://github.com/jczhang02/lyntty/blob/main/PRIVACY.md
+- Support: https://github.com/jczhang02/lyntty/issues
+- Source: https://github.com/jczhang02/lyntty
 
-### Support / Contact
-https://github.com/slopus/lyntty/issues
+## Store declarations
 
-### Website / Marketing
-https://github.com/slopus/lyntty
-
-## Additional Google Play Requirements
-
-### Content Rating
-Everyone
-
-### Target Audience
-Developers and software engineers
-
-### Contains Ads
-No
-
-### In-App Purchases
-No
+- Contains ads: No
+- In-app purchases: No
+- Target audience: Developers and software engineers

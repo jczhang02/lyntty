@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-const { machineRPC, sessionRPC } = vi.hoisted(() => ({
+const { machineRPC, sessionRPC, sessions } = {
     machineRPC: vi.fn(),
     sessionRPC: vi.fn(),
-}));
+    sessions: {} as Record<string, { metadata?: { flavor?: string } }>,
+};
 
 vi.mock('./apiSocket', () => ({
     apiSocket: { machineRPC, sessionRPC },
@@ -14,7 +15,7 @@ vi.mock('./sync', () => ({
 }));
 
 vi.mock('./storage', () => ({
-    storage: { getState: () => ({ sessions: {} }) },
+    storage: { getState: () => ({ sessions }) },
 }));
 
 describe('Pi session open helpers', () => {
@@ -43,6 +44,8 @@ describe('Pi machine session ops', () => {
     beforeEach(() => {
         machineRPC.mockReset();
         sessionRPC.mockReset();
+        for (const key of Object.keys(sessions)) delete sessions[key];
+        sessions['session-1'] = { metadata: { flavor: 'pi' } };
     });
 
     it('lists machine-wide Pi sessions through machine RPC', async () => {
@@ -54,7 +57,7 @@ describe('Pi machine session ops', () => {
         const { machineListPiSessions } = await import('./ops');
         const result = await machineListPiSessions({ machineId: 'machine-1', limit: 100, cursor: '100' });
 
-        expect(result).toEqual({
+        expect(result as any).toEqual({
             type: 'success',
             sessions: [{ piSessionId: 'pi-1', state: 'discovered_local', name: 'Release fix' }],
         });
@@ -63,13 +66,13 @@ describe('Pi machine session ops', () => {
             scope: 'machine',
             limit: 100,
             cursor: '100',
-        });
+        }, expect.any(Function));
     });
 
     it('uses narrow worktree machine RPC methods instead of generic bash', async () => {
         machineRPC
             .mockResolvedValueOnce({ success: true, worktreePath: '/repo/.dev/worktree/test', branchName: 'test' })
-            .mockResolvedValueOnce({ worktrees: [{ path: '/repo/.dev/worktree/test', branch: 'test' }] })
+            .mockResolvedValueOnce({ success: true, worktrees: [{ path: '/repo/.dev/worktree/test', branch: 'test' }] })
             .mockResolvedValueOnce({ success: true, clean: true })
             .mockResolvedValueOnce({ success: true });
 
@@ -85,23 +88,29 @@ describe('Pi machine session ops', () => {
         await expect(machineWorktreeStatus('machine-1', '/repo/.dev/worktree/test')).resolves.toMatchObject({ clean: true });
         await expect(machineWorktreeRemove('machine-1', '/repo/.dev/worktree/test')).resolves.toMatchObject({ success: true });
 
-        expect(machineRPC).toHaveBeenNthCalledWith(1, 'machine-1', 'worktree-create', { basePath: '/repo', branchName: 'test' });
-        expect(machineRPC).toHaveBeenNthCalledWith(2, 'machine-1', 'worktree-list', { basePath: '/repo' });
-        expect(machineRPC).toHaveBeenNthCalledWith(3, 'machine-1', 'worktree-status', { worktreePath: '/repo/.dev/worktree/test' });
-        expect(machineRPC).toHaveBeenNthCalledWith(4, 'machine-1', 'worktree-remove', { worktreePath: '/repo/.dev/worktree/test' });
+        expect(machineRPC).toHaveBeenNthCalledWith(1, 'machine-1', 'worktree-create', { basePath: '/repo', branchName: 'test' }, expect.any(Function));
+        expect(machineRPC).toHaveBeenNthCalledWith(2, 'machine-1', 'worktree-list', { basePath: '/repo' }, expect.any(Function));
+        expect(machineRPC).toHaveBeenNthCalledWith(3, 'machine-1', 'worktree-status', { worktreePath: '/repo/.dev/worktree/test' }, expect.any(Function));
+        expect(machineRPC).toHaveBeenNthCalledWith(4, 'machine-1', 'worktree-remove', { worktreePath: '/repo/.dev/worktree/test' }, expect.any(Function));
     });
 
-    it('normalizes legacy or malformed worktree-list RPC responses to an array', async () => {
+    it('fails closed on obsolete or malformed worktree-list RPC responses', async () => {
         machineRPC
-            .mockResolvedValueOnce([{ path: '/repo/.dev/worktree/legacy', branch: 'legacy' }])
-            .mockResolvedValueOnce({});
+            .mockImplementationOnce(async (_machineId, _method, _params, parse) => parse([
+                { path: '/repo/.dev/worktree/legacy', branch: 'legacy' },
+            ]))
+            .mockImplementationOnce(async (_machineId, _method, _params, parse) => parse({}));
 
         const { machineWorktreeList } = await import('./ops');
 
-        await expect(machineWorktreeList('machine-1', '/repo')).resolves.toEqual({
-            worktrees: [{ path: '/repo/.dev/worktree/legacy', branch: 'legacy' }],
+        await expect(machineWorktreeList('machine-1', '/repo')).resolves.toMatchObject({
+            success: false,
+            error: expect.stringContaining('Invalid machine RPC response'),
         });
-        await expect(machineWorktreeList('machine-1', '/repo')).resolves.toEqual({ worktrees: [] });
+        await expect(machineWorktreeList('machine-1', '/repo')).resolves.toMatchObject({
+            success: false,
+            error: expect.stringContaining('Invalid machine RPC response'),
+        });
     });
 
     it('passes an existing Pi session id when spawning from history', async () => {
@@ -120,7 +129,7 @@ describe('Pi machine session ops', () => {
             directory: '/repo',
             agent: 'pi',
             sessionId: 'pi-existing',
-        }));
+        }), expect.any(Function));
     });
 
     it('first resumes Pi without takeover so an active extension runtime can be reused', async () => {
@@ -140,7 +149,7 @@ describe('Pi machine session ops', () => {
             sessionId: 'pi-existing',
             agent: 'pi',
             takeoverChoice: undefined,
-        }));
+        }), expect.any(Function));
     });
 
     it('recognizes only the daemon remediation that requires explicit takeover', async () => {
@@ -221,7 +230,7 @@ describe('Pi machine session ops', () => {
             token: undefined,
             agent: 'pi',
             takeoverChoice: 'interrupt',
-        });
+        }, expect.any(Function));
     });
 
     it('loads Pi history pages through a narrow session RPC', async () => {

@@ -1,5 +1,19 @@
 import * as z from 'zod';
-import { AgentDefaultOverridesSchema } from './agentDefaults';
+
+const LEGACY_AGENT_SETTING_KEYS = [
+    'lastUsedAgent',
+    'lastUsedPermissionMode',
+    'lastUsedModelMode',
+    'agentDefaultOverrides',
+] as const;
+
+function stripLegacyAgentSettings<T extends Record<string, unknown>>(settings: T): T {
+    const result = { ...settings };
+    for (const key of LEGACY_AGENT_SETTING_KEYS) {
+        delete result[key];
+    }
+    return result;
+}
 
 //
 // Settings Schema
@@ -33,10 +47,6 @@ export const SettingsSchema = z.object({
         machineId: z.string(),
         path: z.string()
     })).describe('Last 10 machine-path combinations, ordered by most recent first'),
-    lastUsedAgent: z.string().nullable().describe('Last selected agent type for new sessions'),
-    lastUsedPermissionMode: z.string().nullable().describe('Last selected permission mode for new sessions'),
-    lastUsedModelMode: z.string().nullable().describe('Last selected model mode for new sessions'),
-    agentDefaultOverrides: AgentDefaultOverridesSchema.describe('User-selected agent defaults. Missing values use code defaults and are not sent as agent metadata.'),
 });
 
 //
@@ -78,10 +88,6 @@ export const settingsDefaults: Settings = {
     reviewPromptLikedApp: null,
     preferredLanguage: null,
     recentMachinePaths: [],
-    lastUsedAgent: null,
-    lastUsedPermissionMode: null,
-    lastUsedModelMode: null,
-    agentDefaultOverrides: {},
 };
 Object.freeze(settingsDefaults);
 
@@ -97,8 +103,8 @@ export function settingsParse(settings: unknown): Settings {
 
     const parsed = SettingsSchemaPartial.safeParse(settings);
     if (!parsed.success) {
-        // For invalid settings, preserve unknown fields but use defaults for known fields
-        const unknownFields = { ...(settings as any) };
+        // For invalid settings, preserve unrelated unknown fields but drop retired agent controls.
+        const unknownFields = stripLegacyAgentSettings({ ...(settings as Record<string, unknown>) });
         // Remove all known schema fields from unknownFields
         const knownFields = Object.keys(SettingsSchema.shape);
         knownFields.forEach(key => delete unknownFields[key]);
@@ -111,8 +117,8 @@ export function settingsParse(settings: unknown): Settings {
         parsed.data.preferredLanguage = 'zh-Hans';
     }
 
-    // Merge defaults, parsed settings, and preserve unknown fields
-    const unknownFields = { ...(settings as any) };
+    // Merge defaults, parsed settings, and preserve unrelated unknown fields.
+    const unknownFields = stripLegacyAgentSettings({ ...(settings as Record<string, unknown>) });
     // Remove known fields from unknownFields to preserve only the unknown ones
     Object.keys(parsed.data).forEach(key => delete unknownFields[key]);
 
@@ -125,8 +131,7 @@ export function settingsParse(settings: unknown): Settings {
 //
 
 export function applySettings(settings: Settings, delta: Partial<Settings>): Settings {
-    // Original behavior: start with settings, apply delta, fill in missing with defaults
-    const result = { ...settings, ...delta };
+    const result = stripLegacyAgentSettings({ ...settings, ...delta }) as Settings;
 
     // Fill in any missing fields with defaults
     Object.keys(settingsDefaults).forEach(key => {
@@ -139,16 +144,5 @@ export function applySettings(settings: Settings, delta: Partial<Settings>): Set
 }
 
 export function settingsToSyncPayload(settings: Settings): Partial<Settings> {
-    const result: Partial<Settings> = { ...settings };
-    const compactAgentOverrides = Object.fromEntries(
-        Object.entries(settings.agentDefaultOverrides ?? {}).filter(([, value]) => (
-            value && typeof value === 'object' && Object.keys(value).length > 0
-        )),
-    ) as Settings['agentDefaultOverrides'];
-    if (Object.keys(compactAgentOverrides).length === 0) {
-        delete result.agentDefaultOverrides;
-    } else {
-        result.agentDefaultOverrides = compactAgentOverrides;
-    }
-    return result;
+    return stripLegacyAgentSettings({ ...settings }) as Partial<Settings>;
 }

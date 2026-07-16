@@ -46,6 +46,12 @@ import type { Machine, Session } from '@/sync/storageTypes';
 import { isRunningOnMac } from '@/utils/platform';
 import { getNewSessionSidebarLayout } from '@/utils/newSessionSidebarLayout';
 import { deliverNewSessionPrompt } from '@/utils/newSessionPrompt';
+import {
+    advanceWorktreeRequestVersion,
+    currentWorktreeItems,
+    isCurrentWorktreeSelection,
+    type NewSessionWorktreeInventory,
+} from '@/utils/newSessionWorktreeInventory';
 
 type PickerItem = { key: string; label: string; subtitle?: string; dimmed?: boolean };
 
@@ -492,17 +498,17 @@ function NewSessionScreen() {
     const setSelectedMachineId = draft.setMachineId;
     const selectedPath = draft.selectedPath;
     const setSelectedPath = draft.setPath;
-    const [worktreeKey, setWorktreeKey] = React.useState<string>(
-        draft.worktreeKey ?? (draft.sessionType === 'worktree' ? '__new__' : '__none__')
-    );
-    React.useEffect(() => {
-        draft.setSessionType(worktreeKey !== '__none__' ? 'worktree' : 'simple');
-        draft.setWorktreeKey(worktreeKey === '__none__' || worktreeKey === '__new__' ? null : worktreeKey);
-    }, [worktreeKey]);
+    const worktreeKey = draft.worktreeKey
+        ?? (draft.sessionType === 'worktree' ? '__new__' : '__none__');
+    const setWorktreeKey = React.useCallback((key: string) => {
+        draft.setSessionType(key === '__none__' ? 'simple' : 'worktree');
+        draft.setWorktreeKey(key === '__none__' || key === '__new__' ? null : key);
+    }, [draft.setSessionType, draft.setWorktreeKey]);
 
     // Local-only UI state (not persisted)
     const [isSpawning, setIsSpawning] = React.useState(false);
     const [activePicker, setActivePicker] = React.useState<PickerType | null>(null);
+    const [worktreeRefreshNonce, setWorktreeRefreshNonce] = React.useState(0);
 
     // Config collapse — auto-collapses when typing, expands when empty
     const [isConfigExpanded, setIsConfigExpanded] = React.useState(true);
@@ -582,38 +588,84 @@ function NewSessionScreen() {
         return () => clearTimeout(timeout);
     }, [resolvedSelectedPath]);
 
-    // Fetch existing worktrees from the selected machine/path
-    const [worktreeItems, setWorktreeItems] = React.useState<PickerItem[]>([]);
+    // Bind every fetched worktree list to the exact machine/base-path/request
+    // generation that produced it. The generation changes synchronously during
+    // render, so old results disappear before the refresh effect runs.
+    const selectedMachineOnline = selectedMachine ? isMachineOnline(selectedMachine) : false;
+    const worktreeRequestIdentity = JSON.stringify([
+        selectedMachineId,
+        resolvedSelectedPath,
+        selectedMachineOnline,
+        worktreeRefreshNonce,
+    ]);
+    const worktreeRequestRef = React.useRef({ identity: '', generation: 0 });
+    worktreeRequestRef.current = advanceWorktreeRequestVersion(
+        worktreeRequestRef.current,
+        worktreeRequestIdentity,
+    );
+    const worktreeRequestGeneration = worktreeRequestRef.current.generation;
+    const [worktreeInventory, setWorktreeInventory] = React.useState<NewSessionWorktreeInventory<PickerItem> | null>(null);
+    const worktreeItems = React.useMemo(
+        () => currentWorktreeItems(
+            worktreeInventory,
+            selectedMachineId,
+            resolvedSelectedPath,
+            worktreeRequestGeneration,
+        ),
+        [worktreeInventory, selectedMachineId, resolvedSelectedPath, worktreeRequestGeneration],
+    );
     React.useEffect(() => {
-        if (!selectedMachineId || !debouncedResolvedSelectedPath) {
-            setWorktreeItems([]);
-            return;
-        }
-        if (!selectedMachine || !isMachineOnline(selectedMachine)) {
-            setWorktreeItems([]);
+        if (
+            !selectedMachineId
+            || !resolvedSelectedPath
+            || debouncedResolvedSelectedPath !== resolvedSelectedPath
+            || !selectedMachineOnline
+        ) {
+            setWorktreeInventory(null);
             return;
         }
         let cancelled = false;
-        listWorktrees(selectedMachineId, debouncedResolvedSelectedPath).then(worktrees => {
+        const machineId = selectedMachineId;
+        const basePath = resolvedSelectedPath;
+        const generation = worktreeRequestGeneration;
+        setWorktreeInventory({ machineId, basePath, generation, status: 'loading', items: [] });
+        listWorktrees(machineId, basePath).then(result => {
             if (cancelled) return;
-            setWorktreeItems(worktrees.map(wt => ({
-                key: wt.path,
-                label: wt.branch,
-                subtitle: wt.path,
-            })));
+            if (!result.success) {
+                setWorktreeInventory({
+                    machineId,
+                    basePath,
+                    generation,
+                    status: 'error',
+                    items: [],
+                    error: result.error,
+                });
+                return;
+            }
+            setWorktreeInventory({
+                machineId,
+                basePath,
+                generation,
+                status: 'success',
+                items: result.worktrees.map(wt => ({
+                    key: wt.path,
+                    label: wt.branch,
+                    subtitle: wt.path,
+                })),
+            });
+        }).catch(error => {
+            if (cancelled) return;
+            setWorktreeInventory({
+                machineId,
+                basePath,
+                generation,
+                status: 'error',
+                items: [],
+                error: error instanceof Error ? error.message : 'Failed to list worktrees',
+            });
         });
         return () => { cancelled = true; };
-    }, [debouncedResolvedSelectedPath, selectedMachineId, selectedMachine]);
-
-    React.useEffect(() => {
-        if (worktreeKey === '__none__' || worktreeKey === '__new__') {
-            return;
-        }
-
-        if (!worktreeItems.some((item) => item.key === worktreeKey)) {
-            setWorktreeKey('__none__');
-        }
-    }, [worktreeItems, worktreeKey]);
+    }, [debouncedResolvedSelectedPath, resolvedSelectedPath, selectedMachineId, selectedMachineOnline, worktreeRequestGeneration]);
 
     // Auto collapse config once when user starts typing on phones and tablets.
     // On Mac Catalyst the panel stays expanded.
@@ -642,8 +694,12 @@ function NewSessionScreen() {
     }, []);
 
     const togglePicker = React.useCallback((type: PickerType) => {
-        setActivePicker(v => v === type ? null : type);
-    }, []);
+        const nextPicker = activePicker === type ? null : type;
+        if (nextPicker === 'worktree') {
+            setWorktreeRefreshNonce(value => value + 1);
+        }
+        setActivePicker(nextPicker);
+    }, [activePicker]);
 
     const isOffline = selectedMachine ? !isMachineOnline(selectedMachine) : false;
 
@@ -683,11 +739,17 @@ function NewSessionScreen() {
                 setSelectedMachineId(key);
                 break;
             case 'worktree':
-                setWorktreeKey(key);
+                setWorktreeKey(isCurrentWorktreeSelection(
+                    key,
+                    worktreeInventory,
+                    selectedMachineId,
+                    resolvedSelectedPath,
+                    worktreeRequestGeneration,
+                ) ? key : '__none__');
                 break;
         }
         setActivePicker(null);
-    }, [activePicker, setSelectedMachineId]);
+    }, [activePicker, resolvedSelectedPath, selectedMachineId, setSelectedMachineId, setWorktreeKey, worktreeInventory, worktreeRequestGeneration]);
 
     const handlePathChange = React.useCallback((value: string) => {
         setWorktreeKey('__none__');
@@ -720,7 +782,16 @@ function NewSessionScreen() {
                 }
                 spawnDirectory = worktreeResult.worktreePath;
             } else if (worktreeKey !== '__none__') {
-                // Existing worktree — use its path directly
+                if (!isCurrentWorktreeSelection(
+                    worktreeKey,
+                    worktreeInventory,
+                    selectedMachineId,
+                    resolvedSelectedPath,
+                    worktreeRequestGeneration,
+                )) {
+                    Modal.alert(t('common.error'), t('appWide.failedToCreateWorktree'));
+                    return;
+                }
                 spawnDirectory = worktreeKey;
             }
 
@@ -780,9 +851,21 @@ function NewSessionScreen() {
         } finally {
             setIsSpawning(false);
         }
-    }, [selectedMachineId, selectedMachine, selectedPath, router, navigateToSession, worktreeKey]);
+    }, [selectedMachineId, selectedMachine, selectedPath, resolvedSelectedPath, router, navigateToSession, worktreeInventory, worktreeKey, worktreeRequestGeneration]);
 
-    const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning;
+    const canSend = Boolean(
+        selectedMachineId
+        && selectedMachine
+        && isMachineOnline(selectedMachine)
+        && !isSpawning
+        && isCurrentWorktreeSelection(
+            worktreeKey,
+            worktreeInventory,
+            selectedMachineId,
+            resolvedSelectedPath,
+            worktreeRequestGeneration,
+        )
+    );
     const sidebarLayout = getNewSessionSidebarLayout({
         isMac: isRunningOnMac(),
         fileDiffsSidebarEnabled,

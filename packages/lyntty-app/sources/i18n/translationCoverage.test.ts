@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { en, type TranslationStructure } from '@/text/_default';
 import { SUPPORTED_LANGUAGE_CODES, type SupportedLanguage } from '@/text/_all';

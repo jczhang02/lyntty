@@ -17,16 +17,8 @@ function plural({ count, singular, plural }: { count: number; singular: string; 
 export const ca: TranslationStructure = {
     tabs: {
         // Tab navigation labels
-        inbox: 'Safata',
         sessions: 'Sessions',
         settings: 'Configuració',
-    },
-
-    inbox: {
-        // Inbox screen
-        emptyTitle: 'Safata buida',
-        emptyDescription: 'Connecta\'t amb amics per començar a compartir sessions',
-        updates: 'Actualitzacions',
     },
 
     common: {
@@ -339,24 +331,6 @@ export const ca: TranslationStructure = {
     },
 
     agentInput: {
-        permissionMode: {
-            title: 'MODE DE PERMISOS',
-            default: 'Per defecte',
-            acceptEdits: 'Accepta edicions',
-            plan: 'Mode de planificació',
-            dontAsk: 'No preguntis',
-            bypassPermissions: 'Mode Yolo',
-            badgeAcceptAllEdits: 'Accepta totes les edicions',
-            badgeBypassAllPermissions: 'Omet tots els permisos',
-            badgePlanMode: 'Mode de planificació',
-        },
-        model: {
-            title: 'MODEL',
-            configureInCli: 'Configura els models a la configuració del CLI',
-        },
-        effort: {
-            title: 'ESFORÇ',
-        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% restant`,
         },

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { formatSettingsNodeSubtitle, formatSettingsServerSubtitle } from './settingsOverview';
 
 describe('settings overview helpers', () => {

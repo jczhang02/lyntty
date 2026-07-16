@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { AuthCredentials } from '@/auth/tokenStorage';
 import {
@@ -8,10 +8,10 @@ import {
 } from './apiAttachments';
 import { getAttachmentDiagnostic } from './attachmentDiagnostics';
 
-const { appendFormFile, cleanupFormFile } = vi.hoisted(() => ({
+const { appendFormFile, cleanupFormFile } = {
     appendFormFile: vi.fn(),
     cleanupFormFile: vi.fn(),
-}));
+};
 
 vi.mock('./serverConfig', () => ({
     getServerUrl: () => 'https://api.cluster-fluster.com',
@@ -30,10 +30,11 @@ const storageUrl = 'https://files.cluster-fluster.com/lyntty/session-1/ref?X-Amz
 const apiBlobUrl = 'https://api.cluster-fluster.com/v1/sessions/session-1/attachments/blob?X-Amz-Signature=s3-secret';
 
 let fetchMock: ReturnType<typeof vi.fn>;
+const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
     fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
     cleanupFormFile.mockReset();
     cleanupFormFile.mockResolvedValue(undefined);
     appendFormFile.mockReset();
@@ -41,7 +42,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    vi.unstubAllGlobals();
+    globalThis.fetch = originalFetch;
 });
 
 describe('requestAttachmentUpload', () => {

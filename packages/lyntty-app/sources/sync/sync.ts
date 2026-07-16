@@ -42,6 +42,7 @@ import { t } from '@/text';
 import { mergePiDiscoveredSessions } from './piDiscoveredSessions';
 import { canControlSession } from './sessionControlPolicy';
 import { applyPiHistoryPageResult, type PiHistoryPageResult } from './piHistoryPage';
+import { listPiSessionsResultSchema, parseMachineRpcResult } from './machineRpcSchemas';
 
 type V3GetSessionMessagesResponse = {
     messages: ApiMessage[];
@@ -85,7 +86,6 @@ class Sync {
     private static readonly BACKGROUND_SEND_TIMEOUT_MS = 30_000;
     encryption!: Encryption;
     serverID!: string;
-    anonID!: string;
     private credentials!: AuthCredentials;
     public encryptionCache = new EncryptionCache();
     private sessionsSync: InvalidateSync;
@@ -213,7 +213,6 @@ class Sync {
     async create(credentials: AuthCredentials, encryption: Encryption) {
         this.credentials = credentials;
         this.encryption = encryption;
-        this.anonID = encryption.anonID;
         this.serverID = parseToken(credentials.token);
         await this.#init();
 
@@ -226,7 +225,6 @@ class Sync {
         // NOTE: No awaiting anything here, we're restoring from disk (for example after an app restart).
         this.credentials = credentials;
         this.encryption = encryption;
-        this.anonID = encryption.anonID;
         this.serverID = parseToken(credentials.token);
         await this.#init();
     }
@@ -267,8 +265,10 @@ class Sync {
     onSessionVisible = (sessionId: string) => {
         this.getMessagesSync(sessionId).invalidate();
 
-        // Also invalidate git status sync for this session
-        gitStatusSync.getSync(sessionId).invalidate();
+        const session = storage.getState().sessions[sessionId];
+        if (session && canControlSession(session.metadata)) {
+            gitStatusSync.getSync(sessionId).invalidate();
+        }
     }
 
     private getMessagesSync(sessionId: string): InvalidateSync {
@@ -869,7 +869,12 @@ class Sync {
                     const response = await apiSocket.machineRPC<
                         { type: 'success'; sessions: PiMachineSessionRecord[]; nextCursor?: string; total?: number } | { type: 'error'; errorMessage: string },
                         { scope: 'machine'; limit: number; cursor?: string }
-                    >(machine.id, 'list-pi-sessions', { scope: 'machine', limit: pageSize, cursor });
+                    >(
+                        machine.id,
+                        'list-pi-sessions',
+                        { scope: 'machine', limit: pageSize, cursor },
+                        parseMachineRpcResult('list-pi-sessions', listPiSessionsResultSchema),
+                    );
 
                     if (response.type !== 'success') {
                         throw new Error(response.errorMessage);
@@ -1561,7 +1566,10 @@ class Sync {
                     return;
                 }
                 const currentSession = storage.getState().sessions[sessionId];
-                if (currentSession?.metadata?.piHistoryHasMore === true) {
+                if (
+                    currentSession?.metadata?.piHistoryHasMore === true
+                    && canControlSession(currentSession.metadata)
+                ) {
                     const fromSeq = this.sessionLastSeq.get(sessionId) ?? 0;
                     const result = await apiSocket.sessionRPC<PiHistoryPageResult, { beforeEntryId?: string }>(
                         sessionId,

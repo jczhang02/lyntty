@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
     getImageAttachmentSendPlan,
@@ -7,13 +7,14 @@ import {
 } from './attachmentSupport';
 
 describe('supportsImageAttachmentsForFlavor', () => {
-    it('supports Pi and flavorless legacy sessions', () => {
-        expect(supportsImageAttachmentsForFlavor(undefined)).toBe(true);
-        expect(supportsImageAttachmentsForFlavor(null)).toBe(true);
+    it('supports only explicit Pi sessions', () => {
         expect(supportsImageAttachmentsForFlavor('pi')).toBe(true);
+        expect(supportsImageAttachmentsForFlavor(' PI ')).toBe(true);
     });
 
-    it('rejects non-Pi and unknown explicit flavors', () => {
+    it('rejects unidentified, non-Pi, and unknown flavors', () => {
+        expect(supportsImageAttachmentsForFlavor(undefined)).toBe(false);
+        expect(supportsImageAttachmentsForFlavor(null)).toBe(false);
         expect(supportsImageAttachmentsForFlavor('claude')).toBe(false);
         expect(supportsImageAttachmentsForFlavor('codex')).toBe(false);
         expect(supportsImageAttachmentsForFlavor('gemini')).toBe(false);

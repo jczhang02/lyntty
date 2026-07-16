@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-const { alert } = vi.hoisted(() => ({ alert: vi.fn() }));
+const { alert } = { alert: vi.fn() };
 
 vi.mock('@/modal', () => ({ Modal: { alert } }));
 vi.mock('@/text', () => ({ t: (key: string) => key }));
@@ -32,7 +32,7 @@ describe('requestPiResumeTakeoverChoice', () => {
     it.each([
         ['sessionInfo.resumeStop', 'stop'],
         ['sessionInfo.resumeInterrupt', 'interrupt'],
-    ] as const)('requires a second explicit confirmation for %s', async (buttonText, expected) => {
+    ] as const)('requires a second explicit confirmation for %s', async (buttonText: string, expected: 'stop' | 'interrupt') => {
         const { requestPiResumeTakeoverChoice } = await import('./piResumeTakeoverChoice');
         const choice = requestPiResumeTakeoverChoice();
 

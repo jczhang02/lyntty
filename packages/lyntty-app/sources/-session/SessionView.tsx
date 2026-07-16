@@ -518,17 +518,18 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         // Mark session as currently being viewed (clears unread)
         storage.getState().setCurrentViewingSession(sessionId);
 
-        // Initialize git status sync for this session
-        gitStatusSync.getSync(sessionId);
+        if (sessionIsControllable) {
+            gitStatusSync.getSync(sessionId);
+        }
 
         return () => {
-            // Clear viewing session on unmount
+            gitStatusSync.stop(sessionId);
             const current = storage.getState().currentViewingSessionId;
             if (current === sessionId) {
                 storage.getState().setCurrentViewingSession(null);
             }
         };
-    }, [sessionId]);
+    }, [sessionId, sessionIsControllable]);
 
     const showPiHistoryLoading = shouldShowPiHistoryLoading(session, messages.length);
 

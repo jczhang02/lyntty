@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import type { Metadata } from '@/sync/storageTypes';
 import { abortSessionFromMobile, usesPiExtensionControl } from './sessionAbortAction';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
     sessionAbort: vi.fn(),
     sendMessage: vi.fn(),
-}));
+};
 
 vi.mock('@/sync/ops', () => ({
     sessionAbort: mocks.sessionAbort,

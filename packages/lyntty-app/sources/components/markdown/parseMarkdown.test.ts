@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { parseMarkdown } from './parseMarkdown';
+import { describe, expect, it } from 'bun:test';
+import { parseMarkdown, type MarkdownSpan } from './parseMarkdown';
 
-const item = (spans: { styles: string[]; text: string; url: string | null }[]) => ({
+const item = (spans: MarkdownSpan[]) => ({
     depth: 0,
     spans,
 });

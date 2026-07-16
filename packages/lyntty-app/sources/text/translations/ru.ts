@@ -28,16 +28,8 @@ function plural({ count, one, few, many }: { count: number; one: string; few: st
 export const ru: TranslationStructure = {
     tabs: {
         // Tab navigation labels
-        inbox: 'Входящие',
         sessions: 'Терминалы',
         settings: 'Настройки',
-    },
-
-    inbox: {
-        // Inbox screen
-        emptyTitle: 'Входящие пусты',
-        emptyDescription: 'Подключитесь к друзьям, чтобы начать делиться сессиями',
-        updates: 'Обновления',
     },
 
     common: {
@@ -356,24 +348,6 @@ export const ru: TranslationStructure = {
     },
 
     agentInput: {
-        permissionMode: {
-            title: 'РЕЖИМ РАЗРЕШЕНИЙ',
-            default: 'По умолчанию',
-            acceptEdits: 'Принимать правки',
-            plan: 'Режим планирования',
-            dontAsk: 'Не спрашивать',
-            bypassPermissions: 'YOLO режим',
-            badgeAcceptAllEdits: 'Принимать все правки',
-            badgeBypassAllPermissions: 'Обход всех разрешений',
-            badgePlanMode: 'Режим планирования',
-        },
-        model: {
-            title: 'МОДЕЛЬ',
-            configureInCli: 'Настройте модели в настройках CLI',
-        },
-        effort: {
-            title: 'УСИЛИЕ',
-        },
         context: {
             remaining: ({ percent }: { percent: number }) => `Осталось ${percent}%`,
         },
