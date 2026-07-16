@@ -32,7 +32,7 @@ const uploadRateState = new Map<string, { count: number; windowStart: number }>(
  * download endpoints. Prefer an explicit PUBLIC_URL, then x-forwarded-* (for
  * deployments behind a proxy), then the Host header the request itself
  * arrived on. Falling back to localhost would make any non-localhost client
- * (a phone, another LAN device, a desktop pointing at a dev IP) fail with a
+ * (a phone or emulator pointing at a development relay) fail with a
  * generic Network request failed when it tries to follow the URL.
  */
 function resolveBaseUrl(request: { headers: Record<string, string | string[] | undefined> }): string {

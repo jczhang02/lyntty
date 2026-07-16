@@ -1,133 +1,78 @@
 # Lyntty Relay
 
-Minimal backend for open-source end-to-end encrypted Claude Code clients.
+Lyntty Relay is the self-hosted API and encrypted synchronization service used by the Lyntty Android app and `lynttyd`.
 
-## What is Lyntty?
+## Runtime boundary
 
-Lyntty Relay is the synchronization backbone for secure Claude Code clients. It enables multiple devices to share encrypted conversations while maintaining complete privacy - the server never sees your messages, only encrypted blobs it cannot read.
+- The Android app connects to the Relay for pairing, encrypted session state, queued input, attachments, and push registration.
+- Only `lynttyd` connects computer-side Pi sessions to the Relay.
+- The Pi extension talks only to local `lynttyd`; it never connects to the public Relay.
+- Pi JSONL is canonical history. Relay data is encrypted sync state, queues, metadata, and caches.
+- Relay is API-only. It does not serve a browser client or static web app.
 
-## Features
+Relay stores message and metadata ciphertext without the client data keys. Authentication and operational metadata are still security-sensitive and must be protected like any production service.
 
-- 🔐 **Zero Knowledge** - The server stores encrypted data but has no ability to decrypt it
-- 🎯 **Minimal Surface** - Only essential features for secure sync, nothing more
-- 🕵️ **Privacy First** - No analytics, no tracking, no data mining
-- 📖 **Open Source** - Transparent implementation you can audit and self-host
-- 🔑 **Cryptographic Auth** - No passwords stored, only public key signatures
-- ⚡ **Real-time Sync** - WebSocket-based synchronization across all your devices
-- 📱 **Multi-device** - Seamless session management across phones, tablets, and computers
-- 🔔 **Push Notifications** - Notify when Claude Code finishes tasks or needs permissions (encrypted, we can't see the content)
-- 🌐 **Distributed Ready** - Built to scale horizontally when needed
+## Development
 
-## How It Works
-
-Your Claude Code clients generate encryption keys locally and use Lyntty Relay as a secure relay. Messages are end-to-end encrypted before leaving your device. The server's job is simple: store encrypted blobs and sync them between your devices in real-time.
-
-## Hosting
-
-**You don't need to self-host!** Our free cloud Lyntty Relay at `lyntty-api.slopus.com` is just as secure as running your own. Since all data is end-to-end encrypted before it reaches our servers, we literally cannot read your messages even if we wanted to. The encryption happens on your device, and only you have the keys.
-
-That said, Lyntty Relay is open source and self-hostable if you prefer running your own infrastructure. The security model is identical whether you use our servers or your own.
-
-## Self-Hosting with Docker
-
-The standalone Docker image runs everything in a single container with no external dependencies (no Postgres, no Redis, no S3).
+From the repository root:
 
 ```bash
-docker build -t lyntty-relay -f Dockerfile .
+bun install --frozen-lockfile
+bun run --cwd packages/lyntty-relay typecheck
+bun run --cwd packages/lyntty-relay test
+bun run --cwd packages/lyntty-relay standalone:dev
 ```
 
-Run from the monorepo root:
+`standalone:dev` uses `.env.dev`, runs pending PGlite migrations, and starts the API on port 3005 by default.
+
+## Compiled runtime
+
+Build the standalone executable from the repository root:
 
 ```bash
-docker run -p 3005:3005 \
-  -e HANDY_MASTER_SECRET=<your-secret> \
-  -v lyntty-data:/data \
-  lyntty-relay
+bun run --cwd packages/lyntty-relay build:standalone
 ```
 
-This uses:
-- **PGlite** - embedded PostgreSQL (data stored in `/data/pglite`)
-- **Local filesystem** - for file uploads (stored in `/data/files`)
-- **In-memory event bus** - no Redis needed
+The output is `packages/lyntty-relay/dist/lyntty-relay`. The release artifact and container runtime do not require Bun or Node.
 
-Data persists in the `lyntty-data` Docker volume across container restarts.
-
-### Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `HANDY_MASTER_SECRET` | Yes | - | Master secret for auth/encryption |
-| `PUBLIC_URL` | No | `http://localhost:3005` | Public base URL for file URLs sent to clients |
-| `PORT` | No | `3005` | Server port |
-| `DATA_DIR` | No | `/data` | Base data directory |
-| `PGLITE_DIR` | No | `/data/pglite` | PGlite database directory |
-
-### Optional: External Services
-
-To use external Postgres or Redis instead of the embedded defaults, set:
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection URL (bypasses PGlite) |
-| `REDIS_URL` | Redis connection URL |
-| `S3_HOST` | S3/MinIO host (bypasses local file storage) |
-
-### S3 bucket configuration (when self-hosting with S3)
-
-When `S3_HOST` is set, image attachments and other blobs land in S3 under
-`sessions/<sessionId>/attachments/<id>.enc`. Two bucket-level settings are
-not configured by the server itself and must be applied once at deploy
-time:
-
-**1. Lifecycle rule for attachment TTL.** Encrypted blobs are deleted when
-their session is deleted, but a long-lived session would otherwise keep
-its blobs forever. Add a lifecycle rule on the attachments prefix so
-objects age out automatically. Pick a TTL that matches your retention
-policy (30 days is a reasonable default).
-
-```bash
-# AWS CLI
-aws s3api put-bucket-lifecycle-configuration --bucket lyntty-blobs \
-  --lifecycle-configuration '{
-    "Rules": [{
-      "ID": "session-attachments-ttl",
-      "Status": "Enabled",
-      "Filter": { "Prefix": "sessions/" },
-      "Expiration": { "Days": 30 }
-    }]
-  }'
-
-# MinIO
-mc ilm rule add myminio/lyntty-blobs \
-  --expire-days 30 \
-  --prefix "sessions/"
+```text
+lyntty-relay migrate
+lyntty-relay serve
 ```
 
-**2. Server-side encryption (defense-in-depth).** Blobs are already
-end-to-end encrypted by the client, but enabling AES-256 SSE on the
-bucket protects against an attacker who somehow obtains raw object
-storage access without the keys.
+PGlite deployments may run `migrate` automatically from the container entrypoint. PostgreSQL deployments must run an explicit migration job before starting the new Relay version; serving against an unapplied schema must fail closed.
 
-```bash
-# AWS CLI
-aws s3api put-bucket-encryption --bucket lyntty-blobs \
-  --server-side-encryption-configuration '{
-    "Rules": [{
-      "ApplyServerSideEncryptionByDefault": {
-        "SSEAlgorithm": "AES256"
-      }
-    }]
-  }'
+## Storage
 
-# MinIO
-mc encrypt set sse-s3 myminio/lyntty-blobs
-```
+PGlite is the default database and persists under `PGLITE_DIR`. PostgreSQL is optional and selected explicitly with `DB_PROVIDER=postgres` plus `DATABASE_URL`.
 
-Local-storage mode (no `S3_HOST`) writes blobs under
-`<DATA_DIR>/files/sessions/<sessionId>/attachments/`. There is no
-lifecycle equivalent — clean up old session directories on a cron if
-you want a TTL story.
+Encrypted attachments use the local filesystem by default. Setting `S3_HOST` enables S3-compatible storage.
 
-## License
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `LYNTTY_MASTER_SECRET` | Yes | — | Relay authentication and server-side key derivation |
+| `DB_PROVIDER` | No | `pglite` | `pglite` or `postgres` |
+| `DATABASE_URL` | PostgreSQL only | — | PostgreSQL connection URL |
+| `DATA_DIR` | No | `./data` | Base local state directory |
+| `PGLITE_DIR` | No | `<DATA_DIR>/pglite` | PGlite database directory |
+| `PUBLIC_URL` | Recommended behind a proxy | Request origin | Public base URL for local attachment transfer |
+| `PORT` | No | `3005` | API port |
+| `HOST` | No | `0.0.0.0` | API bind address |
+| `REDIS_URL` | No | — | Socket.IO multi-process adapter |
+| `S3_HOST` | No | — | Enable S3-compatible attachment storage |
+| `S3_PORT` | No | provider default | S3 port |
+| `S3_USE_SSL` | No | `true` | S3 TLS setting |
+| `S3_REGION` | No | `us-east-1` | S3 region |
+| `S3_ACCESS_KEY` | S3 only | — | S3 access key |
+| `S3_SECRET_KEY` | S3 only | — | S3 secret key |
+| `S3_BUCKET` | S3 only | — | Attachment bucket |
 
-MIT - Use it, modify it, deploy it anywhere.
+`HANDY_MASTER_SECRET` is accepted only as a temporary compatibility fallback. New deployments must use `LYNTTY_MASTER_SECRET` without changing the secret value during migration.
+
+Never commit secrets, production database URLs, auth tokens, pairing URLs, or attachment authorization material.
+
+## Deployment
+
+The production image contains the compiled Relay executable, PGlite assets, and immutable Prisma migrations. Pin deployments to a release digest and keep release publication separate from production rollout.
+
+See [`../../docs/deploy/relay-vps.md`](../../docs/deploy/relay-vps.md) for the operator runbook.

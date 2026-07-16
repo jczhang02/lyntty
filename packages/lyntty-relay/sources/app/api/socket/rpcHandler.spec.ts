@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { MAX_RPC_PARAMS_CHARS, MAX_RPC_RESPONSE_CHARS, canCallRpcMethod, canRegisterRpcMethod, isOversizedRpcPayload } from './rpcHandler';
 
 const machineId = '3f761d9e-5ef6-4b8a-8b13-a20bc0fed470';

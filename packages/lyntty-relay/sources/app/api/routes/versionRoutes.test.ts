@@ -1,8 +1,10 @@
 import fastify from "fastify";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from "fastify-type-provider-zod";
 import { type Fastify } from "../types";
 import { resetVersionRouteCacheForTests, shouldUpdateAndroid, versionRoutes } from "./versionRoutes";
+
+const originalFetch = globalThis.fetch;
 
 const manifest = {
     platform: "android" as const,
@@ -29,16 +31,16 @@ describe("versionRoutes", () => {
 
     beforeEach(() => {
         resetVersionRouteCacheForTests();
-        vi.stubGlobal("fetch", vi.fn(async () => ({
+        globalThis.fetch = mock(async () => ({
             ok: true,
             json: async () => manifest,
-        })));
+        })) as unknown as typeof fetch;
     });
 
     afterEach(async () => {
         await app?.close();
-        vi.unstubAllGlobals();
-        vi.restoreAllMocks();
+        globalThis.fetch = originalFetch;
+        mock.restore();
         delete process.env.LYNTTY_ANDROID_UPDATE_MANIFEST_URL;
         delete process.env.LYNTTY_UPDATE_MANIFEST_CACHE_MS;
     });
@@ -58,7 +60,8 @@ describe("versionRoutes", () => {
         });
 
         expect(response.statusCode).toBe(200);
-        expect(response.json()).toEqual({
+        const body = response.json() as unknown;
+        expect(body).toEqual({
             update_required: true,
             version_name: "1.7.1",
             version_code: 178,
@@ -84,7 +87,8 @@ describe("versionRoutes", () => {
         });
 
         expect(response.statusCode).toBe(200);
-        expect(response.json()).toEqual({ update_required: false, update_url: null });
+        const body = response.json() as unknown;
+        expect(body).toEqual({ update_required: false, update_url: null });
     });
 
     it("does not offer production APK to another app id", () => {
@@ -109,7 +113,8 @@ describe("versionRoutes", () => {
         });
 
         expect(response.statusCode).toBe(200);
-        expect(response.json()).toEqual({ update_required: false, update_url: null });
+        const body = response.json() as unknown;
+        expect(body).toEqual({ update_required: false, update_url: null });
         expect(fetch).not.toHaveBeenCalled();
     });
 });

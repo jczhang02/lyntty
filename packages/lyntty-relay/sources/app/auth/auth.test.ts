@@ -1,24 +1,23 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 
-const dbMock = vi.hoisted(() => ({
+const dbMock = {
     account: {
-        findUnique: vi.fn(),
-        update: vi.fn(),
+        findUnique: mock(),
+        update: mock(),
     },
     revokedAuthToken: {
-        findUnique: vi.fn(),
-        delete: vi.fn(),
-        upsert: vi.fn(),
+        findUnique: mock(),
+        delete: mock(),
+        upsert: mock(),
     },
-}));
+};
 
-vi.mock('@/storage/db', () => ({ db: dbMock }));
-vi.mock('@/utils/log', () => ({ log: vi.fn() }));
+mock.module('@/storage/db', () => ({ db: dbMock }));
+mock.module('@/utils/log', () => ({ log: mock() }));
 
 describe('AuthModule token hardening', () => {
     beforeEach(() => {
-        vi.useRealTimers();
-        vi.clearAllMocks();
+        mock.clearAllMocks();
         dbMock.account.findUnique.mockResolvedValue({ tokenVersion: 7 });
         dbMock.account.update.mockResolvedValue({ tokenVersion: 8 });
         dbMock.revokedAuthToken.findUnique.mockResolvedValue(null);
@@ -30,17 +29,15 @@ describe('AuthModule token hardening', () => {
         const { AuthModule } = await import('./auth');
         const auth = new AuthModule();
         const verifier = {
-            verify: vi.fn(async (token: string) => JSON.parse(token)),
+            verify: mock(async (token: string) => JSON.parse(token)),
         };
         const generator = {
             publicKey: new Uint8Array([1, 2, 3]),
-            new: vi.fn(async (payload: any) => JSON.stringify(payload)),
+            new: mock(async (payload: any) => JSON.stringify(payload)),
         };
         (auth as any).tokens = {
             generator,
             verifier,
-            githubGenerator: { new: vi.fn() },
-            githubVerifier: { verify: vi.fn() },
             ...overrides,
         };
         return { auth, generator, verifier };
@@ -52,7 +49,7 @@ describe('AuthModule token hardening', () => {
         const token = await auth.createToken('account-1', { allowedClientTypes: ['user-scoped'] });
         const payload = JSON.parse(token);
 
-        expect(generator.new).toHaveBeenCalledOnce();
+        expect(generator.new).toHaveBeenCalledTimes(1);
         expect(payload).toMatchObject({
             user: 'account-1',
             tokenVersion: 7,

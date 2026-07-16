@@ -8,8 +8,8 @@ import { Socket } from 'socket.io';
 // Global default labels — applied to ALL metrics at scrape time
 register.setDefaultLabels({ app: 'lyntty-relay' });
 
-// Expected client_type values (trust whatever the client sends):
-// cli-coding-session, cli-daemon, cli-control-plane, ios, android, web, desktop
+// Expected client_type values: cli-coding-session, cli-daemon,
+// cli-control-plane, android, and best-effort ios.
 
 interface ClientLabels {
     client: string;

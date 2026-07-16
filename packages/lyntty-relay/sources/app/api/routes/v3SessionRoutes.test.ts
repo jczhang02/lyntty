@@ -1,6 +1,6 @@
 import fastify from "fastify";
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from "fastify-type-provider-zod";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { type Fastify } from "../types";
 
 type SessionRecord = {
@@ -29,7 +29,7 @@ const {
     resetState,
     seedSession,
     seedMessage
-} = vi.hoisted(() => {
+} = (() => {
     const state = {
         sessions: [] as SessionRecord[],
         messages: [] as MessageRecord[],
@@ -94,7 +94,7 @@ const {
         return picked;
     };
 
-    const sessionFindFirst = vi.fn(async (args: any) => {
+    const sessionFindFirst = mock(async (args: any) => {
         const row = state.sessions.find((session) => (
             session.id === args?.where?.id &&
             session.accountId === args?.where?.accountId
@@ -105,7 +105,7 @@ const {
         return selectFields(row as unknown as Record<string, unknown>, args?.select) as SessionRecord;
     });
 
-    const sessionUpdate = vi.fn(async (args: any) => {
+    const sessionUpdate = mock(async (args: any) => {
         const session = state.sessions.find((item) => item.id === args?.where?.id);
         if (!session) {
             throw new Error("Session not found");
@@ -124,7 +124,7 @@ const {
         return selectFields(session as unknown as Record<string, unknown>, args?.select);
     });
 
-    const accountUpdate = vi.fn(async (args: any) => {
+    const accountUpdate = mock(async (args: any) => {
         const accountId = args?.where?.id as string;
         const current = state.accountSeqById.get(accountId) ?? 0;
         const increment = args?.data?.seq?.increment ?? 0;
@@ -133,7 +133,7 @@ const {
         return selectFields({ seq: next }, args?.select);
     });
 
-    const sessionMessageFindMany = vi.fn(async (args: any) => {
+    const sessionMessageFindMany = mock(async (args: any) => {
         let rows = [...state.messages];
 
         if (args?.where?.sessionId) {
@@ -165,7 +165,7 @@ const {
         return rows.map((row) => selectFields(row as unknown as Record<string, unknown>, args?.select));
     });
 
-    const sessionMessageCreate = vi.fn(async (args: any) => {
+    const sessionMessageCreate = mock(async (args: any) => {
         const createdAt = new Date(state.nowMs);
         state.nowMs += 1;
         const row: MessageRecord = {
@@ -207,10 +207,10 @@ const {
             findMany: sessionMessageFindMany,
             create: sessionMessageCreate
         },
-        $transaction: vi.fn(async (fn: any) => fn(txClient))
+        $transaction: mock(async (fn: any) => fn(txClient))
     };
 
-    const emitUpdateMock = vi.fn();
+    const emitUpdateMock = mock();
 
     return {
         state,
@@ -220,21 +220,21 @@ const {
         seedSession,
         seedMessage
     };
-});
+})();
 
-vi.mock("@/storage/db", () => ({
+mock.module("@/storage/db", () => ({
     db: dbMock
 }));
 
-vi.mock("@/utils/randomKeyNaked", () => ({
-    randomKeyNaked: vi.fn(() => "update-id")
+mock.module("@/utils/randomKeyNaked", () => ({
+    randomKeyNaked: mock(() => "update-id")
 }));
 
-vi.mock("@/app/events/eventRouter", () => ({
+mock.module("@/app/events/eventRouter", () => ({
     eventRouter: {
         emitUpdate: emitUpdateMock
     },
-    buildNewMessageUpdate: vi.fn((message: unknown, sessionId: string, updateSeq: number, updateId: string) => ({
+    buildNewMessageUpdate: mock((message: unknown, sessionId: string, updateSeq: number, updateId: string) => ({
         id: updateId,
         seq: updateSeq,
         body: {
@@ -254,12 +254,14 @@ async function createApp() {
     app.setSerializerCompiler(serializerCompiler);
     const typed = app.withTypeProvider<ZodTypeProvider>() as unknown as Fastify;
 
-    typed.decorate("authenticate", async (request: any, reply: any) => {
+    typed.decorate("authenticate", (request: any, reply: any, done: () => void) => {
         const userId = request.headers["x-user-id"];
         if (typeof userId !== "string") {
-            return reply.code(401).send({ error: "Unauthorized" });
+            reply.code(401).send({ error: "Unauthorized" });
+            return;
         }
         request.userId = userId;
+        done();
     });
 
     v3SessionRoutes(typed);

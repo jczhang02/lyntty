@@ -8,7 +8,6 @@ import { activityCache } from "@/app/presence/sessionCache";
 import { auth } from "./app/auth/auth";
 import { startDatabaseMetricsUpdater } from "@/app/monitoring/metrics2";
 import { initEncrypt } from "./modules/encrypt";
-import { initGithub } from "./modules/github";
 import { loadFiles } from "./storage/files";
 
 async function main() {
@@ -30,7 +29,6 @@ async function main() {
 
     // Initialize auth module
     await initEncrypt();
-    await initGithub();
     await loadFiles();
     await auth.init();
 

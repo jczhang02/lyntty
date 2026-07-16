@@ -1,6 +1,45 @@
-import { GitHubProfile as GitHubProfileType, GitHubOrg as GitHubOrgType } from "../app/api/types";
 import { ImageRef as ImageRefType } from "./files";
 import type { SessionMessageContent as WireSessionMessageContent } from "lyntty-wire";
+
+// Persisted JSON compatibility only. The corresponding product integrations
+// are inactive; these shapes remain until the database contract window closes.
+type LegacyGitHubProfile = {
+    id: number;
+    login: string;
+    type: string;
+    site_admin: boolean;
+    avatar_url: string;
+    gravatar_id: string | null;
+    name: string | null;
+    company: string | null;
+    blog: string | null;
+    location: string | null;
+    email: string | null;
+    hireable: boolean | null;
+    bio: string | null;
+    twitter_username: string | null;
+    public_repos: number;
+    public_gists: number;
+    followers: number;
+    following: number;
+    created_at: string;
+    updated_at: string;
+    private_gists?: number;
+    total_private_repos?: number;
+    owned_private_repos?: number;
+    disk_usage?: number;
+    collaborators?: number;
+    two_factor_authentication?: boolean;
+    plan?: {
+        collaborators: number;
+        name: string;
+        space: number;
+        private_repos: number;
+    };
+};
+
+type LegacyGitHubOrg = Record<string, never>;
+
 declare global {
     namespace PrismaJson {
         // Session message content types
@@ -61,7 +100,7 @@ declare global {
                 value: string | null;
                 version: number;
             } | null | undefined;
-            github?: GitHubProfileType | null | undefined;
+            github?: LegacyGitHubProfile | null | undefined;
         } | {
             t: 'new-machine';
             machineId: string;
@@ -89,8 +128,8 @@ declare global {
             activeAt?: number;
         };
 
-        type GitHubProfile = GitHubProfileType;
-        type GitHubOrg = GitHubOrgType;
+        type GitHubProfile = LegacyGitHubProfile;
+        type GitHubOrg = LegacyGitHubOrg;
         type ImageRef = ImageRefType;
     }
 }

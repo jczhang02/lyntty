@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import type { ClientConnection } from '@/app/events/eventRouter';
-import { canAccessKeyScope } from './accessKeyHandler';
 import { canAccessMachine, canUpdateMachineMetadata } from './machineUpdateHandler';
 import { canAccessSession } from './sessionUpdateHandler';
 
@@ -35,11 +34,4 @@ describe('socket scope guards', () => {
         expect(canUpdateMachineMetadata(machineConnection('machine-1'), 'machine-2')).toBe(false);
     });
 
-    it('binds access-key socket reads to the caller scope', () => {
-        expect(canAccessKeyScope(userConnection(), 'session-1', 'machine-1')).toBe(true);
-        expect(canAccessKeyScope(sessionConnection('session-1'), 'session-1', 'machine-2')).toBe(true);
-        expect(canAccessKeyScope(sessionConnection('session-1'), 'session-2', 'machine-1')).toBe(false);
-        expect(canAccessKeyScope(machineConnection('machine-1'), 'session-2', 'machine-1')).toBe(true);
-        expect(canAccessKeyScope(machineConnection('machine-1'), 'session-1', 'machine-2')).toBe(false);
-    });
 });

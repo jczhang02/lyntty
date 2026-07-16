@@ -2,11 +2,7 @@ import { log } from "@/utils/log";
 import { Fastify } from "../types";
 import { FastifyError } from "fastify";
 
-export interface EnableErrorHandlersOptions {
-    skipNotFoundHandler?: boolean;
-}
-
-export function enableErrorHandlers(app: Fastify, options: EnableErrorHandlersOptions = {}) {
+export function enableErrorHandlers(app: Fastify) {
     // Global error handler
     app.setErrorHandler(async (error: FastifyError, request, reply) => {
         const method = request.method;
@@ -47,15 +43,11 @@ export function enableErrorHandlers(app: Fastify, options: EnableErrorHandlersOp
         }
     });
 
-    // Catch-all route for debugging 404s. Skipped when caller will register
-    // its own (e.g. SPA fallback for self-hosted webapp).
-    if (!options.skipNotFoundHandler) {
-        app.setNotFoundHandler((request, reply) => {
-            const userAgent = request.headers['user-agent'] || 'unknown';
-            log({ module: '404-handler' }, `404 - Method: ${request.method}, Path: ${request.url}, User-Agent: ${userAgent}`);
-            reply.code(404).send({ error: 'Not found', path: request.url, method: request.method });
-        });
-    }
+    app.setNotFoundHandler((request, reply) => {
+        const userAgent = request.headers['user-agent'] || 'unknown';
+        log({ module: '404-handler' }, `404 - Method: ${request.method}, Path: ${request.url}, User-Agent: ${userAgent}`);
+        reply.code(404).send({ error: 'Not found', path: request.url, method: request.method });
+    });
 
     // Error hook for additional logging
     app.addHook('onError', async (request, reply, error) => {

@@ -37,9 +37,9 @@ Decisions:
 
 - Cloudflare record starts **DNS-only** (gray cloud), not proxied.
 - Caddy terminates HTTPS directly and obtains Let’s Encrypt certificates.
-- VPS runs prebuilt GHCR image; VPS does not clone repo, install Node, or build TypeScript.
+- VPS runs the prebuilt, runtime-free GHCR image; it does not clone the repository or build source.
 - PGlite and uploaded files persist under `/opt/lyntty/data`.
-- `HANDY_MASTER_SECRET` stays on VPS and in password manager/encrypted backup, not GitHub Secrets.
+- `LYNTTY_MASTER_SECRET` stays on the VPS and in a password manager/encrypted backup, not GitHub Secrets.
 
 ## VPS prerequisites
 
@@ -61,7 +61,7 @@ sudo chmod 700 /opt/lyntty
 
 ## Secrets
 
-Generate `HANDY_MASTER_SECRET` once on VPS:
+Generate `LYNTTY_MASTER_SECRET` once on the VPS:
 
 ```bash
 openssl rand -base64 48
@@ -70,7 +70,7 @@ openssl rand -base64 48
 Write `/opt/lyntty/.env`:
 
 ```dotenv
-HANDY_MASTER_SECRET=<redacted-random-secret>
+LYNTTY_MASTER_SECRET=<redacted-random-secret>
 PUBLIC_URL=https://relay.jczhang.cc
 PORT=3005
 DATA_DIR=/data
@@ -84,7 +84,7 @@ Permissions:
 sudo chmod 600 /opt/lyntty/.env
 ```
 
-Do not store `HANDY_MASTER_SECRET` in GitHub Actions. GitHub deploy workflow only needs SSH access and an image tag.
+Do not store `LYNTTY_MASTER_SECRET` in GitHub Actions. The deploy workflow only needs SSH access and an image tag.
 
 ## Docker Compose
 
@@ -184,7 +184,7 @@ curl -fsS http://127.0.0.1:3005/health
 curl -fsS https://relay.jczhang.cc/health
 ```
 
-Do not run `git pull`, `pnpm install`, or source builds on VPS.
+Do not run `git pull`, package installation, or source builds on the VPS.
 
 ## Rollback
 
@@ -310,7 +310,7 @@ Health endpoint expected shape:
 ## Security notes
 
 - Keep SSH key restricted to deployment user and command scope where practical.
-- Keep `HANDY_MASTER_SECRET` out of GitHub and logs.
+- Keep `LYNTTY_MASTER_SECRET` out of GitHub and logs.
 - Do not paste full pairing URLs, auth tokens, public-key blobs used as auth material, request headers, or secrets into evidence.
 - Use pinned sha tags for production deploys.
 - Keep Cloudflare proxy off for first version to reduce WebSocket/TLS/timeout variables.

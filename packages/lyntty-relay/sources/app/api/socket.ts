@@ -8,13 +8,10 @@ import { log } from "@/utils/log";
 import { auth } from "@/app/auth/auth";
 import { isClientTypeAllowedByToken } from "@/app/auth/authScope";
 import { getMetricsLabelsFromSocket, redisStreamLagMsGauge, websocketConnectionsGauge, websocketEventsCounter } from "../monitoring/metrics2";
-import { usageHandler } from "./socket/usageHandler";
 import { rpcHandler } from "./socket/rpcHandler";
 import { pingHandler } from "./socket/pingHandler";
 import { sessionUpdateHandler } from "./socket/sessionUpdateHandler";
 import { machineUpdateHandler } from "./socket/machineUpdateHandler";
-import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
-import { accessKeyHandler } from "./socket/accessKeyHandler";
 import { db } from "@/storage/db";
 
 const MAX_VISIBLE_SESSION_ID_LENGTH = 512;
@@ -293,12 +290,9 @@ export function startSocket(app: Fastify) {
 
         // Handlers
         rpcHandler(userId, socket, io);
-        usageHandler(userId, socket);
         sessionUpdateHandler(userId, socket, connection);
         pingHandler(socket);
         machineUpdateHandler(userId, socket, connection);
-        artifactUpdateHandler(userId, socket);
-        accessKeyHandler(userId, socket, connection);
 
         // Ready
         log({ module: 'websocket' }, `User connected: ${userId}`);

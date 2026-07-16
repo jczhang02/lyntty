@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { db } from "@/storage/db";
 import { log } from "@/utils/log";
 import type { SocketClientType } from "./authScope";
+import { resolveMasterSecret } from "@/masterSecret";
 
 /** Cache entries expire after 24 hours */
 const TOKEN_CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -39,8 +40,6 @@ const DEFAULT_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 interface AuthTokens {
     generator: Awaited<ReturnType<typeof privacyKit.createPersistentTokenGenerator>>;
     verifier: Awaited<ReturnType<typeof privacyKit.createPersistentTokenVerifier>>;
-    githubVerifier: Awaited<ReturnType<typeof privacyKit.createEphemeralTokenVerifier>>;
-    githubGenerator: Awaited<ReturnType<typeof privacyKit.createEphemeralTokenGenerator>>;
 }
 
 export class AuthModule {
@@ -56,8 +55,9 @@ export class AuthModule {
         log({ module: 'auth' }, 'Initializing auth module...');
 
         const generator = await privacyKit.createPersistentTokenGenerator({
+            // Stable cryptographic domain retained so existing auth tokens remain valid.
             service: 'handy',
-            seed: process.env.HANDY_MASTER_SECRET!
+            seed: resolveMasterSecret(),
         });
 
 
@@ -66,19 +66,7 @@ export class AuthModule {
             publicKey: Uint8Array.from(generator.publicKey)
         });
 
-        const githubGenerator = await privacyKit.createEphemeralTokenGenerator({
-            service: 'github-lyntty',
-            seed: process.env.HANDY_MASTER_SECRET!,
-            ttl: 5 * 60 * 1000 // 5 minutes
-        });
-
-        const githubVerifier = await privacyKit.createEphemeralTokenVerifier({
-            service: 'github-lyntty',
-            publicKey: Uint8Array.from(githubGenerator.publicKey),
-        });
-
-
-        this.tokens = { generator, verifier, githubVerifier, githubGenerator };
+        this.tokens = { generator, verifier };
 
         // Start periodic cleanup of expired cache entries
         this.cleanupTimer = setInterval(() => this.cleanup(), CLEANUP_INTERVAL);
@@ -285,35 +273,6 @@ export class AuthModule {
             size: this.tokenCache.size,
             oldestEntry: oldest
         };
-    }
-
-    async createGithubToken(userId: string): Promise<string> {
-        if (!this.tokens) {
-            throw new Error('Auth module not initialized');
-        }
-
-        const payload = { user: userId, purpose: 'github-oauth' };
-        const token = await this.tokens.githubGenerator.new(payload);
-
-        return token;
-    }
-
-    async verifyGithubToken(token: string): Promise<{ userId: string } | null> {
-        if (!this.tokens) {
-            throw new Error('Auth module not initialized');
-        }
-
-        try {
-            const verified = await this.tokens.githubVerifier.verify(token);
-            if (!verified) {
-                return null;
-            }
-
-            return { userId: verified.user as string };
-        } catch (error) {
-            log({ module: 'auth', level: 'error' }, `GitHub token verification failed: ${error}`);
-            return null;
-        }
     }
 
     /** Remove expired entries from the cache */

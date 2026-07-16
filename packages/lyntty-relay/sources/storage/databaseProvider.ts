@@ -1,8 +1,10 @@
 export type DatabaseProvider = "pglite" | "postgres";
 
-type DatabaseEnvironment = Partial<Pick<NodeJS.ProcessEnv, "DATABASE_URL" | "DB_PROVIDER">>;
+type DatabaseEnvironment = Partial<Record<"DATABASE_URL" | "DB_PROVIDER", string | undefined>>;
 
-export function resolveDatabaseProvider(environment: DatabaseEnvironment = process.env): DatabaseProvider {
+export function resolveDatabaseProvider(
+    environment: DatabaseEnvironment = process.env as DatabaseEnvironment,
+): DatabaseProvider {
     const configuredProvider = environment.DB_PROVIDER?.trim().toLowerCase();
     if (configuredProvider) {
         if (configuredProvider === "pglite" || configuredProvider === "postgres") {

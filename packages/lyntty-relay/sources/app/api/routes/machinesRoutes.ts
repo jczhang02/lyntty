@@ -6,7 +6,7 @@ import { inTx, afterTx } from "@/storage/inTx";
 import { log } from "@/utils/log";
 import { randomKeyNaked } from "@/utils/randomKeyNaked";
 import { allocateUserSeq } from "@/storage/seq";
-import { buildNewMachineUpdate, buildUpdateMachineUpdate, buildDeleteMachineUpdate } from "@/app/events/eventRouter";
+import { buildDeleteMachineUpdate, buildNewMachineUpdate, buildUpdateMachineUpdate } from "@/app/events/machineUpdates";
 
 export function machinesRoutes(app: Fastify) {
     app.post('/v1/machines', {
@@ -197,8 +197,8 @@ export function machinesRoutes(app: Fastify) {
         };
     });
 
-    // DELETE /v1/machines/:id - Remove a machine and its access keys.
-    // Sessions spawned by this machine are preserved so history is not lost.
+    // DELETE /v1/machines/:id - Remove a machine and compatibility-only
+    // legacy access-key rows. Sessions are preserved so history is not lost.
     app.delete('/v1/machines/:id', {
         preHandler: app.authenticate,
         schema: {

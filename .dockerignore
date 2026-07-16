@@ -1,6 +1,5 @@
 .git
 .DS_Store
-.claude
 .dev
 .env
 **/.env
@@ -9,10 +8,6 @@
 node_modules
 **/node_modules
 **/dist
-**/.claude
 **/.expo
-**/.turbo
-**/.next
 **/ios/Pods
-**/src-tauri/target
 **/target

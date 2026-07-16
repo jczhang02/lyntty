@@ -23,6 +23,7 @@ import { createHash } from "node:crypto";
 import { Pool, PoolClient } from "pg";
 import { createPGlite } from "./storage/pgliteLoader";
 import { resolveDatabaseProvider } from "./storage/databaseProvider";
+import { resolveMasterSecret } from "./masterSecret";
 
 const dataDir = process.env.DATA_DIR || "./data";
 const pgliteDir = process.env.PGLITE_DIR || path.join(dataDir, "pglite");
@@ -223,22 +224,10 @@ async function serve() {
         process.env.PGLITE_DIR = process.env.PGLITE_DIR || pgliteDir;
     }
 
-    const masterSecret = process.env.HANDY_MASTER_SECRET;
-    if (!masterSecret) {
-        throw new Error("HANDY_MASTER_SECRET is required");
-    }
+    const masterSecret = resolveMasterSecret();
 
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
     const host = process.env.HOST || "0.0.0.0";
-    const staticDir = findStaticDir();
-    let injectHtmlConfig: Record<string, unknown> | undefined;
-    if (process.env.LYNTTY_INJECT_HTML_CONFIG) {
-        try {
-            injectHtmlConfig = JSON.parse(process.env.LYNTTY_INJECT_HTML_CONFIG);
-        } catch {
-            // ignore malformed input
-        }
-    }
 
     const { awaitShutdown } = await import("./utils/shutdown");
     const shutdown = awaitShutdown();
@@ -248,29 +237,11 @@ async function serve() {
         masterSecret,
         port,
         host,
-        staticDir,
-        injectHtmlConfig,
     });
 
     // Block until shutdown so the process stays alive.
     await shutdown;
     process.exit(0);
-}
-
-function findStaticDir(): string | undefined {
-    const candidates = [
-        process.env.LYNTTY_STATIC_DIR,
-        path.join(process.cwd(), "webapp"),
-        path.join(path.dirname(process.execPath), "webapp"),
-    ].filter(Boolean) as string[];
-
-    for (const candidate of candidates) {
-        if (fs.existsSync(path.join(candidate, "index.html"))) {
-            return candidate;
-        }
-    }
-
-    return undefined;
 }
 
 // CLI — only when this file is invoked directly, not when imported as a library.
@@ -291,40 +262,52 @@ export function isStandaloneEntrypoint(invokedFile: string): boolean {
     return standaloneEntrypoints.has(path.win32.basename(invokedFile).toLowerCase());
 }
 
-const invokedFile = process.argv[1] || "";
-const isDirectInvocation = isStandaloneEntrypoint(invokedFile);
+export function standaloneCommandFromArgv(argv: readonly string[]): string | undefined {
+    const firstArgument = argv[1];
+    // Source execution: [bun, standalone.ts, command]. Compiled execution:
+    // [lyntty-relay, command]. Bun compiled executables do not retain a script
+    // path in argv, so the old argv[2]-only dispatch silently became a no-op.
+    return firstArgument && isStandaloneEntrypoint(firstArgument)
+        ? argv[2]
+        : firstArgument;
+}
 
-if (isDirectInvocation) {
-    const command = process.argv[2];
-
-    switch (command) {
-        case "migrate":
-            runMigrations({ pgliteDir }).catch(e => {
-                console.error(e);
-                process.exit(1);
-            });
-            break;
-        case "serve":
-            serve().catch(e => {
-                console.error(e);
-                process.exit(1);
-            });
-            break;
-        default:
-            console.log(`lyntty-relay - portable distribution
+function printStandaloneHelp(): void {
+    console.log(`lyntty-relay - portable distribution
 
 Usage:
   lyntty-relay migrate    Apply database migrations
   lyntty-relay serve      Start the server
 
 Environment variables:
-  DATA_DIR          Base data directory (default: ./data)
-  PGLITE_DIR        PGlite database directory (default: DATA_DIR/pglite)
-  DATABASE_URL      PostgreSQL URL (if set, uses external Postgres instead of PGlite)
-  REDIS_URL         Redis URL (optional, not required for standalone)
-  PORT              Server port (default: 3005)
-  HANDY_MASTER_SECRET  Required: master secret for auth/encryption
+  DATA_DIR              Base data directory (default: ./data)
+  PGLITE_DIR            PGlite database directory (default: DATA_DIR/pglite)
+  DATABASE_URL          PostgreSQL URL (if set, uses external Postgres instead of PGlite)
+  REDIS_URL             Redis URL (optional, not required for standalone)
+  PORT                  Server port (default: 3005)
+  LYNTTY_MASTER_SECRET  Required: master secret for auth/encryption
 `);
-            process.exit(command === "--help" || command === "-h" ? 0 : 1);
+}
+
+async function runStandaloneCommand(command: string | undefined): Promise<number> {
+    switch (command) {
+        case "migrate":
+            await runMigrations({ pgliteDir });
+            return 0;
+        case "serve":
+            await serve();
+            return 0;
+        default:
+            printStandaloneHelp();
+            return command === "--help" || command === "-h" ? 0 : 1;
     }
+}
+
+if (import.meta.main) {
+    runStandaloneCommand(standaloneCommandFromArgv(process.argv))
+        .then(code => process.exit(code))
+        .catch(error => {
+            console.error(error);
+            process.exit(1);
+        });
 }

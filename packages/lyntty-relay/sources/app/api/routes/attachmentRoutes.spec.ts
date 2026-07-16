@@ -1,6 +1,6 @@
 import fastify from "fastify";
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from "fastify-type-provider-zod";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { type Fastify } from "../types";
 
 const {
@@ -10,7 +10,7 @@ const {
     fsMock,
     resetState,
     seedSession
-} = vi.hoisted(() => {
+} = (() => {
     const state = {
         sessions: [] as Array<{ id: string; accountId: string }>,
         uploads: new Map<string, Buffer>(),
@@ -31,7 +31,7 @@ const {
         state.sessions.push({ id, accountId });
     };
 
-    const sessionFindFirst = vi.fn(async (args: any) => {
+    const sessionFindFirst = mock(async (args: any) => {
         return state.sessions.find((s) =>
             s.id === args?.where?.id && s.accountId === args?.where?.accountId,
         ) ?? null;
@@ -59,40 +59,37 @@ const {
                 };
                 return policy;
             },
-            presignedPostPolicy: vi.fn(async (_policy: any) => ({
+            presignedPostPolicy: mock(async (_policy: any) => ({
                 postURL: state.s3PostUrl,
                 formData: { key: _policy.key, policy: "stub-policy" },
             })),
-            presignedGetObject: vi.fn(async (_bucket: string, _key: string, _ttl: number) => state.s3GetUrl),
+            presignedGetObject: mock(async (_bucket: string, _key: string, _ttl: number) => state.s3GetUrl),
         },
         s3bucket: "test-bucket",
-        isLocalStorage: vi.fn(() => state.useLocalStorage),
-        getLocalFilesDir: vi.fn(() => "/tmp/test-files"),
-        putLocalFile: vi.fn(async (filePath: string, data: Buffer) => {
+        isLocalStorage: mock(() => state.useLocalStorage),
+        getLocalFilesDir: mock(() => "/tmp/test-files"),
+        putLocalFile: mock(async (filePath: string, data: Buffer) => {
             state.uploads.set(filePath, data);
         }),
     };
 
     const fsMock = {
-        existsSync: vi.fn((p: string) => {
+        existsSync: mock((p: string) => {
             const rel = p.replace(/^\/tmp\/test-files\//, "");
             return state.uploads.has(rel);
         }),
-        readFileSync: vi.fn((p: string) => {
+        readFileSync: mock((p: string) => {
             const rel = p.replace(/^\/tmp\/test-files\//, "");
             return state.uploads.get(rel) ?? Buffer.alloc(0);
         }),
     };
 
     return { state, dbMock, filesMock, fsMock, resetState, seedSession };
-});
+})();
 
-vi.mock("@/storage/db", () => ({ db: dbMock }));
-vi.mock("@/storage/files", () => filesMock);
-vi.mock("fs", async () => {
-    const actual = await vi.importActual<typeof import("fs")>("fs");
-    return { ...actual, existsSync: fsMock.existsSync, readFileSync: fsMock.readFileSync };
-});
+mock.module("@/storage/db", () => ({ db: dbMock }));
+mock.module("@/storage/files", () => filesMock);
+mock.module("fs", () => fsMock);
 
 import { attachmentRoutes } from "./attachmentRoutes";
 
