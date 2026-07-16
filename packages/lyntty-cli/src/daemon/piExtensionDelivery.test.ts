@@ -1,25 +1,25 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, spyOn, jest } from 'bun:test';
 import { createEnvelope } from 'lyntty-wire';
 
 import { flushPendingPiLiveText, markPiExtensionAssistantTextDelivered } from './run';
 
 afterEach(() => {
-  vi.useRealTimers();
+  jest.useRealTimers();
 });
 
 describe('Pi extension delivery bookkeeping', () => {
   it('marks flushed live assistant text immediately so JSONL fallback can dedupe it', async () => {
-    vi.useFakeTimers();
-    const deliveredEntries = vi.fn();
-    const deliveredAssistantText = vi.fn();
-    const sendSessionProtocolMessage = vi.fn();
-    const flush = vi.fn().mockResolvedValue(undefined);
+    jest.useFakeTimers();
+    const deliveredEntries = mock();
+    const deliveredAssistantText = mock();
+    const sendSessionProtocolMessage = mock();
+    const flush = mock().mockResolvedValue(undefined);
     const pendingTextFlushTimer = setTimeout(() => undefined, 10_000);
     const mirror = {
       markCurrentEntriesDeliveredSince: deliveredEntries,
-      markUserTextDeliveredSince: vi.fn(),
+      markUserTextDeliveredSince: mock(),
       markAssistantTextDeliveredSince: deliveredAssistantText,
-      capAssistantTextDeliveryWindow: vi.fn(),
+      capAssistantTextDeliveryWindow: mock(),
       deliveredAssistantTextInTurn: '',
       pendingTextFlushTimer,
       sessionClient: { sendSessionProtocolMessage, flush },
@@ -43,8 +43,8 @@ describe('Pi extension delivery bookkeeping', () => {
   });
 
   it('normalizes assistant text before marking fallback dedupe', () => {
-    vi.useFakeTimers();
-    const markAssistantTextDeliveredSince = vi.fn();
+    jest.useFakeTimers();
+    const markAssistantTextDeliveredSince = mock();
 
     markPiExtensionAssistantTextDelivered({ markAssistantTextDeliveredSince }, '  repeated answer  ', 123);
 

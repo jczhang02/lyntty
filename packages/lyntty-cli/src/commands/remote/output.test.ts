@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { formatSessionTable, formatSessionStatus, formatMessageHistory, formatJson } from './output';
 import type { DecryptedSession, DecryptedMessage } from './api';
 

@@ -1,24 +1,24 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, mock, spyOn, jest } from 'bun:test'
 
-const mocks = vi.hoisted(() => ({
-  mockLoggerDebug: vi.fn(),
-  mockIsDaemonRunningCurrentlyInstalledLynttyVersion: vi.fn(),
-  mockCheckIfDaemonRunningAndCleanupStaleState: vi.fn(),
-  mockSpawnLynttyCLI: vi.fn(),
-}))
+const mocks = {
+  mockLoggerDebug: mock(),
+  mockIsDaemonRunningCurrentlyInstalledLynttyVersion: mock(),
+  mockCheckIfDaemonRunningAndCleanupStaleState: mock(),
+  mockSpawnLynttyCLI: mock(),
+}
 
-vi.mock('@/ui/logger', () => ({
+mock.module('@/ui/logger', () => ({
   logger: {
     debug: mocks.mockLoggerDebug,
   },
 }))
 
-vi.mock('./controlClient', () => ({
+mock.module('./controlClient', () => ({
   isDaemonRunningCurrentlyInstalledLynttyVersion: mocks.mockIsDaemonRunningCurrentlyInstalledLynttyVersion,
   checkIfDaemonRunningAndCleanupStaleState: mocks.mockCheckIfDaemonRunningAndCleanupStaleState,
 }))
 
-vi.mock('@/utils/spawnLynttyCLI', () => ({
+mock.module('@/utils/spawnLynttyCLI', () => ({
   spawnLynttyCLI: mocks.mockSpawnLynttyCLI,
 }))
 
@@ -26,9 +26,9 @@ import { ensureDaemonRunning } from './ensureDaemonRunning'
 
 describe('ensureDaemonRunning', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    mock.clearAllMocks()
     mocks.mockSpawnLynttyCLI.mockReturnValue({
-      unref: vi.fn(),
+      unref: mock(),
     })
     mocks.mockCheckIfDaemonRunningAndCleanupStaleState.mockResolvedValue(true)
   })
@@ -46,7 +46,7 @@ describe('ensureDaemonRunning', () => {
   })
 
   it('starts the daemon and waits for readiness when the installed version is not running', async () => {
-    const mockUnref = vi.fn()
+    const mockUnref = mock()
     mocks.mockIsDaemonRunningCurrentlyInstalledLynttyVersion.mockResolvedValue(false)
     mocks.mockSpawnLynttyCLI.mockReturnValue({
       unref: mockUnref,

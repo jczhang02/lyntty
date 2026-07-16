@@ -210,6 +210,7 @@ export class ApiMachineClient {
         }));
 
         this.rpcHandlerManager.registerHandler('worktree-list', async (params: any) => ({
+            success: true,
             worktrees: await listManagedWorktrees({ basePath: params?.basePath }),
         }));
 

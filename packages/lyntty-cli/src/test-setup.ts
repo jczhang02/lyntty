@@ -1,27 +1,34 @@
 /**
- * Vitest global setup — runs ONCE before all tests.
+ * Bun preload setup for CLI unit tests.
  *
- * We only build the CLI here. Integration suites now provision their own
- * isolated environments so each suite can get a fresh lab-rat project copy.
+ * Keep every test process away from a developer's real ~/.pi and ~/.lyntty.
+ * The compiled daemon integration target provisions its own isolated stack.
  */
 
-import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll } from 'bun:test'
 
-export async function setup() {
-    process.env.VITEST_POOL_TIMEOUT = '60000'
-    process.env.LYNTTY_RUN_SANDBOX_NETWORK_TESTS = '1'
+const previousEnvironment = {
+    HOME: process.env.HOME,
+    USERPROFILE: process.env.USERPROFILE,
+    LYNTTY_HOME_DIR: process.env.LYNTTY_HOME_DIR,
+}
+const testRoot = mkdtempSync(join(tmpdir(), 'lyntty-cli-test-'))
+const testHome = join(testRoot, 'home')
 
-    const buildResult = spawnSync('bun', ['run', 'build'], { stdio: 'pipe' })
-    if (buildResult.stderr && buildResult.stderr.length > 0) {
-        const errorOutput = buildResult.stderr.toString()
-        console.error(`Build stderr (could be debugger output): ${errorOutput}`)
-        console.log(`Build stdout: ${buildResult.stdout.toString()}`)
-        if (errorOutput.includes('Command failed with exit code')) {
-            throw new Error(`Build failed STDERR: ${errorOutput}`)
+process.env.HOME = testHome
+process.env.USERPROFILE = testHome
+process.env.LYNTTY_HOME_DIR = join(testRoot, 'lyntty')
+
+afterAll(() => {
+    for (const [key, value] of Object.entries(previousEnvironment)) {
+        if (value === undefined) {
+            delete process.env[key]
+        } else {
+            process.env[key] = value
         }
     }
-}
-
-export async function teardown() {
-    // Per-suite integration environments clean themselves up.
-}
+    rmSync(testRoot, { recursive: true, force: true })
+})

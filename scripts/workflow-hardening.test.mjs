@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import test from 'node:test';
+import { test } from 'bun:test';
 
 const relayDeployPath = new URL('../.github/workflows/relay-deploy.yml', import.meta.url);
 const relayImagePath = new URL('../.github/workflows/relay-image.yml', import.meta.url);

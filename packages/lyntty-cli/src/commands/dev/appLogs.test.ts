@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, spyOn, jest } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,7 +15,7 @@ async function request(
 describe('app log receiver', () => {
     it('defaults to loopback and accepts an explicit host', async () => {
         const homeDir = await mkdtemp(join(tmpdir(), 'lyntty-app-logs-'));
-        const output = { write: vi.fn() };
+        const output = { write: mock() };
         const appLogs = await startAppLogsServer({ port: 0, homeDir, stdout: output });
         try {
             expect(appLogs.host).toBe('127.0.0.1');
@@ -41,7 +41,7 @@ describe('app log receiver', () => {
 
     it('writes formatted POST lines to stdout and the per-home file', async () => {
         const homeDir = await mkdtemp(join(tmpdir(), 'lyntty-app-logs-'));
-        const output = { write: vi.fn() };
+        const output = { write: mock() };
         const appLogs = await startAppLogsServer({ port: 0, homeDir, stdout: output });
         try {
             const response = await request(appLogs.port, '/logs', {
@@ -69,7 +69,7 @@ describe('app log receiver', () => {
 
     it('preserves OPTIONS, bad-request, and not-found behavior', async () => {
         const homeDir = await mkdtemp(join(tmpdir(), 'lyntty-app-logs-'));
-        const appLogs = await startAppLogsServer({ port: 0, homeDir, stdout: { write: vi.fn() } });
+        const appLogs = await startAppLogsServer({ port: 0, homeDir, stdout: { write: mock() } });
         try {
             const options = await request(appLogs.port, '/logs', { method: 'OPTIONS' });
             expect(options.status).toBe(204);

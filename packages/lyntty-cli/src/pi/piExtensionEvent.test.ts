@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { installLynttyPiExtension } from './piExtensionInstall';
 import { attachImagesToPiRemoteCommand, isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent } from './piExtensionEvent';

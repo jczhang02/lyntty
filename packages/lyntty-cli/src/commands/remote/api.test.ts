@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, mock, spyOn, jest } from 'bun:test';
 import tweetnacl from 'tweetnacl';
 import {
     encodeBase64,
@@ -14,11 +14,11 @@ import type { Credentials } from './credentials';
 import type { RawSession, RawMessage } from './api';
 
 // Mock axios
-vi.mock('axios', () => {
+mock.module('axios', () => {
     const fn = {
-        get: vi.fn(),
-        post: vi.fn(),
-        delete: vi.fn(),
+        get: mock(),
+        post: mock(),
+        delete: mock(),
     };
     return {
         default: fn,
@@ -51,9 +51,9 @@ const authHeader = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockedAxios = axios as any as {
-    get: ReturnType<typeof vi.fn>;
-    post: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof mock>;
+    post: ReturnType<typeof mock>;
+    delete: ReturnType<typeof mock>;
 };
 
 // --- Test helpers ---
@@ -141,7 +141,7 @@ describe('api', () => {
     beforeEach(() => {
         config = makeConfig();
         creds = makeCredentials();
-        vi.resetAllMocks();
+        jest.resetAllMocks();
     });
 
     describe('resolveSessionEncryption', () => {
@@ -562,7 +562,7 @@ describe('api', () => {
             const decrypted = decryptWithDataKey(
                 Buffer.from(body.messages[0].content, 'base64'),
                 sessionKey,
-            ) as { role: string; content: { text: string }; localKey: string; meta: Record<string, unknown> };
+            ) as { role: string; content: { type: string; text: string }; localKey: string; meta: Record<string, unknown> };
             expect(decrypted).toEqual({
                 role: 'user',
                 content: { type: 'text', text: 'hello' },

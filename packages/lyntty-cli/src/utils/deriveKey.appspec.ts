@@ -1,7 +1,7 @@
 import { deriveKey, deriveSecretKeyTreeRoot, deriveSecretKeyTreeChild } from './deriveKey';
 import { encodeUTF8 } from './text';
 import { encodeHex } from './hex';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 
 describe('Key Derivation Tests', () => {
     const hex = (...parts: string[]) => parts.join('');

@@ -1,15 +1,15 @@
 /**
  * Unit tests for environment variable expansion utility
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, spyOn, jest } from 'bun:test';
 
 // Mock logger to avoid logger.warn/debug not being a function errors
-vi.mock('@/ui/logger', () => ({
+mock.module('@/ui/logger', () => ({
     logger: {
-        debug: vi.fn(),
-        warn: vi.fn(),
-        info: vi.fn(),
-        error: vi.fn()
+        debug: mock(),
+        warn: mock(),
+        info: mock(),
+        error: mock()
     }
 }));
 
@@ -182,7 +182,7 @@ describe('expandEnvironmentVariables', () => {
         };
 
         const result = expandEnvironmentVariables(envVars);
-        expect(result.MY_PATH).toBe(originalPath);
+        expect(result.MY_PATH as string | undefined).toBe(originalPath);
     });
 
     it('should handle nested braces correctly', () => {

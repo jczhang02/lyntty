@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn, jest } from 'bun:test';
 import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -8,8 +8,8 @@ import { readCredentials, writeCredentials } from './credentials';
 import type { Config } from './config';
 
 // Mock axios
-vi.mock('axios', () => {
-    const fn = vi.fn();
+mock.module('axios', () => {
+    const fn = mock();
     return {
         default: { post: fn },
         AxiosError: class AxiosError extends Error {
@@ -22,16 +22,16 @@ vi.mock('axios', () => {
 });
 
 // Mock qrcode-terminal
-vi.mock('qrcode-terminal', () => ({
+mock.module('qrcode-terminal', () => ({
     default: {
-        generate: vi.fn((_data: string, _opts: unknown, cb: (code: string) => void) => {
+        generate: mock((_data: string, _opts: unknown, cb: (code: string) => void) => {
             cb('[QR CODE]');
         }),
     },
 }));
 
 // Mock chalk to pass-through
-vi.mock('chalk', () => ({
+mock.module('chalk', () => ({
     default: {
         bold: (s: string) => s,
         dim: (s: string) => s,
@@ -43,7 +43,7 @@ vi.mock('chalk', () => ({
 import axios from 'axios';
 import { authLogin, authLogout, authStatus } from './auth';
 
-const mockedAxiosPost = vi.mocked(axios.post);
+const mockedAxiosPost = axios.post as unknown as ReturnType<typeof mock>;
 
 function makeTestConfig(): Config {
     const homeDir = mkdtempSync(join(tmpdir(), 'lyntty remote-auth-test-'));
@@ -56,11 +56,11 @@ function makeTestConfig(): Config {
 
 describe('auth', () => {
     let config: Config;
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
+    let consoleSpy: ReturnType<typeof spyOn>;
 
     beforeEach(() => {
         config = makeTestConfig();
-        consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
         mockedAxiosPost.mockReset();
     });
 
@@ -273,7 +273,7 @@ describe('auth', () => {
 
         it('prints logout message', async () => {
             await authLogout(config);
-            const calls = consoleSpy.mock.calls.map(c => String(c[0]));
+            const calls = consoleSpy.mock.calls.map((c: unknown[]) => String(c[0]));
             expect(calls).toContain('## Authentication');
             expect(calls).toContain('- Status: Logged out');
             expect(calls).toContain('- Credentials: Cleared');
@@ -286,7 +286,7 @@ describe('auth', () => {
 
             await authStatus(config);
 
-            const calls = consoleSpy.mock.calls.map(c => String(c[0]));
+            const calls = consoleSpy.mock.calls.map((c: unknown[]) => String(c[0]));
             expect(calls).toContain('## Authentication');
             expect(calls).toContain('- Status: Authenticated');
         });
@@ -294,7 +294,7 @@ describe('auth', () => {
         it('shows not authenticated when no credentials', async () => {
             await authStatus(config);
 
-            const calls = consoleSpy.mock.calls.map(c => String(c[0]));
+            const calls = consoleSpy.mock.calls.map((c: unknown[]) => String(c[0]));
             expect(calls).toContain('## Authentication');
             expect(calls).toContain('- Status: Not authenticated');
         });
@@ -306,8 +306,8 @@ describe('auth', () => {
             await authStatus(config);
 
             // Should include a call with the public key
-            const calls = consoleSpy.mock.calls.map(c => String(c[0]));
-            const pubKeyCall = calls.find(c => c.includes('- Public Key: `'));
+            const calls = consoleSpy.mock.calls.map((c: unknown[]) => String(c[0]));
+            const pubKeyCall = calls.find((c: string) => c.includes('- Public Key: `'));
             expect(pubKeyCall).toBeDefined();
         });
     });

@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, spyOn, jest } from 'bun:test';
 import { handleRemoteCommand } from './index';
 
-vi.mock('@/pi/piExtensionInstall', () => ({
-    installLynttyPiExtension: vi.fn(),
-    lynttyPiExtensionPath: vi.fn(() => '/tmp/pi-extension.ts'),
+mock.module('@/pi/piExtensionInstall', () => ({
+    installLynttyPiExtension: mock(),
+    lynttyPiExtensionPath: mock(() => '/tmp/pi-extension.ts'),
 }));
 
 describe('remote command dispatch', () => {

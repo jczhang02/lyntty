@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn, jest } from 'bun:test';
 import { EventEmitter } from 'node:events';
 import {
     decodeBase64,
@@ -52,8 +52,8 @@ class MockSocket extends EventEmitter {
 
 let mockSocketInstance: MockSocket | null = null;
 
-vi.mock('socket.io-client', () => ({
-    io: vi.fn((url: string, opts: unknown) => {
+mock.module('socket.io-client', () => ({
+    io: mock((url: string, opts: unknown) => {
         mockSocketInstance = new MockSocket(url, opts);
         return mockSocketInstance;
     }),
@@ -151,7 +151,7 @@ function makeSessionUpdate(
 describe('SessionClient', () => {
     beforeEach(() => {
         mockSocketInstance = null;
-        vi.clearAllMocks();
+        mock.clearAllMocks();
     });
 
     afterEach(() => {
@@ -175,7 +175,9 @@ describe('SessionClient', () => {
         });
 
         it('connects to the correct server URL', async () => {
-            const { io: mockIo } = vi.mocked(await import('socket.io-client'));
+            const { io: mockIo } = (await import('socket.io-client')) as unknown as {
+                io: ReturnType<typeof mock>;
+            };
             const opts = makeOptions({ serverUrl: 'https://custom-server.example.com' });
             const client = new SessionClient(opts);
 

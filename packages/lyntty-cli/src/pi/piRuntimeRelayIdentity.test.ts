@@ -1,11 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, spyOn, jest } from 'bun:test';
 
 import { resolvePiRelaySessionTag } from './piRelaySessionTag';
 import { createPiRuntimeRelayIdentity } from './piRuntimeRelayIdentity';
 
 describe('createPiRuntimeRelayIdentity', () => {
   it('derives the relay tag from the actual newly-created Pi session id', async () => {
-    const createRuntime = vi.fn(async () => ({ session: { sessionId: 'actual-pi-session' } }));
+    const createRuntime = mock(async () => ({ session: { sessionId: 'actual-pi-session' } }));
 
     const result = await createPiRuntimeRelayIdentity({
       machineId: 'machine-1',

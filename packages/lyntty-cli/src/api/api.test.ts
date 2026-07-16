@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, mock, spyOn, jest, beforeEach, afterEach } from 'bun:test';
 import { ApiClient } from './api';
 import axios from 'axios';
 import { connectionState } from '@/utils/serverConnectionErrors';
 
-// Use vi.hoisted to ensure mock functions are available when vi.mock factory runs
-const { mockPost, mockIsAxiosError } = vi.hoisted(() => ({
-    mockPost: vi.fn(),
-    mockIsAxiosError: vi.fn(() => true)
-}));
+// Use module-scope to ensure mock functions are available when mock.module factory runs
+const { mockPost, mockIsAxiosError } = {
+    mockPost: mock(),
+    mockIsAxiosError: mock(() => true)
+};
 
-vi.mock('axios', () => ({
+mock.module('axios', () => ({
     default: {
         post: mockPost,
         isAxiosError: mockIsAxiosError
@@ -17,30 +17,30 @@ vi.mock('axios', () => ({
     isAxiosError: mockIsAxiosError
 }));
 
-vi.mock('@/ui/logger', () => ({
+mock.module('@/ui/logger', () => ({
     logger: {
-        debug: vi.fn()
+        debug: mock()
     }
 }));
 
 // Mock encryption utilities
-vi.mock('./encryption', () => ({
-    decodeBase64: vi.fn((data: string) => data),
-    encodeBase64: vi.fn((data: any) => data),
-    decrypt: vi.fn((data: any) => data),
-    encrypt: vi.fn((data: any) => data)
+mock.module('./encryption', () => ({
+    decodeBase64: mock((data: string) => data),
+    encodeBase64: mock((data: any) => data),
+    decrypt: mock((data: any) => data),
+    encrypt: mock((data: any) => data)
 }));
 
 // Mock configuration
-vi.mock('./configuration', () => ({
+mock.module('./configuration', () => ({
     configuration: {
         serverUrl: 'https://api.example.com'
     }
 }));
 
 // Mock libsodium encryption
-vi.mock('./libsodiumEncryption', () => ({
-    libsodiumEncryptForPublicKey: vi.fn((data: any) => new Uint8Array(32))
+mock.module('./libsodiumEncryption', () => ({
+    libsodiumEncryptForPublicKey: mock((data: any) => new Uint8Array(32))
 }));
 
 // Global test metadata
@@ -66,7 +66,7 @@ describe('Api server error handling', () => {
     let api: ApiClient;
 
     beforeEach(async () => {
-        vi.clearAllMocks();
+        mock.clearAllMocks();
         connectionState.reset(); // Reset offline state between tests
 
         // Create a mock credential
@@ -83,7 +83,7 @@ describe('Api server error handling', () => {
 
     describe('getOrCreateSession', () => {
         it('should return null when Lyntty relay is unreachable (ECONNREFUSED)', async () => {
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
             // Mock axios to throw connection refused error
             mockPost.mockRejectedValue({ code: 'ECONNREFUSED' });
@@ -104,7 +104,7 @@ describe('Api server error handling', () => {
 
         it('should return null when Lyntty relay cannot be found (ENOTFOUND)', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
             // Mock axios to throw DNS resolution error
             mockPost.mockRejectedValue({ code: 'ENOTFOUND' });
@@ -125,7 +125,7 @@ describe('Api server error handling', () => {
 
         it('should return null when Lyntty relay times out (ETIMEDOUT)', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
             // Mock axios to throw timeout error
             mockPost.mockRejectedValue({ code: 'ETIMEDOUT' });
@@ -146,7 +146,7 @@ describe('Api server error handling', () => {
 
         it('should return null when session endpoint returns 404', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
             // Mock axios to return 404
             mockPost.mockRejectedValue({
@@ -174,7 +174,7 @@ describe('Api server error handling', () => {
 
         it('should return null when server returns 500 Internal Server Error', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
             // Mock axios to return 500 error
             mockPost.mockRejectedValue({
@@ -197,7 +197,7 @@ describe('Api server error handling', () => {
 
         it('should return null when server returns 503 Service Unavailable', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
             // Mock axios to return 503 error
             mockPost.mockRejectedValue({
@@ -229,7 +229,7 @@ describe('Api server error handling', () => {
             ).rejects.toThrow('Failed to get or create session: Invalid API key');
 
             // Should not show the offline mode message
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
             expect(consoleSpy).not.toHaveBeenCalledWith(
                 expect.stringContaining('⚠️  Lyntty relay unreachable')
             );
@@ -240,7 +240,7 @@ describe('Api server error handling', () => {
     describe('getOrCreateMachine', () => {
         it('should return minimal machine object when server is unreachable (ECONNREFUSED)', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
             // Mock axios to throw connection refused error
             mockPost.mockRejectedValue({ code: 'ECONNREFUSED' });
@@ -276,7 +276,7 @@ describe('Api server error handling', () => {
 
         it('should return minimal machine object when server endpoint returns 404', async () => {
             connectionState.reset();
-            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+            const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
             // Mock axios to return 404
             mockPost.mockRejectedValue({

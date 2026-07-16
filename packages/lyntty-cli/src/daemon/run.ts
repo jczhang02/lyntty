@@ -15,7 +15,7 @@ import { configuration } from '@/configuration';
 import { startCaffeinate, stopCaffeinate } from '@/utils/caffeinate';
 import packageJson from '../../package.json';
 import { getEnvironmentInfo } from '@/ui/doctor';
-import { spawnLynttyCLI } from '@/utils/spawnLynttyCLI';
+import { currentLynttyShellCommand, spawnLynttyCLI } from '@/utils/spawnLynttyCLI';
 import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedPiCommandBoundary, readPersistedPiCommandOutcomes, readPersistedPiHistoryWatermark, readPersistedSessions, persistPiCommandBoundary, persistPiCommandOutcome, persistPiHistoryWatermark, persistSession } from '@/persistence';
 import type { PersistedSession } from '@/persistence';
 
@@ -741,10 +741,10 @@ export async function startDaemon(): Promise<void> {
 
           const tmux = getTmuxUtilities(tmuxSessionName);
 
-          // Construct command for the CLI
-          const cliPath = join(projectPath(), 'dist', 'index.mjs');
+          // Construct a runtime-free command for release binaries. Source
+          // development still resolves through Bun's generated dist entrypoint.
           const agent = 'pi';
-          const fullCommand = `bun ${cliPath} ${agent} --started-by daemon`;
+          const fullCommand = currentLynttyShellCommand([agent, '--started-by', 'daemon']);
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:

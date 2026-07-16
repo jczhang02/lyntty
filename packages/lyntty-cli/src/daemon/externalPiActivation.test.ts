@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, spyOn, jest } from 'bun:test';
 
 import { isExternalPiMirrorActive, resolveExternalPiActivationLease, resolveStalePiMirrorCleanup } from './externalPiActivation';
 
@@ -34,19 +34,19 @@ describe('resolveExternalPiActivationLease', () => {
   });
 
   it('reuses an ordinary extension-backed Pi runtime by default', async () => {
-    const queueShutdown = vi.fn();
+    const queueShutdown = mock();
     await expect(resolveExternalPiActivationLease({
       relaySessionId: 'relay-1',
       queueShutdown,
-      waitForAccepted: vi.fn(),
-      waitForStopped: vi.fn(),
+      waitForAccepted: mock(),
+      waitForStopped: mock(),
     })).resolves.toEqual({ type: 'reuse', sessionId: 'relay-1' });
     expect(queueShutdown).not.toHaveBeenCalled();
   });
 
   it('waits without sending shutdown when wait takeover is requested', async () => {
-    const queueShutdown = vi.fn();
-    const waitForAccepted = vi.fn();
+    const queueShutdown = mock();
+    const waitForAccepted = mock();
     await expect(resolveExternalPiActivationLease({
       relaySessionId: 'relay-1',
       takeoverChoice: 'wait',

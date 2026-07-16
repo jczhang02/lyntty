@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';

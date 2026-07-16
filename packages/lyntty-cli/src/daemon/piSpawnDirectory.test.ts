@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { choosePiSpawnDirectory } from './run';
 import type { PiSessionRecoveryRecord } from '@/pi/runPiRecovery';
 

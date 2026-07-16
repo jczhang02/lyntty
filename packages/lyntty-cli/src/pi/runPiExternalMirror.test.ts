@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, mock, spyOn, jest } from 'bun:test';
 import type { SessionEntry, SessionHeader } from '@earendil-works/pi-coding-agent';
 
 import { PiExternalMirror, readPiSessionEntriesFromOffset, startPiExternalMirror } from './runPiExternalMirror';
@@ -45,7 +45,7 @@ const assistantEntry = (id: string, text: string, timestamp = '2026-07-02T00:00:
 });
 
 afterEach(() => {
-  vi.useRealTimers();
+  jest.useRealTimers();
 });
 
 describe('PiExternalMirror', () => {
@@ -166,15 +166,15 @@ describe('PiExternalMirror', () => {
   });
 
   it('forwards quiet external writes through session-protocol envelopes and flushes once', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(0);
+    jest.useFakeTimers();
+    jest.setSystemTime(0);
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
       const file = join(dir, 'session.jsonl');
       const first = userEntry('u1', 'hello');
       writeJsonl(file, [header, first]);
-      const sendSessionProtocolMessage = vi.fn();
-      const flush = vi.fn().mockResolvedValue(undefined);
+      const sendSessionProtocolMessage = mock();
+      const flush = mock().mockResolvedValue(undefined);
       const mirror = startPiExternalMirror({
         sessionFile: file,
         initialEntries: [first],
@@ -184,10 +184,10 @@ describe('PiExternalMirror', () => {
       expect(mirror).not.toBeNull();
 
       appendJsonl(file, userEntry('u2', 'external mobile-visible line'));
-      await vi.advanceTimersByTimeAsync(100);
+      await jest.advanceTimersByTime(100);
       expect(sendSessionProtocolMessage).not.toHaveBeenCalled();
 
-      await vi.advanceTimersByTimeAsync(2_200);
+      await jest.advanceTimersByTime(2_200);
       expect(sendSessionProtocolMessage).toHaveBeenCalledTimes(1);
       expect(sendSessionProtocolMessage.mock.calls[0][0]).toMatchObject({
         id: 'pi-history-u2-user',
@@ -202,15 +202,15 @@ describe('PiExternalMirror', () => {
   });
 
   it('does not mark JSONL writes known merely because the live runtime is active', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(0);
+    jest.useFakeTimers();
+    jest.setSystemTime(0);
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
       const file = join(dir, 'session.jsonl');
       const first = userEntry('u1', 'hello');
       writeJsonl(file, [header, first]);
-      const sendSessionProtocolMessage = vi.fn();
-      const flush = vi.fn().mockResolvedValue(undefined);
+      const sendSessionProtocolMessage = mock();
+      const flush = mock().mockResolvedValue(undefined);
       let active = true;
       const mirror = startPiExternalMirror({
         sessionFile: file,
@@ -222,12 +222,12 @@ describe('PiExternalMirror', () => {
       expect(mirror).not.toBeNull();
 
       appendJsonl(file, userEntry('u2', 'fallback must recover this tail'));
-      await vi.advanceTimersByTimeAsync(500);
+      await jest.advanceTimersByTime(500);
       expect(sendSessionProtocolMessage).not.toHaveBeenCalled();
 
       active = false;
-      await vi.advanceTimersByTimeAsync(100);
-      await vi.advanceTimersByTimeAsync(2_200);
+      await jest.advanceTimersByTime(100);
+      await jest.advanceTimersByTime(2_200);
       expect(sendSessionProtocolMessage).toHaveBeenCalledWith(expect.objectContaining({
         id: 'pi-history-u2-user',
         ev: { t: 'text', text: 'fallback must recover this tail' },
@@ -262,15 +262,15 @@ describe('PiExternalMirror', () => {
   });
 
   it('forwards assistant-delivery marking through the startPiExternalMirror wrapper', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(0);
+    jest.useFakeTimers();
+    jest.setSystemTime(0);
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
       const file = join(dir, 'session.jsonl');
       const first = userEntry('u1', 'hello');
       writeJsonl(file, [header, first]);
-      const sendSessionProtocolMessage = vi.fn();
-      const flush = vi.fn().mockResolvedValue(undefined);
+      const sendSessionProtocolMessage = mock();
+      const flush = mock().mockResolvedValue(undefined);
       const mirror = startPiExternalMirror({
         sessionFile: file,
         initialEntries: [first],
@@ -280,9 +280,9 @@ describe('PiExternalMirror', () => {
       expect(mirror).not.toBeNull();
 
       appendJsonl(file, assistantEntry('a2', 'already delivered completed turn'));
-      await vi.advanceTimersByTimeAsync(100);
+      await jest.advanceTimersByTime(100);
       mirror?.markAssistantTextDeliveredSince('already delivered completed turn', Date.parse('2026-07-02T00:00:00.000Z'));
-      await vi.advanceTimersByTimeAsync(2_200);
+      await jest.advanceTimersByTime(2_200);
 
       expect(sendSessionProtocolMessage).not.toHaveBeenCalled();
       expect(flush).not.toHaveBeenCalled();
@@ -293,15 +293,15 @@ describe('PiExternalMirror', () => {
   });
 
   it('can attach remote command metadata to mirrored Pi user echoes', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(0);
+    jest.useFakeTimers();
+    jest.setSystemTime(0);
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
       const file = join(dir, 'session.jsonl');
       const first = userEntry('u1', 'hello');
       writeJsonl(file, [header, first]);
-      const sendSessionProtocolMessage = vi.fn();
-      const flush = vi.fn().mockResolvedValue(undefined);
+      const sendSessionProtocolMessage = mock();
+      const flush = mock().mockResolvedValue(undefined);
       const mirror = startPiExternalMirror({
         sessionFile: file,
         initialEntries: [first],
@@ -314,8 +314,8 @@ describe('PiExternalMirror', () => {
       expect(mirror).not.toBeNull();
 
       appendJsonl(file, userEntry('u2', 'phone echo'));
-      await vi.advanceTimersByTimeAsync(100);
-      await vi.advanceTimersByTimeAsync(2_200);
+      await jest.advanceTimersByTime(100);
+      await jest.advanceTimersByTime(2_200);
 
       expect(sendSessionProtocolMessage).toHaveBeenCalledWith(expect.objectContaining({
         id: 'pi-history-u2-user',

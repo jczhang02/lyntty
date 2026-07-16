@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn, jest } from 'bun:test';
 import { ApiSessionClient } from './apiSession';
 import { decodeBase64, decrypt, decryptBlob, encodeBase64, encrypt } from './encryption';
 import type { Update } from './types';
@@ -12,12 +12,12 @@ const {
     mockBackoff,
     mockDelay,
     mockShouldReconnect
-} = vi.hoisted(() => ({
-    mockIo: vi.fn(),
-    mockAxiosGet: vi.fn(),
-    mockAxiosPost: vi.fn(),
-    mockAxiosPut: vi.fn(),
-    mockBackoff: vi.fn(async <T>(callback: () => Promise<T>) => {
+} = {
+    mockIo: mock(),
+    mockAxiosGet: mock(),
+    mockAxiosPost: mock(),
+    mockAxiosPut: mock(),
+    mockBackoff: mock(async <T>(callback: () => Promise<T>) => {
         let lastError: unknown;
         for (let i = 0; i < 20; i += 1) {
             try {
@@ -28,15 +28,15 @@ const {
         }
         throw lastError;
     }),
-    mockDelay: vi.fn(async () => undefined),
-    mockShouldReconnect: vi.fn(() => true)
-}));
+    mockDelay: mock(async () => undefined),
+    mockShouldReconnect: mock(() => true)
+};
 
-vi.mock('socket.io-client', () => ({
+mock.module('socket.io-client', () => ({
     io: mockIo
 }));
 
-vi.mock('axios', () => ({
+mock.module('axios', () => ({
     default: {
         get: mockAxiosGet,
         post: mockAxiosPost,
@@ -44,37 +44,37 @@ vi.mock('axios', () => ({
     }
 }));
 
-vi.mock('@/configuration', () => ({
+mock.module('@/configuration', () => ({
     configuration: {
         serverUrl: 'https://server.test'
     }
 }));
 
-vi.mock('@/ui/logger', () => ({
+mock.module('@/ui/logger', () => ({
     logger: {
-        debug: vi.fn(),
-        debugLargeJson: vi.fn()
+        debug: mock(),
+        debugLargeJson: mock()
     }
 }));
 
-vi.mock('@/api/rpc/RpcHandlerManager', () => ({
+mock.module('@/api/rpc/RpcHandlerManager', () => ({
     RpcHandlerManager: class {
-        onSocketConnect = vi.fn();
-        onSocketDisconnect = vi.fn();
-        handleRequest = vi.fn(async () => '');
+        onSocketConnect = mock();
+        onSocketDisconnect = mock();
+        handleRequest = mock(async () => '');
     }
 }));
 
-vi.mock('@/modules/common/registerCommonHandlers', () => ({
-    registerCommonHandlers: vi.fn()
+mock.module('@/modules/common/registerCommonHandlers', () => ({
+    registerCommonHandlers: mock()
 }));
 
-vi.mock('@/utils/time', () => ({
+mock.module('@/utils/time', () => ({
     backoff: mockBackoff,
     delay: mockDelay
 }));
 
-vi.mock('@/utils/lidState', () => ({
+mock.module('@/utils/lidState', () => ({
     shouldReconnect: mockShouldReconnect
 }));
 
@@ -143,6 +143,9 @@ async function waitForCheck(check: () => void, timeoutMs = 2000) {
     throw lastError;
 }
 
+const loggerDebugMock = logger.debug as unknown as ReturnType<typeof mock>;
+const loggerDebugLargeJsonMock = logger.debugLargeJson as unknown as ReturnType<typeof mock>;
+
 describe('ApiSessionClient v3 messages API migration', () => {
     let socketHandlers: SocketHandlers;
     let mockSocket: any;
@@ -154,34 +157,37 @@ describe('ApiSessionClient v3 messages API migration', () => {
     };
 
     beforeEach(() => {
-        vi.clearAllMocks();
+        mock.clearAllMocks();
+        mockAxiosGet.mockReset();
+        mockAxiosPost.mockReset();
+        mockAxiosPut.mockReset();
         mockShouldReconnect.mockReturnValue(true);
         socketHandlers = {};
         session = makeSession();
         mockSocket = {
             connected: true,
-            connect: vi.fn(),
-            on: vi.fn((event: string, handler: SocketHandler) => {
+            connect: mock(),
+            on: mock((event: string, handler: SocketHandler) => {
                 if (!socketHandlers[event]) {
                     socketHandlers[event] = [];
                 }
                 socketHandlers[event].push(handler);
             }),
-            off: vi.fn(),
-            emit: vi.fn(),
-            emitWithAck: vi.fn(async () => ({ result: 'error' })),
+            off: mock(),
+            emit: mock(),
+            emitWithAck: mock(async () => ({ result: 'error' })),
             volatile: {
-                emit: vi.fn()
+                emit: mock()
             },
-            close: vi.fn()
+            close: mock()
         };
 
         mockIo.mockReturnValue(mockSocket);
     });
 
     afterEach(() => {
-        vi.useRealTimers();
-        vi.restoreAllMocks();
+        jest.useRealTimers();
+        jest.restoreAllMocks();
     });
 
     it('registers core socket handlers and connects', () => {
@@ -194,7 +200,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
     });
 
     it('retries after initial socket connection error', async () => {
-        vi.useFakeTimers();
+        jest.useFakeTimers();
         mockSocket.connected = false;
 
         const client = new ApiSessionClient('fake-token', session);
@@ -203,10 +209,10 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
         emitSocketEvent('connect_error', new Error('ECONNREFUSED'));
 
-        await vi.advanceTimersByTimeAsync(1000);
+        await jest.advanceTimersByTime(1000);
         expect(mockSocket.connect).toHaveBeenCalledTimes(2);
 
-        await vi.advanceTimersByTimeAsync(3000);
+        await jest.advanceTimersByTime(3000);
         expect(mockSocket.connect).toHaveBeenCalledTimes(3);
 
         await client.close();
@@ -449,7 +455,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
     it('replays unacked user commands from after_seq=0 after daemon client reconstruction', async () => {
         const client = new ApiSessionClient('fake-token', session);
-        const onUserMessage = vi.fn();
+        const onUserMessage = mock();
         client.onUserMessage(onUserMessage);
 
         const userMessage = {
@@ -494,7 +500,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
     it('skips only the fixed construction snapshot and still routes commands arriving during initialization', async () => {
         const snapshot = { ...session, seq: 1 };
         const client = new ApiSessionClient('fake-token', snapshot);
-        const onUserMessage = vi.fn();
+        const onUserMessage = mock();
         client.onUserMessage(onUserMessage);
         client.skipExistingMessages();
         const oldMessage = {
@@ -549,7 +555,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
     it('fetchMessages uses incremental cursor and paginates while hasMore is true', async () => {
         const client = new ApiSessionClient('fake-token', session);
-        const onUserMessage = vi.fn();
+        const onUserMessage = mock();
         client.onUserMessage(onUserMessage);
 
         (client as any).lastSeq = 2;
@@ -628,8 +634,8 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
     it('routes non-user fetched messages through EventEmitter message event', async () => {
         const client = new ApiSessionClient('fake-token', session);
-        const onUserMessage = vi.fn();
-        const onMessage = vi.fn();
+        const onUserMessage = mock();
+        const onMessage = mock();
         client.onUserMessage(onUserMessage);
         client.on('message', onMessage);
 
@@ -707,7 +713,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
     it('routes file events without logging sensitive names or refs', async () => {
         const client = new ApiSessionClient('fake-token', session);
-        const onFileEvent = vi.fn();
+        const onFileEvent = mock();
         const sensitiveName = 'https://upload.example.test/image.png?token=secret';
         const sensitiveRef = 'sessions/test-session-id/attachments/secret-ref.enc?signature=secret';
         client.onFileEvent(onFileEvent);
@@ -750,7 +756,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         await (client as any).fetchMessages();
 
         expect(onFileEvent).toHaveBeenCalledWith(fileMessage);
-        const debugOutput = JSON.stringify(vi.mocked(logger.debug).mock.calls);
+        const debugOutput = JSON.stringify(loggerDebugMock.mock.calls);
         expect(debugOutput).not.toContain(sensitiveName);
         expect(debugOutput).not.toContain(sensitiveRef);
         expect(debugOutput).not.toContain('signature=secret');
@@ -758,7 +764,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
     it('applies file event socket updates directly without logging sensitive names or refs', () => {
         const client = new ApiSessionClient('fake-token', session);
-        const onFileEvent = vi.fn();
+        const onFileEvent = mock();
         const sensitiveName = 'https://upload.example.test/image.png?token=socket-secret';
         const sensitiveRef = 'sessions/test-session-id/attachments/socket-secret-ref.enc?signature=socket-secret';
         client.onFileEvent(onFileEvent);
@@ -789,8 +795,8 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect(onFileEvent).toHaveBeenCalledWith(fileMessage);
         expect((client as any).lastSeq).toBe(2);
         const debugOutput = JSON.stringify([
-            ...vi.mocked(logger.debug).mock.calls,
-            ...vi.mocked(logger.debugLargeJson).mock.calls,
+            ...loggerDebugMock.mock.calls,
+            ...loggerDebugLargeJsonMock.mock.calls,
         ]);
         expect(debugOutput).not.toContain(sensitiveName);
         expect(debugOutput).not.toContain(sensitiveRef);
@@ -799,7 +805,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
     it('applies consecutive new-message updates directly (fast path)', () => {
         const client = new ApiSessionClient('fake-token', session);
-        const onUserMessage = vi.fn();
+        const onUserMessage = mock();
         client.onUserMessage(onUserMessage);
 
         (client as any).lastSeq = 1;
@@ -842,7 +848,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
     it('applies first live new-message update directly when lastSeq is 0', async () => {
         const client = new ApiSessionClient('fake-token', session);
-        const onUserMessage = vi.fn();
+        const onUserMessage = mock();
         client.onUserMessage(onUserMessage);
         mockAxiosGet.mockResolvedValueOnce({
             data: {
@@ -975,7 +981,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
     });
 
     it('never reconnects after close triggers a disconnect event', async () => {
-        vi.useFakeTimers();
+        jest.useFakeTimers();
         try {
             const client = new ApiSessionClient('fake-token', session);
             mockSocket.connect.mockClear();
@@ -983,11 +989,11 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
             emitSocketEvent('disconnect', 'io client disconnect');
             emitSocketEvent('connect_error', new Error('after close'));
-            await vi.advanceTimersByTimeAsync(10_000);
+            await jest.advanceTimersByTime(10_000);
 
             expect(mockSocket.connect).not.toHaveBeenCalled();
         } finally {
-            vi.useRealTimers();
+            jest.useRealTimers();
         }
     });
 

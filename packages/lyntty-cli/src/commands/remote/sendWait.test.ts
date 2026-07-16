@@ -1,31 +1,31 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn, jest } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
-    listSessions: vi.fn(),
-    postSessionUserMessage: vi.fn(),
-    waitForConnect: vi.fn(),
-    waitForTurnCompletionAfter: vi.fn(),
-    close: vi.fn(),
-}));
+const mocks = {
+    listSessions: mock(),
+    postSessionUserMessage: mock(),
+    waitForConnect: mock(),
+    waitForTurnCompletionAfter: mock(),
+    close: mock(),
+};
 
-vi.mock('./config', () => ({
+mock.module('./config', () => ({
     loadConfig: () => ({ serverUrl: 'https://relay.example.test' }),
 }));
 
-vi.mock('./credentials', () => ({
+mock.module('./credentials', () => ({
     requireCredentials: () => ({ token: 'test-token' }),
 }));
 
-vi.mock('./api', () => ({
+mock.module('./api', () => ({
     listSessions: mocks.listSessions,
     postSessionUserMessage: mocks.postSessionUserMessage,
-    createSession: vi.fn(),
-    getSessionMessages: vi.fn(),
-    listActiveSessions: vi.fn(),
-    listMachines: vi.fn(),
+    createSession: mock(),
+    getSessionMessages: mock(),
+    listActiveSessions: mock(),
+    listMachines: mock(),
 }));
 
-vi.mock('./session', () => ({
+mock.module('./session', () => ({
     SessionClient: class {
         waitForConnect = mocks.waitForConnect;
         waitForTurnCompletionAfter = mocks.waitForTurnCompletionAfter;
@@ -33,9 +33,9 @@ vi.mock('./session', () => ({
     },
 }));
 
-vi.mock('@/pi/piExtensionInstall', () => ({
-    installLynttyPiExtension: vi.fn(),
-    lynttyPiExtensionPath: vi.fn(() => '/tmp/pi-extension.ts'),
+mock.module('@/pi/piExtensionInstall', () => ({
+    installLynttyPiExtension: mock(),
+    lynttyPiExtensionPath: mock(() => '/tmp/pi-extension.ts'),
 }));
 
 import { handleRemoteCommand } from './index';
@@ -49,14 +49,14 @@ const session = {
 
 describe('remote send --wait orchestration', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        mock.clearAllMocks();
         mocks.listSessions.mockResolvedValue([session]);
         mocks.waitForConnect.mockResolvedValue(undefined);
-        vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        spyOn(console, 'log').mockImplementation(() => undefined);
     });
 
     afterEach(() => {
-        vi.restoreAllMocks();
+        jest.restoreAllMocks();
     });
 
     it('installs the localId acceptance waiter before persisting the message', async () => {

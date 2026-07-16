@@ -1,235 +1,107 @@
-# Lyntty standardization plan
+# Lyntty delivery standardization
 
-Date: 2026-07-06
-Status: accepted planning snapshot, implementation pending
-Beads: `lyntty-3t8`
-Evidence: `docs/evidence/r62-standardization-docs.md`
+Status: active Bun-only migration
 
-## Goal
+Current epic: `lyntty-6o0`
 
-Make Lyntty usable for stable personal daily use:
+Historical baseline: `docs/evidence/r62-standardization-docs.md`
 
-- public GitHub repo at `jczhang02/lyntty`;
-- clean push/PR CI for app/cli/relay/wire health;
-- VPS relay at `https://relay.jczhang.cc` with HTTPS, persistence, restart policy, logs, and backups;
-- `lynttyd` connects to that relay and remains node-local authority;
-- GitHub Actions can build relay Docker images and manually deploy them to VPS;
-- GitHub Actions can manually produce signed production Android APK releases;
-- installed APK can discover newer APKs, download them, verify `sha256`, then invoke Android Package Installer with user confirmation;
-- Android phone can control an ordinary computer-side `pi` session through shared control.
+## Objective
 
-## Non-goals
+Ship Lyntty as an Android-first, Pi-only, self-hosted product whose installation, tests, builds, release artifacts, and production runtimes do not require Node, npm, pnpm, npx, or tsx.
 
-- Public SaaS launch.
-- Play Store / App Store release as primary distribution.
-- Silent APK install or bypassing Android system confirmation.
-- Native Android updater shim.
-- EAS Build / EAS Update as main release channel.
-- Restoring Happy/Claude/Codex/Gemini/OpenClaw product surfaces.
-- Making iOS acceptance equal to Android for this standardization pass.
+The supported components are independently versioned:
 
-## Product invariants
+- Android App
+- compiled `lyntty` CLI
+- compiled `lynttyd`
+- compiled Relay/container
+- Wire capability contract
+- signed Compatibility BOM tying compatible versions together
 
-Source of truth: `docs/contexts/product/CONTEXT.md` and `docs/architecture/pi-shared-control.md`.
+## Product and runtime invariants
 
-- `pi` is the only supported runtime in product scope.
-- `lynttyd` is the local node daemon.
-- Only `lynttyd` connects to `relay`; Pi extension talks only to local `lynttyd`.
-- Pi JSONL remains canonical history.
-- `relay` stores encrypted sync state, metadata, queues, and caches; it is not canonical Pi history.
-- One Pi session has one `active runtime`; takeover is explicit.
-- Phone sends to ordinary computer-running `pi` sessions use shared control:
+- `pi` is the only supported agent/runtime.
+- `lynttyd` is the computer-side authority and the only computer component that connects to Relay.
+- The Pi extension talks only to local `lynttyd`.
+- Phone control uses `phone -> relay -> lynttyd -> Pi extension -> pi.sendUserMessage()`.
+- Pi JSONL is canonical history; Relay stores encrypted sync state, queues, metadata, attachments, and caches.
+- One Pi session has one `active runtime`; takeover requires an explicit `wait`, `stop`, or `interrupt` choice.
+- Missing/stale extension paths fail or queue with actionable remediation. They never silently drop input or start a duplicate runtime.
+- Only sessions with explicit `flavor: 'pi'` can send, execute RPC, answer permissions, or control a runtime. Older provider/flavorless records are history-only.
+- Android is the release acceptance target. iOS source compatibility is best effort and does not block release.
 
-```text
-phone -> relay -> lynttyd -> Pi extension -> pi.sendUserMessage()
-```
+## Bun boundary
 
-- Extension-missing or stale cases queue/fail with explicit remediation such as `Waiting for Pi extension`; no silent drop and no silent duplicate runtime.
+- Bun is pinned by `.bun-version` and `packageManager`.
+- Active workspaces are only App, CLI, Relay, and Wire.
+- Tests use native `bun:test`.
+- Lifecycle scripts are allowed only through the root `trustedDependencies` list; `bun pm untrusted` must report zero.
+- Bun-compatible `node:*` APIs are allowed. Project commands and shipped runtimes may not execute Node/npm/pnpm/npx/tsx.
+- Formal CLI/daemon/Relay artifacts use `bun build --compile`; end users do not install Bun.
+- Android may use Hermes, Gradle, JDK, Android SDK/NDK, Rust/C/C++, and other native toolchains.
 
-## Accepted decisions
+## Current implemented foundation
 
-| Area | Decision |
-| --- | --- |
-| Initial target | Stable personal use, not public release. |
-| GitHub repo | `origin` should become `git@github.com:jczhang02/lyntty.git`; repo public; default branch `main`. |
-| Upstream Happy | Optional `upstream` only for history lookup/cherry-pick; no automatic merge/sync. |
-| Public push gate | Run full git-history secret scan before public push. True secret means rotate/revoke and rewrite history before push. |
-| Default production relay | `https://relay.jczhang.cc`. |
-| Cloudflare | `relay.jczhang.cc` starts DNS-only (gray cloud), A record to VPS. |
-| CI | Push/PR CI runs install plus focused tests/typecheck; no APK release, VPS deploy, Maestro, or Windows matrix by default. |
-| Relay image | GitHub Actions builds GHCR image `ghcr.io/jczhang02/lyntty-relay`. Push both `sha-<shortsha>` and `main`; production deploy pins a sha tag. |
-| Relay deploy | Manual GitHub Actions workflow SSHes to VPS and runs `docker compose pull && docker compose up -d && healthcheck`. VPS does not git pull or build. |
-| Relay VPS shape | Single VPS, Docker Compose, host Caddy HTTPS, PGlite persistent volume at `/opt/lyntty/data`, restart `unless-stopped`. |
-| Relay secret | `HANDY_MASTER_SECRET` generated once for VPS, kept in `/opt/lyntty/.env` plus password manager/encrypted backup; not stored in GitHub Secrets. |
-| Relay backups | First version: daily encrypted local VPS backup of `/opt/lyntty/data`, retain 14-30 days; remote backup later. |
-| Android package names | Production `dev.jczhang.lyntty`; dev/E2E `dev.jczhang.lyntty.dev`; preview optional `dev.jczhang.lyntty.preview`. |
-| Android data isolation | Production/dev data remain isolated by package name; no automatic cross-package migration. |
-| Existing signed app conflict | If old `dev.jczhang.lyntty` has different signing key, uninstall/reinstall once; do not chase old key. |
-| Android release key | Create new permanent `lyntty-release.jks`, keep out of git, local encrypted backup, GitHub Secrets for CI signing. |
-| Android release trigger | APK release workflow is manual `workflow_dispatch` only. Ordinary fixes do not auto-release APK. |
-| Version strategy | `versionName` human version, e.g. `1.7.1`; `versionCode` from GitHub run number by default; tag `android-v<versionName>-<versionCode>`. |
-| APK distribution | GitHub Releases is primary APK distribution. Relay returns manifest/URL; relay does not host APK as primary path. |
-| Update manifest | Android release workflow generates `latest.json`; relay reads GitHub latest release manifest, caches briefly, and returns `/v1/version` response. |
-| APK self-update | App downloads APK with Expo/React Native APIs, verifies `sha256`, then invokes Android Package Installer; user confirms install. |
-| Update permission | Production APK may request `android.permission.REQUEST_INSTALL_PACKAGES`. |
-| Hash requirement | `sha256` verification is first-version requirement, even if file bytes are read into memory. |
-| Installer implementation | No Android-only native shim. Use `expo-file-system` / `expo-file-system/legacy`, `expo-crypto`, `expo-intent-launcher`, Android intents. |
-| EAS | EAS Update can remain secondary OTA for JS/assets if useful; not main native release/update mechanism. |
+- Four-workspace Bun lock/install boundary.
+- Native Bun tests for App, CLI, Relay, and Wire.
+- Android-native App with Web/Tauri/EAS/OTA and inherited social/voice/subscription/provider product surfaces removed.
+- Relay API-only surface with static browser serving and unused SaaS/vendor routes removed.
+- PGlite default plus explicit PostgreSQL provider/migration gate.
+- Canonical `LYNTTY_MASTER_SECRET` with compatibility-only legacy fallback.
+- Compiled Relay smoke covering help, all migrations, health serving, and graceful shutdown.
+- Compiled CLI/`lynttyd` integration against an isolated compiled Relay, with temporary HOME/state/port and forbidden-runtime sentinels.
+- Protected `main`; implementation remains on `refactor/bun-migration` until the complete compatibility/release gate is ready.
 
-## Current code gaps to close
+## Remaining delivery phases
 
-Observed from current tree:
+### 1. Reproducible artifacts
 
-- `packages/lyntty-app/sources/sync/serverConfig.ts` defaults to `https://api.cluster-fluster.com`, not `https://relay.jczhang.cc`.
-- `packages/lyntty-app/app.config.js` has production package `dev.jczhang.lyntty`, but checked-in `android/app/build.gradle` still hardcodes `dev.jczhang.lyntty.dev` and release signing uses debug keystore.
-- `packages/lyntty-app/app.config.js` does not yet request `REQUEST_INSTALL_PACKAGES`.
-- `packages/lyntty-app/sources/sync/sync.ts` posts `platform`, `version`, and `app_id` to `/v1/version`, and expects `update_required` / `update_url`; it does not send `versionCode` yet.
-- `packages/lyntty-app/sources/components/UpdateBanner.tsx` opens native update URL externally, not through APK download/hash/install flow.
-- `packages/lyntty-relay/sources/app/api/routes/versionRoutes.ts` is Happy-era semver/store logic and returns `{ updateUrl }`, not the planned APK manifest shape.
-- `packages/lyntty-relay/sources/versions.ts` uses static `>=1.4.1` constraints.
-- Existing `.github/workflows/typecheck.yml` only typechecks app.
-- Existing `.github/workflows/cli-smoke-test.yml` does broad CLI smoke including Linux/Windows matrix; planned default CI should be simpler and focused.
-- `packages/lyntty-app/eas.json` and release scripts are still EAS/store oriented.
-- Root `Dockerfile` is the preferred standalone relay image base; `Dockerfile.server` is not the deployment target for this plan.
-- Package metadata is partly still upstream-oriented in `lyntty-relay`, `lyntty-wire`, and `lyntty-agent`.
+- Produce release archives for supported CLI/daemon platforms.
+- Produce runtime-free Relay binary/container.
+- Produce release-style Android APK with production signing fail-closed.
+- Generate checksums, SBOMs, provenance, and artifact manifests.
 
-## Implementation phases
+### 2. Installer, service, and updater lifecycle
 
-### Phase 0 — docs and decision ledger
+- Install versioned CLI/daemon assets atomically.
+- Register the native service without runtime fallbacks.
+- Verify upgrade, rollback, uninstall, and interrupted-install recovery.
+- Keep extension installation isolated and explicit; never overwrite the live global extension during tests.
 
-Exit:
+### 3. Compatibility and release control
 
-- `docs/standardization/PLAN.md` records accepted standardization plan.
-- `docs/deploy/relay-vps.md` records VPS/relay runbook.
-- `docs/release/android-apk.md` records APK release/update runbook.
-- `docs/evidence/r62-standardization-docs.md` records evidence and not-run items.
+- Publish independent SemVer for App, CLI/daemon, Relay, and Wire.
+- Negotiate Wire major/minor capabilities; reject incompatible majors and degrade safely when optional capabilities are missing.
+- Sign a Compatibility BOM covering the current and previous two stable BOMs for at least 90 days.
+- Keep `stable` and `preview` isolated. Ordinary `main` pushes do not publish stable artifacts or deploy production Relay.
+- Require release PR checks and environment approval before tags/releases.
 
-### Phase 1 — repo hygiene and public push gate
+### 4. Final integration
 
-Work:
+- Rebuild and inspect a clean no-Node Android APK.
+- Run critical Maestro shared-control, restart, ownership, and `history_gap` paths.
+- Prove PGlite/PostgreSQL upgrade and rollback with preserved data.
+- Run supported-platform artifact/service smoke tests.
+- Obtain independent zero-P0/P1 review and merge through the protected PR.
 
-- Update package repository/homepage/bugs metadata to `jczhang02/lyntty` where still upstream-oriented.
-- Confirm `.gitignore` blocks `.jks`, `.keystore`, `.env`, and local secrets.
-- Run `gitleaks detect` or `trufflehog git file://...` before public push.
-- If secret scan hits a real secret, rotate/revoke and rewrite history before publishing.
-- Configure `origin` to `git@github.com:jczhang02/lyntty.git` only after scan is clean.
+macOS Developer ID/notarization, Windows Authenticode, production Android signing, and production Relay rollout are explicit external gates. Missing credentials block only the corresponding stable platform or production deployment; they are never replaced with unsigned artifacts presented as stable.
 
-Exit:
+## Verification
 
-- Secret-scan report recorded in evidence.
-- Repo remote configured only after clean scan.
-
-### Phase 2 — focused CI
-
-Work:
-
-- Add default push/PR CI for:
-  - `pnpm install --frozen-lockfile`
-  - `pnpm --filter ./packages/lyntty-wire build`
-  - `pnpm --filter ./packages/lyntty-wire test`
-  - `pnpm --filter ./packages/lyntty-cli typecheck`
-  - `pnpm --filter ./packages/lyntty-cli test`
-  - `pnpm --filter ./packages/lyntty-relay typecheck`
-  - `pnpm --filter ./packages/lyntty-relay test`
-  - `pnpm --filter ./packages/lyntty-app typecheck`
-  - `pnpm --filter ./packages/lyntty-app test`
-  - `git diff --check`
-- Do not run Maestro, APK release build, VPS deploy, or Windows smoke matrix by default.
-
-Exit:
-
-- Push/PR CI green for focused checks.
-
-### Phase 3 — relay image and manual VPS deploy
-
-Work:
-
-- Add GitHub Actions workflow to build root `Dockerfile` and push GHCR tags `sha-<shortsha>` and `main`.
-- Add manual deploy workflow with `image_tag` input and SSH secrets.
-- Add/update VPS Compose and Caddy runbook from `docs/deploy/relay-vps.md`.
-- Keep VPS secret local: `HANDY_MASTER_SECRET` in `/opt/lyntty/.env`, not GitHub Secrets.
-- Add daily encrypted local backup timer.
-
-Exit:
-
-- `https://relay.jczhang.cc/health` returns healthy on pinned image tag.
-- VPS can rollback by changing `LYNTTY_RELAY_IMAGE_TAG` to previous sha.
-
-### Phase 4 — Android signed APK release and self-update
-
-Work:
-
-- Add Gradle properties/env wiring so default local builds use dev package and production release requires explicit opt-in.
-- Add release signing from GitHub Secrets.
-- Add manual Android release workflow.
-- Generate signed production APK and `latest.json` as GitHub Release assets.
-- Update relay `/v1/version` to read manifest and return snake_case update fields.
-- Update app to send/compare `versionCode`, download APK, verify `sha256`, and invoke Android Package Installer through Expo APIs.
-- Add `REQUEST_INSTALL_PACKAGES` for production APK.
-
-Exit:
-
-- Fresh install of signed production APK works.
-- APK detects newer GitHub Release through relay.
-- APK downloads update, verifies `sha256`, opens Android Package Installer, and user can confirm install.
-- `sha256` mismatch does not open installer.
-
-### Phase 5 — personal-use acceptance
-
-Work:
-
-- Validate phone can pair with node through `https://relay.jczhang.cc`.
-- Validate `lynttyd` reconnect and shared-control send path for a computer-side `pi` session.
-- Validate daemon restart and relay restart do not lose canonical history; Pi JSONL remains source.
-- Validate APK update from one production version to next.
-- Record evidence with exact commands, artifacts, and not-run reasons.
-
-Exit:
-
-- Daily-use path works on Android release-style APK.
-
-## Acceptance checklist
-
-- [ ] Public repo push prepared with clean secret-history scan.
-- [ ] Focused CI green on `main`.
-- [ ] GHCR relay image builds on push.
-- [ ] Manual deploy workflow updates VPS by pinned sha tag.
-- [ ] `https://relay.jczhang.cc/health` healthy through Caddy HTTPS.
-- [ ] `/opt/lyntty/data` persists PGlite/files across container restart.
-- [ ] Daily encrypted local backup exists and restore command is documented.
-- [ ] Production APK package id is `dev.jczhang.lyntty`.
-- [ ] Release APK signed with permanent release keystore, not debug key.
-- [ ] Android release workflow is manual only.
-- [ ] GitHub Release contains APK plus generated `latest.json`.
-- [ ] Relay `/v1/version` returns GitHub APK manifest data.
-- [ ] App compares `versionCode`, not only semver.
-- [ ] App verifies APK `sha256` before invoking installer.
-- [ ] App uses Android Package Installer with user confirmation; no silent install.
-- [ ] Dev APK remains `dev.jczhang.lyntty.dev` and data-isolated.
-- [ ] Phone controls computer-side `pi` session through shared control.
-
-## Verification commands
-
-Use narrow checks first, then broaden as touched layers require:
+From the repository root:
 
 ```bash
-pnpm --filter ./packages/lyntty-wire build
-pnpm --filter ./packages/lyntty-wire test
-pnpm --filter ./packages/lyntty-cli typecheck
-pnpm --filter ./packages/lyntty-cli test
-pnpm --filter ./packages/lyntty-relay typecheck
-pnpm --filter ./packages/lyntty-relay test
-pnpm --filter ./packages/lyntty-app typecheck
-pnpm --filter ./packages/lyntty-app test
+bun install --frozen-lockfile
+bun pm untrusted
+bun audit
+bun run test:repo-hardening
+bun run ci:wire
+bun run ci:cli
+bun run ci:daemon-integration
+bun run ci:relay
+bun run ci:app
 git diff --check
 ```
 
-Android release validation should add release-style APK install/update smoke and record artifact hashes.
-
-## Residual risks
-
-- Expo-only APK install path depends on `expo-file-system/legacy` content URI behavior on target SDK/device versions.
-- Reading full APK bytes for SHA-256 may fail on low-memory devices if APK grows large.
-- GitHub Release `latest.json` and relay cache behavior need robust fallback for GitHub outage/rate limits.
-- Public repo scan may find historical upstream secrets requiring rewrite before push.
-- Caddy/Cloudflare/Docker VPS deployment remains untested until VPS exists.
+Android and production-data checks must use temporary HOME, `LYNTTY_HOME_DIR`, extension directories, databases, ports, Gradle caches, and build outputs. Evidence records exact commands, artifact hashes, not-run items, and residual risk.

@@ -682,7 +682,7 @@ if (!maybeEnvelope.success) {
 
 ## Build and distribution
 
-`lyntty-wire` is currently a private Bun workspace. Its package export points to `src/index.ts`, so App, CLI, and Relay consume the same source contract from the frozen workspace install. The build gate is a TypeScript no-emit check; tests currently run under Bun-invoked Vitest until the repository-wide `bun:test` migration lands.
+`lyntty-wire` is a private Bun workspace. Its package export points to `src/index.ts`, so App, CLI, and Relay consume the same source contract from the frozen workspace install. The build gate is a TypeScript no-emit check, and the suite runs directly under `bun:test`.
 
 There is no npm/yarn publish or release command in the current package. Formal Wire version/capability metadata and distribution are governed by the signed Lyntty Compatibility BOM release flow.
 

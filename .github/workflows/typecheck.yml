@@ -77,6 +77,8 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Typecheck and test lyntty-cli
         run: bun run ci:cli
+      - name: Exercise compiled CLI and daemon against isolated Relay
+        run: bun run ci:daemon-integration
 
   relay:
     name: lyntty-relay

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, spyOn, jest } from 'bun:test';
 
 import type { FileEventMessage, UserMessage } from '@/api/types';
 import { bindPiRemoteInput, MAX_REMOTE_IMAGES_PER_MESSAGE } from './piRemoteInput';
@@ -67,7 +67,7 @@ function createSessionHarness(download: (ref: string) => Promise<Uint8Array | nu
 describe('bindPiRemoteInput', () => {
   it('binds file events to the next user message as Pi image content', async () => {
     const harness = createSessionHarness(async () => new Uint8Array([1, 2, 3]));
-    const handle = vi.fn(async () => {});
+    const handle = mock(async () => {});
     const binding = bindPiRemoteInput(harness.session, handle);
 
     harness.emitFile(fileEvent('ref-1'));
@@ -101,9 +101,9 @@ describe('bindPiRemoteInput', () => {
 
   it('rejects the whole command when an attachment cannot be delivered', async () => {
     const harness = createSessionHarness(async () => null);
-    const handle = vi.fn(async () => {});
-    const reject = vi.fn(async () => {});
-    const binding = bindPiRemoteInput(harness.session, handle, vi.fn(), reject);
+    const handle = mock(async () => {});
+    const reject = mock(async () => {});
+    const binding = bindPiRemoteInput(harness.session, handle, mock(), reject);
 
     harness.emitFile(fileEvent('bad'));
     harness.emitMessage(userMessage('do not send partial input', 'local-1'));
@@ -118,9 +118,9 @@ describe('bindPiRemoteInput', () => {
 
   it('rejects non-image and oversized attachment batches before Pi delivery', async () => {
     const harness = createSessionHarness(async () => new Uint8Array([1]));
-    const handle = vi.fn(async () => {});
-    const reject = vi.fn(async () => {});
-    const binding = bindPiRemoteInput(harness.session, handle, vi.fn(), reject);
+    const handle = mock(async () => {});
+    const reject = mock(async () => {});
+    const binding = bindPiRemoteInput(harness.session, handle, mock(), reject);
 
     for (let index = 0; index <= MAX_REMOTE_IMAGES_PER_MESSAGE; index += 1) {
       harness.emitFile(fileEvent(`ref-${index}`));

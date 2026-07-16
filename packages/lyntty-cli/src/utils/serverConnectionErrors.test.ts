@@ -15,13 +15,13 @@
  * - REQ-9: Backend transparency (via generic TSession tests)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, mock, spyOn, jest, beforeEach } from 'bun:test';
 import { startOfflineReconnection, printOfflineWarning, connectionState, isNetworkError, NETWORK_ERROR_CODES } from './serverConnectionErrors';
 
 // Mock axios - only isAxiosError needed for error type detection
-vi.mock('axios', () => ({
+mock.module('axios', () => ({
     default: {
-        get: vi.fn(),
+        get: mock(),
         isAxiosError: (e: unknown) => {
             return e !== null && typeof e === 'object' && 'isAxiosError' in e && (e as any).isAxiosError === true;
         }
@@ -32,9 +32,9 @@ vi.mock('axios', () => ({
 }));
 
 // Mock logger to prevent console noise in tests
-vi.mock('@/ui/logger', () => ({
+mock.module('@/ui/logger', () => ({
     logger: {
-        debug: vi.fn()
+        debug: mock()
     }
 }));
 
@@ -56,9 +56,9 @@ interface TestHandleConfig<T = { id: string }> {
  * Reduces boilerplate in individual tests.
  */
 function createTestHandle<T = { id: string }>(config: TestHandleConfig<T> = {}) {
-    const onReconnected = config.onReconnected ?? vi.fn().mockResolvedValue({ id: 'test-session' });
-    const onNotify = config.onNotify ?? vi.fn();
-    const onCleanup = config.onCleanup ?? vi.fn();
+    const onReconnected = config.onReconnected ?? mock().mockResolvedValue({ id: 'test-session' });
+    const onNotify = config.onNotify ?? mock();
+    const onCleanup = config.onCleanup ?? mock();
 
     const handle = startOfflineReconnection<T>({
         serverUrl: 'http://test-server',
@@ -105,7 +105,7 @@ function createAxiosError(status: number): Error & { response: { status: number 
 
 describe('startOfflineReconnection', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        mock.clearAllMocks();
     });
 
     describe('successful reconnection', () => {
@@ -114,7 +114,7 @@ describe('startOfflineReconnection', () => {
 
             await waitForReconnection(handle);
 
-            expect(onReconnected).toHaveBeenCalledOnce();
+            expect(onReconnected).toHaveBeenCalledTimes(1);
             expect(onNotify).toHaveBeenCalledWith('✅ Reconnected! Session syncing in background.');
             expect(handle.isReconnected()).toBe(true);
 
@@ -124,7 +124,7 @@ describe('startOfflineReconnection', () => {
         it('should return session via getSession() after reconnection', async () => {
             const mockSession = { id: 'session-123', metadata: { path: '/test' } };
             const { handle } = createTestHandle({
-                onReconnected: vi.fn().mockResolvedValue(mockSession)
+                onReconnected: mock().mockResolvedValue(mockSession)
             });
 
             expect(handle.getSession()).toBeNull(); // Before reconnection
@@ -167,14 +167,14 @@ describe('startOfflineReconnection', () => {
 
             expect(success).toBe(true);
             expect(attemptCount).toBeGreaterThanOrEqual(2);
-            expect(onReconnected).toHaveBeenCalledOnce();
+            expect(onReconnected).toHaveBeenCalledTimes(1);
 
             handle.cancel();
         }, 20000);
 
         it('should retry when onReconnected throws', async () => {
             let callCount = 0;
-            const onReconnected = vi.fn().mockImplementation(async () => {
+            const onReconnected = mock().mockImplementation(async () => {
                 callCount++;
                 if (callCount === 1) throw new Error('Session creation failed');
                 return { id: 'session' };
@@ -221,7 +221,7 @@ describe('startOfflineReconnection', () => {
             const countBeforeCancel = attemptCount;
 
             handle.cancel();
-            expect(onCleanup).toHaveBeenCalledOnce();
+            expect(onCleanup).toHaveBeenCalledTimes(1);
 
             await new Promise(resolve => setTimeout(resolve, 200));
             expect(attemptCount).toBe(countBeforeCancel);
@@ -233,7 +233,7 @@ describe('startOfflineReconnection', () => {
             });
 
             handle.cancel();
-            expect(onCleanup).toHaveBeenCalledOnce();
+            expect(onCleanup).toHaveBeenCalledTimes(1);
 
             await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -242,7 +242,7 @@ describe('startOfflineReconnection', () => {
         });
 
         it('should be safe to call cancel() multiple times', async () => {
-            const onCleanup = vi.fn();
+            const onCleanup = mock();
             const { handle } = createTestHandle({ onCleanup });
 
             handle.cancel();
@@ -409,7 +409,7 @@ describe('startOfflineReconnection', () => {
                 onReconnectedResolve = () => resolve({ id: 'session' });
             });
 
-            const onReconnected = vi.fn().mockImplementation(async () => {
+            const onReconnected = mock().mockImplementation(async () => {
                 return onReconnectedPromise;
             });
 
@@ -434,7 +434,7 @@ describe('startOfflineReconnection', () => {
 
         it('should handle empty/undefined session from onReconnected', async () => {
             const { handle } = createTestHandle({
-                onReconnected: vi.fn().mockResolvedValue(undefined)
+                onReconnected: mock().mockResolvedValue(undefined)
             });
 
             await waitForReconnection(handle);
@@ -447,7 +447,7 @@ describe('startOfflineReconnection', () => {
 
         it('should handle null session from onReconnected', async () => {
             const { handle } = createTestHandle({
-                onReconnected: vi.fn().mockResolvedValue(null)
+                onReconnected: mock().mockResolvedValue(null)
             });
 
             await waitForReconnection(handle);
@@ -475,7 +475,7 @@ describe('startOfflineReconnection', () => {
             };
 
             const { handle } = createTestHandle<CustomSession>({
-                onReconnected: vi.fn().mockResolvedValue(customSession)
+                onReconnected: mock().mockResolvedValue(customSession)
             });
 
             await waitForReconnection(handle);
@@ -492,7 +492,7 @@ describe('startOfflineReconnection', () => {
             const handle = startOfflineReconnection({
                 serverUrl: 'http://test',
                 onReconnected: async () => ({ id: 'session' }),
-                onNotify: vi.fn(),
+                onNotify: mock(),
                 healthCheck: async () => {},
                 initialDelayMs: 1
                 // onCleanup intentionally omitted
@@ -516,7 +516,7 @@ describe('printOfflineWarning', () => {
     });
 
     it('should print offline warning with unified format', () => {
-        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
         printOfflineWarning();
 
@@ -532,7 +532,7 @@ describe('printOfflineWarning', () => {
     });
 
     it('should deduplicate repeated calls', () => {
-        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        const consoleSpy = spyOn(console, 'log').mockImplementation(() => {});
 
         printOfflineWarning();
         const callCountAfterFirst = consoleSpy.mock.calls.length;
