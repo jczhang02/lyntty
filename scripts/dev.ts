@@ -311,7 +311,19 @@ async function resolveLayout(): Promise<DevLayout> {
   const canonicalRoot = await realpath(resolve(gitRootText));
   const commonGitDir = await realpath(resolve(canonicalRoot, commonDirText));
   const scriptPath = await realpath(resolve(import.meta.dir, 'dev.ts'));
-  const worktreeHash = createHash('sha256').update(canonicalRoot).digest('hex').slice(0, 16);
+  const testNamespace = process.env.LYNTTY_DEV_TEST_NAMESPACE;
+  if (testNamespace !== undefined) {
+    if (process.env.LYNTTY_DEV_ALLOW_TEST_HOOKS !== '1') {
+      throw new Error('Development test namespace requires explicit test hooks');
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(testNamespace)) {
+      throw new Error('Development test namespace is invalid');
+    }
+  }
+  const worktreeIdentity = testNamespace === undefined
+    ? canonicalRoot
+    : `${canonicalRoot}\0test:${testNamespace}`;
+  const worktreeHash = createHash('sha256').update(worktreeIdentity).digest('hex').slice(0, 16);
   const stateDir = join(canonicalRoot, 'dist', 'dev', worktreeHash);
   const homeDir = join(stateDir, 'home');
   const lynttyHomeDir = join(stateDir, 'lyntty');

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { chmod, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { chmod, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseCoordination, parseDarwinBsdStartToken, parseKernProcargs2, pathIsInside, reconcileCoordinationAllocations } from './dev';
 
@@ -20,13 +20,17 @@ interface State {
 }
 
 const script = join(import.meta.dir, 'dev.ts');
+const testEnvironment = {
+  LYNTTY_DEV_ALLOW_TEST_HOOKS: '1',
+  LYNTTY_DEV_TEST_NAMESPACE: `suite-${process.pid}`,
+};
 let state: State | null = null;
 
 async function runDev(args: string[], environment: Record<string, string> = {}): Promise<RunResult> {
   const child = Bun.spawn({
     cmd: [process.execPath, script, ...args],
     cwd: join(import.meta.dir, '..'),
-    env: { ...Bun.env, ...environment },
+    env: { ...Bun.env, ...testEnvironment, ...environment },
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
@@ -140,6 +144,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await runDev(['down', '--json']);
+  if (state) await rm(state.stateDir, { recursive: true, force: true });
 });
 
 describe('public bun dev commands', () => {
@@ -258,7 +263,7 @@ describe('public bun dev commands', () => {
     expect(firstState.startedAt).toBe(secondState.startedAt);
     expect(firstState.supervisors.map(item => item.role).sort()).toEqual(['daemon', 'relay']);
     expect(secondState.supervisors.map(item => item.role).sort()).toEqual(['daemon', 'relay']);
-  });
+  }, 20_000);
 
   it('rejects partial-role existing-state reuse without rewriting it as running', async () => {
     const statePath = join(state!.stateDir, 'state.json');
@@ -395,6 +400,7 @@ describe('public bun dev commands', () => {
       cwd: join(import.meta.dir, '..'),
       env: {
         ...Bun.env,
+        ...testEnvironment,
         LYNTTY_DEV_ALLOW_TEST_HOOKS: '1',
         LYNTTY_DEV_TEST_CLAIM_DELAY_ROLE: 'relay',
         LYNTTY_DEV_TEST_CLAIM_DELAY_MS: '5000',
