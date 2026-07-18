@@ -23,7 +23,7 @@ bun run --cwd packages/lyntty-relay test
 bun run --cwd packages/lyntty-relay standalone:dev
 ```
 
-`standalone:dev` uses `.env.dev`, runs pending PGlite migrations, and starts the API on port 3005 by default.
+`standalone:dev` uses `.env.dev`, runs pending PGlite migrations, and starts the API on port 3005 by default. With Podman available, `bun run --cwd packages/lyntty-relay test:postgres` runs the real PostgreSQL 17 migration/lease gate and `test:container` rebuilds and drills the runtime image.
 
 ## Compiled runtime
 
@@ -37,10 +37,17 @@ The output is `packages/lyntty-relay/dist/lyntty-relay`. The release artifact an
 
 ```text
 lyntty-relay migrate
+lyntty-relay doctor [--json]
+lyntty-relay backup <path> [--force]
+lyntty-relay restore <path> --force
 lyntty-relay serve
 ```
 
-PGlite deployments may run `migrate` automatically from the container entrypoint. PostgreSQL deployments must run an explicit migration job before starting the new Relay version; serving against an unapplied schema must fail closed.
+PGlite `serve` applies immutable migrations automatically. PostgreSQL deployments must run an explicit migration job before starting the new Relay version; both `doctor` and `serve` fail closed on pending, unfinished, checksum-mismatched, or contract-incompatible schemas.
+
+`backup` writes a private atomic PGlite data-directory tarball or a PostgreSQL custom-format dump plus a SHA-256 sidecar. `restore` requires that sidecar and explicit `--force`; PGlite swaps back to the old data directory if import fails, while PostgreSQL uses `pg_restore --single-transaction --exit-on-error`. PGlite lifecycle commands use a cross-process lease and reject backup/restore while Relay is live; stop Relay first and keep backup files outside `PGLITE_DIR`. PostgreSQL backup may run online, but restore belongs in a maintenance window and both providers require a tested restore drill.
+
+PostgreSQL tools receive credentials through libpq environment variables, never process arguments. The container includes PostgreSQL 17 client tools; `pg_dump` 17 can back up supported older servers and PostgreSQL 17.
 
 ## Storage
 
@@ -67,12 +74,16 @@ Encrypted attachments use the local filesystem by default. Setting `S3_HOST` ena
 | `S3_SECRET_KEY` | S3 only | — | S3 secret key |
 | `S3_BUCKET` | S3 only | — | Attachment bucket |
 
-`HANDY_MASTER_SECRET` is accepted only as a temporary compatibility fallback. New deployments must use `LYNTTY_MASTER_SECRET` without changing the secret value during migration.
+`HANDY_MASTER_SECRET` is accepted only while Relay schema compatibility remains at version 1. The fallback closes at the schema-2 contract boundary; new deployments must use `LYNTTY_MASTER_SECRET`, and existing operators must copy the exact same secret bytes to the canonical name rather than rotate the secret during migration.
 
 Never commit secrets, production database URLs, auth tokens, pairing URLs, or attachment authorization material.
 
 ## Deployment
 
-The production image contains the compiled Relay executable, PGlite assets, and immutable Prisma migrations. Pin deployments to a release digest and keep release publication separate from production rollout.
+The production image contains the compiled Relay executable, PGlite assets, immutable Prisma migrations, and PostgreSQL 17 backup/restore clients. It contains no Bun or Node executable. The image verification workflow builds both `linux/amd64` and `linux/arm64` without publishing.
+
+Migration jobs maintain `_lyntty_schema_compatibility`, including an attestation over the complete applied migration set. Additive future migrations remain usable by an older Relay only when the database explicitly declares a compatible minimum Relay schema and the complete-set attestation is current. Contract migrations raise that minimum, causing older binaries to fail closed. PostgreSQL serve holds a shared schema lease for its lifetime while migration jobs take the exclusive lease. This is the expand–migrate–contract rollback boundary; never edit or delete applied migration files.
+
+Pin deployments to a release digest and keep release publication separate from production rollout.
 
 See [`../../docs/deploy/relay-vps.md`](../../docs/deploy/relay-vps.md) for the operator runbook.
