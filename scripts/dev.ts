@@ -1670,19 +1670,28 @@ async function inspectOwnedProcessGroup(
       if (ownership.owned) rootChildPids.add(member.pid);
     }
   }
+  const provenMembers: ProcessGroupMember[] = [];
   for (const member of members) {
+    const discoveredChildOwnership = childOwnershipByPid.get(member.pid);
     const ownership = member.pid === record.pid
       ? await supervisorOwnership(layout, state, record)
-      : rootChildPids.has(member.pid)
-        ? childOwnershipByPid.get(member.pid) ?? await childOwnership(layout, state, record, member.pid)
-        : hasOwnedChildAncestor(member, rootChildPids, membersByPid)
-          ? await descendantOwnership(layout, state, record, member.pid)
-          : { pid: member.pid, role: record.role, alive: true, owned: false, reason: 'unrelated-process-group-member' };
+      : discoveredChildOwnership && !discoveredChildOwnership.alive
+        ? discoveredChildOwnership
+        : rootChildPids.has(member.pid)
+          ? discoveredChildOwnership ?? await childOwnership(layout, state, record, member.pid)
+          : hasOwnedChildAncestor(member, rootChildPids, membersByPid)
+            ? await descendantOwnership(layout, state, record, member.pid)
+            : { pid: member.pid, role: record.role, alive: true, owned: false, reason: 'unrelated-process-group-member' };
+    // A member may exit between the process-group snapshot and identity proof.
+    // It no longer needs a signal and must not turn a clean shutdown race into
+    // an ownership failure. Every member still alive remains fail closed.
+    if (!ownership.alive) continue;
     if (!ownership.owned) {
       throw new Error(`Refusing to signal process group ${pgid}: PID ${member.pid} (${record.role}) ownership not proven (${ownership.reason ?? 'unknown'})`);
     }
+    provenMembers.push(member);
   }
-  return { pgid, members };
+  return { pgid, members: provenMembers };
 }
 
 async function inspectOwnedProcessGroups(layout: DevLayout, state: DevState): Promise<OwnedProcessGroup[]> {

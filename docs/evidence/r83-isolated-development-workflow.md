@@ -44,6 +44,8 @@ Results:
 - Relay health, exactly one current authenticated machine id, current daemon child/control proof, source CLI daemon status/list, redacted evidence, shutdown, and mode-0600 sensitive files passed;
 - Bun build/syntax and diff checks passed.
 
+A post-acceptance repeat exposed one shutdown race: a child could exit between the process-group snapshot and identity proof, causing the first safe `down` to reject a member that no longer existed. The fix drops only snapshot members re-proved as no longer alive; every live member still requires exact ownership, and forced shutdown still re-enumerates and re-proves the group. The same 13-test/88-assertion suite passed after the fix.
+
 ## Simultaneous two-worktree verification
 
 Two detached worktrees were created under the repository's required `worktrees/` directory. Each received its own `node_modules` and Bun cache. No dependencies, native output, PGlite directory, HOME, or `LYNTTY_HOME_DIR` were shared.
@@ -83,3 +85,5 @@ The Linux ownership path ran locally. The exact Darwin parser has a synthetic NU
 ## Review
 
 Independent final process-isolation/safety re-review after provisional allocation, lifecycle locking, whole-group shutdown, durable atomic launch claims/receipts, current-daemon readiness, Android ownership retention, and exact Darwin identity fixes: `APPROVE — no P0/P1/P2 isolated-development blockers.`
+
+Focused re-review of the post-acceptance snapshot/exit race fix confirmed that vanished members cannot be signalled, live unowned members still fail closed, tracked groups remain monitored, and SIGKILL still requires fresh whole-group proof: `APPROVE — no P0/P1/P2 shutdown-race blockers.`
