@@ -5,5 +5,5 @@ import type { Metadata } from './storageTypes';
  * Flavorless and non-Pi rows remain encrypted-history compatibility only.
  */
 export function canControlSession(metadata: Pick<Metadata, 'flavor'> | null | undefined): boolean {
-    return metadata?.flavor?.trim().toLowerCase() === 'pi';
+    return metadata?.flavor === 'pi';
 }
