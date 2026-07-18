@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { cp, link, lstat, mkdir, readFile, readlink, rename, rm, symlink } from 'node:fs/promises';
+import { cp, lstat, mkdir, readFile, readlink, rename, rm, symlink } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import type { DaemonServiceManager, DaemonServiceState } from '@/daemon/service';
@@ -87,7 +87,9 @@ async function readOptionalFile(path: string): Promise<Buffer | null> {
 }
 
 async function restoreClaimedSymlink(claimedPath: string, path: string): Promise<void> {
-  if (await pathKind(path) === 'missing') await link(claimedPath, path);
+  if (await pathKind(path) !== 'missing') return;
+  if (await pathKind(claimedPath) !== 'symlink') throw new Error(`Claimed path is not a symlink: ${claimedPath}`);
+  await symlink(await readlink(claimedPath), path, 'dir');
 }
 
 async function replaceOwnedSymlink(path: string, target: string, allowedExistingTargets: readonly string[]): Promise<void> {
@@ -98,7 +100,6 @@ async function replaceOwnedSymlink(path: string, target: string, allowedExisting
 
   const transactionId = randomUUID();
   const claimedPath = join(dirname(path), `.${basename(path)}.${transactionId}.claimed`);
-  const temporaryPath = join(dirname(path), `.${basename(path)}.${transactionId}.tmp`);
   let claimed = false;
   if (kind === 'symlink') {
     await rename(path, claimedPath);
@@ -113,13 +114,14 @@ async function replaceOwnedSymlink(path: string, target: string, allowedExisting
   }
 
   try {
-    await symlink(target, temporaryPath, 'dir');
-    await link(temporaryPath, path);
+    // symlink(2) publishes directly with O_EXCL-style no-clobber semantics on
+    // both Linux and macOS. Hard-linking a temporary symlink is not portable:
+    // Darwin rejects link(2) on symbolic links with EPERM.
+    await symlink(target, path, 'dir');
   } catch (error) {
     if (claimed) await restoreClaimedSymlink(claimedPath, path).catch(() => undefined);
     throw new Error(`Failed to publish owned symlink ${path} without clobbering: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
-    await rm(temporaryPath, { force: true });
     if (claimed) await rm(claimedPath, { force: true });
   }
 }
