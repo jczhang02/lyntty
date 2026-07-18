@@ -6,16 +6,17 @@ Branch: `refactor/bun-migration`
 
 Bead: `lyntty-6o0.9`
 
-Integration HEAD before this evidence commit: `2a952a1110f4da96a7fa2717dbecc2f46ca70c6a`
+Initial local integration HEAD: `2a952a1110f4da96a7fa2717dbecc2f46ca70c6a`
+PR-remediation HEAD before this evidence update: `7a2e095b019596e68f197739c1c9ecf53ddd2811`
 Android application source verification HEAD: `e63a93f66d89b2372da9e24562d47c44b84bef3c`
 
 ## Result
 
-**LOCAL PASS; PROTECTED-PR GATE PENDING.**
+**LOCAL PASS; PROTECTED PR #14 OPEN.**
 
-The isolated branch satisfies the locally executable Bun-only migration gates. The post-review-fix source passed a frozen install, lifecycle/dependency audits, all four package suites, compiled CLI/daemon/Relay integration, isolated developer lifecycle tests, and a clean current-source release-style Android build under a Node-family execution audit. All 27 migration commits through the integration HEAD have valid GPG signatures.
+The isolated branch satisfies the locally executable Bun-only migration gates. The post-review-fix source passed a frozen install, lifecycle/dependency audits, all four package suites, compiled CLI/daemon/Relay integration, isolated developer lifecycle tests, and a clean current-source release-style Android build under a Node-family execution audit. All 35 migration commits through the PR-remediation HEAD have valid GPG signatures.
 
-This document does not claim a Stable release, production deployment, permanent Android signing, macOS notarization, Windows Authenticode, physical-phone run, or production-data migration. The branch must still pass the protected GitHub PR checks before merge.
+Protected PR #14 produced an all-green required matrix on head `76ed6ec`; a final current-head recheck is required after the claim-preservation and evidence commits. This document does not claim a Stable release, production deployment, permanent Android signing, macOS notarization, Windows Authenticode, physical-phone run, or production-data migration.
 
 ## Definition-of-Done audit
 
@@ -24,7 +25,7 @@ This document does not claim a Stable release, production deployment, permanent 
 | 1 | Bun is pinned and only App, CLI, Relay, and Wire remain active workspaces. | `.bun-version`, root `packageManager`, root `workspaces`; removal audit found no Codium, standalone agent/app-logs, Tauri, EAS, pnpm lock/workspace, or old release scripts. | Pass |
 | 2 | Frozen install and lifecycle trust are deterministic. | `bun install --frozen-lockfile` changed no lockfile; `bun pm untrusted` reported 0. | Pass |
 | 3 | Project/user paths do not require Node/npm/pnpm/npx/tsx. | Active package-script scan found no Node-family command. Compiled CLI/daemon/Relay sentinels passed. Current Android `strace` found 0 Node-family `execve` and 0 sentinel invocation. | Pass |
-| 4 | Tests use Bun and all active packages pass. | Wire 33; CLI 582; Relay 119; App 791; developer lifecycle 13; all failed 0. Typechecks/builds passed. | Pass |
+| 4 | Tests use Bun and all active packages pass. | Wire 33; CLI 584; Relay 119; App 791; developer lifecycle 13; all failed 0. Typechecks/builds passed. | Pass |
 | 5 | Product is Android-first and Pi-only with legacy product surfaces removed. | `docs/evidence/r77-bun-app-product-boundary.md`, `docs/evidence/r78-bun-native-tests-api-boundary.md`; current removed-surface/workspace audit. | Pass |
 | 6 | `lyntty` and `lynttyd` are runtime-free compiled artifacts. | `docs/evidence/r79-cli-artifact-service-update.md`; current `ci:daemon-integration` rebuilt both executables and exercised them against a compiled isolated Relay. | Pass |
 | 7 | Installer, native user service, update, interrupted recovery, and rollback are fail-closed. | R79 artifact/service/update tests and evidence; retained five-target manifests and exact self-check inventories. | Pass; native signatures remain external |
@@ -33,10 +34,10 @@ This document does not claim a Stable release, production deployment, permanent 
 | 10 | Android shared-control/recovery acceptance remains covered. | R81 guarded Maestro 01–10 passed first run, pairing, shared control, reconnect, daemon replay, recovered reply, reload ownership, `history_gap`, full update, and bad digest. R84 reran a signed Preview Wire/account smoke after Wire/BOM changes; the later control-policy change only narrows malformed identity and has direct test coverage. | Pass on isolated emulator; no physical phone claimed |
 | 11 | Component SemVer, Wire capabilities, signed BOM, compatibility history, and replay protection exist. | `docs/evidence/r82-compatibility-release-system.md`; current Wire suite and compiled daemon integration passed. | Pass; R82 fixture key is not a release key |
 | 12 | Stable/Preview publication, SBOM/provenance, immutable GHCR promotion, rollback, and Relay deploy are protected and isolated. | R82 workflows/evidence; post-review hardening binds native manifests to clean exact source commits and adds required PR lifecycle/release/platform gates. Workflow hardening, YAML parsing, Bash syntax, and ShellCheck passed. | Implementation pass; real promotion/deploy external |
-| 13 | Two worktrees can run isolated development safely. | `docs/evidence/r83-isolated-development-workflow.md`; current 13-test suite includes concurrent lifecycle, port lease, durable receipt recovery, whole-group ownership, and shutdown-race coverage. | Pass locally; macOS PR matrix pending |
+| 13 | Two worktrees can run isolated development safely. | `docs/evidence/r83-isolated-development-workflow.md`; current 13-test suite includes concurrent lifecycle, port lease, durable receipt recovery, whole-group ownership, and shutdown-race coverage. Protected Linux and macOS jobs passed. | Pass |
 | 14 | Documentation/evidence are current and redact auth/signing material. | R76–R84 evidence, current READMEs/release/deploy/development docs; evidence-redaction suite passed. | Pass |
-| 15 | Changes are signed and independently reviewed with no unresolved P0/P1. | Phase reviews are recorded in R76–R83. First whole-branch Standards/Spec review found exact-Pi identity, test isolation, provenance, PR trust/release tests, and supported-platform smoke gaps; all have implementation fixes. Replacement verdicts are pending. | Pending final re-review |
-| 16 | Integration occurs only through a protected PR with required CI. | GitHub `main` ruleset is active and requires PR, linear history, signed commits, and status checks. Branch is not merged or directly pushed to `main`. | Pending protected PR |
+| 15 | Changes are signed and independently reviewed with no unresolved P0/P1/P2. | Phase reviews are recorded in R76–R83. Whole-branch and PR-gate findings were fixed; final focused Standards, Spec, and PR-gate reviews all approved with no P0/P1/P2 blocker. | Pass |
+| 16 | Integration occurs only through a protected PR with required CI. | GitHub `main` ruleset is active and requires PR, linear history, signed commits, and 12 named status checks. PR #14 is open; all required checks passed on `76ed6ec`, and merge remains conditional on the final current-head rerun. | Pending final rerun and merge |
 
 ## Latest local gates
 
@@ -61,7 +62,7 @@ Results:
 - dependency audit: no vulnerabilities;
 - repository hardening/redaction: 16 passed;
 - Wire: build passed, 33 tests passed across 5 files;
-- CLI: typecheck/build passed, 583 tests passed across 72 files;
+- CLI: typecheck/build passed, 584 tests passed across 72 files;
 - compiled CLI/daemon integration: passed against an isolated compiled Relay with forbidden-runtime sentinels;
 - Relay: typecheck/build passed, compiled lifecycle smoke passed, 119 tests passed across 19 files;
 - App: typecheck/i18n/Expo introspection passed, 791 tests and 3,183 assertions passed across 87 files;
@@ -103,6 +104,17 @@ Final focused verdicts:
 
 - `APPROVE — no P0/P1/P2 standards blockers.`
 - `APPROVE — no P0/P1/P2 spec blockers.`
+- `APPROVE — no P0/P1/P2 PR-gate blockers.`
+
+## Protected PR evidence
+
+PR [#14](https://github.com/jczhang02/lyntty/pull/14) exercised the branch under active ruleset `18673628`. The first complete all-green required head was `76ed6ec81cbddac4dc64b8ca138a2bcde648c73c`:
+
+- Lyntty CI run `29659248984`: Repo hygiene, Wire, CLI plus compiled daemon integration, Relay, App, and isolated development on Ubuntu/macOS all passed.
+- CLI Smoke Test run `29659248980`: Linux x64/arm64, macOS x64/arm64, and Windows x64 artifacts all built on matching runners and passed runtime-free self-check/build-info; Linux systemd and macOS LaunchAgent lint passed.
+- Relay image run `29659248983`: multi-platform OCI build passed without publication.
+
+Earlier protected failures exposed clean-checkout-only defects that local warm state had hidden: bundled test tools were not unpacked, App/Relay module mocks leaked between files, macOS lacked `flock`, lifecycle tests inherited Bun's five-second timeout, Darwin rejected hard-linking a symlink, the artifact smoke pre-created state it expected absent, and `AGENTS.md`/`agents.md` collided on case-insensitive hosts. Each mechanism received a source fix and reran green. A final P2 review then found that simultaneous pointer publication/restoration failure could discard the claimed old symlink; `7a2e095` preserves and reports that claim, with a 9/9 fault-injection suite and focused approval. The same required checks must rerun on the final documentation head before merge.
 
 ## External and protected gates
 
@@ -117,4 +129,4 @@ The following are deliberately not claimed locally:
 
 These gates remain enforced by protected workflows and environments. Missing credentials or authorization must fail closed and must not be replaced by local fixture evidence.
 
-Before opening the protected PR, active ruleset `18673628` was updated to remove the deleted `lyntty-agent` check and require Repo hygiene, all four active package checks, Linux/macOS isolated-development checks, and all five supported CLI artifact-smoke contexts. The PR results remain external evidence and are not claimed here.
+Before opening the protected PR, active ruleset `18673628` was updated to remove the deleted `lyntty-agent` check and require Repo hygiene, all four active package checks, Linux/macOS isolated-development checks, and all five supported CLI artifact-smoke contexts. No check was bypassed.
