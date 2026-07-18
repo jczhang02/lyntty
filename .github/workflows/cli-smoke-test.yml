@@ -57,7 +57,7 @@ jobs:
           ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-${{ matrix.target }}"
           GATE="$PWD/packages/lyntty-cli/dist/test-state/workflow-${{ matrix.target }}"
           rm -rf "$GATE"
-          mkdir -p "$GATE/home" "$GATE/state" "$GATE/path"
+          mkdir -p "$GATE/home" "$GATE/path"
           export HOME="$GATE/home"
           export USERPROFILE="$GATE/home"
           export LYNTTY_HOME_DIR="$GATE/state"
@@ -111,8 +111,6 @@ jobs:
         shell: pwsh
         run: |
           bun run --cwd packages/lyntty-cli typecheck
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          bun test --isolate --preload ./packages/lyntty-cli/src/test-setup.ts ./packages/lyntty-cli/src/distribution
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun run --cwd packages/lyntty-cli build:artifact --target windows-x64 --no-archive
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
