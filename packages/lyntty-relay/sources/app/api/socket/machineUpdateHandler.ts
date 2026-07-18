@@ -1,6 +1,7 @@
 import { getMetricsLabelsFromSocket, machineAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
-import { buildMachineActivityEphemeral, buildUpdateMachineUpdate, eventRouter } from "@/app/events/eventRouter";
+import { buildMachineActivityEphemeral, eventRouter } from "@/app/events/eventRouter";
+import { buildUpdateMachineUpdate } from "@/app/events/machineUpdates";
 import { log } from "@/utils/log";
 import { db } from "@/storage/db";
 import { Socket } from "socket.io";

@@ -1,0 +1,4 @@
+Command: APP_ENV=production LYNTTY_EXPO_PROJECT_ID=<valid configured UUID> ./gradlew :app:validateSigningRelease --no-daemon (with all LYNTTY_ANDROID_KEY* variables unset and the same isolated HOME/Gradle/PATH gate)
+Exit status: 1
+Expected configuration error: Production release builds require Lyntty release signing properties
+Result: production release cannot fall back to the preview signer; Expo project identity validation passed first.

@@ -1,5 +1,4 @@
 import 'react-native-quick-base64';
-import '../theme.css';
 import * as React from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Fonts from 'expo-font';
@@ -17,7 +16,6 @@ import sodium from '@/encryption/libsodium.lib';
 import { View, Platform, AppState } from 'react-native';
 import { ModalProvider } from '@/modal';
 import { syncRestore } from '@/sync/sync';
-import { CommandPaletteProvider } from '@/components/CommandPalette/CommandPaletteProvider';
 import { StatusBarProvider } from '@/components/StatusBarProvider';
 // import * as SystemUI from 'expo-system-ui';
 import { initConsoleLogging, setConsoleOutputEnabled } from '@/utils/consoleLogging';
@@ -26,7 +24,6 @@ import { useUnistyles } from 'react-native-unistyles';
 import { AsyncLock } from '@/utils/lock';
 import { getSessionRouteFromNotificationResponse } from '@/utils/notificationRouting';
 import { navigateToSession } from '@/hooks/useNavigateToSession';
-import { BrowserNavigationShortcuts } from '@/hooks/useBrowserNavigationShortcuts';
 
 // Configure notification handler — suppress push display when app is in foreground
 Notifications.setNotificationHandler({
@@ -108,79 +105,22 @@ async function loadFonts() {
             return;
         }
         loaded = true;
-        // Check if running in Tauri
-        const isTauri = Platform.OS === 'web' &&
-            typeof window !== 'undefined' &&
-            (window as any).__TAURI_INTERNALS__ !== undefined;
-
-        if (!isTauri) {
-            // Normal font loading for non-Tauri environments (native and regular web)
-            await Fonts.loadAsync({
-                // Keep existing font
-                SpaceMono: require('@/assets/fonts/SpaceMono-Regular.ttf'),
-
-                // IBM Plex Sans family
-                'IBMPlexSans-Regular': require('@/assets/fonts/IBMPlexSans-Regular.ttf'),
-                'IBMPlexSans-Italic': require('@/assets/fonts/IBMPlexSans-Italic.ttf'),
-                'IBMPlexSans-SemiBold': require('@/assets/fonts/IBMPlexSans-SemiBold.ttf'),
-
-                // IBM Plex Mono family
-                'IBMPlexMono-Regular': require('@/assets/fonts/IBMPlexMono-Regular.ttf'),
-                'IBMPlexMono-Italic': require('@/assets/fonts/IBMPlexMono-Italic.ttf'),
-                'IBMPlexMono-SemiBold': require('@/assets/fonts/IBMPlexMono-SemiBold.ttf'),
-
-                // Anthropic-leaning editorial typography
-                'SourceSerif4-Regular': require('@/assets/fonts/SourceSerif4-Regular.ttf'),
-                'SourceSerif4-SemiBold': require('@/assets/fonts/SourceSerif4-Semibold.ttf'),
-                'SourceSans3-Regular': require('@/assets/fonts/SourceSans3-Regular.ttf'),
-                'SourceSans3-SemiBold': require('@/assets/fonts/SourceSans3-Semibold.ttf'),
-
-                // Chinese session prose font: LXGW Neo ZhiSong (IPA Font License 1.0)
-                'LXGWNeoZhiSong-Regular': require('@/assets/fonts/LXGWNeoZhiSong-Regular.ttf'),
-
-                // Bricolage Grotesque
-                'BricolageGrotesque-Bold': require('@/assets/fonts/BricolageGrotesque-Bold.ttf'),
-
-                ...FontAwesome.font,
-            });
-        } else {
-            // For Tauri, skip Font Face Observer as fonts are loaded via CSS
-            console.log('Do not wait for fonts to load');
-            (async () => {
-                try {
-                    await Fonts.loadAsync({
-                        // Keep existing font
-                        SpaceMono: require('@/assets/fonts/SpaceMono-Regular.ttf'),
-
-                        // IBM Plex Sans family
-                        'IBMPlexSans-Regular': require('@/assets/fonts/IBMPlexSans-Regular.ttf'),
-                        'IBMPlexSans-Italic': require('@/assets/fonts/IBMPlexSans-Italic.ttf'),
-                        'IBMPlexSans-SemiBold': require('@/assets/fonts/IBMPlexSans-SemiBold.ttf'),
-
-                        // IBM Plex Mono family
-                        'IBMPlexMono-Regular': require('@/assets/fonts/IBMPlexMono-Regular.ttf'),
-                        'IBMPlexMono-Italic': require('@/assets/fonts/IBMPlexMono-Italic.ttf'),
-                        'IBMPlexMono-SemiBold': require('@/assets/fonts/IBMPlexMono-SemiBold.ttf'),
-
-                        // Anthropic-leaning editorial typography
-                        'SourceSerif4-Regular': require('@/assets/fonts/SourceSerif4-Regular.ttf'),
-                        'SourceSerif4-SemiBold': require('@/assets/fonts/SourceSerif4-Semibold.ttf'),
-                        'SourceSans3-Regular': require('@/assets/fonts/SourceSans3-Regular.ttf'),
-                        'SourceSans3-SemiBold': require('@/assets/fonts/SourceSans3-Semibold.ttf'),
-
-                        // Chinese session prose font: LXGW Neo ZhiSong (IPA Font License 1.0)
-                        'LXGWNeoZhiSong-Regular': require('@/assets/fonts/LXGWNeoZhiSong-Regular.ttf'),
-
-                        // Bricolage Grotesque
-                        'BricolageGrotesque-Bold': require('@/assets/fonts/BricolageGrotesque-Bold.ttf'),
-
-                        ...FontAwesome.font,
-                    });
-                } catch (e) {
-                    // Ignore
-                }
-            })();
-        }
+        await Fonts.loadAsync({
+            SpaceMono: require('@/assets/fonts/SpaceMono-Regular.ttf'),
+            'IBMPlexSans-Regular': require('@/assets/fonts/IBMPlexSans-Regular.ttf'),
+            'IBMPlexSans-Italic': require('@/assets/fonts/IBMPlexSans-Italic.ttf'),
+            'IBMPlexSans-SemiBold': require('@/assets/fonts/IBMPlexSans-SemiBold.ttf'),
+            'IBMPlexMono-Regular': require('@/assets/fonts/IBMPlexMono-Regular.ttf'),
+            'IBMPlexMono-Italic': require('@/assets/fonts/IBMPlexMono-Italic.ttf'),
+            'IBMPlexMono-SemiBold': require('@/assets/fonts/IBMPlexMono-SemiBold.ttf'),
+            'SourceSerif4-Regular': require('@/assets/fonts/SourceSerif4-Regular.ttf'),
+            'SourceSerif4-SemiBold': require('@/assets/fonts/SourceSerif4-Semibold.ttf'),
+            'SourceSans3-Regular': require('@/assets/fonts/SourceSans3-Regular.ttf'),
+            'SourceSans3-SemiBold': require('@/assets/fonts/SourceSans3-Semibold.ttf'),
+            'LXGWNeoZhiSong-Regular': require('@/assets/fonts/LXGWNeoZhiSong-Regular.ttf'),
+            'BricolageGrotesque-Bold': require('@/assets/fonts/BricolageGrotesque-Bold.ttf'),
+            ...FontAwesome.font,
+        });
     });
 }
 
@@ -191,21 +131,6 @@ function getDevEnvironmentCredentials(): AuthCredentials | null {
 
     const token = process.env.EXPO_PUBLIC_DEV_TOKEN;
     const secret = process.env.EXPO_PUBLIC_DEV_SECRET;
-    if (!token || !secret) {
-        return null;
-    }
-
-    return { token, secret };
-}
-
-function getDevWebQueryCredentials(): AuthCredentials | null {
-    if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') {
-        return null;
-    }
-
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('dev_token');
-    const secret = params.get('dev_secret');
     if (!token || !secret) {
         return null;
     }
@@ -246,7 +171,7 @@ export default function RootLayout() {
                 await sodium.ready;
 
                 let credentials = await TokenStorage.getCredentials();
-                const devCredentials = getDevWebQueryCredentials() ?? getDevEnvironmentCredentials();
+                const devCredentials = getDevEnvironmentCredentials();
 
                 if (devCredentials) {
                     const credentialsChanged = credentials?.token !== devCredentials.token
@@ -259,9 +184,6 @@ export default function RootLayout() {
                         }
                     }
 
-                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                        window.history.replaceState({}, '', window.location.pathname);
-                    }
                 }
 
                 if (credentials) {
@@ -390,12 +312,9 @@ export default function RootLayout() {
                         <ThemeProvider value={navigationTheme}>
                             <StatusBarProvider />
                             <ModalProvider>
-                                <BrowserNavigationShortcuts />
-                                <CommandPaletteProvider>
-                                    <HorizontalSafeAreaWrapper>
-                                        <SidebarNavigator />
-                                    </HorizontalSafeAreaWrapper>
-                                </CommandPaletteProvider>
+                                <HorizontalSafeAreaWrapper>
+                                    <SidebarNavigator />
+                                </HorizontalSafeAreaWrapper>
                             </ModalProvider>
                         </ThemeProvider>
                     </AuthProvider>

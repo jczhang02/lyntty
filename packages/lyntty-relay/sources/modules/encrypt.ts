@@ -1,10 +1,11 @@
 import { KeyTree, crypto } from "privacy-kit";
+import { resolveMasterSecret } from "@/masterSecret";
 
 let keyTree: KeyTree | null = null;
 
 export async function initEncrypt() {
     keyTree = new KeyTree(await crypto.deriveSecureKey({
-        key: process.env.HANDY_MASTER_SECRET!,
+        key: resolveMasterSecret(),
         usage: 'lyntty-relay-tokens'
     }));
 }

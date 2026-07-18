@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, spyOn, jest } from 'bun:test';
 import type { Metadata } from '@/api/types';
 
 import {
@@ -78,7 +78,7 @@ describe('PiCompletionNotificationTracker', () => {
 
 describe('sendPiDoneNotification', () => {
   it('uses existing done notification copy and Pi routing data', () => {
-    const sendSessionNotification = vi.fn();
+    const sendSessionNotification = mock();
     const metadata = makeMetadata({ name: 'Pi session' });
 
     sendPiDoneNotification(

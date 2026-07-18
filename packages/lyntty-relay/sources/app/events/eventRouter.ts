@@ -1,8 +1,5 @@
 import { Server, Socket } from "socket.io";
 import { log } from "@/utils/log";
-import { GitHubProfile } from "@/app/api/types";
-import { AccountProfile } from "@/types";
-import { getPublicUrl } from "@/storage/files";
 import type { SessionMessageContent } from "lyntty-wire";
 
 // === CONNECTION TYPES ===
@@ -84,7 +81,6 @@ export type UpdateEvent = {
         value: string | null;
         version: number;
     } | null | undefined;
-    github?: GitHubProfile | null | undefined;
 } | {
     type: 'new-machine';
     machineId: string;
@@ -114,51 +110,8 @@ export type UpdateEvent = {
     type: 'delete-machine';
     machineId: string;
 } | {
-    type: 'new-artifact';
-    artifactId: string;
-    seq: number;
-    header: string;
-    headerVersion: number;
-    body: string;
-    bodyVersion: number;
-    dataEncryptionKey: string | null;
-    createdAt: number;
-    updatedAt: number;
-} | {
-    type: 'update-artifact';
-    artifactId: string;
-    header?: {
-        value: string;
-        version: number;
-    };
-    body?: {
-        value: string;
-        version: number;
-    };
-} | {
-    type: 'delete-artifact';
-    artifactId: string;
-} | {
     type: 'delete-session';
     sessionId: string;
-} | {
-    type: 'relationship-updated';
-    uid: string;
-    status: 'none' | 'requested' | 'pending' | 'friend' | 'rejected';
-    timestamp: number;
-} | {
-    type: 'new-feed-post';
-    id: string;
-    body: any;
-    cursor: string;
-    createdAt: number;
-} | {
-    type: 'kv-batch-update';
-    changes: Array<{
-        key: string;
-        value: string | null; // null indicates deletion
-        version: number; // -1 for deleted keys
-    }>;
 };
 
 // === EPHEMERAL EVENT TYPES (Transient) ===
@@ -174,13 +127,6 @@ export type EphemeralEvent = {
     id: string;
     active: boolean;
     activeAt: number;
-} | {
-    type: 'usage';
-    id: string;
-    key: string;
-    tokens: Record<string, number>;
-    cost: Record<string, number>;
-    timestamp: number;
 } | {
     type: 'machine-status';
     machineId: string;
@@ -435,75 +381,19 @@ export function buildDeleteSessionUpdate(sessionId: string, updateSeq: number, u
     };
 }
 
-export function buildUpdateAccountUpdate(userId: string, profile: Partial<AccountProfile>, updateSeq: number, updateId: string): UpdatePayload {
+export function buildUpdateAccountUpdate(
+    userId: string,
+    account: Pick<Extract<UpdateEvent, { type: 'update-account' }>, 'settings'>,
+    updateSeq: number,
+    updateId: string,
+): UpdatePayload {
     return {
         id: updateId,
         seq: updateSeq,
         body: {
             t: 'update-account',
             id: userId,
-            ...profile,
-            avatar: profile.avatar ? { ...profile.avatar, url: getPublicUrl(profile.avatar.path) } : undefined
-        },
-        createdAt: Date.now()
-    };
-}
-
-export function buildNewMachineUpdate(machine: {
-    id: string;
-    seq: number;
-    metadata: string;
-    metadataVersion: number;
-    daemonState: string | null;
-    daemonStateVersion: number;
-    dataEncryptionKey: Uint8Array | null;
-    active: boolean;
-    lastActiveAt: Date;
-    createdAt: Date;
-    updatedAt: Date;
-}, updateSeq: number, updateId: string): UpdatePayload {
-    return {
-        id: updateId,
-        seq: updateSeq,
-        body: {
-            t: 'new-machine',
-            machineId: machine.id,
-            seq: machine.seq,
-            metadata: machine.metadata,
-            metadataVersion: machine.metadataVersion,
-            daemonState: machine.daemonState,
-            daemonStateVersion: machine.daemonStateVersion,
-            dataEncryptionKey: machine.dataEncryptionKey ? Buffer.from(machine.dataEncryptionKey).toString('base64') : null,
-            active: machine.active,
-            activeAt: machine.lastActiveAt.getTime(),
-            createdAt: machine.createdAt.getTime(),
-            updatedAt: machine.updatedAt.getTime()
-        },
-        createdAt: Date.now()
-    };
-}
-
-export function buildUpdateMachineUpdate(machineId: string, updateSeq: number, updateId: string, metadata?: { value: string; version: number }, daemonState?: { value: string; version: number }): UpdatePayload {
-    return {
-        id: updateId,
-        seq: updateSeq,
-        body: {
-            t: 'update-machine',
-            machineId,
-            metadata,
-            daemonState
-        },
-        createdAt: Date.now()
-    };
-}
-
-export function buildDeleteMachineUpdate(machineId: string, updateSeq: number, updateId: string): UpdatePayload {
-    return {
-        id: updateId,
-        seq: updateSeq,
-        body: {
-            t: 'delete-machine',
-            machineId
+            ...account,
         },
         createdAt: Date.now()
     };
@@ -528,17 +418,6 @@ export function buildMachineActivityEphemeral(machineId: string, active: boolean
     };
 }
 
-export function buildUsageEphemeral(sessionId: string, key: string, tokens: Record<string, number>, cost: Record<string, number>): EphemeralPayload {
-    return {
-        type: 'usage',
-        id: sessionId,
-        key,
-        tokens,
-        cost,
-        timestamp: Date.now()
-    };
-}
-
 export function buildMachineStatusEphemeral(machineId: string, online: boolean): EphemeralPayload {
     return {
         type: 'machine-status',
@@ -549,9 +428,8 @@ export function buildMachineStatusEphemeral(machineId: string, online: boolean):
 }
 
 /**
- * Session-level lifecycle event (Claude finished, needs permission, asks question).
- * Emitted alongside the mobile push so other clients (e.g. web) can surface a
- * tab-title counter or inline indicator without parsing every encrypted message.
+ * Session-level Pi lifecycle event emitted alongside the mobile push so the
+ * Android client can update Session Remote without parsing encrypted payloads.
  */
 export function buildSessionEventEphemeral(sessionId: string, kind: 'done' | 'permission' | 'question', title: string, body: string): EphemeralPayload {
     return {
@@ -561,117 +439,5 @@ export function buildSessionEventEphemeral(sessionId: string, kind: 'done' | 'pe
         title,
         body,
         timestamp: Date.now()
-    };
-}
-
-export function buildNewArtifactUpdate(artifact: {
-    id: string;
-    seq: number;
-    header: Uint8Array;
-    headerVersion: number;
-    body: Uint8Array;
-    bodyVersion: number;
-    dataEncryptionKey: Uint8Array;
-    createdAt: Date;
-    updatedAt: Date;
-}, updateSeq: number, updateId: string): UpdatePayload {
-    return {
-        id: updateId,
-        seq: updateSeq,
-        body: {
-            t: 'new-artifact',
-            artifactId: artifact.id,
-            seq: artifact.seq,
-            header: Buffer.from(artifact.header).toString('base64'),
-            headerVersion: artifact.headerVersion,
-            body: Buffer.from(artifact.body).toString('base64'),
-            bodyVersion: artifact.bodyVersion,
-            dataEncryptionKey: Buffer.from(artifact.dataEncryptionKey).toString('base64'),
-            createdAt: artifact.createdAt.getTime(),
-            updatedAt: artifact.updatedAt.getTime()
-        },
-        createdAt: Date.now()
-    };
-}
-
-export function buildUpdateArtifactUpdate(artifactId: string, updateSeq: number, updateId: string, header?: { value: string; version: number }, body?: { value: string; version: number }): UpdatePayload {
-    return {
-        id: updateId,
-        seq: updateSeq,
-        body: {
-            t: 'update-artifact',
-            artifactId,
-            header,
-            body
-        },
-        createdAt: Date.now()
-    };
-}
-
-export function buildDeleteArtifactUpdate(artifactId: string, updateSeq: number, updateId: string): UpdatePayload {
-    return {
-        id: updateId,
-        seq: updateSeq,
-        body: {
-            t: 'delete-artifact',
-            artifactId
-        },
-        createdAt: Date.now()
-    };
-}
-
-export function buildRelationshipUpdatedEvent(
-    data: {
-        uid: string;
-        status: 'none' | 'requested' | 'pending' | 'friend' | 'rejected';
-        timestamp: number;
-    },
-    updateSeq: number,
-    updateId: string
-): UpdatePayload {
-    return {
-        id: updateId,
-        seq: updateSeq,
-        body: {
-            t: 'relationship-updated',
-            ...data
-        },
-        createdAt: Date.now()
-    };
-}
-
-export function buildNewFeedPostUpdate(feedItem: {
-    id: string;
-    body: any;
-    cursor: string;
-    createdAt: number;
-}, updateSeq: number, updateId: string): UpdatePayload {
-    return {
-        id: updateId,
-        seq: updateSeq,
-        body: {
-            t: 'new-feed-post',
-            id: feedItem.id,
-            body: feedItem.body,
-            cursor: feedItem.cursor,
-            createdAt: feedItem.createdAt
-        },
-        createdAt: Date.now()
-    };
-}
-
-export function buildKVBatchUpdateUpdate(
-    changes: Array<{ key: string; value: string | null; version: number }>,
-    updateSeq: number,
-    updateId: string
-): UpdatePayload {
-    return {
-        id: updateId,
-        seq: updateSeq,
-        body: {
-            t: 'kv-batch-update',
-            changes
-        },
-        createdAt: Date.now()
     };
 }

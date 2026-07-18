@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { createTracer, traceMessages } from './reducerTracer';
 import { NormalizedMessage } from '../typesRaw';
 

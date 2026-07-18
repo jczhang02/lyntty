@@ -1,0 +1,2 @@
+token=R81_RESTART2_PONG
+pane_occurrences=1

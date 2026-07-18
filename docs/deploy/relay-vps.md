@@ -37,9 +37,9 @@ Decisions:
 
 - Cloudflare record starts **DNS-only** (gray cloud), not proxied.
 - Caddy terminates HTTPS directly and obtains Let’s Encrypt certificates.
-- VPS runs prebuilt GHCR image; VPS does not clone repo, install Node, or build TypeScript.
+- VPS runs the prebuilt, runtime-free GHCR image; it does not clone the repository or build source.
 - PGlite and uploaded files persist under `/opt/lyntty/data`.
-- `HANDY_MASTER_SECRET` stays on VPS and in password manager/encrypted backup, not GitHub Secrets.
+- `LYNTTY_MASTER_SECRET` stays on the VPS and in a password manager/encrypted backup, not GitHub Secrets.
 
 ## VPS prerequisites
 
@@ -61,7 +61,7 @@ sudo chmod 700 /opt/lyntty
 
 ## Secrets
 
-Generate `HANDY_MASTER_SECRET` once on VPS:
+Generate `LYNTTY_MASTER_SECRET` once on the VPS:
 
 ```bash
 openssl rand -base64 48
@@ -70,12 +70,13 @@ openssl rand -base64 48
 Write `/opt/lyntty/.env`:
 
 ```dotenv
-HANDY_MASTER_SECRET=<redacted-random-secret>
+LYNTTY_MASTER_SECRET=<redacted-random-secret>
 PUBLIC_URL=https://relay.jczhang.cc
 PORT=3005
 DATA_DIR=/data
 PGLITE_DIR=/data/pglite
-LYNTTY_RELAY_IMAGE_TAG=sha-<shortsha>
+LYNTTY_RELAY_IMAGE=ghcr.io/jczhang02/lyntty-relay@sha256:<64-hex-digest>
+LYNTTY_RELEASE_TRUST_ROOTS=<single-line-reviewed-trust-store-JSON>
 ```
 
 Permissions:
@@ -84,7 +85,7 @@ Permissions:
 sudo chmod 600 /opt/lyntty/.env
 ```
 
-Do not store `HANDY_MASTER_SECRET` in GitHub Actions. GitHub deploy workflow only needs SSH access and an image tag.
+Do not store `LYNTTY_MASTER_SECRET` in GitHub Actions. The deploy workflow needs SSH access, pinned known-host material, and a signed Stable BOM tag; it resolves the image digest from the BOM. `LYNTTY_RELEASE_TRUST_ROOTS` contains public keys and release identity pins, not private signing material. Existing Relay-schema-1 deployments using `HANDY_MASTER_SECRET` must copy the exact same secret bytes to `LYNTTY_MASTER_SECRET` before the schema-2 contract boundary; do not rotate the value during the name migration.
 
 ## Docker Compose
 
@@ -93,17 +94,17 @@ Do not store `HANDY_MASTER_SECRET` in GitHub Actions. GitHub deploy workflow onl
 ```yaml
 services:
   lyntty-relay:
-    image: ghcr.io/jczhang02/lyntty-relay:${LYNTTY_RELAY_IMAGE_TAG}
+    image: ${LYNTTY_RELAY_IMAGE}
     restart: unless-stopped
     env_file:
       - /opt/lyntty/.env
     environment:
-      NODE_ENV: production
       DATA_DIR: /data
       PGLITE_DIR: /data/pglite
       PORT: "3005"
     volumes:
       - /opt/lyntty/data:/data
+      - /opt/lyntty/backups:/backups
     ports:
       - "127.0.0.1:3005:3005"
 ```
@@ -111,10 +112,11 @@ services:
 Start:
 
 ```bash
-cd /opt/lyntty
-sudo docker compose pull
-sudo docker compose up -d
-sudo docker compose ps
+sudo docker compose --project-directory /opt/lyntty pull
+sudo docker compose --project-directory /opt/lyntty run --rm lyntty-relay migrate
+sudo docker compose --project-directory /opt/lyntty run --rm lyntty-relay doctor
+sudo docker compose --project-directory /opt/lyntty up -d
+sudo docker compose --project-directory /opt/lyntty ps
 curl -fsS http://127.0.0.1:3005/health
 ```
 
@@ -139,23 +141,9 @@ curl -fsS https://relay.jczhang.cc/health
 
 ## GitHub image build workflow design
 
-Trigger:
+`.github/workflows/relay-image.yml` verifies `linux/amd64` and `linux/arm64` images on pull requests and manual dispatch. It does not publish from an ordinary `main` push.
 
-- push to `main`
-- optional `workflow_dispatch`
-
-Output image:
-
-```text
-ghcr.io/jczhang02/lyntty-relay:sha-<shortsha>
-ghcr.io/jczhang02/lyntty-relay:main
-```
-
-Rules:
-
-- Use root `Dockerfile`.
-- `sha-<shortsha>` is production deploy target.
-- `main` is convenience/testing tag, not default production pin.
+GHCR publication belongs to an approved Compatibility BOM promotion. The release records the immutable OCI digest and signs/attests the image by digest; production deploy accepts only that signed Stable BOM and uses its exact `@sha256:` reference. Release publication and production rollout remain separate approvals.
 
 ## Manual deploy workflow design
 
@@ -163,139 +151,137 @@ Trigger: `workflow_dispatch`
 
 Inputs:
 
-- `image_tag`: required or defaulted from latest successful build metadata; recommended value `sha-<shortsha>`.
+- `bom_tag`: an exact signed Stable Compatibility release tag. Mutable image tags and raw operator-supplied digests are not accepted.
 
 GitHub Secrets:
 
 - `LYNTTY_VPS_HOST`
 - `LYNTTY_VPS_USER`
 - `LYNTTY_VPS_SSH_KEY`
+- `LYNTTY_VPS_KNOWN_HOSTS`
 
-Deployment script shape:
+Production environment variable:
+
+- `LYNTTY_RELEASE_TRUST_ROOTS` (reviewed public Stable roots and identity pins)
+
+Deployment script shape (brief maintenance window for both providers):
 
 ```bash
+sudo env IMAGE_REFERENCE="$IMAGE_REFERENCE" BOM_TAG="$BOM_TAG" bash -se <<'ROOT'
 set -euo pipefail
 cd /opt/lyntty
-sudo sed -i "s/^LYNTTY_RELAY_IMAGE_TAG=.*/LYNTTY_RELAY_IMAGE_TAG=${IMAGE_TAG}/" /opt/lyntty/.env
-sudo docker compose pull
-sudo docker compose up -d
-sudo docker compose ps
+# Workflow has already verified the BOM signature and resolved IMAGE_REFERENCE.
+docker compose stop lyntty-relay
+sed -i "s#^LYNTTY_RELAY_IMAGE=.*#LYNTTY_RELAY_IMAGE=${IMAGE_REFERENCE}#" .env
+docker compose pull lyntty-relay
+docker compose run --rm lyntty-relay backup "/backups/predeploy-${BOM_TAG}.backup"
+docker compose run --rm lyntty-relay migrate
+docker compose run --rm lyntty-relay doctor
+docker compose up -d
+docker compose ps
 curl -fsS http://127.0.0.1:3005/health
+ROOT
 curl -fsS https://relay.jczhang.cc/health
 ```
 
-Do not run `git pull`, `pnpm install`, or source builds on VPS.
+Relay holds a schema lease while serving. Stop every old Relay replica before the explicit migration job; otherwise the migration waits rather than racing an active binary. The workflow enters the root-only directory through a privileged shell, accepts only the current signed Stable head, and requires its sequence to advance `deployed-sequence.txt`. Any failure after `.migration-incomplete` is written leaves Relay stopped; retries remain blocked until an operator verifies the named backup, restores or validates schema state, runs `doctor`, and explicitly removes the marker. Preserve the pre-deploy backup and its `.sha256` sidecar until rollback is no longer required.
+
+Do not run `git pull`, package installation, or source builds on the VPS.
 
 ## Rollback
 
-Pick previous known-good sha tag:
+Run the protected `Roll back stable compatibility release` workflow with one of the two retained predecessor Stable tags and a new higher sequence. It preserves the current Android App, selects the retained CLI/Relay bytes, verifies all current-plus-two rolling combinations, signs a new BOM, and advances Stable latest without rebuilding. Then run `Deploy relay from Compatibility BOM` with that new rollback tag.
 
-```bash
-cd /opt/lyntty
-sudo sed -i 's/^LYNTTY_RELAY_IMAGE_TAG=.*/LYNTTY_RELAY_IMAGE_TAG=sha-<previous-shortsha>/' /opt/lyntty/.env
-sudo docker compose pull
-sudo docker compose up -d
-curl -fsS https://relay.jczhang.cc/health
-```
-
-Record rollback tag and reason in evidence.
+Do not directly edit the VPS to an older mutable image tag or deploy a historical signed BOM directly. The deploy workflow records the exact current-head BOM, monotonic sequence, and `@sha256:` reference. Failures before migration restore the prior image; once migration begins, any failure or cancellation leaves Relay stopped until backup/schema compatibility is explicitly verified. If the retained image's `doctor` rejects a contract migration, do not start it: restore the matching pre-deploy backup and sidecar in the maintenance window, rerun `doctor`, then start. Record the BOM, image digest, schema decision, backup identity, and rollback reason in evidence.
 
 ## Backup
 
-First version: daily encrypted local backup of `/opt/lyntty/data`.
-
-Example `/opt/lyntty/scripts/backup.sh`:
+Use the compiled backup command rather than archiving a live PGlite directory. PGlite must be quiescent:
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
+if (( EUID != 0 )); then
+  echo "backup must run as root" >&2
+  exit 1
+fi
 
-backup_root=/opt/lyntty/backups
+cd /opt/lyntty
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
-plain="${backup_root}/lyntty-data-${stamp}.tar.zst"
+plain="/opt/lyntty/backups/lyntty-pglite-${stamp}.tar.gz"
 encrypted="${plain}.age"
 
-mkdir -p "$backup_root"
-tar --zstd -cpf "$plain" -C /opt/lyntty data
+docker compose stop lyntty-relay
+trap 'docker compose start lyntty-relay >/dev/null' EXIT
+docker compose run --rm lyntty-relay \
+  backup "/backups/$(basename "$plain")"
 age -r '<age-recipient-redacted>' -o "$encrypted" "$plain"
-rm -f "$plain"
-find "$backup_root" -name 'lyntty-data-*.tar.zst.age' -mtime +30 -delete
+age -r '<age-recipient-redacted>' -o "${plain}.sha256.age" "${plain}.sha256"
+rm -f "$plain" "${plain}.sha256"
+find /opt/lyntty/backups -name 'lyntty-pglite-*.tar.gz.age' -mtime +30 -delete
+find /opt/lyntty/backups -name 'lyntty-pglite-*.tar.gz.sha256.age' -mtime +30 -delete
+docker compose start lyntty-relay
+trap - EXIT
+curl -fsS http://127.0.0.1:3005/health
 ```
 
-Permissions:
+For PostgreSQL, the same command creates a custom-format `pg_dump` and may run online. The image contains PostgreSQL 17 clients; retain and encrypt both the dump and its `.sha256` sidecar before deleting plaintext.
 
-```bash
-sudo chmod 700 /opt/lyntty/scripts/backup.sh
-```
-
-Systemd timer sketch:
-
-```ini
-# /etc/systemd/system/lyntty-backup.service
-[Unit]
-Description=Lyntty relay data backup
-
-[Service]
-Type=oneshot
-ExecStart=/opt/lyntty/scripts/backup.sh
-```
-
-```ini
-# /etc/systemd/system/lyntty-backup.timer
-[Unit]
-Description=Daily Lyntty relay data backup
-
-[Timer]
-OnCalendar=*-*-* 03:30:00 UTC
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-```
-
-Enable:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now lyntty-backup.timer
-systemctl list-timers lyntty-backup.timer
-```
+Run the script from a root-owned systemd timer. Keep the script mode `0700`, the backup directory non-public, and encryption keys outside the VPS backup set.
 
 ## Restore drill
 
-Stop relay:
+Decrypt the selected backup and recreate its checksum sidecar. Stop Relay before PGlite restore:
 
 ```bash
+sudo bash -se <<'ROOT'
+set -euo pipefail
 cd /opt/lyntty
-sudo docker compose down
-```
-
-Restore backup:
-
-```bash
-tmp=$(mktemp -d)
-age -d -i <identity-file> /opt/lyntty/backups/lyntty-data-<stamp>.tar.zst.age > "$tmp/restore.tar.zst"
-sudo rm -rf /opt/lyntty/data
-sudo tar --zstd -xpf "$tmp/restore.tar.zst" -C /opt/lyntty
-sudo chmod 700 /opt/lyntty/data
-```
-
-Start and verify:
-
-```bash
-cd /opt/lyntty
-sudo docker compose up -d
+plain=/opt/lyntty/backups/restore-pglite.tar.gz
+identity_file=/root/.config/age/keys.txt
+stamp=20260718T120000Z # replace with the selected backup timestamp
+restore_started=false
+success=false
+cleanup() {
+  rm -f "$plain" "${plain}.sha256"
+  if [[ "$success" != true ]]; then
+    if [[ "$restore_started" == true ]]; then
+      docker compose stop lyntty-relay >/dev/null || true
+      echo "Restore failed after database replacement began; Relay remains stopped." >&2
+    else
+      docker compose start lyntty-relay >/dev/null || true
+    fi
+  fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+age -d -i "$identity_file" \
+  "backups/lyntty-pglite-${stamp}.tar.gz.age" > "$plain"
+age -d -i "$identity_file" \
+  "backups/lyntty-pglite-${stamp}.tar.gz.sha256.age" > "${plain}.sha256"
+docker compose stop lyntty-relay
+restore_started=true
+docker compose run --rm lyntty-relay \
+  restore "/backups/$(basename "$plain")" --force
+docker compose run --rm lyntty-relay doctor
+docker compose start lyntty-relay
+curl -fsS http://127.0.0.1:3005/health
+success=true
+cleanup
+trap - EXIT INT TERM
+ROOT
 curl -fsS https://relay.jczhang.cc/health
 ```
+
+For PostgreSQL, `restore --force` verifies the sidecar and runs `pg_restore` with one transaction and `--exit-on-error`. Perform PostgreSQL restore only in an approved maintenance window and take a fresh backup first.
 
 ## Logs and health
 
 Common checks:
 
 ```bash
-cd /opt/lyntty
-sudo docker compose ps
-sudo docker compose logs --tail=200 lyntty-relay
+sudo docker compose --project-directory /opt/lyntty ps
+sudo docker compose --project-directory /opt/lyntty logs --tail=200 lyntty-relay
 curl -fsS http://127.0.0.1:3005/health
 curl -fsS https://relay.jczhang.cc/health
 journalctl -u caddy --since '1 hour ago'
@@ -304,15 +290,15 @@ journalctl -u caddy --since '1 hour ago'
 Health endpoint expected shape:
 
 ```json
-{"status":"ok"}
+{"status":"ok","service":"lyntty-relay"}
 ```
 
 ## Security notes
 
 - Keep SSH key restricted to deployment user and command scope where practical.
-- Keep `HANDY_MASTER_SECRET` out of GitHub and logs.
+- Keep `LYNTTY_MASTER_SECRET` out of GitHub and logs.
 - Do not paste full pairing URLs, auth tokens, public-key blobs used as auth material, request headers, or secrets into evidence.
-- Use pinned sha tags for production deploys.
+- Deploy only the current signed Stable BOM selected by the protected workflow; the resolved Relay reference must use `@sha256:...`, never a mutable or `sha-*` tag.
 - Keep Cloudflare proxy off for first version to reduce WebSocket/TLS/timeout variables.
 
 ## Acceptance
@@ -320,9 +306,9 @@ Health endpoint expected shape:
 - [x] `relay.jczhang.cc` DNS resolves to VPS.
 - [x] Caddy obtains valid HTTPS certificate.
 - [x] `https://relay.jczhang.cc/health` returns healthy.
-- [x] Container uses GHCR image pinned to `sha-9752c689c927`.
+- [ ] Protected deploy verifies the current signed Stable BOM, image signature, provenance, and SBOM before selecting an `@sha256:` reference; the new workflow has not been run with production approvals yet.
 - [x] `/opt/lyntty/data` persists across restart.
-- [x] Manual deploy can apply a pinned image tag and healthcheck.
-- [ ] Rollback to previous tag works; not exercised yet because there is no older production relay tag.
+- [ ] Protected deploy applies the signed BOM-selected digest and records its monotonic sequence; the previous manual tag deployment is bootstrap history, not formal acceptance.
+- [ ] A higher-sequence signed rollback BOM has been deployed; not exercised yet because no formal predecessor release exists.
 - [x] Daily encrypted local backup exists.
 - [ ] Restore procedure has been run at least once on copied data or maintenance window.

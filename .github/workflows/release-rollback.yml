@@ -1,0 +1,191 @@
+name: Roll back stable compatibility release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_tag:
+        description: One of the two retained predecessor stable Compatibility tags
+        required: true
+        type: string
+      sequence:
+        description: New monotonic stable sequence for the rollback BOM
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+env:
+  TARGET_TAG: ${{ inputs.target_tag }}
+  SEQUENCE: ${{ inputs.sequence }}
+  LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
+  LYNTTY_BOM_KEY_ID: ${{ vars.LYNTTY_BOM_KEY_ID }}
+
+concurrency:
+  group: compatibility-promotion-stable
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release-stable
+    steps:
+      - name: Checkout protected main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install deterministic verifier dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate retained rollback target
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          [[ "$TARGET_TAG" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
+          [[ "$SEQUENCE" =~ ^[1-9][0-9]*$ ]]
+          : "${LYNTTY_RELEASE_TRUST_ROOTS:?protected stable trust roots are required}"
+          : "${LYNTTY_BOM_KEY_ID:?protected stable key id is required}"
+          release_rows="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --jq \
+            '.[] | select(.prerelease == false and .draft == false and (.tag_name | startswith("compat-v"))) | [.published_at, .id, .tag_name] | @tsv')"
+          retained=()
+          if [[ -n "$release_rows" ]]; then
+            mapfile -t retained < <(printf '%s\n' "$release_rows" | sort -t$'\t' -k1,1r -k2,2nr | awk -F '\t' 'NR <= 3 { print $3 }')
+          fi
+          [[ "${#retained[@]}" -ge 2 ]]
+          current_tag="${retained[0]}"
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "$current_tag" ]]
+          [[ "$TARGET_TAG" != "$current_tag" ]]
+          printf '%s\n' "${retained[@]:1}" | grep -Fqx "$TARGET_TAG"
+          tag="compat-vrollback-${TARGET_TAG#compat-v}-s${SEQUENCE}"
+          [[ "$tag" =~ ^[a-z0-9][A-Za-z0-9._-]{2,127}$ ]]
+          if existing_request_release="$(gh release view "$tag" --json isDraft 2>/dev/null)"; then
+            RELEASE_JSON="$existing_request_release" bun -e 'const x=JSON.parse(process.env.RELEASE_JSON);if(!x.isDraft)throw new Error("rollback release tag is already published")'
+          else
+            test -z "$(git ls-remote --tags origin "refs/tags/$tag")"
+          fi
+          echo "current_tag=$current_tag" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$LYNTTY_RELEASE_TRUST_ROOTS" > "$RUNNER_TEMP/trust-roots.json"
+
+      - name: Download and verify current and target BOMs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_TAG: ${{ steps.release.outputs.current_tag }}
+        run: |
+          set -euo pipefail
+          for tag in "$CURRENT_TAG" "$TARGET_TAG"; do
+            dir="$RUNNER_TEMP/$tag"
+            mkdir "$dir"
+            gh release download "$tag" -p compatibility-bom.json -p compatibility-bom.sig.json -D "$dir"
+            bun --no-install scripts/release.ts verify \
+              --bom "$dir/compatibility-bom.json" --signature "$dir/compatibility-bom.sig.json" \
+              --trust-store "$RUNNER_TEMP/trust-roots.json" --channel stable > "$dir/verified.json"
+          done
+
+      - name: Assemble a new monotonic rollback BOM without rebuilding
+        env:
+          CURRENT_TAG: ${{ steps.release.outputs.current_tag }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64: ${{ secrets.LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64 }}
+        run: |
+          set -euo pipefail
+          : "${LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64:?protected stable BOM key is required}"
+          root="$RUNNER_TEMP/rollback"
+          mkdir "$root"
+          ROOT="$root" ARTIFACT_ROOT="$RUNNER_TEMP" CURRENT="$RUNNER_TEMP/$CURRENT_TAG" TARGET="$RUNNER_TEMP/$TARGET_TAG" bun - <<'BUN'
+          import { basename, relative } from 'node:path';
+          const current = await Bun.file(`${process.env.CURRENT}/compatibility-bom.json`).json();
+          const target = await Bun.file(`${process.env.TARGET}/compatibility-bom.json`).json();
+          const ref = (tag, directory, name) => ({
+            name,
+            url: `https://github.com/jczhang02/lyntty/releases/download/${tag}/${name}`,
+            localPath: relative(process.env.ARTIFACT_ROOT, `${directory}/${name}`),
+          });
+          const inventory = structuredClone(current);
+          inventory.releaseId = process.env.RELEASE_TAG;
+          inventory.sequence = Number(process.env.SEQUENCE);
+          inventory.releasedAt = (await Bun.$`git show -s --format=%cI ${process.env.GITHUB_SHA}`.text()).trim();
+          inventory.source = { repository: 'https://github.com/jczhang02/lyntty', commit: process.env.GITHUB_SHA };
+          inventory.components.app = current.components.app;
+          inventory.components.cli = target.components.cli;
+          inventory.components.relay = target.components.relay;
+          inventory.components.wire = target.components.wire;
+          inventory.predecessors = [
+            { sequence: current.sequence, bom: ref(process.env.CURRENT_TAG, process.env.CURRENT, 'compatibility-bom.json'), signature: ref(process.env.CURRENT_TAG, process.env.CURRENT, 'compatibility-bom.sig.json') },
+            { sequence: target.sequence, bom: ref(process.env.TARGET_TAG, process.env.TARGET, 'compatibility-bom.json'), signature: ref(process.env.TARGET_TAG, process.env.TARGET, 'compatibility-bom.sig.json') },
+          ];
+          await Bun.write(`${process.env.ROOT}/inventory.json`, `${JSON.stringify(inventory, null, 2)}\n`);
+          BUN
+          bun --no-install scripts/release.ts assemble --inventory "$root/inventory.json" --artifact-root "$RUNNER_TEMP" --out "$root/compatibility-bom.json"
+          current_sequence="$(bun -e 'const x=await Bun.file(process.argv[1]).json();process.stdout.write(String(x.sequence))' "$RUNNER_TEMP/$CURRENT_TAG/compatibility-bom.json")"
+          (( SEQUENCE > current_sequence ))
+          bun --no-install scripts/release.ts sign --bom "$root/compatibility-bom.json" --signature "$root/compatibility-bom.sig.json" --key-id "$LYNTTY_BOM_KEY_ID" --channel stable
+          bun --no-install scripts/release.ts verify --bom "$root/compatibility-bom.json" --signature "$root/compatibility-bom.sig.json" --trust-store "$RUNNER_TEMP/trust-roots.json" --channel stable --minimum-sequence "$((current_sequence + 1))" > "$root/bom-verification.json"
+          bun --no-install scripts/release.ts verify-history --current "$root/compatibility-bom.json" \
+            --predecessor "$RUNNER_TEMP/$CURRENT_TAG/compatibility-bom.json" \
+            --predecessor "$RUNNER_TEMP/$TARGET_TAG/compatibility-bom.json" > "$root/compatibility-matrix.json"
+          (cd "$root" && sha256sum compatibility-bom.json compatibility-bom.sig.json compatibility-matrix.json bom-verification.json > release-checksums.txt)
+
+      - name: Attest rollback BOM
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: ${{ runner.temp }}/rollback/**
+
+      - name: Resume rollback draft and publish atomically as Stable latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_TAG: ${{ steps.release.outputs.current_tag }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "$CURRENT_TAG" ]]
+          root="$RUNNER_TEMP/rollback"
+          files=("$root/compatibility-bom.json" "$root/compatibility-bom.sig.json" "$root/compatibility-matrix.json" "$root/bom-verification.json" "$root/release-checksums.txt")
+          notes="Signed monotonic rollback BOM. App remains at the current signed APK; CLI and Relay return to retained release $TARGET_TAG. No artifact was rebuilt."
+          if release_json="$(gh release view "$RELEASE_TAG" --json isDraft,targetCommitish 2>/dev/null)"; then
+            RELEASE_JSON="$release_json" bun -e '
+              const release=JSON.parse(process.env.RELEASE_JSON);
+              if (!release.isDraft || release.targetCommitish!==process.env.GITHUB_SHA) throw new Error("existing rollback release is not the exact resumable draft");
+            '
+          else
+            gh release create "$RELEASE_TAG" --draft --target "$GITHUB_SHA" \
+              --title "Lyntty stable rollback $RELEASE_TAG" --notes "$notes"
+          fi
+          existing_dir="$RUNNER_TEMP/existing-rollback-assets"; mkdir "$existing_dir"
+          mapfile -t existing < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)
+          for name in "${existing[@]}"; do
+            [[ -f "$root/$name" ]] || { echo "unexpected rollback draft asset: $name" >&2; exit 1; }
+            gh release download "$RELEASE_TAG" -p "$name" -D "$existing_dir" --clobber
+            cmp "$existing_dir/$name" "$root/$name"
+          done
+          for file in "${files[@]}"; do
+            name="$(basename "$file")"
+            printf '%s\n' "${existing[@]}" | grep -Fqx "$name" || gh release upload "$RELEASE_TAG" "$file"
+          done
+          desired_names="$(printf '%s\n' "${files[@]##*/}" | sort)"
+          published_names="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)"
+          [[ "$published_names" == "$desired_names" ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "$CURRENT_TAG" ]]
+          gh release edit "$RELEASE_TAG" --draft=false --latest
+          verify_dir="$RUNNER_TEMP/rollback-release-verify"; mkdir "$verify_dir"
+          gh release download "$RELEASE_TAG" -D "$verify_dir"
+          (cd "$verify_dir" && sha256sum -c release-checksums.txt)
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "$RELEASE_TAG" ]]

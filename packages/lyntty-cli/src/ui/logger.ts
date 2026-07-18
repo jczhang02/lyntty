@@ -1,6 +1,6 @@
 /**
  * Design decisions:
- * - Logging should be done only through file for debugging, otherwise we might disturb the claude session when in interactive mode
+ * - Logging should be done only through file for debugging, otherwise we might disturb the Pi session when in interactive mode
  * - Use info for logs that are useful to the user - this is our UI
  * - File output location: ~/.handy/logs/<date time in local timezone>.log
  */
@@ -70,7 +70,7 @@ class Logger {
     this.logToFile(`[${this.localTimezoneTimestamp()}]`, message, ...args)
 
     // NOTE: @kirill does not think its a good ideas,
-    // as it will break us using claude in interactive mode.
+    // as it will break us using Pi in interactive mode.
     // Instead simply open the debug file in a new editor window.
     //
     // Also log to console in development mode
@@ -228,7 +228,7 @@ class Logger {
         console.error('[DEV MODE ONLY THROWING] Failed to append to log file:', appendError)
         throw appendError
       }
-      // In production, fail silently to avoid disturbing Claude session
+      // In production, fail silently to avoid disturbing Pi session
     }
   }
 }

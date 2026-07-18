@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
-import { resolveActivePiSessionReuse, resolvePiActivationLock } from './activationLock';
+import { resolveActivePiSessionReuse, resolvePiActivationLock, shouldKeepWaitingForPiExtension } from './activationLock';
 import type { TrackedSession } from './types';
 
 const activePiSession = (overrides: Partial<TrackedSession> = {}): TrackedSession => ({
@@ -31,13 +31,17 @@ describe('resolveActivePiSessionReuse', () => {
   });
 });
 
+describe('shouldKeepWaitingForPiExtension', () => {
+  it('treats wait as a no-spawn choice for an existing Pi session', () => {
+    expect(shouldKeepWaitingForPiExtension('pi-session-1', 'wait')).toBe(true);
+    expect(shouldKeepWaitingForPiExtension('pi-session-1', 'stop')).toBe(false);
+    expect(shouldKeepWaitingForPiExtension(undefined, 'wait')).toBe(false);
+  });
+});
+
 describe('resolvePiActivationLock', () => {
   it('allows first Pi runtime for a directory', () => {
     expect(resolvePiActivationLock({ directory: '/repo', agent: 'pi' }, [])).toEqual({ type: 'allow' });
-  });
-
-  it('ignores non-Pi sessions in the same directory', () => {
-    expect(resolvePiActivationLock({ directory: '/repo', agent: 'pi' }, [activePiSession({ agent: 'codex' })])).toEqual({ type: 'allow' });
   });
 
   it('uses the Pi session lease before falling back to directory locks', () => {

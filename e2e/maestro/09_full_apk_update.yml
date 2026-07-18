@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: Lyntty verified full APK update preserves app data
+tags:
+  - release
+  - full-apk-update
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "App Update Available ${UPDATE_VERSION_NAME}"
+    timeout: 120000
+- tapOn: "App Update Available ${UPDATE_VERSION_NAME}"
+- extendedWaitUntil:
+    visible: "Do you want to update this app?"
+    timeout: 120000
+- tapOn: "Update"
+- extendedWaitUntil:
+    visible: "App installed."
+    timeout: 120000
+- tapOn: "Open"
+- extendedWaitUntil:
+    visible: "${HISTORY_TITLE}"
+    timeout: 120000

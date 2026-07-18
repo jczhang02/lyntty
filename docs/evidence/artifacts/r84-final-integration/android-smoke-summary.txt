@@ -1,0 +1,6 @@
+isolated_avd=lyntty_r84_api35
+device=emulator-5556
+package=dev.jczhang.lyntty.preview
+version_name=1.1.0
+version_code=910001
+maestro=passed

@@ -1,0 +1,5 @@
+application_id=dev.jczhang.lyntty
+version_name=1.0.0
+version_code=900020
+debuggable=false
+signer_sha256=13d65cbe96228136e74a7db71429ed91f30acdc7f4b00201884d165d26b83bbb

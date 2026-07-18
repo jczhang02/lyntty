@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "roots": [
+    {
+      "keyId": "stable-test-key",
+      "channel": "stable",
+      "publicKeyBase64": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "validFromSequence": 0,
+      "androidPackageId": "dev.jczhang.lyntty",
+      "androidSignerSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "relayImageRepository": "ghcr.io/jczhang02/lyntty-relay"
+    }
+  ]
+}

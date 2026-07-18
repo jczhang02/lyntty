@@ -1,0 +1,5 @@
+application_id=dev.jczhang.lyntty.preview
+version_name=1.1.0
+version_code=910002
+debuggable=false
+signer_sha256=ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c

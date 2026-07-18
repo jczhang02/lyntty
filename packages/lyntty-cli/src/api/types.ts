@@ -1,7 +1,5 @@
 import { z } from 'zod'
-import type { Update, UpdateMachineBody } from 'lyntty-wire';
-import { UsageSchema } from '@/claude/types'
-import type { SandboxConfig } from '@/persistence'
+import { WireOfferSchema, type Update, type UpdateMachineBody } from 'lyntty-wire';
 
 export {
   SessionMessageContentSchema,
@@ -21,23 +19,9 @@ export type {
 } from 'lyntty-wire';
 
 /**
- * Permission mode type - includes both Claude and Codex modes
- * Must match MessageMetaSchema.permissionMode enum values
- *
- * Claude modes: default, acceptEdits, bypassPermissions, plan
- * Codex modes: read-only, safe-yolo, yolo
- *
- * When calling Claude SDK, Codex modes are mapped at the SDK boundary:
- * - yolo → bypassPermissions
- * - safe-yolo → default
- * - read-only → default
+ * Permission modes accepted by the Pi remote-control boundary.
  */
-export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'read-only' | 'safe-yolo' | 'yolo'
-
-/**
- * Usage data type from Claude
- */
-export type Usage = z.infer<typeof UsageSchema>
+export type PermissionMode = 'default' | 'yolo'
 
 /**
  * Socket events from server to client
@@ -96,18 +80,6 @@ export interface ClientToServerEvents {
     result?: string
     error?: string
   }) => void) => void
-  'usage-report': (data: {
-    key: string
-    sessionId: string
-    tokens: {
-      total: number
-      [key: string]: number
-    }
-    cost: {
-      total: number
-      [key: string]: number
-    }
-  }) => void
 }
 
 /**
@@ -134,19 +106,16 @@ export const MachineMetadataSchema = z.object({
   homeDir: z.string(),
   lynttyHomeDir: z.string(),
   lynttyLibDir: z.string(),
+  wire: WireOfferSchema.optional(),
   cliAvailability: z.object({
-    claude: z.boolean(),
-    codex: z.boolean(),
-    gemini: z.boolean(),
-    openclaw: z.boolean(),
     pi: z.boolean(),
     detectedAt: z.number(),
   }).optional(),
   resumeSupport: z.object({
     rpcAvailable: z.boolean(),
     requiresSameMachine: z.boolean(),
-    requiresLynttyAgentAuth: z.boolean(),
-    lynttyAgentAuthenticated: z.boolean(),
+    requiresRemoteAuth: z.boolean(),
+    remoteAuthenticated: z.boolean(),
     detectedAt: z.number(),
   }).optional(),
 })
@@ -189,13 +158,8 @@ export type Machine = {
  */
 export const MessageMetaSchema = z.object({
   sentFrom: z.string().optional(), // Source identifier
-  permissionMode: z.enum(['default', 'acceptEdits', 'bypassPermissions', 'plan', 'read-only', 'safe-yolo', 'yolo']).optional(), // Permission mode for this message
+  permissionMode: z.enum(['default', 'yolo']).optional(), // Permission mode for this message
   model: z.string().nullable().optional(), // Model name for this message (null = reset)
-  fallbackModel: z.string().nullable().optional(), // Fallback model for this message (null = reset)
-  customSystemPrompt: z.string().nullable().optional(), // Custom system prompt for this message (null = reset)
-  appendSystemPrompt: z.string().nullable().optional(), // Append to system prompt for this message (null = reset)
-  allowedTools: z.array(z.string()).nullable().optional(), // Allowed tools for this message (null = reset)
-  disallowedTools: z.array(z.string()).nullable().optional(), // Disallowed tools for this message (null = reset)
   displayText: z.string().optional(),
   remoteCommandLocalKey: z.string().optional(),
   sendMobileContextToPi: z.boolean().optional(),
@@ -257,9 +221,6 @@ export const FileEventMessageSchema = z.object({
           width: z.number(),
           height: z.number(),
           // Optional — native iOS picker has no Canvas to compute thumbhash.
-          // App-side schema relaxed this in the same commit; keeping CLI in
-          // sync so the file event isn't silently rejected by Zod and the
-          // attachment never reaches Claude.
           thumbhash: z.string().optional(),
         }).optional(),
       }),
@@ -286,7 +247,7 @@ export type MessageContent = z.infer<typeof MessageContentSchema>
 
 export type Metadata = {
   /**
-   * ACP session config option value (normalized for UI metadata consumers).
+   * Pi session configuration option value (normalized for UI metadata consumers).
    */
   // `code` = protocol value ID, `value` = human label
   models?: Array<{ code: string; value: string; description?: string | null }>,
@@ -315,8 +276,6 @@ export type Metadata = {
   piRecoveryReason?: string,
   piHasHistoryGap?: boolean,
   piSynthetic?: boolean,
-  claudeSessionId?: string, // Legacy Claude Code session ID
-  codexThreadId?: string, // Legacy Codex app-server thread ID
   tools?: string[],
   slashCommands?: string[],
   mcpServers?: Array<{ name: string; status: string }>,
@@ -338,47 +297,8 @@ export type Metadata = {
   remoteCommandFailedLocalKeys?: string[],
   archivedBy?: string,
   archiveReason?: string,
-  flavor?: string
-  sandbox?: SandboxConfig | null
-  dangerouslySkipPermissions?: boolean | null
-  /** Lineage for sessions created via the fork / duplicate flow. */
-  parentSessionId?: string
-  forkedFromMessageId?: string
+  flavor?: 'pi'
 };
-
-export type AgentGoalStatus = {
-  source: 'claude' | 'codex',
-  observedAt: number,
-  sourceSessionId?: string,
-  sourceRevision?: string | number,
-} & (
-  | {
-      status: 'unavailable',
-      reason?: 'unsupported' | 'not_loaded' | 'stale' | 'malformed' | 'error' | 'unknown',
-    }
-  | {
-      status: 'inactive',
-      reason?: 'none' | 'cleared' | 'completed' | 'unknown',
-    }
-  | {
-      status: 'active',
-      sourceSessionId: string,
-      text: string,
-      capabilities?: {
-        clear?: boolean,
-        stop?: boolean,
-        edit?: boolean,
-      },
-      progress?: {
-        currentStep?: number,
-        totalSteps?: number,
-        steps?: Array<{
-          text: string,
-          status: 'pending' | 'in_progress' | 'completed',
-        }>,
-      },
-    }
-);
 
 export type AgentState = {
   controlledByUser?: boolean | null | undefined
@@ -402,5 +322,4 @@ export type AgentState = {
       allowTools?: string[]
     }
   }
-  agentGoalStatus?: AgentGoalStatus
 }

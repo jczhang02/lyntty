@@ -33,8 +33,8 @@ function shouldShowRelaySession(session: Omit<Session, 'presence'> & { presence?
     return true;
 }
 
-function resolvePiSessionTitle(record: PiMachineSessionRecord): string {
-    return record.name?.trim() || record.firstMessage?.trim() || record.piSessionId;
+function resolvePiSessionTitle(record: PiMachineSessionRecord, fallback: string): string {
+    return record.name?.trim() || record.firstMessage?.trim() || fallback;
 }
 
 function resolvePiRuntimeOwner(record: PiMachineSessionRecord): string {
@@ -74,7 +74,7 @@ function buildPiMetadata(
         machineId: machine.id,
         flavor: 'pi',
         piSessionId: record.piSessionId,
-        name: resolvePiSessionTitle(record),
+        name: resolvePiSessionTitle(record, machineMetadata?.displayName || machineMetadata?.host || 'Pi'),
         piDiscoveryState: record.state,
         piMessageCount: record.messageCount,
         piFirstMessage: record.firstMessage,

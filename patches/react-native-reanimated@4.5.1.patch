@@ -1,0 +1,40 @@
+diff --git a/android/build.gradle.kts b/android/build.gradle.kts
+index 0975509613c3ce969fb084ddebb25b444e83ddc6..92a2f9e9e99fef91613debd973f509886ea53459 100644
+--- a/android/build.gradle.kts
++++ b/android/build.gradle.kts
+@@ -11,6 +11,8 @@ plugins {
+     id("org.jetbrains.kotlin.android")
+ }
+ 
++val jsRuntimeExecutable = System.getenv("BUN_EXECUTABLE") ?: "bun"
++
+ fun safeExtGet(prop: String, fallback: Any?): Any? =
+     if (rootProject.extensions.extraProperties.has(prop)) rootProject.extensions.extraProperties.get(prop) else fallback
+ 
+@@ -32,7 +34,7 @@ fun resolveReactNativeDirectory(): File {
+     val reactNativePackage = file(
+         providers.exec {
+             workingDir(rootDir)
+-            commandLine("node", "--print", "require.resolve('react-native/package.json')")
++            commandLine(jsRuntimeExecutable, "--print", "require.resolve('react-native/package.json')")
+         }.standardOutput.asText.get().trim()
+     )
+     if (reactNativePackage.exists()) {
+@@ -260,7 +262,7 @@ androidComponents {
+ 
+ val validateReactNativeVersionResult = providers.exec {
+     workingDir(projectDir.path)
+-    commandLine("node", "./../scripts/validate-react-native-version.js", REACT_NATIVE_VERSION)
++    commandLine(jsRuntimeExecutable, "./../scripts/validate-react-native-version.js", REACT_NATIVE_VERSION)
+     isIgnoreExitValue = true
+ }
+ 
+@@ -277,7 +279,7 @@ tasks.named("preBuild") { dependsOn("assertMinimalReactNativeVersionTask") }
+ 
+ val validateWorkletsBuildResult = providers.exec {
+     workingDir(projectDir.path)
+-    commandLine("node", "./../scripts/validate-worklets-build.js")
++    commandLine(jsRuntimeExecutable, "./../scripts/validate-worklets-build.js")
+     isIgnoreExitValue = true
+ }
+ 

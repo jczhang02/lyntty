@@ -2,15 +2,12 @@
  * Offline reconnection utility for graceful server disconnection handling.
  *
  * Provides a backend-agnostic reconnection mechanism with exponential backoff
- * that works for both Claude and Codex (and future backends).
+ * for the managed Pi runtime.
  *
  * ## Requirements Satisfied
- * - REQ-1: Claude/Codex keeps working when server unreachable
  * - REQ-3: Exponential backoff reconnection attempts
  * - REQ-4: Hot reconnection without PTY exit
  * - REQ-7: Notify user when server becomes available
- * - REQ-8: DRY - single shared implementation for all backends
- * - REQ-9: Backend-transparent design via generic TSession type
  *
  * ## Key Features
  * - Exponential backoff with jitter (prevents thundering herd)
@@ -113,7 +110,7 @@ export interface OfflineReconnectionHandle<TSession> {
 
 /**
  * Starts background reconnection with exponential backoff.
- * Backend-agnostic: works for Claude, Codex, or any future backend.
+ * Works for the managed Pi runtime.
  *
  * ## Retry Behavior
  * - **Retries are UNLIMITED** - will keep trying for hours/days/weeks
@@ -293,7 +290,6 @@ export type OfflineFailure = {
 class OfflineState {
     private state: 'online' | 'offline' = 'online';
     private failures = new Map<string, OfflineFailure>(); // Dedupe by operation
-    private backend = 'Claude';
 
     /** Report failure - accumulates context, prints once on first offline transition */
     fail(failure: OfflineFailure): void {
@@ -310,9 +306,6 @@ class OfflineState {
         this.failures.clear();
     }
 
-    /** Set backend name before API calls */
-    setBackend(name: string): void { this.backend = name; }
-
     /** Check current state */
     isOffline(): boolean { return this.state === 'offline'; }
 
@@ -320,7 +313,6 @@ class OfflineState {
     reset(): void {
         this.state = 'online';
         this.failures.clear();
-        this.backend = 'Claude';
     }
 
     private print(): void {
@@ -351,7 +343,6 @@ export const connectionState = new OfflineState();
 /**
  * @deprecated Use connectionState.fail() for deduplication and context tracking
  */
-export function printOfflineWarning(backendName: string = 'Claude'): void {
-    connectionState.setBackend(backendName);
+export function printOfflineWarning(): void {
     connectionState.fail({ operation: 'Server connection' });
 }

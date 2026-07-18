@@ -13,7 +13,7 @@ import { findAllLynttyProcesses } from '@/daemon/doctor'
 import { readDaemonState } from '@/persistence'
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { projectPath } from '@/projectPath'
+import { runtimeLayout } from '@/distribution/runtimeLayout'
 import packageJson from '../../package.json'
 
 export function redactDaemonStateForDisplay(state: DaemonLocallyPersistedState): DaemonLocallyPersistedState {
@@ -42,7 +42,7 @@ export function getEnvironmentInfo(): Record<string, any> {
         serverUrl: configuration?.serverUrl,
         logsDir: configuration?.logsDir,
         processPid: process.pid,
-        nodeVersion: process.version,
+        bunVersion: process.versions.bun ?? 'unknown',
         platform: process.platform,
         arch: process.arch,
         user: process.env.USER,
@@ -198,14 +198,18 @@ export async function runDoctorCommand(): Promise<void> {
 
     // Daemon spawn diagnostics
     console.log(chalk.bold('\n🔧 Daemon Spawn Diagnostics'));
-    const projectRoot = projectPath();
-    const wrapperPath = join(projectRoot, 'bin', 'lyntty.mjs');
-    const cliEntrypoint = join(projectRoot, 'dist', 'index.mjs');
-    console.log(`Project Root: ${chalk.blue(projectRoot)}`);
-    console.log(`Wrapper Script: ${chalk.blue(wrapperPath)}`);
-    console.log(`CLI Entrypoint: ${chalk.blue(cliEntrypoint)}`);
-    console.log(`Wrapper Exists: ${existsSync(wrapperPath) ? chalk.green('✓ Yes') : chalk.red('❌ No')}`);
-    console.log(`CLI Exists: ${existsSync(cliEntrypoint) ? chalk.green('✓ Yes') : chalk.red('❌ No')}`);
+    const layout = runtimeLayout();
+    console.log(`Runtime Root: ${chalk.blue(layout.rootDir)}`);
+    console.log(`Distribution: ${layout.compiled ? chalk.green('standalone') : chalk.yellow('source development')}`);
+    if (layout.compiled) {
+        console.log(`CLI Executable: ${chalk.blue(layout.cliExecutable!)}`);
+        console.log(`Daemon Executable: ${chalk.blue(layout.daemonExecutable!)}`);
+        console.log(`Manifest Exists: ${existsSync(layout.manifestPath!) ? chalk.green('✓ Yes') : chalk.red('❌ No')}`);
+    } else {
+        const cliEntrypoint = join(layout.rootDir, 'dist', 'index.mjs');
+        console.log(`CLI Entrypoint: ${chalk.blue(cliEntrypoint)}`);
+        console.log(`CLI Exists: ${existsSync(cliEntrypoint) ? chalk.green('✓ Yes') : chalk.red('❌ No')}`);
+    }
 
     // Environment variables
     console.log(chalk.bold('\n🌍 Environment Variables'));
@@ -228,8 +232,8 @@ export async function runDoctorCommand(): Promise<void> {
 
     // Support and bug reports
     console.log(chalk.bold('\n🐛 Support & Bug Reports'));
-    console.log(`Report issues: ${chalk.blue('https://github.com/slopus/lyntty-cli/issues')}`);
-    console.log(`Documentation: ${chalk.blue('https://lyntty.engineering/')}`);
+    console.log(`Report issues: ${chalk.blue('https://github.com/jczhang02/lyntty/issues')}`);
+    console.log(`Documentation: ${chalk.blue('https://github.com/jczhang02/lyntty')}`);
 
     // ── Concise useful info last (visible without scrolling) ──
 
@@ -237,7 +241,7 @@ export async function runDoctorCommand(): Promise<void> {
     console.log(chalk.bold('\n📋 Basic Information'));
     console.log(`Lyntty CLI Version: ${chalk.green(packageJson.version)}`);
     console.log(`Platform: ${chalk.green(process.platform)} ${process.arch}`);
-    console.log(`Node.js Version: ${chalk.green(process.version)}`);
+    console.log(`Runtime: ${chalk.green(runtimeLayout().compiled ? 'standalone executable' : `Bun ${Bun.version}`)}`);
 
     // Configuration
     console.log(chalk.bold('\n⚙️  Configuration'));

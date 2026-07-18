@@ -20,9 +20,7 @@ export function SessionActionsNativeMenu({
     const {
         archiveSession,
         canArchive,
-        canCopySessionMetadata,
         canShowResume,
-        copySessionMetadata,
         openDetails,
         resumeSession,
     } = useSessionQuickActions(session, {
@@ -44,11 +42,6 @@ export function SessionActionsNativeMenu({
                 {canShowResume && (
                     <DropdownMenuItem onClick={resumeSession}>
                         <DropdownMenuItem.Text>{t('appWide.resume')}</DropdownMenuItem.Text>
-                    </DropdownMenuItem>
-                )}
-                {canCopySessionMetadata && (
-                    <DropdownMenuItem onClick={copySessionMetadata}>
-                        <DropdownMenuItem.Text>{t('sessionInfo.copyMetadata')}</DropdownMenuItem.Text>
                     </DropdownMenuItem>
                 )}
             </DropdownMenu.Items>

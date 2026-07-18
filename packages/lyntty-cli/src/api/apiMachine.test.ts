@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn, jest } from 'bun:test';
 import { ApiMachineClient } from './apiMachine';
 import type { Machine } from './types';
 import { registerCommonHandlers } from '@/modules/common/registerCommonHandlers';
@@ -11,74 +11,73 @@ const {
     mockListManagedWorktrees,
     mockRemoveManagedWorktree,
     mockGetManagedWorktreeStatus,
-} = vi.hoisted(() => ({
-    mockIo: vi.fn(),
-    mockShouldReconnect: vi.fn(() => true),
-    mockCreateManagedWorktree: vi.fn(),
-    mockListManagedWorktrees: vi.fn(),
-    mockRemoveManagedWorktree: vi.fn(),
-    mockGetManagedWorktreeStatus: vi.fn(),
-}));
+} = {
+    mockIo: mock(),
+    mockShouldReconnect: mock(() => true),
+    mockCreateManagedWorktree: mock(),
+    mockListManagedWorktrees: mock(),
+    mockRemoveManagedWorktree: mock(),
+    mockGetManagedWorktreeStatus: mock(),
+};
 
-vi.mock('socket.io-client', () => ({
+mock.module('socket.io-client', () => ({
     io: mockIo
 }));
 
-vi.mock('@/configuration', () => ({
+mock.module('@/configuration', () => ({
     configuration: {
         serverUrl: 'http://127.0.0.1:3005',
         currentCliVersion: 'test'
     }
 }));
 
-vi.mock('@/ui/logger', () => ({
+mock.module('@/ui/logger', () => ({
     logger: {
-        debug: vi.fn(),
-        debugLargeJson: vi.fn()
+        debug: mock(),
+        debugLargeJson: mock()
     }
 }));
 
-vi.mock('@/modules/common/registerCommonHandlers', () => ({
-    registerCommonHandlers: vi.fn()
+mock.module('@/modules/common/registerCommonHandlers', () => ({
+    registerCommonHandlers: mock()
 }));
 
-vi.mock('@/modules/worktree/worktreeRpc', () => ({
+mock.module('@/modules/worktree/worktreeRpc', () => ({
     createManagedWorktree: mockCreateManagedWorktree,
     listManagedWorktrees: mockListManagedWorktrees,
     removeManagedWorktree: mockRemoveManagedWorktree,
     getManagedWorktreeStatus: mockGetManagedWorktreeStatus,
 }));
 
-vi.mock('@/api/rpc/RpcHandlerManager', () => ({
+mock.module('@/api/rpc/RpcHandlerManager', () => ({
     RpcHandlerManager: class {
-        onSocketConnect = vi.fn();
-        onSocketDisconnect = vi.fn();
-        handleRequest = vi.fn(async () => '');
-        registerHandler = vi.fn();
-        unregisterHandler = vi.fn();
-        hasHandler = vi.fn(() => false);
+        onSocketConnect = mock();
+        onSocketDisconnect = mock();
+        handleRequest = mock(async () => '');
+        registerHandler = mock();
+        unregisterHandler = mock();
+        hasHandler = mock(() => false);
     }
 }));
 
-vi.mock('@/utils/detectCLI', () => ({
-    detectCLIAvailability: vi.fn(() => ({
-        claude: false,
-        codex: false,
-        gemini: false,
-        openclaw: false
+mock.module('@/utils/detectCLI', () => ({
+    detectCLIAvailability: mock(() => ({
+        pi: true,
+        detectedAt: 1,
     }))
 }));
 
-vi.mock('@/resume/localLynttyAgentAuth', () => ({
-    detectResumeSupport: vi.fn(() => ({
+mock.module('@/resume/localRemoteAuth', () => ({
+    detectResumeSupport: mock(() => ({
         rpcAvailable: false,
-        requiresSameMachine: false,
-        requiresLynttyAgentAuth: false,
-        lynttyAgentAuthenticated: false
+        requiresSameMachine: true,
+        requiresRemoteAuth: true,
+        remoteAuthenticated: false,
+        detectedAt: 1
     }))
 }));
 
-vi.mock('@/utils/lidState', () => ({
+mock.module('@/utils/lidState', () => ({
     shouldReconnect: mockShouldReconnect
 }));
 
@@ -104,6 +103,8 @@ function makeMachine(): Machine {
     };
 }
 
+const loggerDebugMock = logger.debug as unknown as ReturnType<typeof mock>;
+
 describe('ApiMachineClient socket reconnection', () => {
     let socketHandlers: SocketHandlers;
     let mockSocket: any;
@@ -114,7 +115,7 @@ describe('ApiMachineClient socket reconnection', () => {
     };
 
     beforeEach(() => {
-        vi.clearAllMocks();
+        mock.clearAllMocks();
         mockShouldReconnect.mockReturnValue(true);
         mockCreateManagedWorktree.mockResolvedValue({ success: true, worktreePath: '/repo/.dev/worktree/test', branchName: 'test' });
         mockListManagedWorktrees.mockResolvedValue([{ path: '/repo/.dev/worktree/test', branch: 'test' }]);
@@ -123,18 +124,18 @@ describe('ApiMachineClient socket reconnection', () => {
         socketHandlers = {};
         mockSocket = {
             connected: false,
-            connect: vi.fn(),
-            on: vi.fn((event: string, handler: SocketHandler) => {
+            connect: mock(),
+            on: mock((event: string, handler: SocketHandler) => {
                 if (!socketHandlers[event]) {
                     socketHandlers[event] = [];
                 }
                 socketHandlers[event].push(handler);
             }),
-            emit: vi.fn(),
-            emitWithAck: vi.fn(),
-            close: vi.fn(),
+            emit: mock(),
+            emitWithAck: mock(),
+            close: mock(),
             io: {
-                on: vi.fn()
+                on: mock()
             }
         };
 
@@ -142,8 +143,8 @@ describe('ApiMachineClient socket reconnection', () => {
     });
 
     afterEach(() => {
-        vi.useRealTimers();
-        vi.restoreAllMocks();
+        jest.useRealTimers();
+        jest.restoreAllMocks();
     });
 
     it('does not register session shell/file handlers on machine RPC', () => {
@@ -155,9 +156,9 @@ describe('ApiMachineClient socket reconnection', () => {
     it('registers narrow worktree RPC handlers on machine RPC', async () => {
         const client = new ApiMachineClient('fake-token', makeMachine());
         client.setRPCHandlers({
-            spawnSession: vi.fn(async () => ({ type: 'success' as const, sessionId: 'session-1' })),
-            stopSession: vi.fn(() => true),
-            requestShutdown: vi.fn(),
+            spawnSession: mock(async () => ({ type: 'success' as const, sessionId: 'session-1' })),
+            stopSession: mock(() => true),
+            requestShutdown: mock(),
         });
 
         const registeredMethods = (client as any).rpcHandlerManager.registerHandler.mock.calls.map(([method]: [string]) => method);
@@ -171,15 +172,22 @@ describe('ApiMachineClient socket reconnection', () => {
             .find(([method]: [string]) => method === 'worktree-create')?.[1];
         await expect(createHandler({ basePath: '/repo', branchName: 'safe-branch' })).resolves.toMatchObject({ success: true });
         expect(mockCreateManagedWorktree).toHaveBeenCalledWith({ basePath: '/repo', branchName: 'safe-branch' });
+
+        const listHandler = (client as any).rpcHandlerManager.registerHandler.mock.calls
+            .find(([method]: [string]) => method === 'worktree-list')?.[1];
+        await expect(listHandler({ basePath: '/repo' })).resolves.toEqual({
+            success: true,
+            worktrees: [{ path: '/repo/.dev/worktree/test', branch: 'test' }],
+        });
     });
 
     it('redacts sensitive spawn RPC parameters from logs', async () => {
         const client = new ApiMachineClient('fake-token', makeMachine());
-        const spawnSession = vi.fn(async () => ({ type: 'success' as const, sessionId: 'session-1' }));
+        const spawnSession = mock(async () => ({ type: 'success' as const, sessionId: 'session-1' }));
         client.setRPCHandlers({
             spawnSession,
-            stopSession: vi.fn(() => true),
-            requestShutdown: vi.fn(),
+            stopSession: mock(() => true),
+            requestShutdown: mock(),
         });
 
         const handler = (client as any).rpcHandlerManager.registerHandler.mock.calls
@@ -189,19 +197,16 @@ describe('ApiMachineClient socket reconnection', () => {
         await handler({
             directory: '/repo',
             agent: 'pi',
-            token: 'test-token-value',
             environmentVariables: { PROVIDER_KEY: 'provider-key-value' },
         });
 
-        const logs = JSON.stringify(vi.mocked(logger.debug).mock.calls);
-        expect(logs).toContain('hasToken');
+        const logs = JSON.stringify(loggerDebugMock.mock.calls);
         expect(logs).toContain('hasEnvironmentVariables');
-        expect(logs).not.toContain('test-token-value');
         expect(logs).not.toContain('provider-key-value');
     });
 
     it('retries after initial socket connection error', async () => {
-        vi.useFakeTimers();
+        jest.useFakeTimers();
 
         const client = new ApiMachineClient('fake-token', makeMachine());
         client.connect();
@@ -213,10 +218,10 @@ describe('ApiMachineClient socket reconnection', () => {
 
         emitSocketEvent('connect_error', new Error('ECONNREFUSED'));
 
-        await vi.advanceTimersByTimeAsync(1000);
+        await jest.advanceTimersByTime(1000);
         expect(mockSocket.connect).toHaveBeenCalledTimes(1);
 
-        await vi.advanceTimersByTimeAsync(3000);
+        await jest.advanceTimersByTime(3000);
         expect(mockSocket.connect).toHaveBeenCalledTimes(2);
 
         client.shutdown();

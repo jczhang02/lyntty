@@ -1,93 +1,141 @@
+import {
+    CompatibilityBomV1Schema,
+    ReleaseTrustStoreSchema,
+    compatibilityBomFileBytes,
+    selectAndroidRelease,
+    verifyCompatibilityBom,
+    type CompatibilityBomV1,
+    type ReleaseChannel,
+} from "lyntty-wire/compatibility";
+import { nodeCompatibilityCrypto } from "lyntty-wire/compatibility/node";
+import { fetchBoundedJson } from 'lyntty-wire/compatibility/fetch';
+import * as semver from "semver";
 import { z } from "zod";
 import { type Fastify } from "../types";
-import * as semver from "semver";
 
-const DEFAULT_ANDROID_MANIFEST_URL = "https://github.com/jczhang02/lyntty/releases/latest/download/latest.json";
-const DEFAULT_MANIFEST_CACHE_MS = 10 * 60 * 1000;
+const DEFAULT_STABLE_BOM_URL = "https://github.com/jczhang02/lyntty/releases/latest/download/compatibility-bom.json";
+const DEFAULT_BOM_CACHE_MS = 10 * 60 * 1000;
 
-const AndroidUpdateManifestSchema = z.object({
-    platform: z.literal("android"),
-    appId: z.string(),
-    versionName: z.string(),
-    versionCode: z.number().int().nonnegative(),
-    apkUrl: z.string().url(),
-    sha256: z.string().regex(/^[a-f0-9]{64}$/),
-    notes: z.string().optional(),
-    publishedAt: z.string().optional(),
-});
-
-type AndroidUpdateManifest = z.infer<typeof AndroidUpdateManifestSchema>;
-
-type CachedManifest = {
-    manifest: AndroidUpdateManifest;
+type CachedBom = {
+    bom: CompatibilityBomV1;
+    bomSha256: string;
     expiresAt: number;
 };
 
-let cachedAndroidManifest: CachedManifest | null = null;
-let androidManifestFetchInFlight: Promise<AndroidUpdateManifest | null> | null = null;
+const cachedBoms = new Map<ReleaseChannel, CachedBom>();
+const bomFetches = new Map<ReleaseChannel, Promise<CachedBom | null>>();
+const highestAcceptedSequences = new Map<ReleaseChannel, number>();
 
 export function resetVersionRouteCacheForTests() {
-    cachedAndroidManifest = null;
-    androidManifestFetchInFlight = null;
+    cachedBoms.clear();
+    bomFetches.clear();
+    highestAcceptedSequences.clear();
 }
 
-function getAndroidManifestUrl() {
-    return process.env.LYNTTY_ANDROID_UPDATE_MANIFEST_URL || DEFAULT_ANDROID_MANIFEST_URL;
+function getBomUrl(channel: ReleaseChannel): string | null {
+    if (channel === "preview") return process.env.LYNTTY_PREVIEW_BOM_URL || null;
+    return process.env.LYNTTY_STABLE_BOM_URL || DEFAULT_STABLE_BOM_URL;
 }
 
-function getManifestCacheMs() {
-    const raw = process.env.LYNTTY_UPDATE_MANIFEST_CACHE_MS;
-    if (!raw) return DEFAULT_MANIFEST_CACHE_MS;
+function getSignatureUrl(channel: ReleaseChannel, bomUrl: string): string {
+    const explicit = channel === "preview"
+        ? process.env.LYNTTY_PREVIEW_BOM_SIGNATURE_URL
+        : process.env.LYNTTY_STABLE_BOM_SIGNATURE_URL;
+    if (explicit) return explicit;
+    if (!bomUrl.endsWith('.json')) throw new Error('Compatibility BOM URL requires an explicit signature URL');
+    return `${bomUrl.slice(0, -'.json'.length)}.sig.json`;
+}
 
+function getBomCacheMs() {
+    const raw = process.env.LYNTTY_BOM_CACHE_MS;
+    if (!raw) return DEFAULT_BOM_CACHE_MS;
     const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_MANIFEST_CACHE_MS;
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_BOM_CACHE_MS;
 }
 
-async function fetchAndroidManifest(): Promise<AndroidUpdateManifest> {
-    const response = await fetch(getAndroidManifestUrl(), {
-        headers: { "Accept": "application/json" },
+function configuredMinimumSequence(channel: ReleaseChannel): number {
+    const raw = channel === 'stable'
+        ? process.env.LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE
+        : process.env.LYNTTY_PREVIEW_MINIMUM_BOM_SEQUENCE;
+    if (!raw) return 0;
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`Invalid ${channel} minimum Compatibility BOM sequence`);
+    return parsed;
+}
+
+function releaseTrustStore() {
+    const raw = process.env.LYNTTY_RELEASE_TRUST_ROOTS;
+    if (!raw) return null;
+    return ReleaseTrustStoreSchema.parse(JSON.parse(raw));
+}
+
+async function fetchVerifiedBom(channel: ReleaseChannel): Promise<CachedBom | null> {
+    const bomUrl = getBomUrl(channel);
+    const trustStore = releaseTrustStore();
+    if (!bomUrl || !trustStore) return null;
+    const signatureUrl = getSignatureUrl(channel, bomUrl);
+    const [bom, signature] = await Promise.all([
+        fetchBoundedJson({
+            url: bomUrl,
+            canonicalBytes: value => compatibilityBomFileBytes(CompatibilityBomV1Schema.parse(value)),
+        }),
+        fetchBoundedJson({ url: signatureUrl }),
+    ]);
+    const minimumSequence = Math.max(
+        configuredMinimumSequence(channel),
+        highestAcceptedSequences.get(channel) ?? 0,
+    );
+    const verified = await verifyCompatibilityBom({
+        bom,
+        signature,
+        trustStore,
+        crypto: nodeCompatibilityCrypto,
+        expectedChannel: channel,
+        minimumSequence,
     });
-    if (!response.ok) {
-        throw new Error(`manifest request failed with ${response.status}`);
-    }
-
-    return AndroidUpdateManifestSchema.parse(await response.json());
+    highestAcceptedSequences.set(channel, verified.bom.sequence);
+    return {
+        bom: verified.bom,
+        bomSha256: verified.bomSha256,
+        expiresAt: Date.now() + getBomCacheMs(),
+    };
 }
 
-export function shouldUpdateAndroid(manifest: AndroidUpdateManifest, current: { appId: string; version?: string; versionCode?: number }) {
-    if (manifest.appId !== current.appId) return false;
+async function getVerifiedBom(channel: ReleaseChannel): Promise<CachedBom | null> {
+    const cached = cachedBoms.get(channel);
+    if (cached && cached.expiresAt > Date.now()) return cached;
+    if (!bomFetches.has(channel)) {
+        bomFetches.set(channel, fetchVerifiedBom(channel)
+            .then(result => {
+                if (result) cachedBoms.set(channel, result);
+                return result;
+            })
+            .finally(() => bomFetches.delete(channel)));
+    }
+    try {
+        return await bomFetches.get(channel)!;
+    } catch {
+        return cachedBoms.get(channel) ?? null;
+    }
+}
+
+export function shouldUpdateAndroid(manifest: {
+    appId: string;
+    releaseChannel: ReleaseChannel;
+    versionName: string;
+    versionCode: number;
+}, current: {
+    appId: string;
+    releaseChannel: ReleaseChannel;
+    version?: string;
+    versionCode?: number;
+}) {
+    if (manifest.appId !== current.appId || manifest.releaseChannel !== current.releaseChannel) return false;
     if (typeof current.versionCode === "number") return manifest.versionCode > current.versionCode;
     if (current.version && semver.valid(current.version) && semver.valid(manifest.versionName)) {
         return semver.gt(manifest.versionName, current.version);
     }
     return false;
-}
-
-async function getAndroidManifest(): Promise<AndroidUpdateManifest | null> {
-    const now = Date.now();
-    if (cachedAndroidManifest && cachedAndroidManifest.expiresAt > now) {
-        return cachedAndroidManifest.manifest;
-    }
-
-    if (!androidManifestFetchInFlight) {
-        androidManifestFetchInFlight = fetchAndroidManifest()
-            .then((manifest) => {
-                cachedAndroidManifest = {
-                    manifest,
-                    expiresAt: Date.now() + getManifestCacheMs(),
-                };
-                return manifest;
-            })
-            .finally(() => {
-                androidManifestFetchInFlight = null;
-            });
-    }
-
-    try {
-        return await androidManifestFetchInFlight;
-    } catch {
-        return cachedAndroidManifest?.manifest ?? null;
-    }
 }
 
 export function versionRoutes(app: Fastify) {
@@ -98,6 +146,7 @@ export function versionRoutes(app: Fastify) {
                 version: z.string().optional(),
                 version_code: z.number().int().nonnegative().optional(),
                 app_id: z.string(),
+                release_channel: z.enum(["stable", "preview"]).optional(),
             }),
             response: {
                 200: z.object({
@@ -108,43 +157,59 @@ export function versionRoutes(app: Fastify) {
                     update_url: z.string().url().nullable(),
                     sha256: z.string().optional(),
                     notes: z.string().optional(),
+                    release_channel: z.enum(["stable", "preview"]).optional(),
+                    bom_release_id: z.string().optional(),
+                    bom_sequence: z.number().int().nonnegative().optional(),
+                    bom_sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
                 })
             }
         }
     }, async (request, reply) => {
-        const { platform, version, version_code, app_id } = request.body;
-
+        const { platform, version, version_code, app_id, release_channel } = request.body;
         if (platform.toLowerCase() !== 'android') {
             reply.send({ update_required: false, update_url: null });
             return;
         }
-
-        const manifest = await getAndroidManifest();
-        if (!manifest) {
-            request.log.warn({ manifestUrl: getAndroidManifestUrl() }, 'Android update manifest unavailable');
+        const requestedChannel = release_channel
+            ?? (app_id === "dev.jczhang.lyntty" ? "stable" : null);
+        if (!requestedChannel) {
             reply.send({ update_required: false, update_url: null });
             return;
         }
-
+        const verified = await getVerifiedBom(requestedChannel);
+        if (!verified) {
+            request.log.warn({ releaseChannel: requestedChannel }, 'Signed Compatibility BOM unavailable');
+            reply.send({ update_required: false, update_url: null });
+            return;
+        }
+        const android = selectAndroidRelease(verified.bom);
+        const manifest = {
+            appId: android.packageId,
+            releaseChannel: verified.bom.channel,
+            versionName: verified.bom.components.app.version,
+            versionCode: android.versionCode,
+        };
         const updateRequired = shouldUpdateAndroid(manifest, {
             appId: app_id,
+            releaseChannel: requestedChannel,
             version,
             versionCode: version_code,
         });
-
         if (!updateRequired) {
             reply.send({ update_required: false, update_url: null });
             return;
         }
-
         reply.send({
             update_required: true,
             version_name: manifest.versionName,
             version_code: manifest.versionCode,
-            apk_url: manifest.apkUrl,
-            update_url: manifest.apkUrl,
-            sha256: manifest.sha256,
-            notes: manifest.notes,
+            apk_url: android.apk.url,
+            update_url: android.apk.url,
+            sha256: android.apk.sha256,
+            release_channel: verified.bom.channel,
+            bom_release_id: verified.bom.releaseId,
+            bom_sequence: verified.bom.sequence,
+            bom_sha256: verified.bomSha256,
         });
     });
 }

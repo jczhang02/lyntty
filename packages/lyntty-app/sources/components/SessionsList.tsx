@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Pressable, FlatList, Platform } from 'react-native';
+import { View, Pressable, FlatList } from 'react-native';
 import { Text } from '@/components/StyledText';
 import { usePathname } from 'expo-router';
 import { SessionListViewItem, SessionRowData } from '@/sync/storage';
@@ -16,7 +16,6 @@ import { useIsTablet } from '@/utils/responsive';
 import { UpdateBanner } from './UpdateBanner';
 import { layout } from './layout';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
-import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
 import { useSessionActionAlert } from '@/hooks/useSessionQuickActions';
 import { useSettingMutable } from '@/sync/storage';
 import { t } from '@/text';
@@ -345,7 +344,6 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
     const styles = stylesheet;
     const navigateToSession = useNavigateToSession();
     const openPiDiscoveredSession = useOpenPiDiscoveredSession();
-    const [actionsAnchor, setActionsAnchor] = React.useState<SessionActionsAnchor | null>(null);
     const [isOpeningPiSession, setIsOpeningPiSession] = React.useState(false);
     const baseStatus = STATUS_CONFIG[session.state];
     // Override to solid blue when session has unread results
@@ -381,20 +379,8 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
         }
     }, [navigateToSession, openPiDiscoveredSession, session]);
 
-    const handleContextMenu = React.useCallback((event: any) => {
-        event.preventDefault?.();
-        event.stopPropagation?.();
-        setActionsAnchor({
-            type: 'point',
-            x: event.nativeEvent.clientX ?? event.nativeEvent.pageX ?? 0,
-            y: event.nativeEvent.clientY ?? event.nativeEvent.pageY ?? 0,
-        });
-    }, []);
-
     const showActionAlert = useSessionActionAlert(session.id);
-    const menuProps = session.piSynthetic ? {} : Platform.OS === 'web' ? {
-        onContextMenu: handleContextMenu,
-    } as any : {
+    const menuProps = session.piSynthetic ? {} : {
         onLongPress: showActionAlert,
     };
 
@@ -464,14 +450,6 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                 </View>
             </View>
         </Pressable>
-        {Platform.OS === 'web' && (
-            <SessionActionsPopover
-                anchor={actionsAnchor}
-                onClose={() => setActionsAnchor(null)}
-                sessionId={session.id}
-                visible={!!actionsAnchor}
-            />
-        )}
         </View>
     );
 });

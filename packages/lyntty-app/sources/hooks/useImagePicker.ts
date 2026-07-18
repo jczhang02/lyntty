@@ -80,8 +80,6 @@ export function useImagePicker(): UseImagePickerResult {
     }, [selectedImages]);
 
     const requestPermission = useCallback(async (): Promise<boolean> => {
-        if (Platform.OS === 'web') return true;
-
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Modal.alert(
@@ -118,7 +116,7 @@ export function useImagePicker(): UseImagePickerResult {
 
         if (result.canceled || !result.assets.length) return;
 
-        // On web, selectionLimit is not enforced by the browser — clamp here.
+        // Clamp defensively even when the native picker honors selectionLimit.
         const assets = result.assets.slice(0, remaining);
         const previews: AttachmentPreview[] = [];
 

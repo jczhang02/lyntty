@@ -1,10 +1,5 @@
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { runtimeLayout } from './distribution/runtimeLayout';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-export function projectPath() {
-    const path = resolve(__dirname, '..');
-    // console.log('path', path)
-    return path;
+export function projectPath(): string {
+    return runtimeLayout().libraryDir;
 }

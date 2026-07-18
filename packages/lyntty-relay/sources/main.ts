@@ -1,22 +1,22 @@
 import { startApi } from "@/app/api/api";
 import { log } from "@/utils/log";
 import { awaitShutdown, onShutdown } from "@/utils/shutdown";
-import { db } from './storage/db';
+import { closeDatabase, db } from './storage/db';
 import { startTimeout } from "./app/presence/timeout";
 import { startMetricsServer } from "@/app/monitoring/metrics";
 import { activityCache } from "@/app/presence/sessionCache";
 import { auth } from "./app/auth/auth";
 import { startDatabaseMetricsUpdater } from "@/app/monitoring/metrics2";
 import { initEncrypt } from "./modules/encrypt";
-import { initGithub } from "./modules/github";
 import { loadFiles } from "./storage/files";
 
 async function main() {
 
     // Storage
     await db.$connect();
+    await db.$queryRaw`SELECT 1`;
     onShutdown('db', async () => {
-        await db.$disconnect();
+        await closeDatabase();
     });
     onShutdown('activity-cache', async () => {
         activityCache.shutdown();
@@ -29,7 +29,6 @@ async function main() {
 
     // Initialize auth module
     await initEncrypt();
-    await initGithub();
     await loadFiles();
     await auth.init();
 

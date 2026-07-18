@@ -27,7 +27,7 @@ export interface TrackedSession {
   directoryCreated?: boolean;
   message?: string;
   directory?: string;
-  agent?: 'claude' | 'codex' | 'gemini' | 'openclaw' | 'pi';
+  agent?: 'pi';
   /** tmux session identifier (format: session:window) */
   tmuxSessionId?: string;
 }

@@ -1,103 +1,62 @@
-# Privacy Policy for Lyntty Coder
+# Lyntty Privacy Policy
 
-**Last Updated: January 2025**
+Last updated: 2026-07-16
 
-## Overview
+## Scope
 
-Lyntty Coder is committed to protecting your privacy. This policy explains how we handle your data with our zero-knowledge encryption architecture.
+Lyntty is an open-source, self-hosted control system for local `pi` sessions. This policy describes the software as shipped by the Lyntty project. A relay operator may have additional policies and responsibilities.
 
-## What We Collect
+## Architecture
 
-### Encrypted Data
-- **Messages and Code**: All your Claude Code conversations and code snippets are end-to-end encrypted on your device before transmission. We store this encrypted data but have no ability to decrypt or read it.
-- **Encryption Keys**: When you pair devices, encryption keys are transmitted between your devices in encrypted form. We cannot access or decrypt these keys.
+- Pi JSONL on the paired computer is canonical session history.
+- The Lyntty App and `lynttyd` exchange data through a self-hosted `relay`.
+- Session content, session metadata, machine metadata, attachments, and key envelopes are encrypted by Lyntty clients before relay storage where the protocol marks them as encrypted.
+- The relay routes and stores ciphertext; it is not the canonical Pi-history store.
 
-### Metadata (Not Encrypted)
-- **Message IDs**: Unique identifiers for message ordering and synchronization
-- **Timestamps**: When messages were created and synced
-- **Device IDs**: Anonymous identifiers for device pairing
-- **Session IDs**: Identifiers for your Claude Code terminal sessions
-- **Push Notification Tokens**: Device tokens for sending push notifications via Expo's push notification service
+## Data handled by the relay
 
-### Analytics (PostHog)
-- **Anonymous Events**: We collect basic app usage events through PostHog to improve the app experience
-- **Privacy by Design**: All analytics events use an anonymized ID derived from a secret key - we cannot match this back to any user or account
-- **No Content Tracking**: We only track basic app usage events, never any message content, code, or personal information
-- **Opt-Out Available**: You can disable analytics collection at any time in the app settings
+A relay needs some operational data to authenticate clients, order messages, route traffic, and manage presence. Depending on the feature used, this can include:
 
-### Subscription Management (Revenue Cat)
-- **Account ID**: Revenue Cat uses your account ID to manage subscriptions and enable premium features
-- **Backend Integration**: This ID allows us to provide additional features from our backend while maintaining end-to-end encryption for your content
-- **Data Separation**: Purchase analytics sent to PostHog use the anonymized ID instead - we cannot match Revenue Cat data with PostHog analytics
+- account, machine, session, message, and local idempotency identifiers;
+- sequence numbers, timestamps, presence, and connection state;
+- encrypted message, metadata, attachment, and key-envelope payloads;
+- push tokens and the minimal notification routing payload needed for Android notifications; and
+- ordinary service logs, which may include request timing, error details, and network addresses configured by the operator's infrastructure.
 
-## What We Don't Collect
-- Your actual code or conversation content (we can't decrypt it)
-- Personal information beyond what you voluntarily include in encrypted messages
-- Device information beyond anonymous IDs
-- Location data
+The relay must not be treated as a backup for local Pi JSONL history.
 
-## How We Use Data
+## Data kept on devices
 
-### Encrypted Data
-- Stored on our servers solely for synchronization between your devices
-- Transmitted to your paired devices when requested
-- Retained until you delete it through the app
+The App and paired computer keep credentials, encryption material, local settings, drafts, session state, and caches needed for operation. `lynttyd` and the Pi extension also maintain local queue, ownership, and recovery state under the configured Lyntty directories.
 
-### Metadata
-- Message IDs and timestamps are used to maintain proper message ordering
-- Device IDs enable secure pairing between your devices
-- Session IDs track your Claude Code terminal sessions for synchronization
-- Push notification tokens are stored to enable notifications through Expo's service
+Protect device storage and backups. Anyone with access to local credentials or unlocked devices may be able to control paired sessions.
 
-### Push Notifications
-Push notifications are sent directly from your devices to each other, not from our backend. This means:
-- We never see the content of your notifications
-- Notification content is generated on your device
-- Only device-to-device communication occurs for notification content
-- We use Expo's push notification service solely as a delivery mechanism
+## Push notifications
 
-## Data Security
+When Android push is enabled, a push token and a minimal notification payload pass through the self-hosted relay and Expo's push delivery service, which uses the configured Firebase project for Android delivery. Do not put source code, secrets, or command output in notification text.
 
-- **End-to-End Encryption**: Using TweetNaCl (same as Signal) for all sensitive data
-- **Zero-Knowledge**: We cannot decrypt your data even if compelled
-- **Secure Key Exchange**: Encryption keys are transmitted between your devices only in encrypted form that we cannot access
-- **Open Source**: Our encryption implementation is publicly auditable
-- **No Backdoors**: The architecture makes it impossible for us to access your content
+## Analytics, advertising, and subscriptions
 
-## Data Retention
+Lyntty does not ship product analytics, advertising, social tracking, voice services, paywalls, or subscription telemetry. The project does not operate a hosted account or relay service as part of the software distribution.
 
-- Encrypted messages are retained indefinitely until you delete them
-- Metadata is retained for system functionality
-- Deleted data is permanently removed from our servers within 30 days
+## Retention and deletion
 
-## Your Rights
+Relay retention is controlled by the self-host operator and the deployed database policy. Session and machine deletion removes the corresponding active records through supported product flows, subject to database transactions, backups, and operator retention procedures. Local Pi JSONL and local backups must be managed separately.
 
-You have the right to:
-- Delete all your data through the app
-- Export your encrypted data
-- Audit our open-source code
-- Use the app without providing any personal information
+## Security responsibilities
 
-## Data Sharing
+Operators should:
 
-We do not share your data with anyone. Period.
+- use HTTPS and restrict administrative access to the relay host;
+- keep `LYNTTY_MASTER_SECRET`, pairing links, credentials, signing keys, and backups secret;
+- install compatible signed releases and apply security updates;
+- redact auth material and private content from logs and issue reports; and
+- define backup, retention, incident-response, and lawful-access policies appropriate to their deployment.
 
-## Changes to This Policy
+## Your choices
 
-We will notify users of any material changes to this privacy policy through the app. Continued use of the service after changes constitutes acceptance.
+You can stop using a relay, remove paired nodes, delete supported session records, clear local App data, or operate your own audited build. Removing App data does not automatically delete local Pi JSONL, relay backups, or operator logs.
 
-## Contact
+## Changes and contact
 
-For privacy concerns or questions:
-- GitHub Issues: https://github.com/slopus/lyntty/issues
-
-## Compliance
-
-Lyntty Coder is designed with privacy by default and complies with:
-- GDPR (General Data Protection Regulation)
-- CCPA (California Consumer Privacy Act)
-- Privacy by Design principles
-
----
-
-**Remember**: Your encryption keys are only shared between your own devices in encrypted form. We cannot read your code or conversations even if we wanted to.
+Material policy changes are published in the repository. Use the official Lyntty issue tracker for questions, but never include credentials, pairing URLs, auth headers, encryption keys, private code, or other secrets.

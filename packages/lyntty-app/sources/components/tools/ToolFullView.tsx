@@ -6,7 +6,6 @@ import { CodeView } from '../CodeView';
 import { Metadata } from '@/sync/storageTypes';
 import { getToolFullViewComponent } from './views/_all';
 import { layout } from '../layout';
-import { useLocalSetting } from '@/sync/storage';
 import { StyleSheet } from 'react-native-unistyles';
 import { t } from '@/text';
 import { shouldHideGenericToolPayload } from './toolPayloadPolicy';
@@ -23,7 +22,6 @@ export function ToolFullView({ tool, metadata, messages = [] }: ToolFullViewProp
     // Check if there's a specialized content view for this tool
     const SpecializedFullView = getToolFullViewComponent(tool.name);
     const screenWidth = useWindowDimensions().width;
-    const devModeEnabled = (useLocalSetting('devModeEnabled') || __DEV__);
     const hideGenericPayload = shouldHideGenericToolPayload(metadata || null, !!SpecializedFullView);
     const displayName = getToolDisplayName(tool.name);
     const category = getToolSummaryCategory(tool.name);
@@ -116,29 +114,6 @@ export function ToolFullView({ tool, metadata, messages = [] }: ToolFullViewProp
                 </>
                 )}
 
-                {/* Raw JSON View (Dev Mode Only) */}
-                {devModeEnabled && !hideGenericPayload && (
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Ionicons name="code-slash" size={20} color="#FF9500" />
-                            <Text style={styles.sectionTitle}>{t('tools.fullView.rawJsonDevMode')}</Text>
-                        </View>
-                        <CodeView
-                            code={JSON.stringify({
-                                name: tool.name,
-                                state: tool.state,
-                                description: tool.description,
-                                input: tool.input,
-                                result: tool.result,
-                                createdAt: tool.createdAt,
-                                startedAt: tool.startedAt,
-                                completedAt: tool.completedAt,
-                                permission: tool.permission,
-                                messages
-                            }, null, 2)}
-                        />
-                    </View>
-                )}
             </View>
         </ScrollView>
     );

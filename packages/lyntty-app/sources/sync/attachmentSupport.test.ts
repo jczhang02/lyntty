@@ -1,29 +1,41 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import {
     getImageAttachmentSendPlan,
+    isCompleteImageAttachmentUpload,
     supportsImageAttachmentsForFlavor,
 } from './attachmentSupport';
 
 describe('supportsImageAttachmentsForFlavor', () => {
-    it('supports legacy sessions, Claude, and Codex', () => {
-        expect(supportsImageAttachmentsForFlavor(undefined)).toBe(true);
-        expect(supportsImageAttachmentsForFlavor(null)).toBe(true);
-        expect(supportsImageAttachmentsForFlavor('claude')).toBe(true);
-        expect(supportsImageAttachmentsForFlavor('codex')).toBe(true);
+    it('supports only explicit Pi sessions', () => {
+        expect(supportsImageAttachmentsForFlavor('pi')).toBe(true);
+        expect(supportsImageAttachmentsForFlavor(' PI ')).toBe(true);
     });
 
-    it('rejects Gemini, OpenClaw, and unknown explicit flavors', () => {
+    it('rejects unidentified, non-Pi, and unknown flavors', () => {
+        expect(supportsImageAttachmentsForFlavor(undefined)).toBe(false);
+        expect(supportsImageAttachmentsForFlavor(null)).toBe(false);
+        expect(supportsImageAttachmentsForFlavor('claude')).toBe(false);
+        expect(supportsImageAttachmentsForFlavor('codex')).toBe(false);
         expect(supportsImageAttachmentsForFlavor('gemini')).toBe(false);
         expect(supportsImageAttachmentsForFlavor('openclaw')).toBe(false);
         expect(supportsImageAttachmentsForFlavor('custom-agent')).toBe(false);
     });
 });
 
+describe('isCompleteImageAttachmentUpload', () => {
+    it('accepts only a complete attachment batch', () => {
+        expect(isCompleteImageAttachmentUpload({ requested: 2, uploaded: 2, failed: 0 })).toBe(true);
+        expect(isCompleteImageAttachmentUpload({ requested: 2, uploaded: 1, failed: 1 })).toBe(false);
+        expect(isCompleteImageAttachmentUpload({ requested: 2, uploaded: 2, failed: 1 })).toBe(false);
+        expect(isCompleteImageAttachmentUpload({ requested: 0, uploaded: 0, failed: 0 })).toBe(false);
+    });
+});
+
 describe('getImageAttachmentSendPlan', () => {
-    it('uses attachments and sends text for Codex', () => {
+    it('uses attachments and sends text for Pi', () => {
         expect(getImageAttachmentSendPlan({
-            flavor: 'codex',
+            flavor: 'pi',
             text: '',
             attachmentCount: 1,
         })).toEqual({

@@ -1,44 +1,33 @@
 /**
  * Session Metadata Factory
  *
- * Creates session state and metadata objects for all backends (Claude, Codex, Gemini).
+ * Creates session state and metadata for a managed Pi session.
  * This follows DRY principles by providing a single implementation for all backends.
  *
  * @module createSessionMetadata
  */
 
 import os from 'node:os';
-import { resolve } from 'node:path';
-
 import type { AgentState, Metadata } from '@/api/types';
 import { configuration } from '@/configuration';
-import { projectPath } from '@/projectPath';
-import type { SandboxConfig } from '@/persistence';
+import { runtimeLayout } from '@/distribution/runtimeLayout';
 import packageJson from '../../package.json';
 
 /**
- * Backend flavor identifier for session metadata.
+ * Runtime flavor identifier for session metadata.
  */
-export type BackendFlavor = 'claude' | 'codex' | 'gemini' | 'opencode' | 'openclaw' | 'acp' | 'pi';
+export type BackendFlavor = 'pi';
 
 /**
  * Options for creating session metadata.
  */
 export interface CreateSessionMetadataOptions {
-    /** Backend flavor (claude, codex, gemini) */
+    /** Runtime flavor. */
     flavor: BackendFlavor;
     /** Machine ID for server identification */
     machineId: string;
     /** How the session was started */
     startedBy?: 'daemon' | 'terminal';
-    /** Active sandbox config for the session, or undefined when not used */
-    sandbox?: SandboxConfig;
-    /** Whether the backend runs with "dangerously skip permissions" behavior */
-    dangerouslySkipPermissions?: boolean;
-    /** Lyntty session id this session was forked from. */
-    parentSessionId?: string;
-    /** Lyntty message id used as the fork rewind point. */
-    forkedFromMessageId?: string;
 }
 
 /**
@@ -54,8 +43,7 @@ export interface SessionMetadataResult {
 /**
  * Creates session state and metadata for backend agents.
  *
- * This utility consolidates the common session metadata creation logic used by
- * Codex and Gemini backends, ensuring consistency across all backend implementations.
+ * This utility keeps metadata consistent across managed Pi sessions.
  *
  * @param opts - Options specifying flavor, machineId, and startedBy
  * @returns Object containing state and metadata for session creation
@@ -63,7 +51,7 @@ export interface SessionMetadataResult {
  * @example
  * ```typescript
  * const { state, metadata } = createSessionMetadata({
- *     flavor: 'gemini',
+ *     flavor: 'pi',
  *     machineId: settings.machineId,
  *     startedBy: opts.startedBy
  * });
@@ -72,6 +60,7 @@ export interface SessionMetadataResult {
  * ```
  */
 export function createSessionMetadata(opts: CreateSessionMetadataOptions): SessionMetadataResult {
+    const layout = runtimeLayout();
     const state: AgentState = {
         controlledByUser: false,
     };
@@ -84,18 +73,14 @@ export function createSessionMetadata(opts: CreateSessionMetadataOptions): Sessi
         machineId: opts.machineId,
         homeDir: os.homedir(),
         lynttyHomeDir: configuration.lynttyHomeDir,
-        lynttyLibDir: projectPath(),
-        lynttyToolsDir: resolve(projectPath(), 'tools', 'unpacked'),
+        lynttyLibDir: layout.libraryDir,
+        lynttyToolsDir: layout.toolsDir,
         startedFromDaemon: opts.startedBy === 'daemon',
         hostPid: process.pid,
         startedBy: opts.startedBy || 'terminal',
         lifecycleState: 'running',
         lifecycleStateSince: Date.now(),
         flavor: opts.flavor,
-        sandbox: opts.sandbox?.enabled ? opts.sandbox : null,
-        dangerouslySkipPermissions: opts.dangerouslySkipPermissions ?? null,
-        ...(opts.parentSessionId ? { parentSessionId: opts.parentSessionId } : {}),
-        ...(opts.forkedFromMessageId ? { forkedFromMessageId: opts.forkedFromMessageId } : {}),
     };
 
     return { state, metadata };

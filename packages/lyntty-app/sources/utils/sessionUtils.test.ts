@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'bun:test';
 
 import type { Session } from '@/sync/storageTypes';
 
@@ -8,11 +8,6 @@ vi.mock('@/text', () => ({
         if (key === 'appWide.piHistoryGapOlderMessagesUnavailable') return 'History gap · Some older Pi messages are unavailable on this computer.';
         return key;
     },
-}));
-
-vi.mock('./resumeCommand', () => ({
-    buildResumeCommand: vi.fn(),
-    buildResumeCommandBlock: vi.fn(),
 }));
 
 function session(overrides: Partial<Session> = {}): Session {

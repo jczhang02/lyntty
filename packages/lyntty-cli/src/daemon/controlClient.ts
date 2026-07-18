@@ -215,10 +215,16 @@ export async function isDaemonRunningCurrentlyInstalledLynttyVersion(): Promise<
   //
   // Using `configuration.currentCliVersion` instead guarantees the writer and
   // reader agree whenever they're executing the same `dist/` bundle, and still
-  // correctly detects real npm upgrades (the new bundle has a new baked version).
+  // correctly detects real binary upgrades (the new bundle has a new baked version).
   const currentCliVersion = configuration.currentCliVersion;
   logger.debug(`[DAEMON CONTROL] Current CLI version: ${currentCliVersion}, Daemon started with version: ${state.startedWithCliVersion}`);
   return currentCliVersion === state.startedWithCliVersion;
+}
+
+export async function isDaemonRunningExpectedRelease(releaseId: string): Promise<boolean> {
+  if (!await checkIfDaemonRunningAndCleanupStaleState()) return false;
+  const state = await readDaemonState();
+  return state?.startedWithReleaseId === releaseId;
 }
 
 export async function cleanupDaemonState(): Promise<void> {

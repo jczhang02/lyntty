@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { ToolCall } from '@/sync/typesMessage';
 import {
     formatToolDuration,
@@ -9,7 +9,6 @@ import {
     getToolSummaryCategory,
     getToolSummaryDetail,
     isTerminalToolName,
-    shouldRenderToolCardHeader,
 } from './toolDisplay';
 
 function tool(name: string, input: unknown): ToolCall {
@@ -35,7 +34,7 @@ describe('terminal tool display helpers', () => {
     });
 
     it('extracts one-line command summaries from shell tools', () => {
-        expect(getTerminalToolCommand(tool('Bash', { command: 'pnpm test' }))).toBe('pnpm test');
+        expect(getTerminalToolCommand(tool('Bash', { command: 'bun test' }))).toBe('bun test');
         expect(getTerminalToolCommand(tool('bash', { command: 'git status --short' }))).toBe('git status --short');
 
         expect(getTerminalToolCommand(tool(
@@ -52,13 +51,6 @@ describe('terminal tool display helpers', () => {
             'execute',
             { toolCall: { title: 'rm tmp.txt [current working directory /repo] (cleanup)' } },
         ))).toBe('rm tmp.txt');
-    });
-
-    it('hides Codex patch card headers on web only', () => {
-        expect(shouldRenderToolCardHeader('CodexPatch', 'web')).toBe(false);
-        expect(shouldRenderToolCardHeader('CodexPatch', 'ios')).toBe(true);
-        expect(shouldRenderToolCardHeader('CodexPatch', 'android')).toBe(true);
-        expect(shouldRenderToolCardHeader('CodexBash', 'web')).toBe(true);
     });
 
     it('normalizes display names without changing raw tool names', () => {

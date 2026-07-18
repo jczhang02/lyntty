@@ -1,0 +1,579 @@
+name: Compatibility release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Isolated release channel
+        required: true
+        type: choice
+        options: [preview, stable]
+      sequence:
+        description: Monotonic channel sequence
+        required: true
+        type: string
+      android_version_code:
+        description: Monotonic Android versionCode
+        required: true
+        type: string
+      predecessor_1:
+        description: Optional newest retained Compatibility release tag
+        required: false
+        type: string
+      predecessor_2:
+        description: Optional second retained Compatibility release tag
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: compatibility-candidate-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ inputs.channel == 'stable' && 'release-stable-candidate' || 'release-preview-candidate' }}
+    env:
+      CHANNEL: ${{ inputs.channel }}
+      SEQUENCE: ${{ inputs.sequence }}
+      ANDROID_VERSION_CODE: ${{ inputs.android_version_code }}
+      PREDECESSOR_1: ${{ inputs.predecessor_1 }}
+      PREDECESSOR_2: ${{ inputs.predecessor_2 }}
+      LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
+      LYNTTY_BOM_KEY_ID: ${{ vars.LYNTTY_BOM_KEY_ID }}
+      SIGNED_DARWIN_X64_URL: ${{ vars.LYNTTY_SIGNED_DARWIN_X64_URL }}
+      SIGNED_DARWIN_X64_SHA256: ${{ vars.LYNTTY_SIGNED_DARWIN_X64_SHA256 }}
+      SIGNED_DARWIN_ARM64_URL: ${{ vars.LYNTTY_SIGNED_DARWIN_ARM64_URL }}
+      SIGNED_DARWIN_ARM64_SHA256: ${{ vars.LYNTTY_SIGNED_DARWIN_ARM64_SHA256 }}
+      SIGNED_WINDOWS_X64_URL: ${{ vars.LYNTTY_SIGNED_WINDOWS_X64_URL }}
+      SIGNED_WINDOWS_X64_SHA256: ${{ vars.LYNTTY_SIGNED_WINDOWS_X64_SHA256 }}
+    steps:
+      - name: Checkout exact main source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate protected source and release inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          [[ "$CHANNEL" == stable || "$CHANNEL" == preview ]]
+          [[ "$SEQUENCE" =~ ^[0-9]+$ ]]
+          [[ "$ANDROID_VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
+          : "${LYNTTY_RELEASE_TRUST_ROOTS:?protected channel trust roots are required}"
+          : "${LYNTTY_BOM_KEY_ID:?protected channel key id is required}"
+          for predecessor in "$PREDECESSOR_1" "$PREDECESSOR_2"; do
+            [[ -z "$predecessor" ]] && continue
+            if [[ "$CHANNEL" == stable ]]; then
+              [[ "$predecessor" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
+            else
+              [[ "$predecessor" =~ ^compat-preview-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
+            fi
+          done
+          if [[ "$CHANNEL" == stable ]]; then
+            filter='select(.prerelease == false and .draft == false and (.tag_name | startswith("compat-v")))'
+          else
+            filter='select(.prerelease == true and .draft == false and (.tag_name | startswith("compat-preview-v")))'
+          fi
+          release_rows="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --jq ".[] | $filter | [.published_at, .id, .tag_name] | @tsv")"
+          expected_predecessors=()
+          if [[ -n "$release_rows" ]]; then
+            mapfile -t expected_predecessors < <(printf '%s\n' "$release_rows" | sort -t$'\t' -k1,1r -k2,2nr | awk -F '\t' 'NR <= 2 { print $3 }')
+          fi
+          if [[ "$CHANNEL" == stable && "${#expected_predecessors[@]}" -gt 0 ]]; then
+            [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "${expected_predecessors[0]}" ]]
+          fi
+          [[ "${PREDECESSOR_1:-}" == "${expected_predecessors[0]:-}" ]]
+          [[ "${PREDECESSOR_2:-}" == "${expected_predecessors[1]:-}" ]]
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Setup Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        with:
+          platforms: arm64
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Setup Syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
+
+      - name: Install dependencies and audit trust
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          untrusted="$(bun pm untrusted 2>&1)"
+          grep -Fq 'Found 0 untrusted dependencies with scripts.' <<< "$untrusted"
+          bun audit
+          mkdir -p "$RUNNER_TEMP/candidate"/{app,cli,relay,evidence,predecessors}
+          printf '%s\n' "$LYNTTY_RELEASE_TRUST_ROOTS" > "$RUNNER_TEMP/trust-roots.json"
+          TRUST_STORE_PATH="$RUNNER_TEMP/trust-roots.json" KEY_ID="$LYNTTY_BOM_KEY_ID" bun -e '
+            import { NON_PUBLISHABLE_TEST_BOM_KEY_IDS, NON_PUBLISHABLE_TEST_BOM_PUBLIC_KEY_BASE64, ReleaseTrustStoreSchema } from "lyntty-wire/compatibility";
+            const store=ReleaseTrustStoreSchema.parse(await Bun.file(process.env.TRUST_STORE_PATH).json());
+            const selected=store.roots.filter(root=>root.channel===process.env.CHANNEL&&root.keyId===process.env.KEY_ID);
+            if(selected.length!==1)throw new Error("protected signing key must select exactly one channel trust root");
+            if(NON_PUBLISHABLE_TEST_BOM_KEY_IDS.includes(selected[0].keyId)||selected[0].publicKeyBase64===NON_PUBLISHABLE_TEST_BOM_PUBLIC_KEY_BASE64)throw new Error("test fixture BOM roots are never publishable");
+          '
+
+      - name: Prepare channel identity
+        id: release
+        run: |
+          set -euo pipefail
+          versions="$(bun -e 'for (const p of ["app","cli","relay","wire"]) { const f=p==="wire"?"packages/lyntty-wire/package.json":`packages/lyntty-${p}/package.json`; const x=await Bun.file(f).json(); if (!Bun.semver.satisfies(x.version, ">=0.1.0")) throw new Error(`${p} version is not SemVer`); process.stdout.write(`${p}=${x.version}\n`) }')"
+          while IFS='=' read -r key value; do echo "$key=$value" >> "$GITHUB_OUTPUT"; done <<< "$versions"
+          app="$(grep '^app=' <<< "$versions" | cut -d= -f2)"
+          cli="$(grep '^cli=' <<< "$versions" | cut -d= -f2)"
+          relay="$(grep '^relay=' <<< "$versions" | cut -d= -f2)"
+          wire="$(grep '^wire=' <<< "$versions" | cut -d= -f2)"
+          prefix=compat-v
+          [[ "$CHANNEL" == preview ]] && prefix=compat-preview-v
+          tag="${prefix}${app}_${cli}_${relay}_${wire}-s${SEQUENCE}"
+          [[ "$tag" =~ ^[a-z0-9][A-Za-z0-9._-]{2,127}$ ]]
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release_id=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Build five standalone CLI targets
+        run: |
+          set -euo pipefail
+          bun packages/lyntty-cli/scripts/build-artifact.ts --all --out-dir "$RUNNER_TEMP/candidate/cli"
+
+      - name: Replace Stable native archives with externally signed bytes
+        if: inputs.channel == 'stable'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLI_VERSION: ${{ steps.release.outputs.cli }}
+        run: |
+          set -euo pipefail
+          native_signer_workflow="$GITHUB_REPOSITORY/.github/workflows/native-signing.yml"
+          replace_signed_archive() {
+            local target="$1" url="$2" expected_sha="$3" suffix="$4"
+            : "${url:?Stable native archive URL for $target is required}"
+            : "${expected_sha:?Stable native archive SHA-256 for $target is required}"
+            [[ "$url" =~ ^https://github\.com/jczhang02/lyntty/releases/download/native-signing-[0-9A-Za-z._-]+/[^/?#]+$ ]]
+            [[ "$expected_sha" =~ ^[a-f0-9]{64}$ ]]
+            local stem="lyntty-cli-${CLI_VERSION}-${target}"
+            local archive="$RUNNER_TEMP/candidate/cli/${stem}${suffix}"
+            curl -fsSL "$url" -o "$archive"
+            echo "$expected_sha  $archive" | sha256sum -c -
+            gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY" --source-digest "$GITHUB_SHA" \
+              --signer-workflow "$native_signer_workflow" --signer-digest "$GITHUB_SHA" --format json \
+              > "$RUNNER_TEMP/candidate/evidence/native-${target}-attestation.json"
+            local manifest="$RUNNER_TEMP/${stem}.artifact-manifest.json"
+            if [[ "$suffix" == .zip ]]; then
+              unzip -p "$archive" "$stem/artifact-manifest.json" > "$manifest"
+            else
+              tar -xOzf "$archive" "$stem/artifact-manifest.json" > "$manifest"
+            fi
+            EXPECTED_TARGET="$target" EXPECTED_VERSION="$CLI_VERSION" EXPECTED_SOURCE="$GITHUB_SHA" bun -e '
+              import { parseArtifactManifest } from "./packages/lyntty-cli/src/distribution/artifactManifest.ts";
+              const manifest=parseArtifactManifest(await Bun.file(process.argv[1]).json());
+              const target=`${manifest.target.os}-${manifest.target.arch}`;
+              if (manifest.version!==process.env.EXPECTED_VERSION || manifest.releaseId!==`lyntty-cli-${process.env.EXPECTED_VERSION}-${process.env.EXPECTED_TARGET}` || target!==process.env.EXPECTED_TARGET || manifest.sourceCommit!==process.env.EXPECTED_SOURCE) throw new Error("signed native archive identity/source mismatch");
+            ' "$manifest"
+            local extracted="$RUNNER_TEMP/signed-${target}"
+            rm -rf "$extracted"; mkdir "$extracted"
+            local entries
+            if [[ "$suffix" == .zip ]]; then entries="$(unzip -Z1 "$archive")"; else entries="$(tar -tzf "$archive")"; fi
+            [[ -n "$entries" ]]
+            if printf '%s\n' "$entries" | grep -Ev "^${stem}(/|$)"; then
+              echo "signed native archive contains an entry outside $stem" >&2; exit 1
+            fi
+            if printf '%s\n' "$entries" | sort | uniq -d | grep .; then
+              echo "signed native archive contains duplicate entries" >&2; exit 1
+            fi
+            if [[ "$suffix" == .zip ]]; then unzip -q "$archive" -d "$extracted"; else tar -xzf "$archive" -C "$extracted"; fi
+            mapfile -t archive_roots < <(find "$extracted" -mindepth 1 -maxdepth 1 -printf '%f\n')
+            [[ "${#archive_roots[@]}" -eq 1 && "${archive_roots[0]}" == "$stem" ]]
+            ARTIFACT_ROOT="$extracted/$stem" TRUST_ROOTS="$RUNNER_TEMP/trust-roots.json" bun -e '
+              import { chmod, readFile } from "node:fs/promises";
+              import { readArtifactManifest } from "./packages/lyntty-cli/src/distribution/artifactManifest.ts";
+              import { verifyArtifactFiles } from "./packages/lyntty-cli/src/distribution/selfCheck.ts";
+              const manifest=await readArtifactManifest(`${process.env.ARTIFACT_ROOT}/artifact-manifest.json`);
+              if (manifest.target.os==="windows") for (const file of manifest.files.filter(file=>file.executable)) await chmod(`${process.env.ARTIFACT_ROOT}/${file.path}`,0o755);
+              await verifyArtifactFiles(process.env.ARTIFACT_ROOT, manifest);
+              const expected=JSON.stringify(JSON.parse(await readFile(process.env.TRUST_ROOTS,"utf8")));
+              const embedded=JSON.stringify(JSON.parse(await readFile(`${process.env.ARTIFACT_ROOT}/runtime/release/trust-roots.json`,"utf8")));
+              if (embedded!==expected) throw new Error("signed native archive trust roots do not match candidate");
+            '
+            rm -rf "$extracted"
+            local manifest_sha
+            manifest_sha="$(sha256sum "$manifest" | awk '{print $1}')"
+            printf '%s  artifact-manifest.json\n' "$manifest_sha" > "$RUNNER_TEMP/candidate/cli/${stem}.manifest.sha256"
+            rm -f "$manifest"
+          }
+          replace_signed_archive darwin-x64 "$SIGNED_DARWIN_X64_URL" "$SIGNED_DARWIN_X64_SHA256" .tar.gz
+          replace_signed_archive darwin-arm64 "$SIGNED_DARWIN_ARM64_URL" "$SIGNED_DARWIN_ARM64_SHA256" .tar.gz
+          replace_signed_archive windows-x64 "$SIGNED_WINDOWS_X64_URL" "$SIGNED_WINDOWS_X64_SHA256" .zip
+
+      - name: Verify compiled CLI identity without a host runtime
+        env:
+          CLI_VERSION: ${{ steps.release.outputs.cli }}
+        run: |
+          set -euo pipefail
+          sentinel="$RUNNER_TEMP/runtime-sentinel"
+          mkdir "$sentinel"
+          for name in bun node npm pnpm npx tsx; do
+            printf '#!/bin/sh\nexit 97\n' > "$sentinel/$name"
+            chmod +x "$sentinel/$name"
+          done
+          root="$RUNNER_TEMP/candidate/cli/lyntty-cli-${CLI_VERSION}-linux-x64"
+          PATH="$sentinel:/usr/bin:/bin" "$root/lyntty" --self-check --json > "$RUNNER_TEMP/candidate/evidence/cli-self-check.json"
+          CLI_VERSION="$CLI_VERSION" bun -e '
+            const x=await Bun.file(process.argv[1]).json();
+            if (!x.ok || x.version!==process.env.CLI_VERSION || x.wire.protocolMajor!==1 || x.wire.protocolMinor!==1) throw new Error("CLI runtime identity does not match release policy");
+          ' "$RUNNER_TEMP/candidate/evidence/cli-self-check.json"
+
+      - name: Remove unpacked CLI build trees
+        run: find "$RUNNER_TEMP/candidate/cli" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
+
+      - name: Decode stable Android inputs
+        if: inputs.channel == 'stable'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.LYNTTY_ANDROID_KEYSTORE_BASE64 }}
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.LYNTTY_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          : "${KEYSTORE_BASE64:?stable Android keystore is required}"
+          : "${GOOGLE_SERVICES_JSON_BASE64:?stable Firebase config is required}"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lyntty-release.jks"
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > packages/lyntty-app/google-services.json
+          cp packages/lyntty-app/google-services.json packages/lyntty-app/android/app/google-services.json
+          chmod 600 "$RUNNER_TEMP/lyntty-release.jks" packages/lyntty-app/google-services.json packages/lyntty-app/android/app/google-services.json
+
+      - name: Build channel-bound Android APK
+        working-directory: packages/lyntty-app/android
+        env:
+          LYNTTY_EXPO_PROJECT_ID: ${{ vars.LYNTTY_EXPO_PROJECT_ID }}
+          LYNTTY_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEYSTORE_PASSWORD }}
+          LYNTTY_ANDROID_KEY_ALIAS: ${{ secrets.LYNTTY_ANDROID_KEY_ALIAS }}
+          LYNTTY_ANDROID_KEY_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEY_PASSWORD }}
+          EXPECTED_STABLE_CERT: ${{ vars.LYNTTY_ANDROID_CERT_SHA256 }}
+          APP_VERSION: ${{ steps.release.outputs.app }}
+        run: |
+          set -euo pipefail
+          cleanup_android_secrets() {
+            shred -u "$RUNNER_TEMP/lyntty-release.jks" "$GITHUB_WORKSPACE/packages/lyntty-app/google-services.json" app/google-services.json 2>/dev/null || true
+          }
+          trap cleanup_android_secrets EXIT
+          app_env="$CHANNEL"
+          [[ "$CHANNEL" == stable ]] && app_env=production
+          args=(./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2
+            -x lintVitalAnalyzeRelease -x lintVitalRelease
+            -Pandroid.enablePngCrunchInReleaseBuilds=false
+            -PlynttyVersionName="$APP_VERSION"
+            -PlynttyVersionCode="$ANDROID_VERSION_CODE")
+          if [[ "$CHANNEL" == stable ]]; then
+            : "${LYNTTY_EXPO_PROJECT_ID:?stable Expo project id is required}"
+            args+=(-PreactNativeArchitectures=arm64-v8a -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks")
+          else
+            args+=(-PreactNativeArchitectures=x86_64,arm64-v8a)
+          fi
+          APP_ENV="$app_env" BUN_EXECUTABLE="$(command -v bun)" \
+            ../scripts/gradle-runtime-audit.sh "$RUNNER_TEMP/candidate/evidence/android-exec-audit.txt" -- "${args[@]}"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/candidate/app/lyntty-${CHANNEL}.apk"
+          expected_package=dev.jczhang.lyntty.preview
+          expected_cert=()
+          if [[ "$CHANNEL" == stable ]]; then
+            expected_package=dev.jczhang.lyntty
+            : "${EXPECTED_STABLE_CERT:?stable Android certificate pin is required}"
+            expected_cert=("$EXPECTED_STABLE_CERT")
+          fi
+          ../scripts/apk-audit.sh "$RUNNER_TEMP/candidate/app/lyntty-${CHANNEL}.apk" \
+            "$expected_package" "$APP_VERSION" "$ANDROID_VERSION_CODE" "${expected_cert[@]}" \
+            > "$RUNNER_TEMP/candidate/evidence/android-apk-audit.txt"
+
+      - name: Build Relay OCI layout once
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          platforms: linux/amd64,linux/arm64
+          outputs: type=oci,dest=${{ runner.temp }}/candidate/relay/lyntty-relay.oci.tar
+          labels: |
+            org.opencontainers.image.source=https://github.com/jczhang02/lyntty
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.release.outputs.relay }}
+
+      - name: Capture Relay index digest
+        run: |
+          set -euo pipefail
+          tar -xOf "$RUNNER_TEMP/candidate/relay/lyntty-relay.oci.tar" index.json \
+            | jq -er '.manifests | select(length == 1) | .[0].digest | select(test("^sha256:[a-f0-9]{64}$"))' \
+            > "$RUNNER_TEMP/candidate/relay/digest.txt"
+
+      - name: Fetch and verify retained BOMs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for tag in "$PREDECESSOR_1" "$PREDECESSOR_2"; do
+            [[ -z "$tag" ]] && continue
+            dir="$RUNNER_TEMP/candidate/predecessors/$tag"
+            mkdir -p "$dir"
+            gh release download "$tag" -p compatibility-bom.json -p compatibility-bom.sig.json -D "$dir"
+            bun --no-install scripts/release.ts verify \
+              --bom "$dir/compatibility-bom.json" \
+              --signature "$dir/compatibility-bom.sig.json" \
+              --trust-store "$RUNNER_TEMP/trust-roots.json" \
+              --channel "$CHANNEL" > "$dir/verified.json"
+          done
+
+      - name: Build current Relay identity and newest schema fixture
+        run: |
+          set -euo pipefail
+          bun run --cwd packages/lyntty-relay build:standalone
+          sentinel="$RUNNER_TEMP/runtime-sentinel"
+          PATH="$sentinel:/usr/bin:/bin" packages/lyntty-relay/dist/lyntty-relay version --json \
+            > "$RUNNER_TEMP/candidate/evidence/relay-build-info.json"
+          schema="$RUNNER_TEMP/release-schema-fixture"
+          DB_PROVIDER=pglite PGLITE_DIR="$schema" LYNTTY_MASTER_SECRET='candidate-schema-validation-only' \
+            packages/lyntty-relay/dist/lyntty-relay migrate
+          DB_PROVIDER=pglite PGLITE_DIR="$schema" LYNTTY_MASTER_SECRET='candidate-schema-validation-only' \
+            packages/lyntty-relay/dist/lyntty-relay doctor --json > "$RUNNER_TEMP/candidate/evidence/relay-schema-doctor.json"
+          RELAY_INFO="$RUNNER_TEMP/candidate/evidence/relay-build-info.json" RELAY_DOCTOR="$RUNNER_TEMP/candidate/evidence/relay-schema-doctor.json" bun -e '
+            const info=await Bun.file(process.env.RELAY_INFO).json();
+            const doctor=await Bun.file(process.env.RELAY_DOCTOR).json();
+            if (!doctor.ok || doctor.databaseMinimumRelaySchema!==info.minimumRelaySchema || doctor.databaseCurrentRelaySchema!==info.relaySchema) throw new Error("Relay runtime schema identity does not match migrated database evidence");
+          '
+          printf '{"retained":[]}\n' > "$RUNNER_TEMP/candidate/evidence/retained-runtime-verification.json"
+
+      - name: Install cosign for retained release verification
+        if: inputs.predecessor_1 != ''
+        uses: sigstore/cosign-installer@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v3
+
+      - name: Execute retained CLI and Relay compatibility
+        if: inputs.predecessor_1 != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          sentinel="$RUNNER_TEMP/runtime-sentinel"
+          schema="$RUNNER_TEMP/release-schema-fixture"
+          for tag in "$PREDECESSOR_1" "$PREDECESSOR_2"; do
+            [[ -z "$tag" ]] && continue
+            dir="$RUNNER_TEMP/candidate/predecessors/$tag"
+            eval "$(BOM="$dir/compatibility-bom.json" bun - <<'BUN'
+          const bom=await Bun.file(process.env.BOM).json();
+          const archive=bom.components.cli.archives.find(item=>item.target==='linux-x64-gnu');
+          if (!archive) throw new Error('retained BOM lacks linux-x64-gnu CLI archive');
+          const values={
+            CLI_URL:archive.url, CLI_SHA:archive.sha256, CLI_MANIFEST_SHA:archive.artifactManifestSha256,
+            CLI_VERSION:bom.components.cli.version, CLI_WIRE_MAJOR:bom.components.cli.wire.protocolMajor,
+            CLI_WIRE_MINOR:bom.components.cli.wire.protocolMinor, CLI_SOURCE_COMMIT:bom.components.cli.sourceCommit,
+            RELAY_REF:bom.components.relay.image.reference, RELAY_VERSION:bom.components.relay.version,
+            RELAY_SOURCE_COMMIT:bom.components.relay.sourceCommit,
+            RELAY_WIRE_MAJOR:bom.components.relay.wire.protocolMajor, RELAY_WIRE_MINOR:bom.components.relay.wire.protocolMinor,
+            RELAY_SCHEMA_MIN:bom.components.relay.schema.minimum, RELAY_SCHEMA_CURRENT:bom.components.relay.schema.current,
+          };
+          for (const [key,value] of Object.entries(values)) console.log(`${key}=${JSON.stringify(String(value))}`);
+          BUN
+          )"
+            archive="$dir/retained-cli.tar.gz"
+            curl -fsSL "$CLI_URL" -o "$archive"
+            echo "$CLI_SHA  $archive" | sha256sum -c -
+            gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY" --source-digest "$CLI_SOURCE_COMMIT"
+            extract="$dir/retained-cli"; mkdir "$extract"; tar -xzf "$archive" -C "$extract"
+            root="$(find "$extract" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+            [[ -n "$root" ]]
+            echo "$CLI_MANIFEST_SHA  $root/artifact-manifest.json" | sha256sum -c -
+            PATH="$sentinel:/usr/bin:/bin" "$root/lyntty" --self-check --json > "$dir/cli-self-check.json"
+            CLI_VERSION="$CLI_VERSION" CLI_WIRE_MAJOR="$CLI_WIRE_MAJOR" CLI_WIRE_MINOR="$CLI_WIRE_MINOR" bun -e '
+              const x=await Bun.file(process.argv[1]).json();
+              if (!x.ok || x.version!==process.env.CLI_VERSION || String(x.wire.protocolMajor)!==process.env.CLI_WIRE_MAJOR || String(x.wire.protocolMinor)!==process.env.CLI_WIRE_MINOR) throw new Error("retained CLI runtime identity mismatch");
+            ' "$dir/cli-self-check.json"
+            cosign verify --certificate-identity "https://github.com/$GITHUB_REPOSITORY/.github/workflows/release-promote.yml@refs/heads/main" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com "$RELAY_REF" >/dev/null
+            gh attestation verify "oci://$RELAY_REF" --repo "$GITHUB_REPOSITORY" --source-digest "$RELAY_SOURCE_COMMIT"
+            docker pull "$RELAY_REF"
+            docker run --rm "$RELAY_REF" version --json > "$dir/relay-build-info.json"
+            RELAY_VERSION="$RELAY_VERSION" RELAY_WIRE_MAJOR="$RELAY_WIRE_MAJOR" RELAY_WIRE_MINOR="$RELAY_WIRE_MINOR" RELAY_SCHEMA_MIN="$RELAY_SCHEMA_MIN" RELAY_SCHEMA_CURRENT="$RELAY_SCHEMA_CURRENT" bun -e '
+              const x=await Bun.file(process.argv[1]).json();
+              if (x.version!==process.env.RELAY_VERSION || String(x.minimumRelaySchema)!==process.env.RELAY_SCHEMA_MIN || String(x.relaySchema)!==process.env.RELAY_SCHEMA_CURRENT || String(x.wire.protocolMajor)!==process.env.RELAY_WIRE_MAJOR || String(x.wire.protocolMinor)!==process.env.RELAY_WIRE_MINOR) throw new Error("retained Relay runtime identity mismatch");
+            ' "$dir/relay-build-info.json"
+            docker run --rm -v "$schema:/data" \
+              -e DB_PROVIDER=pglite -e PGLITE_DIR=/data -e LYNTTY_MASTER_SECRET='candidate-schema-validation-only' \
+              "$RELAY_REF" doctor --json > "$dir/relay-schema-doctor.json"
+          done
+          PREDECESSOR_1="$PREDECESSOR_1" PREDECESSOR_2="$PREDECESSOR_2" bun -e '
+            const retained=[process.env.PREDECESSOR_1,process.env.PREDECESSOR_2].filter(Boolean).map(tag=>({tag,cliSelfCheck:true,relayIdentity:true,newestSchemaDoctor:true,signatureAndAttestation:true}));
+            await Bun.write(process.argv[1],`${JSON.stringify({retained},null,2)}\n`);
+          ' "$RUNNER_TEMP/candidate/evidence/retained-runtime-verification.json"
+
+      - name: Generate SPDX SBOMs and deterministic provenance subjects
+        run: |
+          set -euo pipefail
+          syft scan "dir:$RUNNER_TEMP/candidate/cli" -o spdx-json="$RUNNER_TEMP/candidate/evidence/cli.spdx.json"
+          syft scan "file:$RUNNER_TEMP/candidate/app/lyntty-${CHANNEL}.apk" -o spdx-json="$RUNNER_TEMP/candidate/evidence/app.spdx.json"
+          syft scan "oci-archive:$RUNNER_TEMP/candidate/relay/lyntty-relay.oci.tar" -o spdx-json="$RUNNER_TEMP/candidate/evidence/relay.spdx.json"
+          for component in app cli relay; do
+            COMPONENT="$component" SOURCE_SHA="$GITHUB_SHA" bun - <<'BUN'
+          import { createHash } from 'node:crypto';
+          import { createReadStream } from 'node:fs';
+          import { readdir, stat } from 'node:fs/promises';
+          import { join } from 'node:path';
+          const root = `${process.env.RUNNER_TEMP}/candidate`;
+          const component = process.env.COMPONENT;
+          const names = await readdir(join(root, component));
+          const subjects = [];
+          for (const name of names.sort()) {
+            const path = join(root, component, name);
+            if (!(await Bun.file(path).exists()) || !(await stat(path)).isFile()) continue;
+            const hash = createHash('sha256');
+            for await (const chunk of createReadStream(path)) hash.update(chunk);
+            subjects.push({ name, digest: { sha256: hash.digest('hex') } });
+          }
+          const statement = {
+            _type: 'https://in-toto.io/Statement/v1',
+            subject: subjects,
+            predicateType: 'https://lyntty.dev/attestation/release-candidate-verification/v1',
+            predicate: {
+              component,
+              sourceCommit: process.env.SOURCE_SHA,
+              verifier: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+              workflow: 'release-candidate.yml',
+              nativeSigningEvidence: component === 'cli'
+                ? (await readdir(join(root, 'evidence'))).filter(name => name.startsWith('native-') && name.endsWith('-attestation.json')).sort()
+                : [],
+            },
+          };
+          await Bun.write(join(root, 'evidence', `${component}.intoto.json`), `${JSON.stringify(statement, null, 2)}\n`);
+          BUN
+          done
+
+      - name: Assemble, sign, and verify immutable Compatibility BOM
+        env:
+          RELEASE_ID: ${{ steps.release.outputs.release_id }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          APP_VERSION: ${{ steps.release.outputs.app }}
+          CLI_VERSION: ${{ steps.release.outputs.cli }}
+          RELAY_VERSION: ${{ steps.release.outputs.relay }}
+          WIRE_VERSION: ${{ steps.release.outputs.wire }}
+          LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64: ${{ secrets.LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64 }}
+        run: |
+          set -euo pipefail
+          : "${LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64:?protected channel BOM key is required}"
+          CANDIDATE="$RUNNER_TEMP/candidate" bun - <<'BUN'
+          import { readdir } from 'node:fs/promises';
+          import { basename, join, relative } from 'node:path';
+          import { CURRENT_WIRE_OFFER } from 'lyntty-wire';
+          const root = process.env.CANDIDATE;
+          const tag = process.env.RELEASE_TAG;
+          const channel = process.env.CHANNEL;
+          const releaseUrl = name => `https://github.com/jczhang02/lyntty/releases/download/${tag}/${name}`;
+          const local = (path, name = basename(path)) => ({ name, url: releaseUrl(name), localPath: relative(root, path) });
+          const audit = Object.fromEntries((await Bun.file(join(root, 'evidence/android-apk-audit.txt')).text()).trim().split('\n').map(line => line.split('=', 2)));
+          const cliIdentity = await Bun.file(join(root, 'evidence/cli-self-check.json')).json();
+          const relayIdentity = await Bun.file(join(root, 'evidence/relay-build-info.json')).json();
+          if (audit.version_name!==process.env.APP_VERSION || cliIdentity.version!==process.env.CLI_VERSION || relayIdentity.version!==process.env.RELAY_VERSION) throw new Error('built component identity does not match package SemVer');
+          const cliMap = { 'linux-x64': 'linux-x64-gnu', 'linux-arm64': 'linux-arm64-gnu', 'darwin-x64': 'darwin-x64', 'darwin-arm64': 'darwin-arm64', 'windows-x64': 'windows-x64' };
+          const archives = [];
+          for (const target of Object.keys(cliMap)) {
+            const stem = `lyntty-cli-${process.env.CLI_VERSION}-${target}`;
+            const suffix = target === 'windows-x64' ? '.zip' : '.tar.gz';
+            const sidecar = (await Bun.file(join(root, 'cli', `${stem}.manifest.sha256`)).text()).trim().split(/\s+/)[0];
+            const nativeSigningAttestation = channel === 'stable' && (target.startsWith('darwin-') || target === 'windows-x64')
+              ? local(join(root, 'evidence', `native-${target}-attestation.json`))
+              : undefined;
+            archives.push({ ...local(join(root, 'cli', `${stem}${suffix}`)), target: cliMap[target], artifactManifestSha256: sidecar, ...(nativeSigningAttestation ? { nativeSigningAttestation } : {}) });
+          }
+          const evidence = component => ({
+            sbom: local(join(root, 'evidence', `${component}.spdx.json`)),
+            provenance: local(join(root, 'evidence', `${component}.intoto.json`)),
+          });
+          const required = [...CURRENT_WIRE_OFFER.capabilities];
+          const wire = CURRENT_WIRE_OFFER;
+          const requires = { app: '>=1.0.0 <2.0.0', cli: '>=1.1.0 <2.0.0', relay: '>=1.1.0 <2.0.0', requiredWireCapabilities: required };
+          const predecessorEntries = [];
+          const predecessorRoot = join(root, 'predecessors');
+          for (const predecessorTag of (await readdir(predecessorRoot)).sort()) {
+            const dir = join(predecessorRoot, predecessorTag);
+            const path = join(dir, 'compatibility-bom.json');
+            const prior = await Bun.file(path).json();
+            const predecessorFile = (filePath, name = basename(filePath)) => ({
+              name,
+              url: `https://github.com/jczhang02/lyntty/releases/download/${predecessorTag}/${name}`,
+              localPath: relative(root, filePath),
+            });
+            predecessorEntries.push({
+              sequence: prior.sequence,
+              path,
+              reference: { sequence: prior.sequence, bom: predecessorFile(path), signature: predecessorFile(join(dir, 'compatibility-bom.sig.json')) },
+            });
+          }
+          predecessorEntries.sort((a, b) => b.sequence - a.sequence);
+          const predecessors = predecessorEntries.map(entry => entry.reference);
+          await Bun.write(join(root, 'predecessor-paths.txt'), `${predecessorEntries.map(entry => entry.path).join('\n')}${predecessorEntries.length ? '\n' : ''}`);
+          const relayRepository = channel === 'stable' ? 'ghcr.io/jczhang02/lyntty-relay' : 'ghcr.io/jczhang02/lyntty-relay-preview';
+          const relayDigest = (await Bun.file(join(root, 'relay/digest.txt')).text()).trim();
+          const base = (version, component, componentWire) => ({ version, sourceCommit: process.env.GITHUB_SHA, wire: componentWire, requires, supplyChain: evidence(component) });
+          const inventory = {
+            schemaVersion: 1,
+            releaseId: process.env.RELEASE_ID,
+            sequence: Number(process.env.SEQUENCE),
+            channel,
+            releasedAt: (await Bun.$`git show -s --format=%cI ${process.env.GITHUB_SHA}`.text()).trim(),
+            source: { repository: 'https://github.com/jczhang02/lyntty', commit: process.env.GITHUB_SHA },
+            support: { maxWireMinorSkew: 1, stableHistoryLength: 3, minimumSupportDays: 90 },
+            components: {
+              app: { ...base(audit.version_name, 'app', wire), android: { packageId: audit.application_id, versionCode: Number(audit.version_code), signerSha256: audit.signer_sha256, apk: local(join(root, 'app', `lyntty-${channel}.apk`)) } },
+              cli: { ...base(cliIdentity.version, 'cli', cliIdentity.wire), archives },
+              relay: { ...base(relayIdentity.version, 'relay', relayIdentity.wire), image: { repository: relayRepository, digest: relayDigest, reference: `${relayRepository}@${relayDigest}`, platforms: ['linux/amd64','linux/arm64'] }, schema: { minimum: relayIdentity.minimumRelaySchema, current: relayIdentity.relaySchema } },
+              wire: { version: process.env.WIRE_VERSION, sourceCommit: process.env.GITHUB_SHA },
+            },
+            predecessors,
+          };
+          await Bun.write(join(root, 'release-inventory.json'), `${JSON.stringify(inventory, null, 2)}\n`);
+          BUN
+          bun --no-install scripts/release.ts assemble --inventory "$CANDIDATE/release-inventory.json" --artifact-root "$CANDIDATE" --out "$CANDIDATE/compatibility-bom.json"
+          bun --no-install scripts/release.ts sign --bom "$CANDIDATE/compatibility-bom.json" --signature "$CANDIDATE/compatibility-bom.sig.json" --key-id "$LYNTTY_BOM_KEY_ID" --channel "$CHANNEL"
+          bun --no-install scripts/release.ts verify --bom "$CANDIDATE/compatibility-bom.json" --signature "$CANDIDATE/compatibility-bom.sig.json" --trust-store "$RUNNER_TEMP/trust-roots.json" --channel "$CHANNEL" --minimum-sequence "$SEQUENCE" > "$CANDIDATE/bom-verification.json"
+          predecessor_args=()
+          while IFS= read -r file; do [[ -z "$file" ]] || predecessor_args+=(--predecessor "$file"); done < "$CANDIDATE/predecessor-paths.txt"
+          bun --no-install scripts/release.ts verify-history --current "$CANDIDATE/compatibility-bom.json" "${predecessor_args[@]}" > "$CANDIDATE/compatibility-matrix.json"
+
+      - name: Seal deterministic candidate bundle
+        id: bundle
+        run: |
+          set -euo pipefail
+          CANDIDATE="$RUNNER_TEMP/candidate"
+          find "$CANDIDATE" -type f ! -name checksums.txt -print0 | sort -z | xargs -0 sha256sum \
+            | sed "s#  $CANDIDATE/#  #" > "$CANDIDATE/checksums.txt"
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -czf "$RUNNER_TEMP/${{ steps.release.outputs.tag }}.candidate.tar.gz" -C "$RUNNER_TEMP" candidate
+          echo "path=$RUNNER_TEMP/${{ steps.release.outputs.tag }}.candidate.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Attest candidate provenance
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: ${{ steps.bundle.outputs.path }}
+
+      - name: Upload candidate without publishing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compatibility-candidate-${{ steps.release.outputs.tag }}
+          path: ${{ steps.bundle.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30

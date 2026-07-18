@@ -13,7 +13,6 @@ import {
     ActivityIndicator,
     TextInputSelectionChangeEventData,
     NativeSyntheticEvent,
-    Image as RNImage,
     useWindowDimensions,
 } from 'react-native';
 import { GlassView } from 'expo-glass-effect';
@@ -24,7 +23,6 @@ import { layout } from '@/components/layout';
 import {
     MultiTextInput,
     MULTI_TEXT_INPUT_LINE_HEIGHT,
-    type KeyPressEvent,
 } from '@/components/MultiTextInput';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,8 +30,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Constants from 'expo-constants';
 import { useHeaderHeight } from '@/utils/responsive';
 import { t } from '@/text';
-import { useAllMachines, useLocalSetting, useSessions, useSetting, storage } from '@/sync/storage';
-import type { NewSessionAgentType } from '@/sync/persistence';
+import { storage, useAllMachines, useLocalSetting, useSessions, useSetting } from '@/sync/storage';
 import { sync } from '@/sync/sync';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { machineSpawnNewSession } from '@/sync/ops';
@@ -46,44 +43,22 @@ import { useShallow } from 'zustand/react/shallow';
 import type { MultiTextInputHandle } from '@/components/MultiTextInput';
 import { Modal } from '@/modal';
 import type { Machine, Session } from '@/sync/storageTypes';
-import {
-    getHardcodedPermissionModes,
-    getHardcodedModelModes,
-    getEffortLevelsForModel,
-    getSupportsWorktree,
-    type PermissionMode,
-    type ModelMode,
-    type EffortLevel,
-} from '@/components/modelModeOptions';
 import { isRunningOnMac } from '@/utils/platform';
 import { getNewSessionSidebarLayout } from '@/utils/newSessionSidebarLayout';
-import { getAgentPickerItems, getModePickerItems } from '@/utils/newSessionPickerItems';
-import { resolveAgentDefaultConfig } from '@/sync/agentDefaults';
-
-// Agent icon assets
-const agentIcons = {
-    pi: require('@/assets/images/icon.png'),
-    claude: require('@/assets/images/icon-claude.png'),
-    codex: require('@/assets/images/icon-gpt.png'),
-    openclaw: require('@/assets/images/icon-openclaw.png'),
-    gemini: require('@/assets/images/icon-gemini.png'),
-};
-
-type AgentKey = NewSessionAgentType;
-const ALL_AGENTS: { key: AgentKey; label: string }[] = [
-    { key: 'pi', label: 'pi' },
-];
+import { deliverNewSessionPrompt } from '@/utils/newSessionPrompt';
+import {
+    advanceWorktreeRequestVersion,
+    currentWorktreeItems,
+    isCurrentWorktreeSelection,
+    type NewSessionWorktreeInventory,
+} from '@/utils/newSessionWorktreeInventory';
 
 type PickerItem = { key: string; label: string; subtitle?: string; dimmed?: boolean };
 
-type PickerType = 'machine' | 'path' | 'worktree' | 'agent' | 'model' | 'effort' | 'permission';
+type PickerType = 'machine' | 'path' | 'worktree';
 
-type PermissionStyle = { color: string; icon: 'play-forward' | 'pause' };
-
-const COMPOSER_INPUT_VERTICAL_PADDING = Platform.OS === 'web' ? 10 : 8;
-// Taller composer on web/desktop where vertical space is plentiful; keep the
-// compact cap on native mobile so the input doesn't dominate the screen.
-const COMPOSER_INPUT_MAX_HEIGHT = Platform.OS === 'web' ? 480 : 240;
+const COMPOSER_INPUT_VERTICAL_PADDING = 8;
+const COMPOSER_INPUT_MAX_HEIGHT = 240;
 const COMPOSER_SEND_BUTTON_SIZE = 32;
 const WORKTREE_PATH_DEBOUNCE_MS = 300;
 
@@ -104,26 +79,6 @@ function normalizePathForComparison(path: string | null | undefined, homeDir?: s
         return null;
     }
     return trimTrailingPathSeparator(resolveAbsolutePath(trimmed, homeDir));
-}
-
-function getPermissionStyle(key: string): PermissionStyle | null {
-    switch (key) {
-        case 'acceptEdits':
-        case 'auto_edit':
-            return { color: '#A78BFA', icon: 'play-forward' };
-        case 'plan':
-            return { color: '#5EABA4', icon: 'pause' };
-        case 'dontAsk':
-        case 'safe-yolo':
-            return { color: '#FBBF24', icon: 'play-forward' };
-        case 'bypassPermissions':
-        case 'yolo':
-            return { color: '#F87171', icon: 'play-forward' };
-        case 'read-only':
-            return { color: '#60A5FA', icon: 'pause' };
-        default:
-            return null;
-    }
 }
 
 // Bottom sheet modal — native formSheet on iOS, slide-up sheet on Android
@@ -215,7 +170,6 @@ function PickerContent({
     selectedKey,
     onSelect,
     searchPlaceholder,
-    embedded = false,
 }: {
     title: string;
     fixedItems?: PickerItem[];
@@ -223,17 +177,15 @@ function PickerContent({
     selectedKey: string | null;
     onSelect: (key: string) => void;
     searchPlaceholder?: string;
-    embedded?: boolean;
 }) {
     const { theme } = useUnistyles();
     const [search, setSearch] = React.useState('');
-    const shouldShowSearch = !embedded || items.length + (fixedItems?.length ?? 0) > 4;
 
     const filtered = React.useMemo(() => {
-        if (!shouldShowSearch || !search) return items;
+        if (!search) return items;
         const q = search.toLowerCase();
         return items.filter(item => item.label.toLowerCase().includes(q));
-    }, [shouldShowSearch, search, items]);
+    }, [search, items]);
 
     const renderOption = (item: PickerItem) => {
         const isSelected = item.key === selectedKey;
@@ -242,7 +194,6 @@ function PickerContent({
                 key={item.key}
                 style={(p) => [
                     pickerStyles.option,
-                    embedded && pickerStyles.embeddedOption,
                     p.pressed && pickerStyles.optionPressed,
                     item.dimmed && { opacity: 0.45 },
                 ]}
@@ -268,33 +219,24 @@ function PickerContent({
     };
 
     return (
-        <View style={[pickerStyles.container, embedded && pickerStyles.embeddedContainer]}>
-            {!embedded && (
-                <Text style={[pickerStyles.title, { color: theme.colors.text }]}>{title}</Text>
-            )}
+        <View style={pickerStyles.container}>
+            <Text style={[pickerStyles.title, { color: theme.colors.text }]}>{title}</Text>
 
-            {shouldShowSearch && (
-                <View style={[
-                    pickerStyles.searchRow,
-                    { backgroundColor: embedded ? 'transparent' : theme.colors.input.background },
-                    embedded && pickerStyles.embeddedSearchRow,
-                ]}>
-                    <Ionicons name="search" size={16} color={theme.colors.textSecondary} />
-                    <TextInput
-                        value={search}
-                        onChangeText={setSearch}
-                        placeholder={searchPlaceholder ?? t('appWide.search')}
-                        placeholderTextColor={theme.colors.textSecondary}
-                        style={[pickerStyles.searchInput, { color: theme.colors.text }]}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                    />
-                </View>
-            )}
+            <View style={[pickerStyles.searchRow, { backgroundColor: theme.colors.input.background }]}>
+                <Ionicons name="search" size={16} color={theme.colors.textSecondary} />
+                <TextInput
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder={searchPlaceholder ?? t('appWide.search')}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    style={[pickerStyles.searchInput, { color: theme.colors.text }]}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                />
+            </View>
 
             <ScrollView
-                style={[pickerStyles.optionList, embedded && pickerStyles.embeddedOptionList]}
-                contentContainerStyle={embedded && pickerStyles.embeddedOptionListContent}
+                style={pickerStyles.optionList}
                 keyboardShouldPersistTaps="handled"
             >
                 {fixedItems?.map(renderOption)}
@@ -317,7 +259,6 @@ function PathPickerContent({
     homeDir,
     onChangeValue,
     onDone,
-    embedded = false,
 }: {
     title: string;
     items: PickerItem[];
@@ -325,7 +266,6 @@ function PathPickerContent({
     homeDir?: string;
     onChangeValue: (value: string) => void;
     onDone?: () => void;
-    embedded?: boolean;
 }) {
     const { theme } = useUnistyles();
     const inputRef = React.useRef<TextInput>(null);
@@ -371,49 +311,46 @@ function PathPickerContent({
     const doneIconColor = theme.colors.header.tint;
 
     return (
-        <View style={[pickerStyles.container, embedded && pickerStyles.embeddedContainer]}>
-            {!embedded && (
-                <View style={pickerStyles.titleRow}>
-                    <Text style={[pickerStyles.title, { color: theme.colors.text }]}>{title}</Text>
-                    {Platform.OS !== 'web' && onDone && (
-                        <Pressable
-                            onPress={onDone}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            style={({ pressed }) => [
-                                pickerStyles.doneButtonPressable,
-                                { opacity: pressed ? 0.82 : 1 },
+        <View style={pickerStyles.container}>
+            <View style={pickerStyles.titleRow}>
+                <Text style={[pickerStyles.title, { color: theme.colors.text }]}>{title}</Text>
+                {onDone && (
+                    <Pressable
+                        onPress={onDone}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={({ pressed }) => [
+                            pickerStyles.doneButtonPressable,
+                            { opacity: pressed ? 0.82 : 1 },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('appWide.done')}
+                    >
+                        <GlassView
+                            glassEffectStyle="regular"
+                            tintColor="rgba(255,255,255,0.10)"
+                            isInteractive={true}
+                            style={[
+                                pickerStyles.doneButtonGlass,
+                                { borderColor: 'rgba(255,255,255,0.16)' },
                             ]}
-                            accessibilityRole="button"
-                            accessibilityLabel={t('appWide.done')}
                         >
-                            <GlassView
-                                glassEffectStyle="regular"
-                                tintColor="rgba(255,255,255,0.10)"
-                                isInteractive={true}
-                                style={[
-                                    pickerStyles.doneButtonGlass,
-                                    { borderColor: 'rgba(255,255,255,0.16)' },
-                                ]}
-                            >
-                                <Ionicons
-                                    name="checkmark"
-                                    size={20}
-                                    color={doneIconColor}
-                                />
-                            </GlassView>
-                        </Pressable>
-                    )}
-                </View>
-            )}
+                            <Ionicons
+                                name="checkmark"
+                                size={20}
+                                color={doneIconColor}
+                            />
+                        </GlassView>
+                    </Pressable>
+                )}
+            </View>
 
             <View
                 style={[
                     pickerStyles.pathInputRow,
                     {
-                        backgroundColor: embedded ? 'transparent' : theme.colors.input.background,
-                        borderColor: embedded ? 'transparent' : theme.colors.divider,
+                        backgroundColor: theme.colors.input.background,
+                        borderColor: theme.colors.divider,
                     },
-                    embedded && pickerStyles.embeddedPathInputRow,
                 ]}
             >
                 <Ionicons name="folder-outline" size={16} color={theme.colors.textSecondary} />
@@ -428,7 +365,6 @@ function PathPickerContent({
                         placeholderTextColor={theme.colors.textSecondary}
                         style={[
                             pickerStyles.pathTextInput,
-                            embedded && pickerStyles.embeddedPathTextInput,
                             { color: theme.colors.text },
                         ]}
                         autoCapitalize="none"
@@ -448,8 +384,7 @@ function PathPickerContent({
             <Text style={[pickerStyles.sectionLabel, { color: theme.colors.textSecondary }]}>{t('appWide.recent')}</Text>
 
             <ScrollView
-                style={[pickerStyles.optionList, embedded && pickerStyles.embeddedOptionList]}
-                contentContainerStyle={embedded && pickerStyles.embeddedOptionListContent}
+                style={pickerStyles.optionList}
                 keyboardShouldPersistTaps="handled"
             >
                 {items.map((item) => {
@@ -460,7 +395,6 @@ function PathPickerContent({
                             key={item.key}
                             style={(p) => [
                                 pickerStyles.option,
-                                embedded && pickerStyles.embeddedOption,
                                 p.pressed && pickerStyles.optionPressed,
                             ]}
                             onPress={() => handleSuggestionPress(item)}
@@ -505,7 +439,6 @@ function getMachineName(machine: Machine): string {
 // because all of its props are stable.
 type PromptInputProps = {
     placeholder: string;
-    onKeyPress?: (e: KeyPressEvent) => boolean;
 };
 const PromptInput = React.memo(React.forwardRef<MultiTextInputHandle, PromptInputProps>(
     function PromptInput(props, ref) {
@@ -521,7 +454,6 @@ const PromptInput = React.memo(React.forwardRef<MultiTextInputHandle, PromptInpu
                 paddingTop={COMPOSER_INPUT_VERTICAL_PADDING}
                 paddingBottom={COMPOSER_INPUT_VERTICAL_PADDING}
                 maxHeight={COMPOSER_INPUT_MAX_HEIGHT}
-                onKeyPress={props.onKeyPress}
             />
         );
     },
@@ -538,8 +470,6 @@ function NewSessionScreen() {
     // Real data sources
     const allMachines = useAllMachines({ includeOffline: true });
     const sessions = useSessions();
-    const agentInputEnterToSend = useSetting('agentInputEnterToSend');
-    const agentDefaultOverrides = useSetting('agentDefaultOverrides');
     const fileDiffsSidebarEnabled = useSetting('fileDiffsSidebar');
     const zenMode = useLocalSetting('zenMode');
     const { width: windowWidth } = useWindowDimensions();
@@ -558,38 +488,27 @@ function NewSessionScreen() {
         setMachineId: s.setMachineId,
         selectedPath: s.selectedPath,
         setPath: s.setPath,
-        agentType: s.agentType,
-        setAgentType: s.setAgentType,
-        permissionMode: s.permissionMode,
-        setPermissionMode: s.setPermissionMode,
-        modelMode: s.modelMode,
-        setModelMode: s.setModelMode,
         sessionType: s.sessionType,
         setSessionType: s.setSessionType,
         worktreeKey: s.worktreeKey,
         setWorktreeKey: s.setWorktreeKey,
     })));
     const hasText = useNewSessionDraft((s) => s.input.trim().length > 0);
-    const selectedAgent = draft.agentType;
-    const setSelectedAgent = draft.setAgentType;
     const selectedMachineId = draft.selectedMachineId;
     const setSelectedMachineId = draft.setMachineId;
     const selectedPath = draft.selectedPath;
     const setSelectedPath = draft.setPath;
-    const [worktreeKey, setWorktreeKey] = React.useState<string>(
-        draft.worktreeKey ?? (draft.sessionType === 'worktree' ? '__new__' : '__none__')
-    );
-    React.useEffect(() => {
-        draft.setSessionType(worktreeKey !== '__none__' ? 'worktree' : 'simple');
-        draft.setWorktreeKey(worktreeKey === '__none__' || worktreeKey === '__new__' ? null : worktreeKey);
-    }, [worktreeKey]);
+    const worktreeKey = draft.worktreeKey
+        ?? (draft.sessionType === 'worktree' ? '__new__' : '__none__');
+    const setWorktreeKey = React.useCallback((key: string) => {
+        draft.setSessionType(key === '__none__' ? 'simple' : 'worktree');
+        draft.setWorktreeKey(key === '__none__' || key === '__new__' ? null : key);
+    }, [draft.setSessionType, draft.setWorktreeKey]);
 
     // Local-only UI state (not persisted)
-    const [permissionIndex, setPermissionIndex] = React.useState(0);
-    const [modelIndex, setModelIndex] = React.useState(0);
-    const [effortIndex, setEffortIndex] = React.useState(0);
     const [isSpawning, setIsSpawning] = React.useState(false);
     const [activePicker, setActivePicker] = React.useState<PickerType | null>(null);
+    const [worktreeRefreshNonce, setWorktreeRefreshNonce] = React.useState(0);
 
     // Config collapse — auto-collapses when typing, expands when empty
     const [isConfigExpanded, setIsConfigExpanded] = React.useState(true);
@@ -669,107 +588,91 @@ function NewSessionScreen() {
         return () => clearTimeout(timeout);
     }, [resolvedSelectedPath]);
 
-    // Fetch existing worktrees from the selected machine/path
-    const [worktreeItems, setWorktreeItems] = React.useState<PickerItem[]>([]);
+    // Bind every fetched worktree list to the exact machine/base-path/request
+    // generation that produced it. The generation changes synchronously during
+    // render, so old results disappear before the refresh effect runs.
+    const selectedMachineOnline = selectedMachine ? isMachineOnline(selectedMachine) : false;
+    const worktreeRequestIdentity = JSON.stringify([
+        selectedMachineId,
+        resolvedSelectedPath,
+        selectedMachineOnline,
+        worktreeRefreshNonce,
+    ]);
+    const worktreeRequestRef = React.useRef({ identity: '', generation: 0 });
+    worktreeRequestRef.current = advanceWorktreeRequestVersion(
+        worktreeRequestRef.current,
+        worktreeRequestIdentity,
+    );
+    const worktreeRequestGeneration = worktreeRequestRef.current.generation;
+    const [worktreeInventory, setWorktreeInventory] = React.useState<NewSessionWorktreeInventory<PickerItem> | null>(null);
+    const worktreeItems = React.useMemo(
+        () => currentWorktreeItems(
+            worktreeInventory,
+            selectedMachineId,
+            resolvedSelectedPath,
+            worktreeRequestGeneration,
+        ),
+        [worktreeInventory, selectedMachineId, resolvedSelectedPath, worktreeRequestGeneration],
+    );
     React.useEffect(() => {
-        if (!selectedMachineId || !debouncedResolvedSelectedPath) {
-            setWorktreeItems([]);
-            return;
-        }
-        if (!selectedMachine || !isMachineOnline(selectedMachine)) {
-            setWorktreeItems([]);
+        if (
+            !selectedMachineId
+            || !resolvedSelectedPath
+            || debouncedResolvedSelectedPath !== resolvedSelectedPath
+            || !selectedMachineOnline
+        ) {
+            setWorktreeInventory(null);
             return;
         }
         let cancelled = false;
-        listWorktrees(selectedMachineId, debouncedResolvedSelectedPath).then(worktrees => {
+        const machineId = selectedMachineId;
+        const basePath = resolvedSelectedPath;
+        const generation = worktreeRequestGeneration;
+        setWorktreeInventory({ machineId, basePath, generation, status: 'loading', items: [] });
+        listWorktrees(machineId, basePath).then(result => {
             if (cancelled) return;
-            setWorktreeItems(worktrees.map(wt => ({
-                key: wt.path,
-                label: wt.branch,
-                subtitle: wt.path,
-            })));
+            if (!result.success) {
+                setWorktreeInventory({
+                    machineId,
+                    basePath,
+                    generation,
+                    status: 'error',
+                    items: [],
+                    error: result.error,
+                });
+                return;
+            }
+            setWorktreeInventory({
+                machineId,
+                basePath,
+                generation,
+                status: 'success',
+                items: result.worktrees.map(wt => ({
+                    key: wt.path,
+                    label: wt.branch,
+                    subtitle: wt.path,
+                })),
+            });
+        }).catch(error => {
+            if (cancelled) return;
+            setWorktreeInventory({
+                machineId,
+                basePath,
+                generation,
+                status: 'error',
+                items: [],
+                error: error instanceof Error ? error.message : 'Failed to list worktrees',
+            });
         });
         return () => { cancelled = true; };
-    }, [debouncedResolvedSelectedPath, selectedMachineId, selectedMachine]);
+    }, [debouncedResolvedSelectedPath, resolvedSelectedPath, selectedMachineId, selectedMachineOnline, worktreeRequestGeneration]);
 
-    React.useEffect(() => {
-        if (worktreeKey === '__none__' || worktreeKey === '__new__') {
-            return;
-        }
-
-        if (!worktreeItems.some((item) => item.key === worktreeKey)) {
-            setWorktreeKey('__none__');
-        }
-    }, [worktreeItems, worktreeKey]);
-
-    // Filter available agents based on CLI availability from machine metadata
-    const availableAgents = React.useMemo(() => {
-        const availability = selectedMachine?.metadata?.cliAvailability;
-        if (!availability) return ALL_AGENTS;
-        return ALL_AGENTS.filter(a => availability[a.key]);
-    }, [selectedMachine]);
-
-    // If current agent not available on this machine, switch to first available
-    React.useEffect(() => {
-        if (availableAgents.length > 0 && !availableAgents.find(a => a.key === selectedAgent)) {
-            setSelectedAgent(availableAgents[0].key);
-        }
-    }, [availableAgents, selectedAgent, setSelectedAgent]);
-
-    // Derive options from agent type
-    const permissionModes = React.useMemo<PermissionMode[]>(
-        () => getHardcodedPermissionModes(selectedAgent, t),
-        [selectedAgent],
-    );
-    const modelModes = React.useMemo<ModelMode[]>(
-        () => getHardcodedModelModes(selectedAgent, t),
-        [selectedAgent],
-    );
-
-    const currentModel = modelModes[modelIndex] ?? modelModes[0];
-    const currentModelKey = currentModel?.key ?? 'default';
-
-    const effortLevels = React.useMemo<EffortLevel[]>(
-        () => getEffortLevelsForModel(selectedAgent, currentModelKey),
-        [selectedAgent, currentModelKey],
-    );
-    const effectiveAgentDefaults = React.useMemo(() => (
-        resolveAgentDefaultConfig(agentDefaultOverrides, selectedAgent)
-    ), [agentDefaultOverrides, selectedAgent]);
-
-    const supportsWorktree = getSupportsWorktree(selectedAgent);
-    const showModel = modelModes.length > 1;
-    const showEffort = effortLevels.length > 0;
-    const showPermission = permissionModes.length > 1;
-
-    // Reset indices when agent/default settings change.
-    React.useEffect(() => {
-        const defaultPermIdx = permissionModes.findIndex(m => m.key === effectiveAgentDefaults.permissionMode);
-        setPermissionIndex(defaultPermIdx >= 0 ? defaultPermIdx : 0);
-
-        const defaultModelIdx = modelModes.findIndex(m => m.key === effectiveAgentDefaults.modelMode);
-        setModelIndex(defaultModelIdx >= 0 ? defaultModelIdx : 0);
-
-        if (!supportsWorktree) setWorktreeKey('__none__');
-    }, [permissionModes, modelModes, supportsWorktree, effectiveAgentDefaults.permissionMode, effectiveAgentDefaults.modelMode]);
-
-    // Reset effort when model changes
-    React.useEffect(() => {
-        const defaultEffort = effectiveAgentDefaults.effortLevel;
-        if (defaultEffort && effortLevels.length > 0) {
-            const idx = effortLevels.findIndex(e => e.key === defaultEffort);
-            setEffortIndex(idx >= 0 ? idx : effortLevels.length - 1);
-        } else {
-            setEffortIndex(0);
-        }
-    }, [effectiveAgentDefaults.effortLevel, currentModelKey, effortLevels]);
-
-    // Auto collapse config once when user starts typing (mobile only)
-    // On desktop (web / Mac Catalyst) the panel stays expanded
+    // Auto collapse config once when user starts typing on phones and tablets.
+    // On Mac Catalyst the panel stays expanded.
     // Also skip collapsing on the initial render when draft text is restored
     const hasCollapsedOnceRef = React.useRef(false);
     const isInitialRef = React.useRef(true);
-    const isDesktop = Platform.OS === 'web' || isRunningOnMac();
+    const isDesktop = isRunningOnMac();
     React.useEffect(() => {
         if (isInitialRef.current) {
             isInitialRef.current = false;
@@ -791,14 +694,14 @@ function NewSessionScreen() {
     }, []);
 
     const togglePicker = React.useCallback((type: PickerType) => {
-        setActivePicker(v => v === type ? null : type);
-    }, []);
+        const nextPicker = activePicker === type ? null : type;
+        if (nextPicker === 'worktree') {
+            setWorktreeRefreshNonce(value => value + 1);
+        }
+        setActivePicker(nextPicker);
+    }, [activePicker]);
 
     const isOffline = selectedMachine ? !isMachineOnline(selectedMachine) : false;
-    const agent = availableAgents.find(a => a.key === selectedAgent) ?? ALL_AGENTS[0];
-    const currentPermission = permissionModes[permissionIndex] ?? permissionModes[0];
-    const currentEffort = effortLevels[effortIndex] ?? effortLevels[0];
-    const permissionStyle = currentPermission?.key !== 'default' ? getPermissionStyle(currentPermission.key) : null;
 
     // Display values
     const machineName = selectedMachine ? getMachineName(selectedMachine) : 'Select machine';
@@ -818,28 +721,12 @@ function NewSessionScreen() {
                 return { title: t('appWide.machine'), items: machineItems, selectedKey: selectedMachineId, searchPlaceholder: 'search machines...' };
             case 'worktree':
                 return { title: t('appWide.worktree'), fixedItems: WORKTREE_FIXED_ITEMS, items: worktreeItems, selectedKey: worktreeKey, searchPlaceholder: 'search worktrees...' };
-            case 'agent':
-                return { title: t('appWide.agent'), items: getAgentPickerItems(availableAgents), selectedKey: selectedAgent, searchPlaceholder: 'search agents...' };
-            case 'model':
-                return { title: t('appWide.model'), items: getModePickerItems(modelModes), selectedKey: currentModelKey, searchPlaceholder: 'search models...' };
-            case 'effort':
-                return { title: t('appWide.effort'), items: getModePickerItems(effortLevels), selectedKey: currentEffort?.key ?? null, searchPlaceholder: 'search efforts...' };
-            case 'permission':
-                return { title: t('appWide.permissions'), items: getModePickerItems(permissionModes), selectedKey: currentPermission?.key ?? null, searchPlaceholder: 'search permissions...' };
             default:
                 return null;
         }
     }, [
         activePicker,
-        availableAgents,
-        currentEffort?.key,
-        currentModelKey,
-        currentPermission?.key,
-        effortLevels,
         machineItems,
-        modelModes,
-        permissionModes,
-        selectedAgent,
         selectedMachineId,
         worktreeKey,
         worktreeItems,
@@ -848,53 +735,26 @@ function NewSessionScreen() {
     const handlePickerSelect = React.useCallback((key: string) => {
         switch (activePicker) {
             case 'machine':
+                setWorktreeKey('__none__');
                 setSelectedMachineId(key);
                 break;
             case 'worktree':
-                setWorktreeKey(key);
+                setWorktreeKey(isCurrentWorktreeSelection(
+                    key,
+                    worktreeInventory,
+                    selectedMachineId,
+                    resolvedSelectedPath,
+                    worktreeRequestGeneration,
+                ) ? key : '__none__');
                 break;
-            case 'agent':
-                if (availableAgents.some((candidate) => candidate.key === key)) {
-                    setSelectedAgent(key as NewSessionAgentType);
-                }
-                break;
-            case 'model': {
-                const next = modelModes.findIndex((mode) => mode.key === key);
-                if (next >= 0) {
-                    setModelIndex(next);
-                    draft.setModelMode(modelModes[next]?.key ?? 'default');
-                }
-                break;
-            }
-            case 'effort': {
-                const next = effortLevels.findIndex((level) => level.key === key);
-                if (next >= 0) {
-                    setEffortIndex(next);
-                }
-                break;
-            }
-            case 'permission': {
-                const next = permissionModes.findIndex((mode) => mode.key === key);
-                if (next >= 0) {
-                    setPermissionIndex(next);
-                    draft.setPermissionMode(permissionModes[next]?.key ?? 'default');
-                }
-                break;
-            }
         }
         setActivePicker(null);
-    }, [
-        activePicker,
-        availableAgents,
-        draft.setModelMode,
-        draft.setPermissionMode,
-        effortLevels,
-        modelModes,
-        permissionModes,
-        setSelectedAgent,
-        setSelectedMachineId,
-        setWorktreeKey,
-    ]);
+    }, [activePicker, resolvedSelectedPath, selectedMachineId, setSelectedMachineId, setWorktreeKey, worktreeInventory, worktreeRequestGeneration]);
+
+    const handlePathChange = React.useCallback((value: string) => {
+        setWorktreeKey('__none__');
+        setSelectedPath(value);
+    }, [setSelectedPath]);
 
     // Spawn session handler
     const handleSend = React.useCallback(async (approvedNewDirectoryCreation: boolean = false) => {
@@ -922,7 +782,16 @@ function NewSessionScreen() {
                 }
                 spawnDirectory = worktreeResult.worktreePath;
             } else if (worktreeKey !== '__none__') {
-                // Existing worktree — use its path directly
+                if (!isCurrentWorktreeSelection(
+                    worktreeKey,
+                    worktreeInventory,
+                    selectedMachineId,
+                    resolvedSelectedPath,
+                    worktreeRequestGeneration,
+                )) {
+                    Modal.alert(t('common.error'), t('appWide.failedToCreateWorktree'));
+                    return;
+                }
                 spawnDirectory = worktreeKey;
             }
 
@@ -930,39 +799,30 @@ function NewSessionScreen() {
                 machineId: selectedMachineId,
                 directory: spawnDirectory,
                 approvedNewDirectoryCreation,
-                agent: selectedAgent,
+                agent: 'pi',
             });
 
             switch (result.type) {
                 case 'success':
                     await sync.refreshSessions();
 
-                    // Store only per-session overrides. Matching the effective
-                    // default stays null so future code default changes apply.
-                    const permissionOverride = currentPermission.key === effectiveAgentDefaults.permissionMode
-                        ? null
-                        : currentPermission.key;
-                    const modelOverride = currentModelKey === effectiveAgentDefaults.modelMode
-                        ? null
-                        : currentModelKey;
-                    const currentEffortKey = currentEffort?.key ?? null;
-                    const effortOverride = currentEffortKey === effectiveAgentDefaults.effortLevel
-                        ? null
-                        : currentEffortKey;
-                    storage.getState().updateSessionPermissionMode(result.sessionId, permissionOverride);
-                    storage.getState().updateSessionModelMode(result.sessionId, modelOverride);
-                    storage.getState().updateSessionEffortLevel(result.sessionId, effortOverride);
-
-                    // Pull live prompt and clear it. We read via getState() so this
-                    // callback doesn't have to subscribe to `input` (which would
-                    // re-render the screen on every keystroke).
-                    const draftState = useNewSessionDraft.getState();
-                    const trimmedPrompt = draftState.input.trim();
-                    draftState.setInput('');
-
-                    // Send initial message if provided
-                    if (trimmedPrompt) {
-                        await sync.sendMessage(result.sessionId, trimmedPrompt, { source: 'new_session' });
+                    // Read the prompt imperatively so the parent remains outside
+                    // the per-keystroke render path. Clear only after durable queueing;
+                    // otherwise transfer it to the created Session Remote draft.
+                    const rawPrompt = useNewSessionDraft.getState().input;
+                    const delivery = await deliverNewSessionPrompt({
+                        rawPrompt,
+                        send: (prompt) => sync.sendMessage(result.sessionId, prompt, { source: 'new_session' }),
+                        clearIfUnchanged: (expected) => {
+                            const current = useNewSessionDraft.getState();
+                            if (current.input === expected) current.setInput('');
+                        },
+                        preserveForSession: (prompt) => {
+                            storage.getState().updateSessionDraft(result.sessionId, prompt);
+                        },
+                    });
+                    if (delivery.error) {
+                        Modal.alert(t('common.error'), t('appWide.messageFailed'));
                     }
 
                     router.back();
@@ -991,11 +851,22 @@ function NewSessionScreen() {
         } finally {
             setIsSpawning(false);
         }
-    }, [selectedMachineId, selectedMachine, selectedPath, selectedAgent, router, navigateToSession, currentPermission.key, currentModelKey, currentEffort?.key, effectiveAgentDefaults.permissionMode, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.effortLevel, worktreeKey]);
+    }, [selectedMachineId, selectedMachine, selectedPath, resolvedSelectedPath, router, navigateToSession, worktreeInventory, worktreeKey, worktreeRequestGeneration]);
 
-    const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning;
+    const canSend = Boolean(
+        selectedMachineId
+        && selectedMachine
+        && isMachineOnline(selectedMachine)
+        && !isSpawning
+        && isCurrentWorktreeSelection(
+            worktreeKey,
+            worktreeInventory,
+            selectedMachineId,
+            resolvedSelectedPath,
+            worktreeRequestGeneration,
+        )
+    );
     const sidebarLayout = getNewSessionSidebarLayout({
-        platform: Platform.OS,
         isMac: isRunningOnMac(),
         fileDiffsSidebarEnabled,
         zenMode,
@@ -1006,17 +877,6 @@ function NewSessionScreen() {
         return () => navigation.setOptions({ headerShown: true });
     }, [navigation, sidebarLayout.showSidebar]);
 
-    // Handle Enter/Cmd+Enter to send on web
-    const handleKeyPress = React.useCallback((event: KeyPressEvent): boolean => {
-        if (Platform.OS === 'web' && event.key === 'Enter' && !event.shiftKey && agentInputEnterToSend) {
-            if (canSend) {
-                handleSend();
-                return true;
-            }
-        }
-        return false;
-    }, [agentInputEnterToSend, canSend, handleSend]);
-
     // Auto-focus the text input when the composer mounts
     const composerInputRef = React.useRef<import('@/components/MultiTextInput').MultiTextInputHandle>(null);
     React.useEffect(() => {
@@ -1026,54 +886,10 @@ function NewSessionScreen() {
         return () => clearTimeout(timeout);
     }, []);
 
-    const renderActivePickerPopover = React.useCallback((type: PickerType) => {
-        if (Platform.OS !== 'web' || activePicker !== type) {
-            return null;
-        }
-
-        return (
-            <View style={[
-                styles.popover,
-                sidebarLayout.showSidebar
-                    ? styles.sidebarPopover
-                    : { backgroundColor: theme.colors.header.background },
-            ]}>
-                {type === 'path' ? (
-                    <PathPickerContent
-                        title={t('appWide.project')}
-                        items={pathItems}
-                        value={selectedPath}
-                        homeDir={selectedHomeDir}
-                        onChangeValue={setSelectedPath}
-                        onDone={() => setActivePicker(null)}
-                        embedded={sidebarLayout.showSidebar}
-                    />
-                ) : pickerData ? (
-                    <PickerContent
-                        {...pickerData}
-                        onSelect={handlePickerSelect}
-                        embedded={sidebarLayout.showSidebar}
-                    />
-                ) : null}
-            </View>
-        );
-    }, [
-        activePicker,
-        handlePickerSelect,
-        pathItems,
-        pickerData,
-        selectedHomeDir,
-        selectedPath,
-        setSelectedPath,
-        sidebarLayout.showSidebar,
-        theme.colors.header.background,
-    ]);
-
     const configContent = (
         <>
             <View style={[
                 styles.configBox,
-                activePicker && styles.configBoxWithPopover,
                 sidebarLayout.showSidebar && styles.sidebarConfigBox,
             ]}>
                 {sidebarLayout.showSidebar || isConfigExpanded ? (
@@ -1103,8 +919,6 @@ function NewSessionScreen() {
                                 </Pressable>
                             )}
                         </View>
-                        {renderActivePickerPopover('machine')}
-
                         {isOffline && (
                             <View style={styles.offlineHelp}>
                                 <Ionicons name="cloud-offline-outline" size={14} color={theme.colors.status.disconnected} />
@@ -1131,85 +945,16 @@ function NewSessionScreen() {
                                 </Text>
                                 <Ionicons name="chevron-down" size={13} color={theme.colors.textSecondary} />
                             </Pressable>
-                            {renderActivePickerPopover('path')}
-
-                            <View style={styles.configRow}>
-                                <Pressable
-                                    onPress={() => togglePicker('agent')}
-                                    style={(p) => [styles.configInlineField, p.pressed && styles.configRowPressed]}
-                                >
-                                    <RNImage
-                                        source={agentIcons[agent.key]}
-                                        style={[styles.agentIcon, { tintColor: theme.colors.textSecondary }]}
-                                        resizeMode="contain"
-                                    />
-                                    <Text style={[styles.configLabel, styles.configInlineText]} numberOfLines={1}>
-                                        {agent.label}
-                                    </Text>
-                                    <Ionicons name="chevron-down" size={12} color={theme.colors.textSecondary} />
-                                </Pressable>
-
-                                {showModel && (
-                                    <>
-                                        <Text style={[styles.configLabel, { color: theme.colors.textSecondary }]}>·</Text>
-                                        <Pressable onPress={() => togglePicker('model')} style={(p) => [styles.configInlineField, p.pressed && styles.configRowPressed]}>
-                                            <Text style={[styles.configLabel, styles.configInlineText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                                                {currentModel.name}
-                                            </Text>
-                                            <Ionicons name="chevron-down" size={12} color={theme.colors.textSecondary} />
-                                        </Pressable>
-                                    </>
-                                )}
-
-                                {showEffort && (
-                                    <>
-                                        <Text style={[styles.configLabel, { color: theme.colors.textSecondary }]}>·</Text>
-                                        <Pressable onPress={() => togglePicker('effort')} style={(p) => [styles.configInlineField, p.pressed && styles.configRowPressed]}>
-                                            <Text style={[styles.configLabel, styles.configInlineText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                                                {currentEffort?.name}
-                                            </Text>
-                                            <Ionicons name="chevron-down" size={12} color={theme.colors.textSecondary} />
-                                        </Pressable>
-                                    </>
-                                )}
-                            </View>
-                            {renderActivePickerPopover('agent')}
-                            {renderActivePickerPopover('model')}
-                            {renderActivePickerPopover('effort')}
-
-                            {showPermission && (
-                                <Pressable
-                                    style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
-                                    onPress={() => togglePicker('permission')}
-                                >
-                                    <Ionicons
-                                        name={permissionStyle?.icon ?? 'shield-outline'}
-                                        size={15}
-                                        color={theme.colors.textSecondary}
-                                    />
-                                    <Text style={[styles.configLabel, styles.configValueText]} numberOfLines={1}>
-                                        {currentPermission?.name}
-                                    </Text>
-                                    <Ionicons name="chevron-down" size={13} color={theme.colors.textSecondary} />
-                                </Pressable>
-                            )}
-                            {renderActivePickerPopover('permission')}
-
-                            {supportsWorktree && (
-                                <>
-                                    <Pressable
-                                        style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
-                                        onPress={() => togglePicker('worktree')}
-                                    >
-                                        <MaterialCommunityIcons name="tree" size={15} color={theme.colors.textSecondary} />
-                                        <Text style={[styles.configLabel, styles.configValueText]} numberOfLines={1}>
-                                            {worktreeLabel}
-                                        </Text>
-                                        <Ionicons name="chevron-down" size={13} color={theme.colors.textSecondary} />
-                                    </Pressable>
-                                    {renderActivePickerPopover('worktree')}
-                                </>
-                            )}
+                            <Pressable
+                                style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
+                                onPress={() => togglePicker('worktree')}
+                            >
+                                <MaterialCommunityIcons name="tree" size={15} color={theme.colors.textSecondary} />
+                                <Text style={[styles.configLabel, styles.configValueText]} numberOfLines={1}>
+                                    {worktreeLabel}
+                                </Text>
+                                <Ionicons name="chevron-down" size={13} color={theme.colors.textSecondary} />
+                            </Pressable>
                         </View>
                     </>
                 ) : (
@@ -1232,8 +977,6 @@ function NewSessionScreen() {
                                 <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
                             </Pressable>
                         </View>
-                        {renderActivePickerPopover('path')}
-
                         <View style={styles.collapsedIconsRow}>
                             <Pressable
                                 onPress={() => togglePicker('machine')}
@@ -1244,46 +987,13 @@ function NewSessionScreen() {
                             </Pressable>
 
                             <Pressable
-                                onPress={() => togglePicker('agent')}
+                                onPress={() => togglePicker('worktree')}
                                 hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                                 style={(p) => [styles.collapsedIconButton, p.pressed && styles.configRowPressed]}
                             >
-                                <RNImage
-                                    source={agentIcons[agent.key]}
-                                    style={[styles.collapsedAgentIcon, { tintColor: theme.colors.textSecondary }]}
-                                    resizeMode="contain"
-                                />
+                                <MaterialCommunityIcons name="tree" size={14} color={theme.colors.textSecondary} />
                             </Pressable>
-
-                            {showPermission && (
-                                <Pressable
-                                    onPress={() => togglePicker('permission')}
-                                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                                    style={(p) => [styles.collapsedIconButton, p.pressed && styles.configRowPressed]}
-                                >
-                                    <Ionicons
-                                        name={permissionStyle?.icon ?? 'shield-outline'}
-                                        size={14}
-                                        color={permissionStyle?.color ?? theme.colors.textSecondary}
-                                    />
-                                </Pressable>
-                            )}
-
-                            {supportsWorktree && (
-                                <Pressable
-                                    onPress={() => togglePicker('worktree')}
-                                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                                    style={(p) => [styles.collapsedIconButton, p.pressed && styles.configRowPressed]}
-                                >
-                                    <MaterialCommunityIcons name="tree" size={14} color={theme.colors.textSecondary} />
-                                </Pressable>
-                            )}
                         </View>
-                        {renderActivePickerPopover('machine')}
-                        {renderActivePickerPopover('agent')}
-                        {renderActivePickerPopover('permission')}
-                        {renderActivePickerPopover('worktree')}
-
                         {isOffline && (
                             <View style={styles.offlineHelp}>
                                 <Ionicons name="cloud-offline-outline" size={14} color={theme.colors.status.disconnected} />
@@ -1310,7 +1020,6 @@ function NewSessionScreen() {
                 <PromptInput
                     ref={composerInputRef}
                     placeholder={t('appWide.whatWouldYouLikeToWorkOn')}
-                    onKeyPress={handleKeyPress}
                 />
             </View>
             <View style={styles.actionButtonsContainer}>
@@ -1341,7 +1050,7 @@ function NewSessionScreen() {
                                 color={theme.colors.button.primary.tint}
                                 style={[
                                     styles.sendButtonIcon,
-                                    { marginTop: Platform.OS === 'web' ? 2 : 0 },
+                                    { marginTop: 0 },
                                 ]}
                             />
                         )}
@@ -1359,12 +1068,6 @@ function NewSessionScreen() {
         >
             {sidebarLayout.showSidebar ? (
                 <View style={styles.desktopShell}>
-                    {Platform.OS === 'web' && activePicker && (
-                        <Pressable
-                            style={styles.clickAwayBackdrop}
-                            onPress={() => setActivePicker(null)}
-                        />
-                    )}
                     <View style={styles.desktopMain}>
                         <View style={styles.centeredComposerWrap}>
                             <View style={styles.desktopPromptCluster}>
@@ -1393,13 +1096,6 @@ function NewSessionScreen() {
                         {configContent}
                     </View>
 
-                    {Platform.OS === 'web' && activePicker && (
-                        <Pressable
-                            style={styles.clickAwayBackdropBehind}
-                            onPress={() => setActivePicker(null)}
-                        />
-                    )}
-
                     <View style={{ flex: 1 }} />
 
                     <View style={styles.inlineComposerWrap}>
@@ -1410,26 +1106,23 @@ function NewSessionScreen() {
                 </View>
             )}
 
-            {/* Native: picker bottom sheet */}
-            {Platform.OS !== 'web' && (
-                <BottomSheet
-                    visible={!!activePicker}
-                    onClose={() => setActivePicker(null)}
-                >
-                    {activePicker === 'path' ? (
-                        <PathPickerContent
-                            title={t('appWide.project')}
-                            items={pathItems}
-                            value={selectedPath}
-                            homeDir={selectedHomeDir}
-                            onChangeValue={setSelectedPath}
-                            onDone={() => setActivePicker(null)}
-                        />
-                    ) : pickerData ? (
-                        <PickerContent {...pickerData} onSelect={handlePickerSelect} />
-                    ) : null}
-                </BottomSheet>
-            )}
+            <BottomSheet
+                visible={!!activePicker}
+                onClose={() => setActivePicker(null)}
+            >
+                {activePicker === 'path' ? (
+                    <PathPickerContent
+                        title={t('appWide.project')}
+                        items={pathItems}
+                        value={selectedPath}
+                        homeDir={selectedHomeDir}
+                        onChangeValue={handlePathChange}
+                        onDone={() => setActivePicker(null)}
+                    />
+                ) : pickerData ? (
+                    <PickerContent {...pickerData} onSelect={handlePickerSelect} />
+                ) : null}
+            </BottomSheet>
         </KeyboardAvoidingView>
     );
 }
@@ -1474,7 +1167,6 @@ const styles = StyleSheet.create((theme) => ({
         color: theme.colors.text,
         textAlign: 'center',
         ...Typography.default(),
-        ...Platform.select({ web: { userSelect: 'none' } as any, default: {} }),
     },
     composerWidthWrap: {
         maxWidth: layout.maxWidth,
@@ -1512,22 +1204,6 @@ const styles = StyleSheet.create((theme) => ({
         paddingHorizontal: 12,
         gap: 8,
     },
-    clickAwayBackdrop: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1,
-    },
-    clickAwayBackdropBehind: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: -1,
-    },
     configBox: {
         backgroundColor: theme.colors.input.background,
         borderRadius: Platform.select({ default: 16, android: 20 }),
@@ -1535,56 +1211,12 @@ const styles = StyleSheet.create((theme) => ({
         paddingHorizontal: 4,
         overflow: 'hidden',
     },
-    configBoxWithPopover: {
-        overflow: 'visible',
-    },
     sidebarConfigBox: {
         backgroundColor: 'transparent',
         borderRadius: 0,
         paddingVertical: 0,
         paddingHorizontal: 0,
         overflow: 'visible',
-    },
-    popover: {
-        borderRadius: 12,
-        paddingVertical: 4,
-        marginTop: 4,
-        borderWidth: 1,
-        borderColor: theme.colors.divider,
-        ...Platform.select({
-            web: {
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
-            },
-            default: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.12,
-                shadowRadius: 10,
-                elevation: 8,
-            },
-        }),
-    },
-    sidebarPopover: {
-        minWidth: 0,
-        alignSelf: 'stretch',
-        backgroundColor: 'transparent',
-        borderRadius: 0,
-        borderWidth: 0,
-        overflow: 'hidden',
-        paddingVertical: 0,
-        marginTop: -2,
-        marginRight: 6,
-        marginBottom: 6,
-        marginLeft: 24,
-        ...Platform.select({
-            web: {
-                boxShadow: 'none',
-            },
-            default: {
-                shadowOpacity: 0,
-                elevation: 0,
-            },
-        }),
     },
     configRow: {
         flexDirection: 'row',
@@ -1638,34 +1270,14 @@ const styles = StyleSheet.create((theme) => ({
     configRowPressed: {
         opacity: 0.6,
     },
-    agentIcon: {
-        width: 15,
-        height: 15,
-    },
-    collapsedAgentIcon: {
-        width: 14,
-        height: 14,
-    },
     configLabel: {
         minWidth: 0,
         fontSize: 14,
         color: theme.colors.text,
         ...Typography.default('semiBold'),
-        ...Platform.select({ web: { userSelect: 'none' } as any, default: {} }),
     },
     configValueText: {
         flex: 1,
-        flexShrink: 1,
-    },
-    configInlineField: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        minWidth: 0,
-        flexShrink: 1,
-    },
-    configInlineText: {
-        minWidth: 0,
         flexShrink: 1,
     },
     inputBox: {
@@ -1785,20 +1397,11 @@ const pickerStyles = {
         paddingHorizontal: 16,
         paddingBottom: 8,
     } as const,
-    embeddedContainer: {
-        width: '100%',
-        maxWidth: '100%',
-        minWidth: 0,
-        alignSelf: 'stretch',
-        paddingHorizontal: 0,
-        paddingBottom: 2,
-    } as const,
     title: {
         fontSize: 18,
         paddingVertical: 12,
         paddingHorizontal: 4,
         ...Typography.default('semiBold'),
-        ...Platform.select({ web: { userSelect: 'none' } as any, default: {} }),
     } as const,
     titleRow: {
         flexDirection: 'row' as const,
@@ -1830,21 +1433,12 @@ const pickerStyles = {
         borderRadius: 12,
         marginBottom: 8,
     },
-    embeddedSearchRow: {
-        width: '100%',
-        minWidth: 0,
-        paddingHorizontal: 4,
-        paddingVertical: 8,
-        borderRadius: 0,
-        marginBottom: 4,
-    } as const,
     searchInput: {
         flex: 1,
         minWidth: 0,
         fontSize: 15,
         padding: 0,
         ...Typography.default(),
-        ...Platform.select({ web: { outlineStyle: 'none' } as any, default: {} }),
     } as const,
     pathInputRow: {
         flexDirection: 'row' as const,
@@ -1856,15 +1450,6 @@ const pickerStyles = {
         marginBottom: 8,
         borderWidth: 1,
     },
-    embeddedPathInputRow: {
-        width: '100%',
-        minWidth: 0,
-        paddingHorizontal: 4,
-        minHeight: 38,
-        borderRadius: 0,
-        borderWidth: 0,
-        marginBottom: 4,
-    } as const,
     pathInputField: {
         flex: 1,
         minWidth: 0,
@@ -1874,29 +1459,19 @@ const pickerStyles = {
         minHeight: 44,
         paddingVertical: 0,
         ...Typography.default(),
-        ...Platform.select({
-            android: { textAlignVertical: 'center' as const },
-            web: { outlineStyle: 'none' } as any,
-            default: {},
-        }),
-    } as const,
-    embeddedPathTextInput: {
-        fontSize: 15,
-        minHeight: 34,
+        ...Platform.select({ android: { textAlignVertical: 'center' as const }, default: {} }),
     } as const,
     pathMetaText: {
         fontSize: 13,
         paddingHorizontal: 4,
         paddingBottom: 8,
         ...Typography.default(),
-        ...Platform.select({ web: { userSelect: 'none' } as any, default: {} }),
     } as const,
     sectionLabel: {
         fontSize: 13,
         paddingHorizontal: 4,
         paddingBottom: 8,
         ...Typography.default('semiBold'),
-        ...Platform.select({ web: { userSelect: 'none' } as any, default: {} }),
     } as const,
     option: {
         flexDirection: 'row' as const,
@@ -1906,14 +1481,6 @@ const pickerStyles = {
         paddingVertical: 12,
         borderRadius: 12,
     },
-    embeddedOption: {
-        width: '100%',
-        maxWidth: '100%',
-        minWidth: 0,
-        paddingHorizontal: 4,
-        paddingVertical: 8,
-        borderRadius: 0,
-    } as const,
     optionPressed: {
         opacity: 0.6,
     } as const,
@@ -1922,7 +1489,6 @@ const pickerStyles = {
         flexShrink: 1,
         fontSize: 15,
         ...Typography.default(),
-        ...Platform.select({ web: { userSelect: 'none' } as any, default: {} }),
     } as const,
     divider: {
         height: 1,
@@ -1933,23 +1499,11 @@ const pickerStyles = {
         flexGrow: 0,
         flexShrink: 1,
     } as const,
-    embeddedOptionList: {
-        width: '100%',
-        maxWidth: '100%',
-        minWidth: 0,
-        maxHeight: 176,
-    } as const,
-    embeddedOptionListContent: {
-        width: '100%',
-        maxWidth: '100%',
-        minWidth: 0,
-    } as const,
     emptyText: {
         fontSize: 14,
         textAlign: 'center' as const,
         paddingVertical: 20,
         ...Typography.default(),
-        ...Platform.select({ web: { userSelect: 'none' } as any, default: {} }),
     } as const,
 };
 

@@ -1,0 +1,11 @@
+bun install v1.3.14 (0d9b296a)
+Resolving dependencies
+Resolved, downloaded and extracted [7]
+
+$ bun ./scripts/postinstall.cjs
+[patch] Fixed pglite-prisma-adapter Bytes column handling (2 file(s))
+[patch] Fixed LiveKit stale Room + v1 RTC 404 (5 file(s))
+[patch] Exposed @pierre/diffs/style.js (2 file(s))
+[force-preact-cjs] patched preact package.json — all subpaths point to CJS
+
+2410 packages installed [98.25s]

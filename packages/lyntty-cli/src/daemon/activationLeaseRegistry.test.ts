@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, mock, spyOn, jest } from 'bun:test';
 
 import { PiActivationLeaseRegistry } from './activationLeaseRegistry';
 
@@ -17,7 +17,7 @@ describe('PiActivationLeaseRegistry', () => {
       order.push('reuse-end');
       return 'reused';
     });
-    const secondActivate = vi.fn(async () => {
+    const secondActivate = mock(async () => {
       order.push('takeover');
       return 'taken-over';
     });

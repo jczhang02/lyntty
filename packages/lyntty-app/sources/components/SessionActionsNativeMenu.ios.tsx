@@ -23,9 +23,7 @@ export function SessionActionsNativeMenu({
     const {
         archiveSession,
         canArchive,
-        canCopySessionMetadata,
         canShowResume,
-        copySessionMetadata,
         openDetails,
         resumeSession,
     } = useSessionQuickActions(session, {
@@ -43,9 +41,6 @@ export function SessionActionsNativeMenu({
                     )}
                     {canShowResume && (
                         <Button onPress={resumeSession} systemImage={iosSymbol('play.circle')} label={t('appWide.resume')} />
-                    )}
-                    {canCopySessionMetadata && (
-                        <Button onPress={copySessionMetadata} systemImage={iosSymbol('ladybug')} label={t('sessionInfo.copyMetadata')} />
                     )}
                 </ContextMenu.Items>
                 <ContextMenu.Trigger>{children}</ContextMenu.Trigger>

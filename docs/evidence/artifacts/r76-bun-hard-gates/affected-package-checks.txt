@@ -1,0 +1,6 @@
+lyntty-wire build: pass
+lyntty-wire tests: 2 files, 19 tests passed
+lyntty-cli typecheck: pass
+lyntty-app typecheck: pass
+lyntty-relay typecheck: pass
+lyntty-relay tests: 18 files, 105 tests passed

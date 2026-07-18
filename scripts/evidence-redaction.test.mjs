@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import test from 'node:test';
+import { test } from 'bun:test';
 
 const PAIRING_URL_PATTERN = /lyntty:\/\/terminal\?[^\s"'<>`]+/g;
 const AUTH_PUBLIC_KEY_PATTERN = /publicKey=(?!\[REDACTED\])[A-Za-z0-9_-]{16,}/;

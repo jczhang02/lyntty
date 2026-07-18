@@ -16,8 +16,7 @@ The phone is not a terminal mirror and not a remote desktop. It is a focused con
 
 - `Sessions Home`: see active and historical `pi` sessions.
 - `Node Management`: pair and inspect machines running `lynttyd`.
-- `Session Remote`: send intent, follow up, redirect, stop, and review structured runtime events.
-- `Review Evidence`: inspect changed files, checks, errors, artifacts, recovery state, and next actions.
+- `Session Remote`: send intent, follow up, redirect, stop, and review Pi messages, tool activity, changed files, checks, and errors.
 
 ## Architecture
 
@@ -34,10 +33,22 @@ See:
 - `docs/roadmap.zh.md`
 - `docs/research/lyntty-product-boundary.md`
 - `docs/research/lyntty-session-discovery.md`
+- `docs/release/compatibility-bom.md`
+- `docs/release/android-apk.md`
+- `docs/release/cli.md`
 
-## Development status
+## Development
 
-The repository is being migrated to a Lyntty-based implementation because Lyntty provides the desired OSS mobile control feel and a strong sync/daemon/mobile foundation. Non-Lyntty product features are being removed while preserving the mobile interaction quality and the encrypted relay/session infrastructure.
+Lyntty uses a Bun-only, Pi-only workspace. Start an isolated worktree-local Relay and daemon with:
+
+```bash
+bun install --frozen-lockfile
+bun dev:up
+bun dev:verify
+bun dev:down
+```
+
+Android is explicit with `bun dev:up --android`. See [`docs/development.md`](docs/development.md) for state, port, evidence, and process-ownership safety.
 
 ## License
 

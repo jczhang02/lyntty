@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text, Pressable, Platform } from "react-native";
+import { View, Text } from "react-native";
 import { StyleSheet } from 'react-native-unistyles';
 import { Ionicons } from '@expo/vector-icons';
 import { MarkdownView } from "./markdown/MarkdownView";
@@ -11,7 +11,7 @@ import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from '@/sync/sync';
 import { Option } from './markdown/MarkdownView';
 import { layout } from "./layout";
-import { parseLocalCommandMessage, isUserSlashCommandEcho } from './parseLocalCommandMessage';
+import { parseLocalCommandMessage } from './parseLocalCommandMessage';
 import { getUserMessagePresentation } from './userMessagePresentation';
 
 
@@ -20,16 +20,11 @@ export const MessageView = React.memo((props: {
   metadata: Metadata | null;
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
-  /**
-   * Long-press handler for user-text bubbles. Wired by ChatList from
-   * the active session screen and used by the fork-from-message flow.
-   */
-  onForkFromUserMessage?: (messageId: string, rewindPointId: string | undefined, messageText: string) => void;
 }) => {
   return (
     <View
       style={styles.messageContainer}
-      renderToHardwareTextureAndroid={Platform.OS !== 'web'}
+      renderToHardwareTextureAndroid={true}
     >
       <View style={styles.messageContent}>
         <RenderBlock
@@ -37,7 +32,6 @@ export const MessageView = React.memo((props: {
           metadata={props.metadata}
           sessionId={props.sessionId}
           getMessageById={props.getMessageById}
-          onForkFromUserMessage={props.onForkFromUserMessage}
         />
       </View>
     </View>
@@ -50,7 +44,6 @@ function RenderBlock(props: {
   metadata: Metadata | null;
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
-  onForkFromUserMessage?: (messageId: string, rewindPointId: string | undefined, messageText: string) => void;
 }): React.ReactElement {
   switch (props.message.kind) {
     case 'user-text':
@@ -59,7 +52,6 @@ function RenderBlock(props: {
           message={props.message}
           metadata={props.metadata}
           sessionId={props.sessionId}
-          onForkFromUserMessage={props.onForkFromUserMessage}
         />
       );
 
@@ -89,38 +81,12 @@ function UserTextBlock(props: {
   message: UserTextMessage;
   metadata: Metadata | null;
   sessionId: string;
-  onForkFromUserMessage?: (messageId: string, rewindPointId: string | undefined, messageText: string) => void;
 }) {
   const handleOptionPress = React.useCallback((option: Option) => {
     sync.sendMessage(props.sessionId, option.title, { source: 'option' });
   }, [props.sessionId]);
 
-  const rewindPointId = props.message.claudeUuid ?? props.message.codexItemId;
-  const canFork = Boolean(props.onForkFromUserMessage)
-    && (Boolean(rewindPointId) || props.metadata?.flavor === 'codex');
-  const handleLongPress = React.useCallback(() => {
-    if (props.onForkFromUserMessage) {
-      props.onForkFromUserMessage(props.message.id, rewindPointId, props.message.text);
-    }
-  }, [props.message.id, props.message.text, props.onForkFromUserMessage, rewindPointId]);
-
-  // Claude Agent SDK emits synthetic user messages wrapped in tags like
-  // <local-command-caveat>…</local-command-caveat> and
-  // <command-message>…</command-message><command-name>/foo</command-name>
-  // whenever a slash command runs. The plain MarkdownView renders these as
-  // literal text, which looks broken. Collapse them into chips or hide
-  // them entirely depending on what kind of wrapper this is.
-  // The user's own slash-command input is shown optimistically (carries a
-  // localId); the SDK then injects the canonical wrapper chip. Hide the raw
-  // echo so we don't render the command twice. Gated to Claude flavor only:
-  // Codex/Gemini don't reliably emit the <command-*> wrapper, so hiding the
-  // echo there would drop the command with nothing to replace it. (Absent
-  // flavor == Claude, matching the convention used elsewhere.)
-  const presentation = getUserMessagePresentation(props.message);
-  const isClaudeFlavor = !props.metadata?.flavor || props.metadata.flavor === 'claude';
-  if (isClaudeFlavor && isUserSlashCommandEcho(props.message.text, presentation.parseRawSlashCommands)) {
-    return null;
-  }
+  const presentation = getUserMessagePresentation(props.message, props.metadata?.controlState);
 
   const parsed = parseLocalCommandMessage(props.message.displayText || props.message.text, {
     parseRawSlashCommands: presentation.parseRawSlashCommands,
@@ -142,13 +108,9 @@ function UserTextBlock(props: {
     return (
       <View style={containerStyle}>
         {presentation.sourceLabel ? <Text style={styles.userSourceLabel}>{presentation.sourceLabel}</Text> : null}
-        <Pressable
-          onLongPress={canFork ? handleLongPress : undefined}
-          delayLongPress={400}
-          style={[...bubbleStyle, styles.goalMessageBubble]}
-        >
+        <View style={[...bubbleStyle, styles.goalMessageBubble]}>
           <MarkdownView markdown={parsed.goal} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
-        </Pressable>
+        </View>
         <View style={styles.goalSentRow}>
           <Ionicons name="locate-outline" size={16} color={styles.goalSentText.color} />
           <Text style={styles.goalSentText}>{t('message.sentAsGoal')}</Text>
@@ -161,13 +123,9 @@ function UserTextBlock(props: {
       <View style={containerStyle}>
         {presentation.sourceLabel ? <Text style={styles.userSourceLabel}>{presentation.sourceLabel}</Text> : null}
         {parsed.args ? (
-          <Pressable
-            onLongPress={canFork ? handleLongPress : undefined}
-            delayLongPress={400}
-            style={[...bubbleStyle, styles.commandMessageBubble]}
-          >
+          <View style={[...bubbleStyle, styles.commandMessageBubble]}>
             <MarkdownView markdown={parsed.args} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
-          </Pressable>
+          </View>
         ) : null}
         <View style={styles.commandChip}>
           <Text style={styles.commandChipText}>/{parsed.commandName}</Text>
@@ -179,13 +137,9 @@ function UserTextBlock(props: {
   return (
     <View style={containerStyle}>
       {presentation.sourceLabel ? <Text style={styles.userSourceLabel}>{presentation.sourceLabel}</Text> : null}
-      <Pressable
-        onLongPress={canFork ? handleLongPress : undefined}
-        delayLongPress={400}
-        style={bubbleStyle}
-      >
+      <View style={bubbleStyle}>
         <MarkdownView markdown={parsed.text} onOptionPress={handleOptionPress} sessionId={props.sessionId} />
-      </Pressable>
+      </View>
     </View>
   );
 }

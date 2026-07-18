@@ -7,6 +7,19 @@ import { apiSocket } from './apiSocket';
 import { sync } from './sync';
 import type { MachineMetadata, PiMachineSessionRecord, PiRecoveryState } from './storageTypes';
 import type { PiHistoryPageResult } from './piHistoryPage';
+import { storage } from './storage';
+import { canControlSession } from './sessionControlPolicy';
+import {
+    ensurePiSessionMirrorResultSchema,
+    listPiSessionsResultSchema,
+    parseMachineRpcResult,
+    spawnSessionResultSchema,
+    stopDaemonResultSchema,
+    worktreeCreateResultSchema,
+    worktreeListResultSchema,
+    worktreeRemoveResultSchema,
+    worktreeStatusResultSchema,
+} from './machineRpcSchemas';
 
 // Strict type definitions for all operations
 
@@ -24,11 +37,6 @@ interface SessionPermissionRequest {
 // Mode change operation types
 interface SessionModeChangeRequest {
     to: 'remote' | 'local';
-}
-
-interface SessionGoalActionRequest {
-    action: 'clear' | 'stop' | 'edit';
-    objective?: string;
 }
 
 // Bash operation types
@@ -147,73 +155,17 @@ export interface SpawnSessionOptions {
     sessionId?: string;
     approvedNewDirectoryCreation?: boolean;
     token?: string;
-    agent?: 'pi' | 'codex' | 'claude' | 'gemini' | 'openclaw';
+    agent?: 'pi';
     takeoverChoice?: 'wait' | 'stop' | 'interrupt';
-    /**
-     * If set, the daemon spawns the agent with `--resume <id>` so the new
-     * Lyntty session attaches to a pre-existing on-disk Claude conversation
-     * file. Used by the session fork / duplicate flow.
-     */
-    resumeClaudeSessionId?: string;
-    /**
-     * If set, the daemon spawns Codex with `--resume <id>` so the new Lyntty
-     * session attaches to an app-server thread created by fork / duplicate.
-     */
-    resumeCodexThreadId?: string;
-    /** Lyntty session id this fork was branched from (lineage). */
-    parentSessionId?: string;
-    /** Lyntty message id used as the rewind point (only set for "duplicate"). */
-    forkedFromMessageId?: string;
 }
 
-// Options for forking a Claude session on a machine
-export interface ClaudeForkSessionOptions {
-    machineId: string;
-    /** Working directory of the source session — used to derive the Claude project dir. */
-    directory: string;
-    /** Source Claude session UUID (Session.metadata.claudeSessionId on the parent). */
-    claudeSessionId: string;
-}
-
-export type ClaudeForkSessionResult =
-    | { type: 'success'; newClaudeSessionId: string }
-    | { type: 'error'; errorMessage: string };
-
-export interface ClaudeRewindPoint {
-    uuid: string;
-    text: string;
-    timestamp: number;
-}
-
-export type ClaudeListRewindPointsResult =
-    | { type: 'success'; points: ClaudeRewindPoint[] }
-    | { type: 'error'; errorMessage: string };
-
-export interface CodexForkThreadOptions {
-    machineId: string;
-    /** Working directory of the source session, passed to Codex thread/fork. */
-    directory: string;
-    /** Source Codex app-server thread id (Session.metadata.codexThreadId). */
-    codexThreadId: string;
-}
-
-export type CodexForkThreadResult =
-    | { type: 'success'; newCodexThreadId: string }
-    | { type: 'error'; errorMessage: string };
-
-export interface CodexRewindPoint {
-    itemId: string;
-    text: string;
-    timestamp: number;
-}
-
-export type CodexListRewindPointsResult =
-    | { type: 'success'; points: CodexRewindPoint[] }
-    | { type: 'error'; errorMessage: string };
+export type PiResumeTakeoverChoice = 'wait' | 'stop' | 'interrupt';
 
 export interface ResumeSessionOptions {
     machineId: string;
-    sessionId: string;
+    directory: string;
+    piSessionId: string;
+    takeoverChoice?: PiResumeTakeoverChoice;
 }
 
 export type { PiMachineSessionRecord, PiRecoveryState };
@@ -233,7 +185,7 @@ export type EnsurePiSessionMirrorResult =
  */
 export async function machineSpawnNewSession(options: SpawnSessionOptions): Promise<SpawnSessionResult> {
 
-    const { machineId, directory, sessionId, approvedNewDirectoryCreation = false, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId } = options;
+    const { machineId, directory, sessionId, approvedNewDirectoryCreation = false, token, agent, takeoverChoice } = options;
 
     try {
         const result = await apiSocket.machineRPC<SpawnSessionResult, {
@@ -243,16 +195,13 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
             approvedNewDirectoryCreation?: boolean,
             machineId?: string,
             token?: string,
-            agent?: 'pi' | 'codex' | 'claude' | 'gemini' | 'openclaw',
+            agent?: 'pi',
             takeoverChoice?: 'wait' | 'stop' | 'interrupt',
-            resumeClaudeSessionId?: string,
-            resumeCodexThreadId?: string,
-            parentSessionId?: string,
-            forkedFromMessageId?: string,
         }>(
             machineId,
             'spawn-lyntty-session',
-            { type: 'spawn-in-directory', directory, sessionId, approvedNewDirectoryCreation, machineId, token, agent, takeoverChoice, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId }
+            { type: 'spawn-in-directory', directory, sessionId, approvedNewDirectoryCreation, machineId, token, agent, takeoverChoice },
+            parseMachineRpcResult('spawn-lyntty-session', spawnSessionResultSchema),
         );
         return result;
     } catch (error) {
@@ -260,157 +209,6 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
         return {
             type: 'error',
             errorMessage: error instanceof Error ? error.message : 'Failed to spawn session'
-        };
-    }
-}
-
-/**
- * Copy the source session's Claude JSONL on the daemon machine and return
- * the new Claude session UUID. Caller then spawns a fresh Lyntty session
- * with `resumeClaudeSessionId` set to that UUID to attach a new Lyntty
- * session row to the copied conversation.
- */
-export async function claudeForkSession(options: ClaudeForkSessionOptions): Promise<ClaudeForkSessionResult> {
-    const { machineId, directory, claudeSessionId } = options;
-    try {
-        const result = await apiSocket.machineRPC<ClaudeForkSessionResult, {
-            directory: string;
-            claudeSessionId: string;
-        }>(
-            machineId,
-            'claude-fork-session',
-            { directory, claudeSessionId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to fork session',
-        };
-    }
-}
-
-/**
- * Read the on-disk Claude JSONL on the daemon machine and return user-text
- * messages with their underlying claudeUuid + timestamp. Disk is the
- * source of truth for the rewind picker — server-side envelopes miss
- * claudeUuid for any user message that travelled via the legacy
- * `sentFrom: 'web'` path.
- */
-export async function claudeListRewindPoints(
-    options: ClaudeForkSessionOptions,
-): Promise<ClaudeListRewindPointsResult> {
-    const { machineId, directory, claudeSessionId } = options;
-    try {
-        const result = await apiSocket.machineRPC<ClaudeListRewindPointsResult, {
-            directory: string;
-            claudeSessionId: string;
-        }>(
-            machineId,
-            'claude-list-rewind-points',
-            { directory, claudeSessionId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to list rewind points',
-        };
-    }
-}
-
-/**
- * Same as claudeForkSession, but truncates the copied JSONL right after the
- * line with `cutAfterUuid` (keeping the chosen message as the last entry,
- * dropping every line after — including the agent's response). Use this
- * for "rewind to message N and try again" flows. Daemon hard-fails if the
- * UUID isn't present in the source — never silently produces a
- * non-truncated copy.
- */
-export async function claudeDuplicateSession(
-    options: ClaudeForkSessionOptions & { cutAfterUuid: string },
-): Promise<ClaudeForkSessionResult> {
-    const { machineId, directory, claudeSessionId, cutAfterUuid } = options;
-    try {
-        const result = await apiSocket.machineRPC<ClaudeForkSessionResult, {
-            directory: string;
-            claudeSessionId: string;
-            cutAfterUuid: string;
-        }>(
-            machineId,
-            'claude-duplicate-session',
-            { directory, claudeSessionId, cutAfterUuid },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to duplicate session',
-        };
-    }
-}
-
-export async function codexForkThread(options: CodexForkThreadOptions): Promise<CodexForkThreadResult> {
-    const { machineId, directory, codexThreadId } = options;
-    try {
-        const result = await apiSocket.machineRPC<CodexForkThreadResult, {
-            directory: string;
-            codexThreadId: string;
-        }>(
-            machineId,
-            'codex-fork-thread',
-            { directory, codexThreadId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to fork Codex thread',
-        };
-    }
-}
-
-export async function codexDuplicateThread(
-    options: CodexForkThreadOptions & { cutAfterItemId: string },
-): Promise<CodexForkThreadResult> {
-    const { machineId, directory, codexThreadId, cutAfterItemId } = options;
-    try {
-        const result = await apiSocket.machineRPC<CodexForkThreadResult, {
-            directory: string;
-            codexThreadId: string;
-            cutAfterItemId: string;
-        }>(
-            machineId,
-            'codex-duplicate-thread',
-            { directory, codexThreadId, cutAfterItemId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to duplicate Codex thread',
-        };
-    }
-}
-
-export async function codexListRewindPoints(
-    options: CodexForkThreadOptions,
-): Promise<CodexListRewindPointsResult> {
-    const { machineId, directory, codexThreadId } = options;
-    try {
-        const result = await apiSocket.machineRPC<CodexListRewindPointsResult, {
-            directory: string;
-            codexThreadId: string;
-        }>(
-            machineId,
-            'codex-list-rewind-points',
-            { directory, codexThreadId },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to list Codex rewind points',
         };
     }
 }
@@ -423,6 +221,7 @@ export async function machineListPiSessions(options: { machineId: string; cwd?: 
             machineId,
             'list-pi-sessions',
             { cwd, scope, limit, cursor },
+            parseMachineRpcResult('list-pi-sessions', listPiSessionsResultSchema),
         );
     } catch (error) {
         return {
@@ -439,6 +238,7 @@ export async function machineEnsurePiSessionMirror(options: { machineId: string;
             machineId,
             'ensure-pi-session-mirror',
             { machineId, piSessionId, directory },
+            parseMachineRpcResult('ensure-pi-session-mirror', ensurePiSessionMirrorResultSchema),
         );
     } catch (error) {
         return {
@@ -448,22 +248,38 @@ export async function machineEnsurePiSessionMirror(options: { machineId: string;
     }
 }
 
-export async function machineResumeSession(options: ResumeSessionOptions & { model?: string; permissionMode?: string }): Promise<SpawnSessionResult> {
-    const { machineId, sessionId, model, permissionMode } = options;
+export function isPiResumeTakeoverRequired(errorMessage: string): boolean {
+    return errorMessage.startsWith('Waiting for Pi extension');
+}
 
-    try {
-        const result = await apiSocket.machineRPC<SpawnSessionResult, { sessionId: string; model?: string; permissionMode?: string }>(
-            machineId,
-            'resume-lyntty-session',
-            { sessionId, model, permissionMode },
-        );
-        return result;
-    } catch (error) {
-        return {
-            type: 'error',
-            errorMessage: error instanceof Error ? error.message : 'Failed to resume session',
-        };
+export async function machineResumeSession(options: ResumeSessionOptions): Promise<SpawnSessionResult> {
+    return machineSpawnNewSession({
+        machineId: options.machineId,
+        directory: options.directory,
+        sessionId: options.piSessionId,
+        approvedNewDirectoryCreation: false,
+        agent: 'pi',
+        takeoverChoice: options.takeoverChoice,
+    });
+}
+
+export async function machineResumePiWithActivationChoice(
+    options: Omit<ResumeSessionOptions, 'takeoverChoice'>,
+    chooseTakeover: () => Promise<PiResumeTakeoverChoice | null>,
+): Promise<SpawnSessionResult | null> {
+    const reuseResult = await machineResumeSession(options);
+    if (reuseResult.type !== 'error' || !isPiResumeTakeoverRequired(reuseResult.errorMessage)) {
+        return reuseResult;
     }
+
+    const takeoverChoice = await chooseTakeover();
+    // Wait is the safe no-takeover choice: leave the session queued for its
+    // Pi extension. It must never start a managed runtime merely because no
+    // current owner was observable at this instant.
+    if (!takeoverChoice || takeoverChoice === 'wait') {
+        return null;
+    }
+    return machineResumeSession({ ...options, takeoverChoice });
 }
 
 /**
@@ -495,7 +311,8 @@ export async function machineStopDaemon(machineId: string): Promise<{ message: s
     const result = await apiSocket.machineRPC<{ message: string }, {}>(
         machineId,
         'stop-daemon',
-        {}
+        {},
+        parseMachineRpcResult('stop-daemon', stopDaemonResultSchema),
     );
     return result;
 }
@@ -515,6 +332,7 @@ export async function machineWorktreeCreate(
             machineId,
             'worktree-create',
             { basePath, branchName },
+            parseMachineRpcResult('worktree-create', worktreeCreateResultSchema),
         );
     } catch (error) {
         return {
@@ -529,18 +347,27 @@ export async function machineWorktreeCreate(
 export async function machineWorktreeList(
     machineId: string,
     basePath: string,
-): Promise<{ worktrees: Array<{ path: string; branch: string }> }> {
+): Promise<
+    | { success: true; worktrees: Array<{ path: string; branch: string }> }
+    | { success: false; error: string }
+> {
     try {
         const result = await apiSocket.machineRPC<
-            { worktrees?: Array<{ path: string; branch: string }> } | Array<{ path: string; branch: string }>,
+            | { success: true; worktrees: Array<{ path: string; branch: string }> }
+            | { success: false; error: string },
             { basePath: string }
-        >(machineId, 'worktree-list', { basePath });
-        if (Array.isArray(result)) {
-            return { worktrees: result };
-        }
-        return { worktrees: Array.isArray(result.worktrees) ? result.worktrees : [] };
-    } catch {
-        return { worktrees: [] };
+        >(
+            machineId,
+            'worktree-list',
+            { basePath },
+            parseMachineRpcResult('worktree-list', worktreeListResultSchema),
+        );
+        return result;
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to list worktrees',
+        };
     }
 }
 
@@ -549,7 +376,12 @@ export async function machineWorktreeRemove(
     worktreePath: string,
 ): Promise<{ success: boolean; error?: string }> {
     try {
-        return await apiSocket.machineRPC(machineId, 'worktree-remove', { worktreePath });
+        return await apiSocket.machineRPC(
+            machineId,
+            'worktree-remove',
+            { worktreePath },
+            parseMachineRpcResult('worktree-remove', worktreeRemoveResultSchema),
+        );
     } catch (error) {
         return {
             success: false,
@@ -563,51 +395,17 @@ export async function machineWorktreeStatus(
     worktreePath: string,
 ): Promise<{ success: boolean; clean: boolean; error?: string }> {
     try {
-        return await apiSocket.machineRPC(machineId, 'worktree-status', { worktreePath });
+        return await apiSocket.machineRPC(
+            machineId,
+            'worktree-status',
+            { worktreePath },
+            parseMachineRpcResult('worktree-status', worktreeStatusResultSchema),
+        );
     } catch (error) {
         return {
             success: false,
             clean: false,
             error: error instanceof Error ? error.message : 'Unknown error',
-        };
-    }
-}
-
-/**
- * Execute a bash command on a specific machine.
- * Legacy compatibility only: relay denies generic machine bash for Lyntty UI.
- */
-export async function machineBash(
-    machineId: string,
-    command: string,
-    cwd: string
-): Promise<{
-    success: boolean;
-    stdout: string;
-    stderr: string;
-    exitCode: number;
-}> {
-    try {
-        const result = await apiSocket.machineRPC<{
-            success: boolean;
-            stdout: string;
-            stderr: string;
-            exitCode: number;
-        }, {
-            command: string;
-            cwd: string;
-        }>(
-            machineId,
-            'bash',
-            { command, cwd }
-        );
-        return result;
-    } catch (error) {
-        return {
-            success: false,
-            stdout: '',
-            stderr: error instanceof Error ? error.message : 'Unknown error',
-            exitCode: -1
         };
     }
 }
@@ -681,15 +479,24 @@ export async function machineUpdateMetadata(
  * Abort the current session operation
  */
 export async function sessionAbort(sessionId: string): Promise<void> {
+    assertSessionControllable(sessionId);
     await apiSocket.sessionRPC(sessionId, 'abort', {
         reason: `The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.`
     });
+}
+
+function assertSessionControllable(sessionId: string): void {
+    const session = storage.getState().sessions[sessionId];
+    if (!session || !canControlSession(session.metadata)) {
+        throw new Error('This session is available as history only');
+    }
 }
 
 /**
  * Allow a permission request
  */
 export async function sessionAllow(sessionId: string, id: string, mode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan', allowedTools?: string[], decision?: 'approved' | 'approved_for_session', updatedInput?: Record<string, unknown>): Promise<void> {
+    assertSessionControllable(sessionId);
     const request: SessionPermissionRequest = { id, approved: true, mode, allowTools: allowedTools, decision, updatedInput };
     await apiSocket.sessionRPC(sessionId, 'permission', request);
 }
@@ -698,6 +505,7 @@ export async function sessionAllow(sessionId: string, id: string, mode?: 'defaul
  * Deny a permission request
  */
 export async function sessionDeny(sessionId: string, id: string, mode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan', allowedTools?: string[], decision?: 'denied' | 'abort'): Promise<void> {
+    assertSessionControllable(sessionId);
     const request: SessionPermissionRequest = { id, approved: false, mode, allowTools: allowedTools, decision };
     await apiSocket.sessionRPC(sessionId, 'permission', request);
 }
@@ -706,6 +514,7 @@ export async function sessionDeny(sessionId: string, id: string, mode?: 'default
  * Request mode change for a session
  */
 export async function sessionSwitch(sessionId: string, to: 'remote' | 'local'): Promise<boolean> {
+    assertSessionControllable(sessionId);
     const request: SessionModeChangeRequest = { to };
     const response = await apiSocket.sessionRPC<boolean, SessionModeChangeRequest>(
         sessionId,
@@ -716,23 +525,10 @@ export async function sessionSwitch(sessionId: string, to: 'remote' | 'local'): 
 }
 
 /**
- * Request an agent-owned goal action.
- */
-export async function sessionGoalAction(
-    sessionId: string,
-    action: SessionGoalActionRequest['action'],
-    objective?: string,
-): Promise<void> {
-    await apiSocket.sessionRPC(sessionId, 'goal-action', {
-        action,
-        ...(objective !== undefined ? { objective } : {}),
-    } satisfies SessionGoalActionRequest);
-}
-
-/**
  * Execute a bash command in the session
  */
 export async function sessionBash(sessionId: string, request: SessionBashRequest): Promise<SessionBashResponse> {
+    assertSessionControllable(sessionId);
     try {
         const response = await apiSocket.sessionRPC<SessionBashResponse, SessionBashRequest>(
             sessionId,
@@ -755,6 +551,7 @@ export async function sessionBash(sessionId: string, request: SessionBashRequest
  * Read a file from the session
  */
 export async function sessionReadFile(sessionId: string, path: string): Promise<SessionReadFileResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionReadFileRequest = { path };
         const response = await apiSocket.sessionRPC<SessionReadFileResponse, SessionReadFileRequest>(
@@ -780,6 +577,7 @@ export async function sessionWriteFile(
     content: string,
     expectedHash?: string | null
 ): Promise<SessionWriteFileResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionWriteFileRequest = { path, content, expectedHash };
         const response = await apiSocket.sessionRPC<SessionWriteFileResponse, SessionWriteFileRequest>(
@@ -800,6 +598,7 @@ export async function sessionWriteFile(
  * List directory contents in the session
  */
 export async function sessionListDirectory(sessionId: string, path: string): Promise<SessionListDirectoryResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionListDirectoryRequest = { path };
         const response = await apiSocket.sessionRPC<SessionListDirectoryResponse, SessionListDirectoryRequest>(
@@ -824,6 +623,7 @@ export async function sessionGetDirectoryTree(
     path: string,
     maxDepth: number
 ): Promise<SessionGetDirectoryTreeResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionGetDirectoryTreeRequest = { path, maxDepth };
         const response = await apiSocket.sessionRPC<SessionGetDirectoryTreeResponse, SessionGetDirectoryTreeRequest>(
@@ -848,6 +648,7 @@ export async function sessionRipgrep(
     args: string[],
     cwd?: string
 ): Promise<SessionRipgrepResponse> {
+    assertSessionControllable(sessionId);
     try {
         const request: SessionRipgrepRequest = { args, cwd };
         const response = await apiSocket.sessionRPC<SessionRipgrepResponse, SessionRipgrepRequest>(
@@ -868,6 +669,7 @@ export async function sessionRipgrep(
  * Kill the session process immediately
  */
 export async function sessionKill(sessionId: string): Promise<SessionKillResponse> {
+    assertSessionControllable(sessionId);
     try {
         const response = await apiSocket.sessionRPC<SessionKillResponse, {}>(
             sessionId,
@@ -889,6 +691,7 @@ export async function sessionLoadPiHistoryPage(
     sessionId: string,
     beforeEntryId?: string,
 ): Promise<PiHistoryPageResult> {
+    assertSessionControllable(sessionId);
     return apiSocket.sessionRPC<PiHistoryPageResult, { beforeEntryId?: string }>(
         sessionId,
         'pi-history-page',
@@ -941,129 +744,6 @@ export async function sessionDelete(sessionId: string): Promise<{ success: boole
             message: error instanceof Error ? error.message : 'Unknown error'
         };
     }
-}
-
-type ClaudeForkSource = {
-    kind?: 'claude';
-    sessionId: string;
-    machineId: string;
-    directory: string;
-    claudeSessionId: string;
-};
-
-type CodexForkSource = {
-    kind: 'codex';
-    sessionId: string;
-    machineId: string;
-    directory: string;
-    codexThreadId: string;
-};
-
-// Forking source description used by forkAndSpawn.
-export type ForkSource = ClaudeForkSource | CodexForkSource;
-
-type ForkOptions = {
-    cutAfterUuid?: string;
-    cutAfterItemId?: string;
-    forkedFromMessageId?: string;
-};
-
-/**
- * Two-step orchestrator for the session fork / duplicate flow:
- *   1. Ask the daemon to copy (and optionally truncate) the source Claude
- *      JSONL — returns a fresh Claude session UUID.
- *   2. Spawn a new Lyntty session on the same machine with
- *      `resumeClaudeSessionId` set to that UUID so `claude --resume` picks
- *      up the copied conversation.
- *
- * Lineage (parentSessionId, forkedFromMessageId) rides through the spawn
- * RPC into env vars, then into the new Lyntty session's metadata at start
- * — so the parent link survives without any server-side schema change.
- */
-export async function forkAndSpawn(
-    source: ForkSource,
-    opts: ForkOptions = {},
-): Promise<SpawnSessionResult> {
-    if (source.kind === 'codex') {
-        const forkResult = opts.cutAfterItemId
-            ? await codexDuplicateThread({
-                machineId: source.machineId,
-                directory: source.directory,
-                codexThreadId: source.codexThreadId,
-                cutAfterItemId: opts.cutAfterItemId,
-            })
-            : await codexForkThread({
-                machineId: source.machineId,
-                directory: source.directory,
-                codexThreadId: source.codexThreadId,
-            });
-
-        if (forkResult.type !== 'success') {
-            return { type: 'error', errorMessage: forkResult.errorMessage };
-        }
-
-        const spawnResult = await machineSpawnNewSession({
-            machineId: source.machineId,
-            directory: source.directory,
-            agent: 'codex',
-            approvedNewDirectoryCreation: false,
-            resumeCodexThreadId: forkResult.newCodexThreadId,
-            parentSessionId: source.sessionId,
-            forkedFromMessageId: opts.forkedFromMessageId,
-        });
-
-        if (spawnResult.type === 'success') {
-            try {
-                await sync.refreshSessions();
-            } catch {
-                // Refresh is best-effort; broadcast sync will still hydrate.
-            }
-        }
-
-        return spawnResult;
-    }
-
-    const forkResult = opts.cutAfterUuid
-        ? await claudeDuplicateSession({
-            machineId: source.machineId,
-            directory: source.directory,
-            claudeSessionId: source.claudeSessionId,
-            cutAfterUuid: opts.cutAfterUuid,
-        })
-        : await claudeForkSession({
-            machineId: source.machineId,
-            directory: source.directory,
-            claudeSessionId: source.claudeSessionId,
-        });
-
-    if (forkResult.type !== 'success') {
-        return { type: 'error', errorMessage: forkResult.errorMessage };
-    }
-
-    const spawnResult = await machineSpawnNewSession({
-        machineId: source.machineId,
-        directory: source.directory,
-        agent: 'claude',
-        approvedNewDirectoryCreation: false,
-        resumeClaudeSessionId: forkResult.newClaudeSessionId,
-        parentSessionId: source.sessionId,
-        forkedFromMessageId: opts.forkedFromMessageId,
-    });
-
-    // Pull the newly-created session row into local sync state before we
-    // hand control back to the caller — otherwise router.replace into the
-    // new session id races the broadcast and the app screams
-    // "Session X not found" until the next sync tick lands.
-    if (spawnResult.type === 'success') {
-        try {
-            await sync.refreshSessions();
-        } catch {
-            // Refresh is best-effort; the broadcast will still hydrate the
-            // session shortly even if this fetch flaked.
-        }
-    }
-
-    return spawnResult;
 }
 
 // Export types for external use

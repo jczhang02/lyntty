@@ -1,0 +1,1 @@
+docker.io/library/postgres:17-alpine sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 running {"5432/tcp":[{"HostIp":"127.0.0.1","HostPort":"35432"}]}

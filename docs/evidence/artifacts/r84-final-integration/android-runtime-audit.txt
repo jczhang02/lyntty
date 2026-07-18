@@ -1,0 +1,3 @@
+Node-family execve matches: 0
+Sentinel invocations: 0
+Trace source: strace -f -e execve

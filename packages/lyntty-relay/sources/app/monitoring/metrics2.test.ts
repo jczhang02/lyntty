@@ -1,18 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 
-const { dbMock } = vi.hoisted(() => {
-    const dbMock = {
-        account: { count: vi.fn() },
-        session: { count: vi.fn() },
-        sessionMessage: { count: vi.fn() },
-        machine: { count: vi.fn() },
-        $queryRaw: vi.fn()
-    };
+const dbMock = {
+    account: { count: mock() },
+    session: { count: mock() },
+    sessionMessage: { count: mock() },
+    machine: { count: mock() },
+    $queryRaw: mock()
+};
 
-    return { dbMock };
-});
-
-vi.mock("@/storage/db", () => ({
+mock.module("@/storage/db", () => ({
     db: dbMock
 }));
 
@@ -20,7 +16,7 @@ import { updateDatabaseMetrics } from "./metrics2";
 
 describe("updateDatabaseMetrics", () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        mock.clearAllMocks();
         dbMock.account.count.mockResolvedValue(10);
         dbMock.session.count.mockResolvedValue(20);
         dbMock.sessionMessage.count.mockResolvedValue(30);

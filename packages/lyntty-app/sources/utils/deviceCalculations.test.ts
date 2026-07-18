@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { calculateDeviceDimensions, determineDeviceType, calculateHeaderHeight } from './deviceCalculations';
 
 describe('responsive utilities', () => {
@@ -154,14 +154,6 @@ describe('responsive utilities', () => {
             expect(result).toBe('phone');
         });
 
-        it('should handle web platform', () => {
-            const result = determineDeviceType({
-                diagonalInches: 15, // Large monitor
-                platform: 'web'
-            });
-
-            expect(result).toBe('tablet'); // Large screens are considered tablets
-        });
     });
 
     describe('integration scenarios', () => {

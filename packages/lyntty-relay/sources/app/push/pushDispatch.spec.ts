@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 
 const {
     accountPushTokenFindMany,
@@ -6,15 +6,15 @@ const {
     isUserViewingSessionMock,
     sendPushNotificationsMock,
     logMock,
-} = vi.hoisted(() => ({
-    accountPushTokenFindMany: vi.fn(),
-    accountPushTokenDeleteMany: vi.fn(),
-    isUserViewingSessionMock: vi.fn(),
-    sendPushNotificationsMock: vi.fn(),
-    logMock: vi.fn(),
-}));
+} = {
+    accountPushTokenFindMany: mock(),
+    accountPushTokenDeleteMany: mock(),
+    isUserViewingSessionMock: mock(),
+    sendPushNotificationsMock: mock(),
+    logMock: mock(),
+};
 
-vi.mock('@/storage/db', () => ({
+mock.module('@/storage/db', () => ({
     db: {
         accountPushToken: {
             findMany: accountPushTokenFindMany,
@@ -22,9 +22,9 @@ vi.mock('@/storage/db', () => ({
         },
     },
 }));
-vi.mock('@/app/push/focusTracker', () => ({ isUserViewingSession: isUserViewingSessionMock }));
-vi.mock('@/app/push/pushSend', () => ({ sendPushNotifications: sendPushNotificationsMock }));
-vi.mock('@/utils/log', () => ({ log: logMock }));
+mock.module('@/app/push/focusTracker', () => ({ isUserViewingSession: isUserViewingSessionMock }));
+mock.module('@/app/push/pushSend', () => ({ sendPushNotifications: sendPushNotificationsMock }));
+mock.module('@/utils/log', () => ({ log: logMock }));
 
 import { dispatchSessionEventPush } from './pushDispatch';
 

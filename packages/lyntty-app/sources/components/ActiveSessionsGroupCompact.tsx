@@ -16,7 +16,6 @@ import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { useOpenPiDiscoveredSession } from '@/hooks/useOpenPiDiscoveredSession';
 import { useLynttyAction } from '@/hooks/useLynttyAction';
 import { LynttyError } from '@/utils/errors';
-import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
 import { useSessionActionAlert } from '@/hooks/useSessionQuickActions';
 import { stopAndArchiveSession } from '@/sync/archiveSessionAction';
 import { isWorktreePath, getRepoPath, getWorktreeName } from '@/utils/worktree';
@@ -88,16 +87,8 @@ const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRo
         router.navigate('/new');
     }, [session.machineId, session.homeDir, repoPath, isWorktree, sessionPath, draft, router]);
 
-    const [isHovered, setIsHovered] = React.useState(false);
-
     return (
-        <View
-            style={hasBranch ? styles.sectionHeader : styles.sectionHeaderSingleLine}
-            // @ts-ignore - Web only events
-            onMouseEnter={() => setIsHovered(true)}
-            // @ts-ignore - Web only events
-            onMouseLeave={() => setIsHovered(false)}
-        >
+        <View style={hasBranch ? styles.sectionHeader : styles.sectionHeaderSingleLine}>
             {/* Avatar — vertically centered */}
             <View style={styles.sectionHeaderAvatar}>
                 <Avatar id={session.avatarId} size={24} flavor={null} />
@@ -131,11 +122,11 @@ const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRo
                 )}
             </View>
 
-            {/* + button — vertically centered, large hit area; desktop: hover-only */}
+            {/* + button — vertically centered with a large hit area. */}
             <Pressable
                 onPress={handleAdd}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-                style={[styles.addButton, { opacity: Platform.OS !== 'web' || isHovered ? 1 : 0 }]}
+                style={styles.addButton}
             >
                 <Ionicons name="add-outline" size={14} color={theme.colors.textSecondary} />
             </Pressable>
@@ -284,8 +275,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     const navigateToSession = useNavigateToSession();
     const openPiDiscoveredSession = useOpenPiDiscoveredSession();
     const swipeableRef = React.useRef<Swipeable | null>(null);
-    const swipeEnabled = Platform.OS !== 'web' && !session.piSynthetic;
-    const [actionsAnchor, setActionsAnchor] = React.useState<SessionActionsAnchor | null>(null);
+    const swipeEnabled = !session.piSynthetic;
     const [isOpeningPiSession, setIsOpeningPiSession] = React.useState(false);
 
     const [archivingSession, performArchive] = useLynttyAction(async () => {
@@ -314,20 +304,8 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
         }
     }, [navigateToSession, openPiDiscoveredSession, session]);
 
-    const handleContextMenu = React.useCallback((event: any) => {
-        event.preventDefault?.();
-        event.stopPropagation?.();
-        setActionsAnchor({
-            type: 'point',
-            x: event.nativeEvent.clientX ?? event.nativeEvent.pageX ?? 0,
-            y: event.nativeEvent.clientY ?? event.nativeEvent.pageY ?? 0,
-        });
-    }, []);
-
     const showActionAlert = useSessionActionAlert(session.id);
-    const menuProps = session.piSynthetic ? {} : Platform.OS === 'web' ? {
-        onContextMenu: handleContextMenu,
-    } as any : {
+    const menuProps = session.piSynthetic ? {} : {
         onLongPress: showActionAlert,
     };
 
@@ -389,17 +367,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     );
 
     if (!swipeEnabled) {
-        return (
-            <>
-                {itemContent}
-                <SessionActionsPopover
-                    anchor={actionsAnchor}
-                    onClose={() => setActionsAnchor(null)}
-                    sessionId={session.id}
-                    visible={!!actionsAnchor}
-                />
-            </>
-        );
+        return itemContent;
     }
 
     const renderRightActions = () => (

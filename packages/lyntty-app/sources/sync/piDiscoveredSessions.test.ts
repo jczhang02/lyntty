@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import type { Machine, PiMachineSessionRecord, Session } from './storageTypes';
 import { mergePiDiscoveredSessions } from './piDiscoveredSessions';
@@ -99,6 +99,20 @@ describe('mergePiDiscoveredSessions', () => {
                 controlState: 'queued',
             },
         });
+    });
+
+    it('never exposes a raw Pi session id as the display title', () => {
+        const sessions = mergePiDiscoveredSessions([], [{
+            machine,
+            sessions: [piRecord({
+                piSessionId: 'internal-pi-id',
+                name: undefined,
+                firstMessage: undefined,
+            })],
+        }]);
+
+        expect(sessions[0]?.metadata?.name).toBe('thinkpad');
+        expect(sessions[0]?.metadata?.name).not.toContain('internal-pi-id');
     });
 
     it('hides old empty relay rows that only represent missing Pi history', () => {

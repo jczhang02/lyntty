@@ -1,6 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
-import { formatSessionRpcFailure } from './apiSocketErrors';
+import { formatSessionRpcFailure, unwrapRpcHandlerResponse } from './apiSocketErrors';
+
+describe('unwrapRpcHandlerResponse', () => {
+    it('throws exact encrypted handler-error envelopes', () => {
+        expect(() => unwrapRpcHandlerResponse({ error: 'Waiting for Pi extension' }))
+            .toThrow('Waiting for Pi extension');
+    });
+
+    it('preserves typed business results that contain error details', () => {
+        expect(unwrapRpcHandlerResponse<{ type: 'error'; errorMessage: string }>({ type: 'error', errorMessage: 'typed error' })).toEqual({
+            type: 'error',
+            errorMessage: 'typed error',
+        });
+        expect(unwrapRpcHandlerResponse<{ success: false; error: string }>({ success: false, error: 'worktree error' })).toEqual({
+            success: false,
+            error: 'worktree error',
+        });
+    });
+});
 
 describe('formatSessionRpcFailure', () => {
     it('preserves method and relay error details', () => {

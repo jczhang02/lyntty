@@ -10,7 +10,6 @@ const localFilesDir = path.join(dataDir, 'files');
 let s3client: any = null;
 let s3bucket: string = '';
 let s3host: string = '';
-let s3public: string = '';
 
 if (!useLocalStorage) {
     const s3Port = process.env.S3_PORT ? parseInt(process.env.S3_PORT, 10) : undefined;
@@ -26,7 +25,6 @@ if (!useLocalStorage) {
     });
     s3bucket = process.env.S3_BUCKET!;
     s3host = process.env.S3_HOST!;
-    s3public = process.env.S3_PUBLIC_URL!;
 }
 
 export { s3client, s3bucket, s3host };
@@ -37,14 +35,6 @@ export async function loadFiles() {
         return;
     }
     await s3client.bucketExists(s3bucket);
-}
-
-export function getPublicUrl(filePath: string) {
-    if (useLocalStorage) {
-        const baseUrl = process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || '3005'}`;
-        return `${baseUrl}/files/${filePath}`;
-    }
-    return `${s3public}/${filePath}`;
 }
 
 export function isLocalStorage() {

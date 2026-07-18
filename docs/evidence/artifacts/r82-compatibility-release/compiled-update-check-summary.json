@@ -1,0 +1,37 @@
+{
+  "sequence18": {
+    "available": false,
+    "channel": "stable",
+    "releaseId": "stable-18",
+    "sequence": 18,
+    "bomSha256": "fa8896865d1293add4dca2a7df6000c6e7c5c6ae599d8baa34e9ef564577602f",
+    "currentVersion": "1.2.0",
+    "candidateVersion": "1.2.0",
+    "archive": {
+      "name": "lyntty-linux-x64-gnu.tar.gz",
+      "url": "https://github.com/jczhang02/lyntty/releases/download/compat-v18/lyntty-linux-x64-gnu.tar.gz",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size": 1024,
+      "target": "linux-x64-gnu",
+      "artifactManifestSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  },
+  "replay17Blocked": true,
+  "signedRollback19": {
+    "available": true,
+    "channel": "stable",
+    "releaseId": "stable-19",
+    "sequence": 19,
+    "bomSha256": "a04935e4ad41875a9447632b266c2fd86b437e8b8f4dc5fc4113972838b9e5cd",
+    "currentVersion": "1.2.0",
+    "candidateVersion": "1.1.0",
+    "archive": {
+      "name": "lyntty-linux-x64-gnu.tar.gz",
+      "url": "https://github.com/jczhang02/lyntty/releases/download/compat-v19/lyntty-linux-x64-gnu.tar.gz",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size": 1024,
+      "target": "linux-x64-gnu",
+      "artifactManifestSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  }
+}

@@ -55,7 +55,7 @@ export const lightTheme = {
         surfaceHighest: '#f0f0f0',
         divider: Platform.select({ ios: '#eaeaea', default: '#eaeaea' }),
         shadow: {
-            color: Platform.select({ default: '#000000', web: 'rgba(0, 0, 0, 0.1)' }),
+            color: '#000000',
             opacity: 0.1,
         },
 
@@ -265,7 +265,7 @@ export const darkTheme = {
         surfaceHighest: Platform.select({ ios: '#38383A', default: '#292929' }),
         divider: Platform.select({ ios: '#38383A', default: '#292929' }),
         shadow: {
-            color: Platform.select({ default: '#000000', web: 'rgba(0, 0, 0, 0.1)' }),
+            color: '#000000',
             opacity: 0.1,
         },
 

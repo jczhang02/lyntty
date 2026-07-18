@@ -1,97 +1,191 @@
-name: Deploy relay
+name: Deploy relay from Compatibility BOM
 
 on:
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: GHCR image tag to deploy, e.g. sha-<40-character commit>
+      bom_tag:
+        description: Signed stable Compatibility release tag
         required: true
         type: string
 
 permissions:
   contents: read
+  packages: read
+  attestations: read
 
 concurrency:
-  group: relay-deploy
+  group: compatibility-promotion-stable
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production-relay
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      BOM_TAG: ${{ inputs.bom_tag }}
+      LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout protected main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
-      - name: Validate deploy source
-        run: |
-          set -euo pipefail
-          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "Relay deploys must run from refs/heads/main"
-            exit 1
-          fi
-          git fetch --no-tags origin main
-          if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
-            echo "Relay deploy HEAD must equal origin/main"
-            exit 1
-          fi
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
 
-      - name: Validate image tag
+      - name: Install deterministic verifier dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install cosign verifier
+        uses: sigstore/cosign-installer@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v3
+
+      - name: Verify signed stable BOM and resolve immutable image
+        id: release
         env:
-          IMAGE_TAG: ${{ inputs.image_tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
-            echo "image_tag must be sha- followed by a full lowercase commit SHA"
-            exit 1
-          fi
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$BOM_TAG" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
+          : "${LYNTTY_RELEASE_TRUST_ROOTS:?production Relay trust roots are required}"
+          release_rows="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --jq \
+            '.[] | select(.prerelease == false and .draft == false and (.tag_name | startswith("compat-v"))) | [.published_at, .id, .tag_name] | @tsv')"
+          [[ -n "$release_rows" ]] || { echo 'no current Stable compatibility release exists' >&2; exit 1; }
+          current_tag="$(printf '%s\n' "$release_rows" | sort -t$'\t' -k1,1r -k2,2nr | awk -F '\t' 'NR == 1 { print $3 }')"
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "$current_tag" ]]
+          [[ "$BOM_TAG" == "$current_tag" ]] || { echo 'production deploy requires the current signed Stable head; use the rollback workflow first' >&2; exit 1; }
+          dir="$RUNNER_TEMP/bom"
+          mkdir "$dir"
+          gh release download "$BOM_TAG" -p compatibility-bom.json -p compatibility-bom.sig.json -D "$dir"
+          printf '%s\n' "$LYNTTY_RELEASE_TRUST_ROOTS" > "$RUNNER_TEMP/trust-roots.json"
+          bun --no-install scripts/release.ts verify --bom "$dir/compatibility-bom.json" --signature "$dir/compatibility-bom.sig.json" \
+            --trust-store "$RUNNER_TEMP/trust-roots.json" --channel stable > "$dir/verified.json"
+          read -r source relay_source image sequence < <(bun -e '
+            const b=await Bun.file(process.argv[1]).json();
+            if (b.releaseId!==process.env.BOM_TAG || b.components.relay.image.repository!=="ghcr.io/jczhang02/lyntty-relay") throw new Error("BOM release identity is invalid");
+            process.stdout.write(`${b.source.commit} ${b.components.relay.sourceCommit} ${b.components.relay.image.reference} ${b.sequence}`);
+          ' "$dir/compatibility-bom.json")
+          [[ "$source" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$relay_source" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$image" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]]
+          [[ "$sequence" =~ ^[1-9][0-9]*$ ]]
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$source" origin/main
+          echo "$GH_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          cosign verify \
+            --certificate-identity "https://github.com/$GITHUB_REPOSITORY/.github/workflows/release-promote.yml@refs/heads/main" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com "$image" >/dev/null
+          gh attestation verify "oci://$image" --repo "$GITHUB_REPOSITORY" --source-digest "$relay_source" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-promote.yml" >/dev/null
+          gh attestation verify "oci://$image" --repo "$GITHUB_REPOSITORY" --source-digest "$relay_source" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-promote.yml" \
+            --predicate-type https://spdx.dev/Document/v2.3 >/dev/null
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+          echo "sequence=$sequence" >> "$GITHUB_OUTPUT"
 
-      - name: Install SSH key
+      - name: Install pinned SSH trust
         env:
           SSH_KEY: ${{ secrets.LYNTTY_VPS_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.LYNTTY_VPS_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          mkdir -p ~/.ssh
+          : "${SSH_KEY:?LYNTTY_VPS_SSH_KEY is required}"
+          : "${SSH_KNOWN_HOSTS:?LYNTTY_VPS_KNOWN_HOSTS is required}"
+          mkdir -m 700 -p ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/lyntty_vps
-          chmod 600 ~/.ssh/lyntty_vps
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/lyntty_vps ~/.ssh/known_hosts
 
-      - name: Deploy pinned relay image
+      - name: Backup, migrate, doctor, and deploy pinned digest
         env:
           HOST: ${{ secrets.LYNTTY_VPS_HOST }}
           USER: ${{ secrets.LYNTTY_VPS_USER }}
           PORT: ${{ secrets.LYNTTY_VPS_PORT }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
+          IMAGE_REFERENCE: ${{ steps.release.outputs.image }}
+          BOM_SEQUENCE: ${{ steps.release.outputs.sequence }}
+          SOURCE_COMMIT: ${{ steps.release.outputs.source }}
         run: |
           set -euo pipefail
           : "${HOST:?LYNTTY_VPS_HOST is required}"
           : "${USER:?LYNTTY_VPS_USER is required}"
           port="${PORT:-22}"
-
-          ssh -i ~/.ssh/lyntty_vps \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new \
-            -p "$port" \
-            "$USER@$HOST" \
-            "bash -se -- $IMAGE_TAG" <<'REMOTE'
-          set -euo pipefail
-          IMAGE_TAG="$1"
-          if [[ ! "$IMAGE_TAG" =~ ^sha-[0-9a-f]{40}$ ]]; then
-            echo "invalid relay image tag" >&2
-            exit 1
+          ssh -i ~/.ssh/lyntty_vps -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$port" "$USER@$HOST" \
+            "sudo /bin/bash -se -- '$IMAGE_REFERENCE' '$BOM_TAG' '$BOM_SEQUENCE' '$SOURCE_COMMIT'" <<'REMOTE'
+          set -Eeuo pipefail
+          IMAGE_REFERENCE="$1"
+          BOM_TAG="$2"
+          BOM_SEQUENCE="$3"
+          SOURCE_COMMIT="$4"
+          [[ "$IMAGE_REFERENCE" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]]
+          [[ "$BOM_TAG" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
+          [[ "$BOM_SEQUENCE" =~ ^[1-9][0-9]*$ ]]
+          [[ "$SOURCE_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          cd /opt/lyntty
+          test -f .env
+          test -f docker-compose.yml
+          incomplete_marker=.migration-incomplete
+          [[ ! -e "$incomplete_marker" ]] || { echo 'incomplete Relay migration marker exists; restore/verify explicitly before retrying' >&2; exit 1; }
+          deployed_sequence=0
+          [[ ! -f deployed-sequence.txt ]] || deployed_sequence="$(cat deployed-sequence.txt)"
+          [[ "$deployed_sequence" =~ ^[0-9]+$ ]]
+          if (( BOM_SEQUENCE == deployed_sequence )); then
+            grep -Fqx "$BOM_TAG $IMAGE_REFERENCE" deployed-bom.txt
+            curl -fsS http://127.0.0.1:3005/health >/dev/null
+            echo 'requested Stable BOM is already healthy and deployed'
+            exit 0
           fi
-          sudo test -f /opt/lyntty/.env
-          sudo test -f /opt/lyntty/docker-compose.yml
-
-          if sudo grep -q '^LYNTTY_RELAY_IMAGE_TAG=' /opt/lyntty/.env; then
-            sudo sed -i "s/^LYNTTY_RELAY_IMAGE_TAG=.*/LYNTTY_RELAY_IMAGE_TAG=${IMAGE_TAG}/" /opt/lyntty/.env
+          (( BOM_SEQUENCE > deployed_sequence )) || { echo 'requested Stable BOM sequence is older than the deployed sequence' >&2; exit 1; }
+          previous_reference="$(sed -n 's/^LYNTTY_RELAY_IMAGE=//p' .env | tail -1)"
+          [[ -z "$previous_reference" || "$previous_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]]
+          schema_mutation_started=false
+          success=false
+          rollback_image() {
+            [[ "$success" == true ]] && return
+            docker compose stop lyntty-relay >/dev/null 2>&1 || true
+            if [[ "$schema_mutation_started" == false && -n "$previous_reference" ]]; then
+              sed -i "s#^LYNTTY_RELAY_IMAGE=.*#LYNTTY_RELAY_IMAGE=${previous_reference}#" .env
+              docker compose pull lyntty-relay >/dev/null 2>&1 || true
+              docker compose up -d lyntty-relay >/dev/null 2>&1 || true
+            else
+              echo 'Relay remains fail-stopped after migration began; verify backup/restore and doctor before any restart.' >&2
+            fi
+          }
+          trap rollback_image EXIT
+          trap 'exit 130' HUP INT TERM
+          docker compose stop lyntty-relay
+          if grep -q '^LYNTTY_RELAY_IMAGE=' .env; then
+            sed -i "s#^LYNTTY_RELAY_IMAGE=.*#LYNTTY_RELAY_IMAGE=${IMAGE_REFERENCE}#" .env
           else
-            printf '\nLYNTTY_RELAY_IMAGE_TAG=%s\n' "$IMAGE_TAG" | sudo tee -a /opt/lyntty/.env >/dev/null
+            printf '\nLYNTTY_RELAY_IMAGE=%s\n' "$IMAGE_REFERENCE" >> .env
           fi
-
-          sudo sh -c 'cd /opt/lyntty && docker compose pull && docker compose up -d && docker compose ps'
-          curl -fsS http://127.0.0.1:3005/health
-          curl -fsS https://relay.jczhang.cc/health
+          docker compose pull lyntty-relay
+          backup="/backups/predeploy-${BOM_TAG}-$(date -u +%Y%m%dT%H%M%SZ).backup"
+          docker compose run --rm lyntty-relay backup "$backup"
+          printf '%s %s %s %s\n' "$BOM_TAG" "$BOM_SEQUENCE" "$IMAGE_REFERENCE" "$backup" > "${incomplete_marker}.tmp"
+          chmod 600 "${incomplete_marker}.tmp"
+          mv "${incomplete_marker}.tmp" "$incomplete_marker"
+          schema_mutation_started=true
+          docker compose run --rm lyntty-relay migrate
+          docker compose run --rm lyntty-relay doctor
+          docker compose up -d lyntty-relay
+          deadline=$((SECONDS + 90))
+          until curl -fsS http://127.0.0.1:3005/health >/dev/null; do
+            if (( SECONDS >= deadline )); then
+              echo 'Relay health check timed out' >&2
+              false
+            fi
+            read -r -t 1 _ || true
+          done
+          curl -fsS https://relay.jczhang.cc/health >/dev/null
+          printf '%s %s\n' "$BOM_TAG" "$IMAGE_REFERENCE" > deployed-bom.txt
+          printf '%s\n' "$BOM_SEQUENCE" > deployed-sequence.txt
+          printf '%s %s %s\n' "$BOM_TAG" "$IMAGE_REFERENCE" "$SOURCE_COMMIT" > deployed-release.txt
+          success=true
+          rm -f "$incomplete_marker"
+          trap - EXIT HUP INT TERM
+          docker compose ps
           REMOTE

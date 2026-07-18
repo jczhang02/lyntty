@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { delay } from "@/utils/delay";
 import { db } from "@/storage/db";
 

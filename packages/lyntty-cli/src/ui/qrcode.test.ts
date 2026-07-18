@@ -5,7 +5,7 @@
  * and handles edge cases gracefully.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 
 import { displayQRCode } from './qrcode.js'
 

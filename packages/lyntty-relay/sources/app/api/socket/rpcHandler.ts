@@ -1,7 +1,6 @@
 import { log } from "@/utils/log";
 import { Server, Socket } from "socket.io";
-import type { RemoteSocket } from "socket.io";
-import type { DefaultEventsMap } from "socket.io/dist/typed-events";
+import type { DefaultEventsMap, RemoteSocket } from "socket.io";
 import { Counter, Histogram, register } from 'prom-client';
 
 // RPC routing uses Socket.IO rooms. A daemon registering method M for user U
@@ -100,12 +99,6 @@ const ALLOWED_MACHINE_RPC_METHODS = new Set([
     'ensure-pi-session-mirror',
     'stop-session',
     'stop-daemon',
-    'claude-fork-session',
-    'claude-duplicate-session',
-    'claude-list-rewind-points',
-    'codex-fork-thread',
-    'codex-duplicate-thread',
-    'codex-list-rewind-points',
     'worktree-create',
     'worktree-list',
     'worktree-remove',

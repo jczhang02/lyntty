@@ -42,7 +42,7 @@ export function isBlockUserMessageText(text: string): boolean {
     return nonEmptyLines.length >= 2 || trimmed.length >= 120;
 }
 
-export function getUserMessagePresentation(message: UserTextMessage): UserMessagePresentation {
+export function getUserMessagePresentation(message: UserTextMessage, controlState?: string | null): UserMessagePresentation {
     const localOptimistic = isLocalOptimisticUserMessage(message);
     const computerOrigin = isComputerOriginUserMessage(message);
     const displayText = message.displayText || message.text;
@@ -61,7 +61,11 @@ export function getUserMessagePresentation(message: UserTextMessage): UserMessag
         frame: block ? 'phonePromptCard' : 'phoneBubble',
         parseRawSlashCommands: localOptimistic,
         sourceLabel: remoteCommandState === 'queued'
-            ? 'Sending…'
+            ? controlState === 'waiting_extension'
+                ? 'Waiting for Pi extension'
+                : controlState === 'computer_offline'
+                    ? 'Queued — computer offline'
+                    : 'Sending…'
             : remoteCommandState === 'failed'
                 ? 'Not delivered'
                 : null,

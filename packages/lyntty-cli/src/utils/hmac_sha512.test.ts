@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { hmac_sha512 } from './hmac_sha512';
 import { decode as decodeHex } from '@stablelib/hex';
 

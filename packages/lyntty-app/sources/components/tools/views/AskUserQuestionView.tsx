@@ -6,6 +6,7 @@ import { ToolSectionView } from '../ToolSectionView';
 import { sessionAllow } from '@/sync/ops';
 import { t } from '@/text';
 import { Ionicons } from '@expo/vector-icons';
+import { canControlSession } from '@/sync/sessionControlPolicy';
 
 interface QuestionOption {
     label: string;
@@ -164,7 +165,7 @@ const styles = StyleSheet.create((theme) => ({
     },
 }));
 
-export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId }) => {
+export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId, metadata }) => {
     const { theme } = useUnistyles();
     const [selections, setSelections] = React.useState<Map<number, Set<number>>>(new Map());
     const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -179,7 +180,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
     }
 
     const isRunning = tool.state === 'running';
-    const canInteract = isRunning && !isSubmitted;
+    const canInteract = canControlSession(metadata) && isRunning && !isSubmitted;
 
     // Check if all questions have at least one selection
     const allQuestionsAnswered = questions.every((_, qIndex) => {
@@ -213,7 +214,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
     }, [canInteract]);
 
     const handleSubmit = React.useCallback(async () => {
-        if (!sessionId || !allQuestionsAnswered || isSubmitting) return;
+        if (!canInteract || !sessionId || !allQuestionsAnswered || isSubmitting) return;
 
         setIsSubmitting(true);
 
@@ -246,7 +247,7 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
         } finally {
             setIsSubmitting(false);
         }
-    }, [sessionId, questions, selections, allQuestionsAnswered, isSubmitting, tool.permission?.id]);
+    }, [canInteract, sessionId, questions, selections, allQuestionsAnswered, isSubmitting, tool.permission?.id]);
 
     // Show submitted state
     if (isSubmitted || tool.state === 'completed') {

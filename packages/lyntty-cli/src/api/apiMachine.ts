@@ -4,6 +4,7 @@
  */
 
 import { io, Socket } from 'socket.io-client';
+import { createCliSocketAuth } from './wireAuth';
 import { logger } from '@/ui/logger';
 import {
     createManagedWorktree,
@@ -18,25 +19,9 @@ import { encodeBase64, decodeBase64, encrypt, decrypt } from './encryption';
 import { backoff } from '@/utils/time';
 import { RpcHandlerManager } from './rpc/RpcHandlerManager';
 import { detectCLIAvailability, CLIAvailability } from '@/utils/detectCLI';
-import { detectResumeSupport, type ResumeSupport } from '@/resume/localLynttyAgentAuth';
+import { detectResumeSupport, type ResumeSupport } from '@/resume/localRemoteAuth';
 import { shouldReconnect } from '@/utils/lidState';
-import { getProjectPath } from '@/claude/utils/path';
-import {
-    forkSession as claudeForkSession,
-    forkAndTruncateSession as claudeForkAndTruncateSession,
-    listClaudeRewindPoints,
-    ForkTruncateUuidNotFoundError,
-    ForkSourceMissingError,
-} from '@/claude/utils/claudeSessionFork';
-import { CodexAppServerClient } from '@/codex/codexAppServerClient';
-import {
-    CodexForkRewindPointNotFoundError,
-    forkCodexThread,
-    listCodexRewindPoints,
-} from '@/codex/codexThreadFork';
 import type { PiSessionRecoveryRecord } from '@/pi/runPiRecovery';
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface ServerToDaemonEvents {
     update: (data: Update) => void;
@@ -97,7 +82,7 @@ interface DaemonToServerEvents {
 
 type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
-    resumeSession?: (sessionId: string, options?: { model?: string; permissionMode?: string }) => Promise<SpawnSessionResult>;
+    resumeSession?: (sessionId: string) => Promise<SpawnSessionResult>;
     listPiSessions?: (options?: { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }) => Promise<{ sessions: PiSessionRecoveryRecord[]; nextCursor?: string; total: number }>;
     ensurePiSessionMirror?: (options: { piSessionId: string; directory?: string; machineId?: string }) => Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }>;
     stopSession: (sessionId: string) => boolean;
@@ -111,23 +96,13 @@ function requireNonEmptyString(value: unknown, name: string): string {
     return value;
 }
 
-async function withCodexAppServerClient<T>(handler: (client: CodexAppServerClient) => Promise<T>): Promise<T> {
-    const client = new CodexAppServerClient();
-    await client.connect();
-    try {
-        return await handler(client);
-    } finally {
-        await client.disconnect();
-    }
-}
-
 export class ApiMachineClient {
     private socket!: Socket<ServerToDaemonEvents, DaemonToServerEvents>;
     private keepAliveInterval: NodeJS.Timeout | null = null;
     private lastKnownCLIAvailability: CLIAvailability | null = null;
     private lastKnownResumeSupport: ResumeSupport | null = null;
     private rpcHandlerManager: RpcHandlerManager;
-    private resumeSessionHandler: ((sessionId: string, options?: { model?: string; permissionMode?: string }) => Promise<SpawnSessionResult>) | null = null;
+    private resumeSessionHandler: ((sessionId: string) => Promise<SpawnSessionResult>) | null = null;
     private reconnectInterval: NodeJS.Timeout | null = null;
 
     constructor(
@@ -159,8 +134,8 @@ export class ApiMachineClient {
 
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-lyntty-session', async (params: any) => {
-            const { directory, sessionId, machineId, approvedNewDirectoryCreation, agent, takeoverChoice, environmentVariables, token, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId } = params || {};
-            logger.debug('[API MACHINE] Spawning session', {
+            const { directory, sessionId, machineId, approvedNewDirectoryCreation, agent, takeoverChoice, environmentVariables } = params || {};
+            logger.debug('[API MACHINE] Spawning Pi session', {
                 hasDirectory: typeof directory === 'string' && directory.length > 0,
                 hasSessionId: typeof sessionId === 'string' && sessionId.length > 0,
                 hasMachineId: typeof machineId === 'string' && machineId.length > 0,
@@ -168,18 +143,24 @@ export class ApiMachineClient {
                 takeoverChoice,
                 approvedNewDirectoryCreation: !!approvedNewDirectoryCreation,
                 hasEnvironmentVariables: !!environmentVariables,
-                hasToken: typeof token === 'string' && token.length > 0,
-                hasResumeClaudeSessionId: typeof resumeClaudeSessionId === 'string' && resumeClaudeSessionId.length > 0,
-                hasResumeCodexThreadId: typeof resumeCodexThreadId === 'string' && resumeCodexThreadId.length > 0,
-                hasParentSessionId: typeof parentSessionId === 'string' && parentSessionId.length > 0,
-                hasForkedFromMessageId: typeof forkedFromMessageId === 'string' && forkedFromMessageId.length > 0,
             });
 
             if (!directory) {
                 throw new Error('Directory is required');
             }
+            if (agent !== undefined && agent !== 'pi') {
+                throw new Error('Only the Pi runtime is supported');
+            }
 
-            const result = await spawnSession({ directory, sessionId, machineId, approvedNewDirectoryCreation, agent, takeoverChoice, environmentVariables, token, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId });
+            const result = await spawnSession({
+                directory,
+                sessionId,
+                machineId,
+                approvedNewDirectoryCreation,
+                agent: 'pi',
+                takeoverChoice,
+                environmentVariables,
+            });
 
             switch (result.type) {
                 case 'success':
@@ -230,6 +211,7 @@ export class ApiMachineClient {
         }));
 
         this.rpcHandlerManager.registerHandler('worktree-list', async (params: any) => ({
+            success: true,
             worktrees: await listManagedWorktrees({ basePath: params?.basePath }),
         }));
 
@@ -258,133 +240,6 @@ export class ApiMachineClient {
             return { message: 'Session stopped' };
         });
 
-        // Register Claude session fork handlers (used by app-side fork /
-        // duplicate flows). These take the source session's working
-        // directory and underlying Claude UUID, copy the on-disk JSONL
-        // — optionally truncated at a chosen message — and return the new
-        // Claude UUID. The caller then spawns a fresh Lyntty session with
-        // `resumeClaudeSessionId` set so `claude --resume <newUuid>`
-        // continues the conversation.
-        this.rpcHandlerManager.registerHandler('claude-fork-session', async (params: any) => {
-            const { directory, claudeSessionId } = params || {};
-            if (typeof directory !== 'string' || directory.length === 0) {
-                throw new Error('directory is required');
-            }
-            if (typeof claudeSessionId !== 'string' || !UUID_RE.test(claudeSessionId)) {
-                throw new Error('claudeSessionId must be a valid UUID');
-            }
-            try {
-                const newClaudeSessionId = await claudeForkSession(getProjectPath(directory), claudeSessionId);
-                return { type: 'success', newClaudeSessionId };
-            } catch (error) {
-                if (error instanceof ForkSourceMissingError) {
-                    throw new Error('Claude session file not found on this machine');
-                }
-                throw error;
-            }
-        });
-
-        // List user-text rewind points directly from the on-disk JSONL.
-        // The server-side session log misses claudeUuid for messages typed
-        // live in the app (legacy `sentFrom: 'web'` path); disk is the
-        // source of truth and carries the right uuids for every message.
-        this.rpcHandlerManager.registerHandler('claude-list-rewind-points', async (params: any) => {
-            const { directory, claudeSessionId } = params || {};
-            if (typeof directory !== 'string' || directory.length === 0) {
-                throw new Error('directory is required');
-            }
-            if (typeof claudeSessionId !== 'string' || !UUID_RE.test(claudeSessionId)) {
-                throw new Error('claudeSessionId must be a valid UUID');
-            }
-            try {
-                const points = await listClaudeRewindPoints(getProjectPath(directory), claudeSessionId);
-                return { type: 'success', points };
-            } catch (error) {
-                if (error instanceof ForkSourceMissingError) {
-                    throw new Error('Claude session file not found on this machine');
-                }
-                throw error;
-            }
-        });
-
-        this.rpcHandlerManager.registerHandler('claude-duplicate-session', async (params: any) => {
-            const { directory, claudeSessionId, cutAfterUuid } = params || {};
-            if (typeof directory !== 'string' || directory.length === 0) {
-                throw new Error('directory is required');
-            }
-            if (typeof claudeSessionId !== 'string' || !UUID_RE.test(claudeSessionId)) {
-                throw new Error('claudeSessionId must be a valid UUID');
-            }
-            if (typeof cutAfterUuid !== 'string' || !UUID_RE.test(cutAfterUuid)) {
-                throw new Error('cutAfterUuid must be a valid UUID');
-            }
-            try {
-                const newClaudeSessionId = await claudeForkAndTruncateSession(
-                    getProjectPath(directory),
-                    claudeSessionId,
-                    cutAfterUuid,
-                );
-                return { type: 'success', newClaudeSessionId };
-            } catch (error) {
-                if (error instanceof ForkSourceMissingError) {
-                    throw new Error('Claude session file not found on this machine');
-                }
-                if (error instanceof ForkTruncateUuidNotFoundError) {
-                    throw new Error(
-                        'The chosen rewind point is no longer present in the source session — try forking without truncation',
-                    );
-                }
-                throw error;
-            }
-        });
-
-        this.rpcHandlerManager.registerHandler('codex-fork-thread', async (params: any) => {
-            const directory = requireNonEmptyString(params?.directory, 'directory');
-            const codexThreadId = requireNonEmptyString(params?.codexThreadId, 'codexThreadId');
-
-            const result = await withCodexAppServerClient((client) => forkCodexThread(client, {
-                threadId: codexThreadId,
-                cwd: directory,
-            }));
-            return result;
-        });
-
-        this.rpcHandlerManager.registerHandler('codex-list-rewind-points', async (params: any) => {
-            const codexThreadId = requireNonEmptyString(params?.codexThreadId, 'codexThreadId');
-
-            return withCodexAppServerClient(async (client) => {
-                const { thread } = await client.readThread({
-                    threadId: codexThreadId,
-                    includeTurns: true,
-                });
-                return {
-                    type: 'success',
-                    points: listCodexRewindPoints(thread),
-                };
-            });
-        });
-
-        this.rpcHandlerManager.registerHandler('codex-duplicate-thread', async (params: any) => {
-            const directory = requireNonEmptyString(params?.directory, 'directory');
-            const codexThreadId = requireNonEmptyString(params?.codexThreadId, 'codexThreadId');
-            const cutAfterItemId = requireNonEmptyString(params?.cutAfterItemId, 'cutAfterItemId');
-
-            try {
-                return await withCodexAppServerClient((client) => forkCodexThread(client, {
-                    threadId: codexThreadId,
-                    cwd: directory,
-                    cutAfterItemId,
-                }));
-            } catch (error) {
-                if (error instanceof CodexForkRewindPointNotFoundError) {
-                    throw new Error(
-                        'The chosen rewind point is no longer present in the source Codex thread — try forking without truncation',
-                    );
-                }
-                throw error;
-            }
-        });
-
         // Register stop daemon handler
         this.rpcHandlerManager.registerHandler('stop-daemon', () => {
             logger.debug('[API MACHINE] Received stop-daemon RPC request');
@@ -405,7 +260,7 @@ export class ApiMachineClient {
         if (this.resumeSessionHandler) {
             if (!this.rpcHandlerManager.hasHandler(method)) {
                 this.rpcHandlerManager.registerHandler(method, async (params: any) => {
-                    const { sessionId, model, permissionMode } = params || {};
+                    const { sessionId } = params || {};
 
                     if (!sessionId || typeof sessionId !== 'string') {
                         throw new Error('Session ID is required');
@@ -416,7 +271,7 @@ export class ApiMachineClient {
                         throw new Error('Resume session handler not available');
                     }
 
-                    const result = await handler(sessionId, { model, permissionMode });
+                    const result = await handler(sessionId);
                     switch (result.type) {
                         case 'success':
                             return { type: 'success', sessionId: result.sessionId };
@@ -498,12 +353,11 @@ export class ApiMachineClient {
 
         this.socket = io(serverUrl, {
             transports: ['websocket'],
-            auth: {
+            auth: createCliSocketAuth({
                 token: this.token,
                 clientType: 'machine-scoped' as const,
                 machineId: this.machine.id,
-                lynttyClient: `cli-daemon/${configuration.currentCliVersion}`
-            },
+            }, 'cli-daemon'),
             path: '/v1/updates',
             reconnection: false,
         });
@@ -592,10 +446,10 @@ export class ApiMachineClient {
             const prev = this.lastKnownCLIAvailability;
             const newResumeSupport = detectResumeSupport();
             const prevResume = this.lastKnownResumeSupport;
-            const cliAvailabilityChanged = !prev || prev.claude !== newAvailability.claude || prev.codex !== newAvailability.codex || prev.gemini !== newAvailability.gemini || prev.openclaw !== newAvailability.openclaw;
+            const cliAvailabilityChanged = !prev || prev.pi !== newAvailability.pi;
             const resumeSupportChanged = !prevResume
                 || prevResume.rpcAvailable !== newResumeSupport.rpcAvailable
-                || prevResume.lynttyAgentAuthenticated !== newResumeSupport.lynttyAgentAuthenticated;
+                || prevResume.remoteAuthenticated !== newResumeSupport.remoteAuthenticated;
 
             if (cliAvailabilityChanged || resumeSupportChanged) {
                 this.lastKnownCLIAvailability = newAvailability;

@@ -34,9 +34,17 @@ function findWasmFiles(): { wasmModule: WebAssembly.Module; fsBundle: Blob } | n
 }
 
 export function createPGlite(dataDir: string): PGlite {
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
     const wasmOpts = findWasmFiles();
     if (wasmOpts) {
         return new PGlite({ dataDir, ...wasmOpts });
     }
     return new PGlite(dataDir);
+}
+
+export function createPGliteFromDump(dataDir: string, dump: Blob): PGlite {
+    const wasmOpts = findWasmFiles();
+    return new PGlite({ dataDir, loadDataDir: dump, ...(wasmOpts ?? {}) });
 }

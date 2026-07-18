@@ -1,4 +1,4 @@
-webapp/
 data/
 .logs/
 *.tgz
+sources/generated/

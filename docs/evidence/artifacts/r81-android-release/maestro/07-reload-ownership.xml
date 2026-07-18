@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty_v03_api35" tests="1" failures="0" time="24.0">
+    <testcase id="Lyntty reload hands control to one Pi extension owner" name="Lyntty reload hands control to one Pi extension owner" classname="Lyntty reload hands control to one Pi extension owner" file="e2e/maestro/07_reload_ownership.yml" time="24.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="reliability, extension-reload, ownership"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

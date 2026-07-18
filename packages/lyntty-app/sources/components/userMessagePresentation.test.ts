@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import { getUserMessagePresentation, isBlockUserMessageText, isLocalOptimisticUserMessage } from './userMessagePresentation';
 import type { UserTextMessage } from '@/sync/typesMessage';
 
@@ -41,6 +41,16 @@ describe('userMessagePresentation', () => {
             frame: 'phoneBubble',
             parseRawSlashCommands: true,
             sourceLabel: 'Sending…',
+        });
+    });
+
+    it('shows queued extension remediation instead of claiming delivery', () => {
+        expect(getUserMessagePresentation(userMessage({
+            localId: 'phone-local-1',
+            text: 'hello',
+            meta: { sentFrom: 'android', remoteCommandState: 'queued' },
+        }), 'waiting_extension')).toMatchObject({
+            sourceLabel: 'Waiting for Pi extension',
         });
     });
 

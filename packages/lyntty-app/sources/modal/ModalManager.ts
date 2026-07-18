@@ -6,7 +6,6 @@ class ModalManagerClass implements IModal {
     private showModalFn: ((config: Omit<ModalConfig, 'id'>) => string) | null = null;
     private hideModalFn: ((id: string) => void) | null = null;
     private hideAllModalsFn: (() => void) | null = null;
-    private confirmResolvers: Map<string, (value: boolean) => void> = new Map();
     private promptResolvers: Map<string, (value: string | null) => void> = new Map();
 
     setFunctions(
@@ -24,23 +23,7 @@ class ModalManagerClass implements IModal {
     }
 
     alert(title: string, message?: string, buttons?: AlertButton[]): void {
-        if (Platform.OS === 'web') {
-            // Show custom web modal
-            if (!this.showModalFn) {
-                console.error('ModalManager not initialized. Make sure ModalProvider is mounted.');
-                return;
-            }
-
-            this.showModalFn({
-                type: 'alert',
-                title,
-                message,
-                buttons: buttons || [{ text: t('common.ok') }]
-            } as Omit<ModalConfig, 'id'>);
-        } else {
-            // Use native alert
-            Alert.alert(title, message, buttons);
-        }
+        Alert.alert(title, message, buttons);
     }
 
     async confirm(
@@ -52,47 +35,25 @@ class ModalManagerClass implements IModal {
             destructive?: boolean;
         }
     ): Promise<boolean> {
-        if (Platform.OS === 'web') {
-            // Show custom web modal
-            if (!this.showModalFn) {
-                console.error('ModalManager not initialized. Make sure ModalProvider is mounted.');
-                return false;
-            }
-
-            const modalId = this.showModalFn({
-                type: 'confirm',
+        return new Promise<boolean>((resolve) => {
+            Alert.alert(
                 title,
                 message,
-                cancelText: options?.cancelText,
-                confirmText: options?.confirmText,
-                destructive: options?.destructive
-            } as Omit<ModalConfig, 'id'>);
-
-            return new Promise<boolean>((resolve) => {
-                this.confirmResolvers.set(modalId, resolve);
-            });
-        } else {
-            // Use native alert
-            return new Promise<boolean>((resolve) => {
-                Alert.alert(
-                    title,
-                    message,
-                    [
-                        {
-                            text: options?.cancelText || t('common.cancel'),
-                            style: 'cancel',
-                            onPress: () => resolve(false)
-                        },
-                        {
-                            text: options?.confirmText || t('common.ok'),
-                            style: options?.destructive ? 'destructive' : 'default',
-                            onPress: () => resolve(true)
-                        }
-                    ],
-                    { cancelable: false }
-                );
-            });
-        }
+                [
+                    {
+                        text: options?.cancelText || t('common.cancel'),
+                        style: 'cancel',
+                        onPress: () => resolve(false)
+                    },
+                    {
+                        text: options?.confirmText || t('common.ok'),
+                        style: options?.destructive ? 'destructive' : 'default',
+                        onPress: () => resolve(true)
+                    }
+                ],
+                { cancelable: false }
+            );
+        });
     }
 
     show(config: Omit<CustomModalConfig, 'id' | 'type'>): string {
@@ -123,14 +84,6 @@ class ModalManagerClass implements IModal {
         }
 
         this.hideAllModalsFn();
-    }
-
-    resolveConfirm(id: string, value: boolean): void {
-        const resolver = this.confirmResolvers.get(id);
-        if (resolver) {
-            resolver(value);
-            this.confirmResolvers.delete(id);
-        }
     }
 
     resolvePrompt(id: string, value: string | null): void {
@@ -176,7 +129,7 @@ class ModalManagerClass implements IModal {
                 );
             });
         } else {
-            // Use custom modal for web and Android
+            // Android needs the custom prompt because Alert.prompt is iOS-only.
             if (!this.showModalFn) {
                 console.error('ModalManager not initialized. Make sure ModalProvider is mounted.');
                 return null;

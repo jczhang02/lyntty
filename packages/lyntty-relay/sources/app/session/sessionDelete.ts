@@ -10,8 +10,7 @@ import { deleteSessionAttachments } from "@/storage/files";
  * Delete a session and all its related data.
  * Handles:
  * - Deleting all session messages
- * - Deleting all usage reports for the session
- * - Deleting all access keys for the session
+ * - Deleting legacy usage/access-key rows during the database compatibility window
  * - Deleting the session itself
  * - Sending socket notification to all connected clients
  *
@@ -52,7 +51,7 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
             deletedCount: deletedMessages.count
         }, `Deleted ${deletedMessages.count} session messages`);
 
-        // 2. Delete usage reports
+        // 2. Delete compatibility-only legacy usage rows
         const deletedReports = await tx.usageReport.deleteMany({
             where: { sessionId }
         });
@@ -63,7 +62,7 @@ export async function sessionDelete(ctx: Context, sessionId: string): Promise<bo
             deletedCount: deletedReports.count
         }, `Deleted ${deletedReports.count} usage reports`);
 
-        // 3. Delete access keys
+        // 3. Delete compatibility-only legacy access-key rows
         const deletedAccessKeys = await tx.accessKey.deleteMany({
             where: { sessionId }
         });

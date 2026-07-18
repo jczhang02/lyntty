@@ -1,6 +1,5 @@
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import * as Application from 'expo-application';
-import * as Crypto from 'expo-crypto';
 import * as IntentLauncher from 'expo-intent-launcher';
 import {
     cacheDirectory,
@@ -8,7 +7,7 @@ import {
     downloadAsync,
     getContentUriAsync,
 } from 'expo-file-system/legacy';
-import { readFileBytes } from './readFileBytes';
+import { apkSha256Matches, validApkSha256 } from './apkUpdateIntegrity';
 
 const APK_MIME_TYPE = 'application/vnd.android.package-archive';
 const FLAG_GRANT_READ_URI_PERMISSION = 1;
@@ -19,15 +18,14 @@ export type AndroidApkUpdate = {
     versionCode?: number;
 };
 
-function toHex(bytes: Uint8Array): string {
-    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
+type LynttyFileHashModule = {
+    sha256(uri: string): Promise<string>;
+};
 
 export async function sha256File(uri: string): Promise<string> {
-    const bytes = await readFileBytes(uri);
-    const digestInput = bytes.slice().buffer as ArrayBuffer;
-    const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, digestInput);
-    return toHex(new Uint8Array(digest));
+    const fileHash = NativeModules.LynttyFileHash as LynttyFileHashModule | undefined;
+    if (!fileHash) throw new Error('Native APK verification is unavailable.');
+    return fileHash.sha256(uri);
 }
 
 export async function openAndroidUnknownSourcesSettings(): Promise<void> {
@@ -45,7 +43,7 @@ export async function installAndroidApkUpdate(update: AndroidApkUpdate): Promise
     if (!cacheDirectory) {
         throw new Error('APK cache directory is unavailable.');
     }
-    if (!/^[a-f0-9]{64}$/i.test(update.sha256)) {
+    if (!validApkSha256(update.sha256)) {
         throw new Error('Update manifest is missing a valid SHA-256 hash.');
     }
 
@@ -58,7 +56,7 @@ export async function installAndroidApkUpdate(update: AndroidApkUpdate): Promise
     }
 
     const actualSha256 = await sha256File(result.uri);
-    if (actualSha256.toLowerCase() !== update.sha256.toLowerCase()) {
+    if (!apkSha256Matches(update.sha256, actualSha256)) {
         await deleteAsync(result.uri, { idempotent: true }).catch(() => undefined);
         throw new Error('Downloaded APK SHA-256 did not match the release manifest.');
     }

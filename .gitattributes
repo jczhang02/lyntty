@@ -1,0 +1,5 @@
+# Keep cross-platform checkouts byte-stable for source provenance checks.
+* text=auto eol=lf
+
+# Unified diff context lines intentionally contain a single prefix space.
+patches/*.patch -whitespace

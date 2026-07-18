@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 
 import { shouldOpenPiSessionImmediately, shouldReportPiSpawnError } from './piSessionOpenRequest';
 import type { SessionRowData } from './storage';

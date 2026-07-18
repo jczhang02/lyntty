@@ -22,10 +22,16 @@ export type LynttyPiCommandInfo = {
   sourceInfo?: Record<string, unknown>;
 };
 
+export type LynttyPiRemoteImage = {
+  type: 'image';
+  data: string;
+  mimeType: string;
+};
+
 export type LynttyPiRemoteCommand =
-  | { type: 'send_user_message'; text: string }
-  | { type: 'follow_up'; text: string }
-  | { type: 'steer'; text: string }
+  | { type: 'send_user_message'; text: string; images?: LynttyPiRemoteImage[] }
+  | { type: 'follow_up'; text: string; images?: LynttyPiRemoteImage[] }
+  | { type: 'steer'; text: string; images?: LynttyPiRemoteImage[] }
   | { type: 'abort' }
   | { type: 'compact'; instructions?: string }
   | { type: 'reload' }
@@ -34,7 +40,7 @@ export type LynttyPiRemoteCommand =
   | { type: 'internal_shutdown' }
   | { type: 'set_session_name'; name: string }
   | { type: 'get_commands' }
-  | { type: 'invoke_pi_command'; commandLine: string; deliverAs?: 'followUp' }
+  | { type: 'invoke_pi_command'; commandLine: string; deliverAs?: 'followUp'; images?: LynttyPiRemoteImage[] }
   | { type: 'set_label'; entryId: string; label?: string };
 
 export type LynttyPiRemoteCommandEnvelope = {
@@ -65,16 +71,21 @@ function capText(value: string, max = REMOTE_PI_TEXT_MAX): string | null {
   return trimmed;
 }
 
-export function parseLynttyPiRemoteCommand(text: string, options: { isStreaming: boolean }): LynttyPiRemoteCommand | null {
+export function parseLynttyPiRemoteCommand(text: string, options: { isStreaming: boolean; hasImages?: boolean }): LynttyPiRemoteCommand | null {
   const trimmed = text.trim();
-  if (!trimmed) return null;
+  if (!trimmed) {
+    if (!options.hasImages) return null;
+    return options.isStreaming
+      ? { type: 'follow_up', text: '' }
+      : { type: 'send_user_message', text: '' };
+  }
 
   const [rawCommand = ''] = trimmed.split(/\s+/, 1);
   const command = rawCommand.toLowerCase();
   const rest = trimmed.slice(rawCommand.length).trim();
 
   if (command === '/stop' || command === '/abort' || command === '/interrupt') {
-    return { type: 'abort' };
+    return options.hasImages ? null : { type: 'abort' };
   }
   if (command === '/redirect' || command === '/steer') {
     const text = capText(rest);
@@ -85,20 +96,30 @@ export function parseLynttyPiRemoteCommand(text: string, options: { isStreaming:
     return text ? { type: 'follow_up', text } : null;
   }
   if (command === '/compact') {
+    if (options.hasImages) return null;
     const instructions = capText(rest);
     return rest ? instructions ? { type: 'compact', instructions } : null : { type: 'compact' };
   }
   if (command === '/reload') {
-    return { type: 'reload' };
+    return options.hasImages ? null : { type: 'reload' };
   }
   if (command === '/name') {
+    if (options.hasImages) return null;
     const name = capText(rest, REMOTE_PI_LABEL_MAX);
     return name ? { type: 'set_session_name', name } : null;
   }
   if (command === '/commands') {
-    return { type: 'get_commands' };
+    return options.hasImages ? null : { type: 'get_commands' };
   }
-  if (command === '/goal' || command === '/context' || command.startsWith('/skill:')) {
+  if (command === '/goal' || command === '/context') {
+    if (options.hasImages) return null;
+    const commandLine = capText(trimmed);
+    if (!commandLine) return null;
+    return options.isStreaming
+      ? { type: 'invoke_pi_command', commandLine, deliverAs: 'followUp' }
+      : { type: 'invoke_pi_command', commandLine };
+  }
+  if (command.startsWith('/skill:')) {
     const commandLine = capText(trimmed);
     if (!commandLine) return null;
     return options.isStreaming
@@ -106,6 +127,7 @@ export function parseLynttyPiRemoteCommand(text: string, options: { isStreaming:
       : { type: 'invoke_pi_command', commandLine };
   }
   if (command === '/label') {
+    if (options.hasImages) return null;
     const [entryId = '', ...labelParts] = rest.split(/\s+/);
     if (!entryId) return null;
     const label = capText(labelParts.join(' '), REMOTE_PI_LABEL_MAX);
@@ -121,6 +143,25 @@ export function parseLynttyPiRemoteCommand(text: string, options: { isStreaming:
   return options.isStreaming
     ? { type: 'follow_up', text: messageText }
     : { type: 'send_user_message', text: messageText };
+}
+
+export function attachImagesToPiRemoteCommand(
+  command: LynttyPiRemoteCommand,
+  images: LynttyPiRemoteImage[],
+): LynttyPiRemoteCommand {
+  if (images.length === 0) return command;
+  switch (command.type) {
+    case 'send_user_message':
+    case 'follow_up':
+    case 'steer':
+      return { ...command, images };
+    case 'invoke_pi_command':
+      return command.commandLine.toLowerCase().startsWith('/skill:')
+        ? { ...command, images }
+        : command;
+    default:
+      return command;
+  }
 }
 
 export function toPiAgentSessionEvent(event: Record<string, unknown>): AgentSessionEvent | null {

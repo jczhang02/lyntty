@@ -10,12 +10,11 @@
 
 Run affected checks and mark not-run items with reason.
 
-- [ ] `pnpm ci:fast`
-- [ ] `pnpm ci:wire`
-- [ ] `pnpm ci:cli`
-- [ ] `pnpm ci:relay`
-- [ ] `pnpm ci:app`
-- [ ] `pnpm ci:agent`
+- [ ] `bun run ci:fast`
+- [ ] `bun run ci:wire`
+- [ ] `bun run ci:cli`
+- [ ] `bun run ci:relay`
+- [ ] `bun run ci:app`
 - [ ] Android/APK validation if app-native or release behavior changed
 - [ ] relay image or deploy smoke if relay/container/deploy changed
 - [ ] CLI smoke if packaging, install, daemon, or server behavior changed

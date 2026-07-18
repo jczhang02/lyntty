@@ -1,12 +1,9 @@
-name: Relay image
+name: Relay image verification
 
 on:
   pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,66 +14,29 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        with:
+          platforms: arm64
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build relay image without publishing
-        uses: docker/build-push-action@v6
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Build Relay image without publishing
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: ./Dockerfile
           push: false
-          tags: ghcr.io/jczhang02/lyntty-relay:pr-${{ github.event.pull_request.number }}
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/jczhang02/lyntty-relay:verify-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/jczhang02/lyntty
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=lyntty-relay
 
-  publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment: production-relay
-    timeout-minutes: 45
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set image tag
-        id: meta
-        run: |
-          image_tag="sha-${GITHUB_SHA}"
-          echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and publish relay image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ghcr.io/jczhang02/lyntty-relay:${{ steps.meta.outputs.image_tag }}
-            ghcr.io/jczhang02/lyntty-relay:main
-          labels: |
-            org.opencontainers.image.source=https://github.com/jczhang02/lyntty
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.title=lyntty-relay
+# GHCR publication belongs to the compatibility-BOM release workflow. A stable
+# component release must not publish from an ordinary push to main.

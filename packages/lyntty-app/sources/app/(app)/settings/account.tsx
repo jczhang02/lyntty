@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, Platform } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, Pressable } from 'react-native';
 import { useAuth } from '@/auth/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -13,16 +13,11 @@ import { Modal } from '@/modal';
 import { t } from '@/text';
 import { layout } from '@/components/layout';
 
-import { sync } from '@/sync/sync';
 import { useUnistyles } from 'react-native-unistyles';
 import { useConnectAccount } from '@/hooks/useConnectAccount';
-import { fetchPushTokens, type PushToken } from '@/sync/apiPush';
 import {
-    getCurrentExpoPushToken,
-    getCurrentPushDeviceMetadata,
     getPushPermissionInfo,
     requestPushPermissionOrOpenSettings,
-    removePushToken,
     syncCurrentPushToken,
     type PushPermissionInfo,
 } from '@/sync/pushRegistration';
@@ -30,9 +25,6 @@ import {
 function formatPushPermissionLabel(permission: PushPermissionInfo | null): string {
     if (!permission) {
         return 'Loading';
-    }
-    if (permission.status === 'unsupported') {
-        return 'Unavailable';
     }
     if (permission.granted) {
         return 'Allowed';
@@ -47,9 +39,6 @@ function formatPushPermissionSubtitle(permission: PushPermissionInfo | null): st
     if (!permission) {
         return 'Checking push notification permissions for this device.';
     }
-    if (permission.status === 'unsupported') {
-        return 'Push notification permissions are only managed on mobile devices.';
-    }
     if (permission.granted) {
         return 'This device can receive push notifications.';
     }
@@ -59,78 +48,24 @@ function formatPushPermissionSubtitle(permission: PushPermissionInfo | null): st
     return 'iOS has stopped prompting. Open system settings to enable notifications again.';
 }
 
-function formatPushTokenFingerprint(token: string): string {
-    const rawValue = token.replace(/^ExponentPushToken\[/, '').replace(/\]$/, '');
-    if (rawValue.length <= 12) {
-        return rawValue;
-    }
-    return `${rawValue.slice(0, 6)}…${rawValue.slice(-6)}`;
-}
-
-function formatPushTimestamp(timestamp: number): string {
-    return new Date(timestamp).toLocaleString();
-}
-
-function buildPushTokenSubtitle(pushToken: PushToken, options: {
-    isCurrentDevice: boolean;
-    currentDeviceLabel: string;
-    currentAppLabel: string | null;
-}): string {
-    const lines: string[] = [];
-
-    if (options.isCurrentDevice) {
-        lines.push(options.currentDeviceLabel);
-        if (options.currentAppLabel) {
-            lines.push(options.currentAppLabel);
-        }
-    } else {
-        lines.push('Other device or stale registration');
-    }
-
-    lines.push(`Registered: ${formatPushTimestamp(pushToken.createdAt)}`);
-    lines.push(`Last seen: ${formatPushTimestamp(pushToken.updatedAt)}`);
-    lines.push(`Server ID: ${pushToken.id}`);
-    lines.push(`Token: ${formatPushTokenFingerprint(pushToken.token)}`);
-    return lines.join('\n');
-}
-
 export default React.memo(() => {
     const { theme } = useUnistyles();
     const auth = useAuth();
     const [showSecret, setShowSecret] = useState(false);
     const [copiedRecently, setCopiedRecently] = useState(false);
     const { connectAccount, isLoading: isConnecting } = useConnectAccount();
-    const currentPushDevice = useMemo(() => getCurrentPushDeviceMetadata(), []);
-    const [pushTokens, setPushTokens] = useState<PushToken[]>([]);
     const [pushPermission, setPushPermission] = useState<PushPermissionInfo | null>(null);
-    const [currentPushToken, setCurrentPushToken] = useState<string | null>(null);
     const [loadingPushSettings, setLoadingPushSettings] = useState(false);
     const [requestingPushPermission, setRequestingPushPermission] = useState(false);
-    const [refreshingPushToken, setRefreshingPushToken] = useState(false);
-    const [deletingPushToken, setDeletingPushToken] = useState<string | null>(null);
 
     // Get the current secret key
     const currentSecret = auth.credentials?.secret || '';
     const formattedSecret = currentSecret ? formatSecretKeyForBackup(currentSecret) : '';
 
     const loadPushSettings = useCallback(async (showError = false) => {
-        if (!auth.credentials) {
-            setPushTokens([]);
-            setPushPermission(null);
-            setCurrentPushToken(null);
-            return;
-        }
-
         setLoadingPushSettings(true);
         try {
-            const [tokens, permission, liveToken] = await Promise.all([
-                fetchPushTokens(auth.credentials),
-                getPushPermissionInfo(),
-                getCurrentExpoPushToken(),
-            ]);
-            setPushTokens(tokens);
-            setPushPermission(permission);
-            setCurrentPushToken(liveToken);
+            setPushPermission(await getPushPermissionInfo());
         } catch (error) {
             console.error('Failed to load push notification settings:', error);
             if (showError) {
@@ -139,7 +74,7 @@ export default React.memo(() => {
         } finally {
             setLoadingPushSettings(false);
         }
-    }, [auth.credentials]);
+    }, []);
 
     useEffect(() => {
         void loadPushSettings();
@@ -210,58 +145,6 @@ export default React.memo(() => {
         }
     }, [auth.credentials, loadPushSettings]);
 
-    const handleRefreshCurrentPushToken = useCallback(async () => {
-        if (!auth.credentials) {
-            return;
-        }
-
-        setRefreshingPushToken(true);
-        try {
-            const result = await syncCurrentPushToken(auth.credentials);
-            setPushPermission(result.permission);
-            await loadPushSettings();
-
-            if (!result.permission.granted) {
-                Modal.alert(t('common.error'), t('appWide.pushNotificationsAreNotEnabledForThisDeviceYet'));
-                return;
-            }
-
-            Modal.alert(t('common.success'), t('appWide.thisDevicePushTokenWasRefreshed'));
-        } catch (error) {
-            console.error('Failed to refresh push token:', error);
-            Modal.alert(t('common.error'), t('appWide.failedToRefreshThisDevicePushToken'));
-        } finally {
-            setRefreshingPushToken(false);
-        }
-    }, [auth.credentials, loadPushSettings]);
-
-    const handleDeletePushToken = useCallback(async (pushToken: PushToken) => {
-        if (!auth.credentials) {
-            return;
-        }
-
-        const confirmed = await Modal.confirm(
-            t('appWide.deletePushToken'),
-            t('appWide.removeValueFromYourAccount', { value0: formatPushTokenFingerprint(pushToken.token) }),
-            { confirmText: t('common.delete'), destructive: true }
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        setDeletingPushToken(pushToken.token);
-        try {
-            await removePushToken(auth.credentials, pushToken.token);
-            await loadPushSettings();
-        } catch (error) {
-            console.error('Failed to delete push token:', error);
-            Modal.alert(t('common.error'), t('appWide.failedToDeletePushToken'));
-        } finally {
-            setDeletingPushToken(null);
-        }
-    }, [auth.credentials, loadPushSettings]);
-
     return (
         <>
             <ItemList>
@@ -273,27 +156,13 @@ export default React.memo(() => {
                         showChevron={false}
                     />
                     <Item
-                        title={t('settingsAccount.anonymousId')}
-                        detail={sync.anonID || t('settingsAccount.notAvailable')}
+                        title={t('settingsAccount.linkNewDevice')}
+                        subtitle={isConnecting ? t('common.scanning') : t('settingsAccount.linkNewDeviceSubtitle')}
+                        icon={<Ionicons name="qr-code-outline" size={29} color="#007AFF" />}
+                        onPress={connectAccount}
+                        disabled={isConnecting}
                         showChevron={false}
-                        copy={!!sync.anonID}
                     />
-                    <Item
-                        title={t('settingsAccount.publicId')}
-                        detail={sync.serverID || t('settingsAccount.notAvailable')}
-                        showChevron={false}
-                        copy={!!sync.serverID}
-                    />
-                    {Platform.OS !== 'web' && (
-                        <Item
-                            title={t('settingsAccount.linkNewDevice')}
-                            subtitle={isConnecting ? t('common.scanning') : t('settingsAccount.linkNewDeviceSubtitle')}
-                            icon={<Ionicons name="qr-code-outline" size={29} color="#007AFF" />}
-                            onPress={connectAccount}
-                            disabled={isConnecting}
-                            showChevron={false}
-                        />
-                    )}
                 </ItemGroup>
 
                 {/* Backup Section */}
@@ -354,7 +223,6 @@ export default React.memo(() => {
 
                 <ItemGroup
                     title={t('appWide.pushNotifications')}
-                    footer={t('appWide.showsEveryPushTokenRegisteredOnYourAccountTap')}
                 >
                     <Item
                         title={t('appWide.permission')}
@@ -366,72 +234,15 @@ export default React.memo(() => {
                     />
                     <Item
                         title={t('appWide.requestPermissionAgain')}
-                        subtitle={pushPermission?.status === 'unsupported'
-                            ? t('appWide.pushNotificationPermissionsAreOnlyAvailableOnIphoneAnd')
-                            : pushPermission?.canAskAgain
+                        subtitle={pushPermission?.canAskAgain
                             ? t('appWide.showsTheSystemPromptAgainIfIosStillAllows')
                             : t('appWide.opensSystemSettingsWhenIosWillNotPromptAgain')}
                         icon={<Ionicons name="shield-checkmark-outline" size={29} color="#34C759" />}
                         onPress={handlePushPermissionRequest}
                         loading={requestingPushPermission}
-                        disabled={requestingPushPermission || loadingPushSettings || pushPermission?.status === 'unsupported' || !auth.credentials}
+                        disabled={requestingPushPermission || loadingPushSettings || !auth.credentials}
                         showChevron={false}
                     />
-                    <Item
-                        title={t('appWide.reRegisterThisDevice')}
-                        subtitle={currentPushToken
-                            ? t('appWide.currentTokenValue', { value0: formatPushTokenFingerprint(currentPushToken) })
-                            : t('appWide.fetchesTheCurrentExpoTokenAndRegistersItAgain')}
-                        icon={<Ionicons name="refresh-outline" size={29} color="#FF9500" />}
-                        onPress={handleRefreshCurrentPushToken}
-                        loading={refreshingPushToken}
-                        disabled={refreshingPushToken || loadingPushSettings || !auth.credentials}
-                        showChevron={false}
-                    />
-                </ItemGroup>
-
-                <ItemGroup
-                    title={t('appWide.registeredTokensValue', { value0: pushTokens.length })}
-                    footer={t('appWide.currentDeviceMetadataComesFromThisPhoneOlderTokens')}
-                >
-                    {pushTokens.length === 0 ? (
-                        <Item
-                            title={t('appWide.noRegisteredPushTokens')}
-                            subtitle={t('appWide.onceThisDeviceIsRegisteredItWillAppearHere')}
-                            showChevron={false}
-                        />
-                    ) : (
-                        <>
-                            {pushTokens.map((pushToken) => {
-                                const isCurrentDevice = currentPushToken === pushToken.token;
-                                return (
-                                    <Item
-                                        key={pushToken.id}
-                                        title={formatPushTokenFingerprint(pushToken.token)}
-                                        detail={isCurrentDevice ? t('appWide.thisDevice') : undefined}
-                                        subtitle={buildPushTokenSubtitle(pushToken, {
-                                            isCurrentDevice,
-                                            currentDeviceLabel: currentPushDevice.deviceLabel,
-                                            currentAppLabel: currentPushDevice.appLabel,
-                                        })}
-                                        subtitleLines={0}
-                                        icon={(
-                                            <Ionicons
-                                                name={isCurrentDevice ? 'phone-portrait-outline' : 'trash-outline'}
-                                                size={29}
-                                                color={isCurrentDevice ? theme.colors.textSecondary : '#FF3B30'}
-                                            />
-                                        )}
-                                        onPress={isCurrentDevice ? undefined : () => handleDeletePushToken(pushToken)}
-                                        loading={deletingPushToken === pushToken.token}
-                                        disabled={deletingPushToken !== null}
-                                        showChevron={false}
-                                        copy={isCurrentDevice ? pushToken.token : false}
-                                    />
-                                );
-                            })}
-                        </>
-                    )}
                 </ItemGroup>
 
                 {/* Danger Zone */}

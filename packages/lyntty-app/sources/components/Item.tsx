@@ -115,7 +115,6 @@ export const Item = React.memo<ItemProps>((props) => {
     // Platform-specific measurements
     const isIOS = Platform.OS === 'ios';
     const isAndroid = Platform.OS === 'android';
-    const isWeb = Platform.OS === 'web';
 
     // Timer ref for long press copy functionality
     const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -147,7 +146,7 @@ export const Item = React.memo<ItemProps>((props) => {
 
     // Handle copy functionality
     const handleCopy = React.useCallback(async () => {
-        if (!copy || isWeb) return;
+        if (!copy) return;
 
         let textToCopy: string;
 
@@ -166,16 +165,16 @@ export const Item = React.memo<ItemProps>((props) => {
         } catch (error) {
             console.error('Failed to copy:', error);
         }
-    }, [copy, isWeb, title, subtitle, detail]);
+    }, [copy, title, subtitle, detail]);
 
     // Handle long press for copy functionality
     const handlePressIn = React.useCallback(() => {
-        if (copy && !isWeb && !onPress) {
+        if (copy && !onPress) {
             longPressTimer.current = setTimeout(() => {
                 handleCopy();
             }, 500); // 500ms delay for long press
         }
-    }, [copy, isWeb, onPress, handleCopy]);
+    }, [copy, onPress, handleCopy]);
 
     const handlePressOut = React.useCallback(() => {
         if (longPressTimer.current) {
@@ -197,9 +196,9 @@ export const Item = React.memo<ItemProps>((props) => {
     // The copy will be handled by long press instead
     const handlePress = onPress;
 
-    const isInteractive = handlePress || onLongPress || (copy && !isWeb);
+    const isInteractive = handlePress || onLongPress || copy;
     const showAccessory = isInteractive && showChevron && !rightElement;
-    const chevronSize = (isIOS && !isWeb) ? 17 : 24;
+    const chevronSize = isIOS ? 17 : 24;
 
     const titleColor = destructive ? styles.titleDestructive : (selected ? styles.titleSelected : styles.titleNormal);
     const containerPadding = subtitle ? styles.containerWithSubtitle : styles.containerWithoutSubtitle;
@@ -277,7 +276,7 @@ export const Item = React.memo<ItemProps>((props) => {
                     style={[
                         styles.divider,
                         {
-                            marginLeft: (isAndroid || isWeb) ? 0 : (dividerInset + (icon || leftElement ? (16 + ((isIOS && !isWeb) ? 29 : 32) + 15) : 16))
+                            marginLeft: isAndroid ? 0 : (dividerInset + (icon || leftElement ? (16 + (isIOS ? 29 : 32) + 15) : 16))
                         }
                     ]}
                 />
@@ -295,12 +294,12 @@ export const Item = React.memo<ItemProps>((props) => {
                 disabled={disabled || loading}
                 style={({ pressed }) => [
                     {
-                        backgroundColor: pressed && isIOS && !isWeb ? theme.colors.surfacePressedOverlay : 'transparent',
+                        backgroundColor: pressed && isIOS ? theme.colors.surfacePressedOverlay : 'transparent',
                         opacity: disabled ? 0.5 : 1
                     },
                     pressableStyle
                 ]}
-                android_ripple={(isAndroid || isWeb) ? {
+                android_ripple={isAndroid ? {
                     color: theme.colors.surfaceRipple,
                     borderless: false,
                     foreground: true

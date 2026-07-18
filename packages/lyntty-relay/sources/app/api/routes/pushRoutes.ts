@@ -84,8 +84,8 @@ export function pushRoutes(app: Fastify) {
     });
 
     // Session-Event Push API
-    // CLI/daemon clients call this instead of talking to Expo directly so the
-    // server can apply presence-based suppression (active desktop/web/mobile).
+    // lynttyd calls this instead of talking to Expo directly so the relay can
+    // suppress notifications while Android is already viewing Session Remote.
     app.post('/v1/sessions/:sessionId/push-event', {
         schema: {
             params: z.object({
@@ -120,9 +120,8 @@ export function pushRoutes(app: Fastify) {
             return reply.code(404).send({ error: 'Session not found' });
         }
 
-        // Fan out the event to user's connected clients (web tabs use this to
-        // bump tab-title unread counter for "user attention needed" moments only,
-        // instead of pinging on every encrypted message).
+        // Fan out the lifecycle event so a visible Android Session Remote can
+        // update immediately without decrypting every message first.
         eventRouter.emitEphemeral({
             userId,
             payload: buildSessionEventEphemeral(sessionId, kind, title, body),

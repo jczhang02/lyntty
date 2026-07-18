@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 /**
  * Typography system for Lyntty.
  *
- * Direction: Anthropic-like editorial warmth without using proprietary fonts.
+ * Direction: editorial warmth without proprietary fonts.
  * - Session English prose / display serif: Source Serif 4
  * - UI sans: Source Sans 3
  * - Session Chinese prose serif: LXGW Neo ZhiSong

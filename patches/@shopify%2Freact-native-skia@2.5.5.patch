@@ -1,0 +1,13 @@
+diff --git a/package.json b/package.json
+index 15fb3250232345102c940588e136fc2ce09dba19..25c5d6c10d1b59618da42bc4a0f46ac1ec627f58 100644
+--- a/package.json
++++ b/package.json
+@@ -37,7 +37,7 @@
+     "dist/**"
+   ],
+   "scripts": {
+-    "postinstall": "node scripts/install-libs.js",
++    "postinstall": "bun scripts/install-libs.js",
+     "lint": "eslint . --ext .ts,.tsx  --max-warnings 0 --cache --fix",
+     "tsc": "tsc --noEmit",
+     "test": "jest",

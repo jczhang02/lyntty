@@ -6,7 +6,6 @@ node_modules/
 # Expo
 .expo/
 dist/
-web-build/
 expo-env.d.ts
 /ios
 /android
@@ -24,11 +23,6 @@ expo-env.d.ts
 
 # Metro
 .metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
 
 # macOS
 .DS_Store
@@ -53,10 +47,6 @@ CLAUDE.md
 .claude/CLAUDE.md
 
 .dev/worktree/*
-
-# Local dev environments
-.environments/
-environments/data/
 
 # Development planning notes (keep local, don't commit)
 notes/
@@ -99,13 +89,3 @@ out/
 # Generated Fumadocs pages; source docs stay in Markdown.
 content/docs/
 docs/.site/content/docs/
-
-# Retired Starlight generated pages.
-src/content/docs/
-
-# Retired Tangly mirrors.
-.tangly/
-tangly-site/
-AGENTS.mdx
-CONTEXT-MAP.mdx
-docs/**/*.mdx

@@ -15,7 +15,8 @@ import { PermissionFooter } from './PermissionFooter';
 import { parseToolUseError } from '@/utils/toolErrorParser';
 import { formatMCPTitle } from './views/MCPToolView';
 import { t } from '@/text';
-import { getToolDisplayName, getToolStateText, getToolSummaryCategory, getToolSummaryDetail, shouldRenderToolCardHeader, ToolSummaryCategory } from '@/utils/toolDisplay';
+import { getToolDisplayName, getToolStateText, getToolSummaryCategory, getToolSummaryDetail, ToolSummaryCategory } from '@/utils/toolDisplay';
+import { canControlSession } from '@/sync/sessionControlPolicy';
 
 interface ToolViewProps {
     metadata: Metadata | null;
@@ -53,7 +54,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     const knownTool = knownTools[tool.name as keyof typeof knownTools] as any;
     const SpecificToolView = getToolViewComponent(tool.name);
 
-    // Internal Claude Code tools (e.g. ToolSearch) are completely hidden from the UI
+    // Inherited internal tools (for example ToolSearch) stay hidden in history.
     if (knownTool?.hidden) {
         return null;
     }
@@ -68,9 +69,8 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     // Unknown provider tools should render as compact cards, not raw JSON.
     // Pi can expose dynamic built-in/extension tools (for example get_goal or
     // custom project tools), and their large structured outputs must stay folded.
-    const isGemini = props.metadata?.flavor === 'gemini';
     const isPi = props.metadata?.flavor === 'pi';
-    if (!knownTool && !SpecificToolView && (isGemini || isPi)) {
+    if (!knownTool && !SpecificToolView && isPi) {
         minimal = true;
     }
 
@@ -114,7 +114,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
 
     const category = getToolSummaryCategory(tool.name);
 
-    // Special handling for CodexBash to determine icon based on parsed_cmd
+    // Read-only compatibility for historical parsed command records.
     if (tool.name === 'CodexBash' && tool.input?.parsed_cmd && Array.isArray(tool.input.parsed_cmd) && tool.input.parsed_cmd.length > 0) {
         const parsedCmd = tool.input.parsed_cmd[0];
         if (parsedCmd.type === 'read') {
@@ -172,12 +172,13 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
 
     const summaryDetail = getToolSummaryDetail(tool);
     const presentationStatus = status || (noStatus ? null : getToolStateText(tool));
-    const isInlineCodexPatch = Platform.OS === 'web' && tool.name === 'CodexPatch';
-    const needsInlineAction = tool.name === 'AskUserQuestion' || tool.permission?.status === 'pending' || isInlineCodexPatch;
+    const needsInlineAction = tool.name === 'AskUserQuestion' || tool.permission?.status === 'pending';
     const isCompactTool = tool.name !== 'file' && !needsInlineAction;
-    const renderCardHeader = shouldRenderToolCardHeader(tool.name, Platform.OS);
     const renderPermissionFooter = () => (
-        tool.permission && sessionId && tool.name !== 'AskUserQuestion'
+        tool.permission
+        && sessionId
+        && tool.name !== 'AskUserQuestion'
+        && canControlSession(props.metadata)
             ? <PermissionFooter permission={tool.permission} sessionId={sessionId} toolName={tool.name} toolInput={tool.input} metadata={props.metadata} />
             : null
     );
@@ -230,18 +231,16 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
     };
 
     return (
-        <View style={isCompactTool ? styles.compactContainer : isInlineCodexPatch ? styles.inlineContainer : styles.container}>
-            {renderCardHeader ? (
-                isPressable ? (
-                    <TouchableOpacity style={isCompactTool ? styles.compactHeader : styles.header} onPress={handlePress} activeOpacity={0.8}>
-                        {renderHeaderContent()}
-                    </TouchableOpacity>
-                ) : (
-                    <View style={isCompactTool ? styles.compactHeader : styles.header}>
-                        {renderHeaderContent()}
-                    </View>
-                )
-            ) : null}
+        <View style={isCompactTool ? styles.compactContainer : styles.container}>
+            {isPressable ? (
+                <TouchableOpacity style={isCompactTool ? styles.compactHeader : styles.header} onPress={handlePress} activeOpacity={0.8}>
+                    {renderHeaderContent()}
+                </TouchableOpacity>
+            ) : (
+                <View style={isCompactTool ? styles.compactHeader : styles.header}>
+                    {renderHeaderContent()}
+                </View>
+            )}
 
             {/* Content area - either custom children or tool-specific view */}
             {(() => {
@@ -259,7 +258,6 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                                 metadata={props.metadata}
                                 messages={props.messages ?? []}
                                 sessionId={sessionId}
-                                permissionFooter={isInlineCodexPatch ? renderPermissionFooter() : undefined}
                             />
                             {tool.state === 'error' && tool.result &&
                                 !(tool.permission && (tool.permission.status === 'denied' || tool.permission.status === 'canceled')) &&
@@ -304,7 +302,7 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
 
             {/* Permission footer - always renders when permission exists to maintain consistent height */}
             {/* AskUserQuestion has its own Submit button UI - no permission footer needed */}
-            {!isInlineCodexPatch ? renderPermissionFooter() : null}
+            {renderPermissionFooter()}
         </View>
     );
 });

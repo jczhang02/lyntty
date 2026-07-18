@@ -1,0 +1,2 @@
+graceful SIGTERM: passed
+runtime write persisted after close path and reopen: passed

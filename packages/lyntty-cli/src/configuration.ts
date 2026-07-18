@@ -2,7 +2,7 @@
  * Global configuration for lyntty CLI
  *
  * Centralizes all configuration including environment variables and paths
- * Environment files should be loaded using Node's --env-file flag
+ * Standalone binaries do not auto-load environment files.
  */
 
 import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
@@ -12,7 +12,6 @@ import packageJson from '../package.json'
 
 class Configuration {
   public readonly serverUrl: string
-  public readonly webappUrl: string
   public readonly isDaemonProcess: boolean
 
   // Directories and paths (from persistence)
@@ -34,7 +33,8 @@ class Configuration {
   constructor() {
     // Check if we're running as daemon based on process args
     const args = process.argv.slice(2)
-    this.isDaemonProcess = args.length >= 2 && args[0] === 'daemon' && (args[1] === 'start-sync')
+    this.isDaemonProcess = process.env.LYNTTY_DAEMON_PROCESS === '1'
+      || (args.length >= 2 && args[0] === 'daemon' && args[1] === 'start-sync')
 
     // Directory configuration - Priority: LYNTTY_HOME_DIR env > default home dir
     if (process.env.LYNTTY_HOME_DIR) {
@@ -55,18 +55,12 @@ class Configuration {
     this.piCommandBoundaryDir = join(this.lynttyHomeDir, 'pi-command-boundary')
     this.piHistoryWatermarkDir = join(this.lynttyHomeDir, 'pi-history-watermark')
 
-    // URL precedence (both): LYNTTY_*_URL env > settings.<key> > default.
+    // The relay URL is the only persisted network endpoint used by the CLI.
     // Settings are read sync here (avoid circular import with persistence.ts).
-    // webappUrl must follow the same chain as serverUrl, otherwise `lyntty server`
-    // self-host points the API at localhost but auth still opens the prod webapp.
     this.serverUrl =
       process.env.LYNTTY_SERVER_URL ||
-      readSettingsStringSync(this.settingsFile, 'serverUrl') ||
+      readSettingsStringSync(this.settingsFile) ||
       'https://relay.jczhang.cc'
-    this.webappUrl =
-      process.env.LYNTTY_WEBAPP_URL ||
-      readSettingsStringSync(this.settingsFile, 'webappUrl') ||
-      'https://app.lyntty.engineering'
 
     this.isExperimentalEnabled = ['true', '1', 'yes'].includes(process.env.LYNTTY_EXPERIMENTAL?.toLowerCase() || '');
     this.disableCaffeinate = ['true', '1', 'yes'].includes(process.env.LYNTTY_DISABLE_CAFFEINATE?.toLowerCase() || '');
@@ -90,11 +84,11 @@ class Configuration {
   }
 }
 
-function readSettingsStringSync(settingsFile: string, key: 'serverUrl' | 'webappUrl'): string | undefined {
+function readSettingsStringSync(settingsFile: string): string | undefined {
   try {
     if (!existsSync(settingsFile)) return undefined
     const raw = JSON.parse(readFileSync(settingsFile, 'utf8'))
-    const value = raw?.[key]
+    const value = raw?.serverUrl
     return typeof value === 'string' && value.length > 0 ? value : undefined
   } catch {
     return undefined

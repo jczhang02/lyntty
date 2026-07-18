@@ -2,7 +2,7 @@
 
 Canonical wire specification package for Lyntty clients and services.
 
-This package defines shared wire contracts as TypeScript types + Zod schemas. It is intentionally small and focused on protocol-level data only.
+This package defines shared wire contracts, runtime capability negotiation, and the signed Compatibility BOM interface as TypeScript types + Zod schemas.
 
 ## Quick Examples (Legacy vs New)
 
@@ -106,6 +106,8 @@ Wire-level encrypted container (same for legacy and new):
 - encrypted message/update payloads
 - session protocol envelope and event stream
 - helper for creating valid session envelopes
+- one-minor Wire capability negotiation
+- canonical signed Compatibility BOM validation and artifact selection
 
 The goal is to keep CLI/app/server/agent on the same wire contract and avoid schema drift.
 
@@ -114,7 +116,7 @@ The goal is to keep CLI/app/server/agent on the same wire contract and avoid sch
 - Name: `lyntty-wire`
 - Workspace path: `packages/lyntty-wire`
 - Entry: `src/index.ts`
-- Runtime deps: `zod`, `@paralleldrive/cuid2`
+- Runtime deps: `zod`, `semver`, `@paralleldrive/cuid2`
 
 ## Public Exports
 
@@ -122,6 +124,9 @@ The goal is to keep CLI/app/server/agent on the same wire contract and avoid sch
 - `src/messages.ts`
 - `src/legacyProtocol.ts`
 - `src/sessionProtocol.ts`
+- `src/wireCompatibility.ts`
+
+The release seam is intentionally separate: `lyntty-wire/compatibility` exports the pure BOM interface, while Node/Bun release tools and Relay/CLI consumers import `lyntty-wire/compatibility/node` for Ed25519. App bundles do not load the BOM/semver or Node-only modules.
 
 ### `messages.ts` exports
 
@@ -680,62 +685,26 @@ if (!maybeEnvelope.success) {
 }
 ```
 
-## Build and Distribution Specification
+## Build and distribution
 
-`package.json` contract:
-- `main`: `./dist/index.cjs`
-- `module`: `./dist/index.mjs`
-- `types`: `./dist/index.d.cts`
-- `exports["."]` provides both CJS and ESM entrypoints with type paths.
+`lyntty-wire` is a private Bun workspace. Its package export points to `src/index.ts`, so App, CLI, and Relay consume the same source contract from the frozen workspace install. The build gate is a TypeScript no-emit check, and the suite runs directly under `bun:test`.
 
-Build script:
-- `shx rm -rf dist && tsc --noEmit && pkgroll`
+There is no npm/yarn publish or release command in the current package. Formal Wire version/capability metadata and distribution are governed by the signed Lyntty Compatibility BOM release flow.
 
-Tests:
-- `vitest` against `src/*.test.ts`
-
-Publish gate:
-- `prepublishOnly` runs build + test
-
-Published files:
-- `dist`
-- `package.json`
-- `README.md`
-
-## Monorepo Build Dependency Behavior
-
-In this repository, consumer workspaces import `lyntty-wire` through package exports that point at `dist/*`.
-
-That means on a clean checkout:
-1. Build wire first: `yarn workspace lyntty-wire build`
-2. Then build/typecheck dependents.
-
-After publishing to npm, dependents consume prebuilt artifacts from the published tarball.
-
-## Change Policy
+## Change policy
 
 When modifying wire schemas:
+
 - Prefer additive changes to keep older consumers compatible.
 - Treat discriminator values (`t`) as protocol-level API and avoid breaking renames.
 - Document semantic changes in this README.
-- Bump package version before downstream releases that depend on new schema behavior.
+- Update capability/version metadata before downstream releases depend on a new contract.
+- Run App, CLI, and Relay checks when the contract affects their runtime behavior.
 
-## Development Commands
+## Development commands
 
 ```bash
 # from repository root
-yarn workspace lyntty-wire build
-yarn workspace lyntty-wire test
+bun run --cwd packages/lyntty-wire build
+bun run --cwd packages/lyntty-wire test
 ```
-
-## Release Commands (maintainers)
-
-```bash
-# interactive release target selection from repo root
-yarn release
-
-# direct release invocation
-yarn workspace lyntty-wire release
-```
-
-This prepares release artifacts using the same `release-it` flow as other publishable libraries in the monorepo.

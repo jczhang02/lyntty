@@ -14,7 +14,7 @@ import { Credentials, persistPiCommandBoundary, persistPiCommandOutcome, readPer
 import { createSessionMetadata } from '@/utils/createSessionMetadata';
 import { initialMachineMetadata } from '@/daemon/run';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
-import { registerKillSessionHandler } from '@/claude/registerKillSessionHandler';
+import { registerKillSessionHandler } from '@/api/registerKillSessionHandler';
 import { connectionState } from '@/utils/serverConnectionErrors';
 import { logger } from '@/ui/logger';
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
@@ -24,6 +24,8 @@ import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 import { startPiExternalMirror } from './runPiExternalMirror';
 import { createPiRuntimeRelayIdentity } from './piRuntimeRelayIdentity';
 import { PiCompletionNotificationTracker, sendPiDoneNotification } from './piCompletionNotifications';
+import { bindPiRemoteInput } from './piRemoteInput';
+import { resolvePiSessionDisplayName } from './piSessionDisplayName';
 
 export interface RunPiOptions {
   credentials: Credentials;
@@ -35,7 +37,7 @@ const LOCAL_ONLY_SLASH_COMMANDS = ['/model', '/settings', '/session', '/theme', 
 const PI_HISTORY_PAGE_MESSAGE_LIMIT = 50;
 
 function getPiSessionDisplayName(session: AgentSessionRuntime['session']): string {
-  return session.sessionName ?? session.sessionId;
+  return resolvePiSessionDisplayName(session.sessionName);
 }
 
 async function createPiRuntime(cwd: string, piSessionId?: string): Promise<AgentSessionRuntime> {
@@ -62,7 +64,8 @@ async function createPiRuntime(cwd: string, piSessionId?: string): Promise<Agent
     const sessions = await SessionManager.listAll();
     const matched = sessions.find((entry) => entry.id === piSessionId);
     if (!matched) {
-      throw new Error(`Pi session ${piSessionId} was not found on this machine`);
+      logger.warn('[pi] Requested managed session was not found on this machine', { piSessionId });
+      throw new Error('This Pi session was not found on this machine.');
     }
     sessionManager = SessionManager.open(matched.path, undefined, matched.cwd || cwd);
   }
@@ -78,7 +81,6 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   // The managed SDK runtime is the sole relay command owner in this process.
   // Keep the globally installed ordinary-TUI bridge disabled, including reloads.
   process.env.LYNTTY_PI_EXTENSION_DISABLED = '1';
-  connectionState.setBackend('pi');
 
   const api = await ApiClient.create(opts.credentials);
   const settings = await readSettings();
@@ -109,7 +111,6 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     flavor: 'pi',
     machineId: settings.machineId,
     startedBy: opts.startedBy,
-    sandbox: settings.sandboxConfig,
   });
   metadata.models = [{ code: 'default', value: piRuntime.session.model?.name ?? 'pi default', description: null }];
   metadata.currentModelCode = 'default';
@@ -330,7 +331,22 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   };
   updateCommandOutcomeMetadata();
 
-  session.onUserMessage((message) => {
+  const rejectPiRemoteInput = (message: { localKey?: string }, reason: string): void => {
+    if (message.localKey) {
+      try {
+        persistPiCommandOutcome(piRuntime.session.sessionId, message.localKey, 'failed');
+      } catch (error) {
+        logger.warn('[pi] Failed to persist rejected Session Remote input', { localKey: message.localKey, error });
+      }
+      failedCommandKeys.add(message.localKey);
+      acceptedCommandKeys.delete(message.localKey);
+      updateCommandOutcomeMetadata();
+    }
+    logger.warn('[pi] Rejected Session Remote input before Pi delivery', { reason });
+    session.sendSessionEvent({ type: 'ready' });
+  };
+
+  bindPiRemoteInput(session, ({ message, images }) => {
     if (!commandLedger.claim(message.localKey)) {
       logger.debug('[pi] Dropping duplicate user command', { localKey: message.localKey });
       return;
@@ -357,12 +373,16 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       updateCommandOutcomeMetadata();
     };
 
-    const action = resolvePiRemoteAction({
-      text: message.content.text,
-      isStreaming: piRuntime.session.isStreaming,
-      supportedSlashCommands: listPiRemoteSlashCommands(piRuntime.session),
-      localOnlySlashCommands: LOCAL_ONLY_SLASH_COMMANDS,
-    });
+    const action = images.length > 0 && !message.content.text.trim()
+      ? piRuntime.session.isStreaming
+        ? { kind: 'followUp' as const, text: '' }
+        : { kind: 'prompt' as const, text: '' }
+      : resolvePiRemoteAction({
+          text: message.content.text,
+          isStreaming: piRuntime.session.isStreaming,
+          supportedSlashCommands: listPiRemoteSlashCommands(piRuntime.session),
+          localOnlySlashCommands: LOCAL_ONLY_SLASH_COMMANDS,
+        });
 
     const run = (() => {
       switch (action.kind) {
@@ -371,6 +391,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
         case 'prompt':
           logger.debug('[pi] Forwarding prompt to Pi SDK runtime', { length: action.text.length });
           return piRuntime.session.prompt(action.text, {
+            images,
             source: 'rpc',
             preflightResult: (accepted) => {
               if (accepted) markAcceptedByPi();
@@ -378,10 +399,10 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
           });
         case 'followUp':
           logger.debug('[pi] Forwarding follow-up to Pi SDK runtime', { length: action.text.length });
-          return piRuntime.session.followUp(action.text);
+          return piRuntime.session.followUp(action.text, images);
         case 'steer':
           logger.debug('[pi] Forwarding redirect/steer to Pi SDK runtime', { length: action.text.length });
-          return piRuntime.session.steer(action.text);
+          return piRuntime.session.steer(action.text, images);
         case 'abort':
           logger.debug('[pi] Aborting Pi SDK runtime by user request');
           completionNotifications.suppressCurrentTurn();
@@ -428,6 +449,12 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       logger.warn('[pi] Failed to handle Session Remote command', { errorMessage });
       session.sendSessionEvent({ type: 'ready' });
     });
+  }, (error) => {
+    logger.warn('[pi] Failed to prepare Session Remote attachments', {
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+  }, ({ message, reason }) => {
+    rejectPiRemoteInput(message, reason);
   });
 
   const keepAlive = setInterval(() => {

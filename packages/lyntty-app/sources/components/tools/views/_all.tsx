@@ -15,8 +15,7 @@ import { CodexBashView } from './CodexBashView';
 import { CodexPatchView } from './CodexPatchView';
 import { CodexDiffView } from './CodexDiffView';
 import { AskUserQuestionView } from './AskUserQuestionView';
-import { GeminiEditView } from './GeminiEditView';
-import { GeminiExecuteView } from './GeminiExecuteView';
+import { PiEditView } from './PiEditView';
 import { FileView } from './FileView';
 
 export type ToolViewProps = {
@@ -34,10 +33,13 @@ export type ToolViewComponent = React.ComponentType<ToolViewProps>;
 export const toolViewRegistry: Record<string, ToolViewComponent> = {
     Edit: EditView,
     Bash: BashView,
+    bash: BashView,
+    // Historical aliases only: current Pi sessions never emit these names.
     CodexBash: CodexBashView,
     CodexPatch: CodexPatchView,
     CodexDiff: CodexDiffView,
     Write: WriteView,
+    write: WriteView,
     TodoWrite: TodoView,
     ExitPlanMode: ExitPlanToolView,
     exit_plan_mode: ExitPlanToolView,
@@ -45,9 +47,7 @@ export const toolViewRegistry: Record<string, ToolViewComponent> = {
     Task: TaskView,
     Agent: TaskView,
     AskUserQuestion: AskUserQuestionView,
-    // Gemini tools (lowercase)
-    edit: GeminiEditView,
-    execute: GeminiExecuteView,
+    edit: PiEditView,
     // File attachment events
     file: FileView,
 };
@@ -84,6 +84,5 @@ export { ExitPlanToolView } from './ExitPlanToolView';
 export { MultiEditView } from './MultiEditView';
 export { TaskView } from './TaskView';
 export { AskUserQuestionView } from './AskUserQuestionView';
-export { GeminiEditView } from './GeminiEditView';
-export { GeminiExecuteView } from './GeminiExecuteView';
+export { PiEditView } from './PiEditView';
 export { FileView } from './FileView';

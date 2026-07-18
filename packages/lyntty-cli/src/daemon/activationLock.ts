@@ -3,6 +3,13 @@ import type { TrackedSession } from './types';
 
 export type PiTakeoverChoice = 'wait' | 'stop' | 'interrupt';
 
+export function shouldKeepWaitingForPiExtension(
+  piSessionId: string | undefined,
+  takeoverChoice: PiTakeoverChoice | undefined,
+): boolean {
+  return Boolean(piSessionId) && takeoverChoice === 'wait';
+}
+
 function sessionMatchesPiLease(session: TrackedSession, machineId: string | undefined, piSessionId: string | undefined): boolean {
   if (!piSessionId) {
     return false;

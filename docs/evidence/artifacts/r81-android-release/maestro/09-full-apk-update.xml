@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty_v03_api35" tests="1" failures="0" time="20.0">
+    <testcase id="Lyntty verified full APK update preserves app data" name="Lyntty verified full APK update preserves app data" classname="Lyntty verified full APK update preserves app data" file="dist/test-state/r81-android-e2e/maestro-runtime/render.KRDl3T/09_full_apk_update.yml" time="20.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="release, full-apk-update"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { encodeUTF8, decodeUTF8, normalizeNFKD } from './text';
 
 describe('Text utilities', () => {

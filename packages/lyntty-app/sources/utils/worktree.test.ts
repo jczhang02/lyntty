@@ -1,14 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
 const {
     machineWorktreeCreate,
     machineWorktreeList,
     machineWorktreeRemove,
-} = vi.hoisted(() => ({
+} = {
     machineWorktreeCreate: vi.fn(),
     machineWorktreeList: vi.fn(),
     machineWorktreeRemove: vi.fn(),
-}));
+};
 
 vi.mock('@/sync/ops', () => ({
     machineWorktreeCreate,
@@ -36,11 +36,20 @@ describe('worktree helpers', () => {
         expect(machineWorktreeCreate.mock.calls[0][2]).toMatch(/^[a-z]+-[a-z]+$/);
     });
 
-    it('lists worktrees through narrow machine RPC helpers', async () => {
-        machineWorktreeList.mockResolvedValue({ worktrees: [{ path: '/repo/.dev/worktree/test', branch: 'test' }] });
+    it('preserves explicit worktree-list success and failure results', async () => {
+        machineWorktreeList
+            .mockResolvedValueOnce({ success: true, worktrees: [{ path: '/repo/.dev/worktree/test', branch: 'test' }] })
+            .mockResolvedValueOnce({ success: false, error: 'machine offline' });
 
         const { listWorktrees } = await import('./worktree');
-        await expect(listWorktrees('machine-1', '/repo')).resolves.toEqual([{ path: '/repo/.dev/worktree/test', branch: 'test' }]);
+        await expect(listWorktrees('machine-1', '/repo')).resolves.toEqual({
+            success: true,
+            worktrees: [{ path: '/repo/.dev/worktree/test', branch: 'test' }],
+        });
+        await expect(listWorktrees('machine-1', '/repo')).resolves.toEqual({
+            success: false,
+            error: 'machine offline',
+        });
         expect(machineWorktreeList).toHaveBeenCalledWith('machine-1', '/repo');
     });
 

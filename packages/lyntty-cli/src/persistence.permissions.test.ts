@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, mock, spyOn, jest } from 'bun:test';
 
 const originalLynttyHomeDir = process.env.LYNTTY_HOME_DIR;
 const testRoot = mkdtempSync(join(tmpdir(), 'lyntty-permissions-'));
@@ -17,7 +17,6 @@ function fileMode(path: string): number {
 
 beforeAll(async () => {
   process.env.LYNTTY_HOME_DIR = testHome;
-  vi.resetModules();
   ({ configuration } = await import('./configuration'));
   persistence = await import('./persistence');
 });
@@ -31,7 +30,7 @@ afterAll(() => {
   rmSync(testRoot, { recursive: true, force: true });
 });
 
-describe.runIf(process.platform !== 'win32')('secret persistence permissions', () => {
+describe.if(process.platform !== 'win32')('secret persistence permissions', () => {
   it('restricts the Lyntty state directory to the current user', () => {
     expect(fileMode(configuration.lynttyHomeDir)).toBe(0o700);
   });

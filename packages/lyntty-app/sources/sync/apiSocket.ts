@@ -1,3 +1,4 @@
+import { CURRENT_WIRE_OFFER } from 'lyntty-wire';
 import { io, Socket } from 'socket.io-client';
 import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
@@ -5,33 +6,18 @@ import { TokenStorage } from '@/auth/tokenStorage';
 import { Encryption } from './encryption/encryption';
 import { isAuthInvalidationMessage, requestAuthInvalidation } from '@/auth/authInvalidation';
 import { storage } from './storage';
-import { formatSessionRpcFailure } from './apiSocketErrors';
+import { formatSessionRpcFailure, unwrapRpcHandlerResponse } from './apiSocketErrors';
 import { buildAppPresencePayload } from './apiSocketPresence';
 
 export function getLynttyClientId(): string {
-    let platform: string = Platform.OS; // 'ios' | 'android' | 'web'
-    if (platform === 'web' && typeof window !== 'undefined' && '__TAURI__' in window) {
-        platform = 'desktop';
-    }
     const version = Constants.expoConfig?.version || '0.0.0';
-    return `${platform}/${version}`;
+    return `${Platform.OS}/${version}`;
 }
 
 /**
- * Compute the current "active" or "background" state for the current platform.
- * Mobile uses AppState. Web/desktop uses document.visibilityState + window focus —
- * "active" means the tab is visible AND has focus, so a backgrounded tab or an
- * unfocused window correctly counts as background and won't suppress mobile pushes.
+ * Compute the current native app state for push routing.
  */
 export function getCurrentAppState(): 'active' | 'background' {
-    if (Platform.OS === 'web') {
-        if (typeof document === 'undefined') {
-            return 'active';
-        }
-        const visible = document.visibilityState === 'visible';
-        const focused = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
-        return visible && focused ? 'active' : 'background';
-    }
     return AppState.currentState === 'active' ? 'active' : 'background';
 }
 
@@ -95,6 +81,8 @@ class ApiSocket {
                 token: this.config.token,
                 clientType: 'user-scoped' as const,
                 lynttyClient: getLynttyClientId(),
+                wire: CURRENT_WIRE_OFFER,
+                component: { kind: 'app', version: Constants.expoConfig?.version || '0.0.0' },
                 ...buildAppPresencePayload(getCurrentAppState(), this.visibleSessionId),
             },
             transports: ['websocket'],
@@ -170,7 +158,7 @@ class ApiSocket {
         });
 
         if (result.ok) {
-            return await sessionEncryption.decryptRaw(result.result) as R;
+            return unwrapRpcHandlerResponse<R>(await sessionEncryption.decryptRaw(result.result));
         }
         throw new Error(formatSessionRpcFailure(method, result));
     }
@@ -178,7 +166,12 @@ class ApiSocket {
     /**
      * RPC call for machines - uses legacy/global encryption (for now)
      */
-    async machineRPC<R, A>(machineId: string, method: string, params: A): Promise<R> {
+    async machineRPC<R, A>(
+        machineId: string,
+        method: string,
+        params: A,
+        parseResult: (value: unknown) => R,
+    ): Promise<R> {
         const machineEncryption = this.encryption!.getMachineEncryption(machineId);
         if (!machineEncryption) {
             throw new Error(`Machine encryption not found for ${machineId}`);
@@ -190,7 +183,8 @@ class ApiSocket {
         });
 
         if (result.ok) {
-            return await machineEncryption.decryptRaw(result.result) as R;
+            const value = unwrapRpcHandlerResponse<unknown>(await machineEncryption.decryptRaw(result.result));
+            return parseResult(value);
         }
         throw new Error(result.error || 'RPC call failed');
     }

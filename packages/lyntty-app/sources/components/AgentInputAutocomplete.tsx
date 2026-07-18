@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Platform, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 const MAX_HEIGHT = 320;
@@ -27,24 +27,7 @@ export const AgentInputAutocomplete = React.memo((props: AgentInputAutocompleteP
         if (selectedIndex < 0 || !scrollRef.current) return;
         const itemTop = selectedIndex * itemHeight;
         const itemBottom = itemTop + itemHeight;
-        const view = scrollRef.current as unknown as {
-            scrollTo?: (opts: { y: number; animated?: boolean }) => void;
-            getScrollableNode?: () => HTMLDivElement | null;
-        };
-        // Web RN exposes the underlying div; we can read scrollTop directly
-        // for tighter control. Native falls back to scrollTo with a guess.
-        const node = view.getScrollableNode?.();
-        if (node) {
-            const visibleTop = node.scrollTop;
-            const visibleBottom = visibleTop + node.clientHeight;
-            if (itemTop < visibleTop) {
-                node.scrollTop = itemTop;
-            } else if (itemBottom > visibleBottom) {
-                node.scrollTop = itemBottom - node.clientHeight;
-            }
-            return;
-        }
-        view.scrollTo?.({ y: itemTop, animated: false });
+        scrollRef.current.scrollTo({ y: Math.max(0, itemBottom - MAX_HEIGHT), animated: false });
     }, [selectedIndex, itemHeight]);
 
     if (suggestions.length === 0) {
@@ -85,7 +68,7 @@ const styles = StyleSheet.create((theme) => ({
         borderRadius: 12,
         overflow: 'hidden',
         backgroundColor: theme.colors.surface,
-        borderWidth: Platform.OS === 'web' ? 0 : 0.5,
+        borderWidth: 0.5,
         borderColor: theme.colors.modal.border,
         shadowColor: theme.colors.shadow.color,
         shadowOffset: { width: 0, height: 2 },

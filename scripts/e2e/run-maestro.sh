@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 FLOW_PATH="${1:-e2e/maestro}"
 APP_ID="${LYNTTY_MAESTRO_APP_ID:-dev.jczhang.lyntty.dev}"
 DEVICE="${LYNTTY_MAESTRO_DEVICE:-}"
@@ -9,9 +10,11 @@ PAIRING_URL="${LYNTTY_MAESTRO_PAIRING_URL:-}"
 HISTORY_TITLE="${LYNTTY_MAESTRO_HISTORY_TITLE:-jc: pi sum calculation session}"
 PONG="${LYNTTY_MAESTRO_PONG:-MAESTRO_PONG}"
 PROMPT="${LYNTTY_MAESTRO_PROMPT:-Join MAESTRO and PONG with one underscore. Reply with only the result.}"
+UPDATE_VERSION_NAME="${LYNTTY_MAESTRO_UPDATE_VERSION_NAME:-}"
 PRELAUNCH="${LYNTTY_MAESTRO_PRELAUNCH:-1}"
 NODE_HOME="${LYNTTY_MAESTRO_NODE_HOME:-}"
 SERVER_URL="${LYNTTY_MAESTRO_SERVER_URL:-${LYNTTY_SERVER_URL:-}}"
+RUNTIME_BASE="${LYNTTY_MAESTRO_RUNTIME_DIR:-$ROOT/dist/test-state/maestro-runtime}"
 
 if ! command -v maestro >/dev/null 2>&1; then
   echo "maestro not found; install Maestro before running E2E" >&2
@@ -38,7 +41,19 @@ if [[ -d "$FLOW_PATH" ]]; then
   status=0
   for flow in "$FLOW_PATH"/*.yml; do
     flow_name="$(basename "$flow" .yml)"
+    if [[ "$flow_name" =~ ^(09_full_apk_update|10_bad_apk_hash)$ && -z "$UPDATE_VERSION_NAME" ]]; then
+      echo "==> Skipping $flow_name (set LYNTTY_MAESTRO_UPDATE_VERSION_NAME after staging an update)"
+      continue
+    fi
     echo "==> Running $flow_name"
+    if [[ "$flow_name" == "05_daemon_restart_replay" ]]; then
+      if ! LYNTTY_MAESTRO_ARTIFACT_DIR="$ARTIFACT_DIR/$flow_name" "$ROOT/scripts/e2e/maestro-daemon-restart.sh"; then status=1; fi
+      continue
+    fi
+    if [[ "$flow_name" == "07_reload_ownership" ]]; then
+      if ! LYNTTY_MAESTRO_ARTIFACT_DIR="$ARTIFACT_DIR/$flow_name" "$ROOT/scripts/e2e/maestro-reload-ownership.sh"; then status=1; fi
+      continue
+    fi
     if LYNTTY_MAESTRO_ARTIFACT_DIR="$ARTIFACT_DIR/$flow_name" "$0" "$flow"; then
       if [[ "$flow_name" == "02_pair_node" && -n "$NODE_HOME" ]]; then
         echo "==> Starting paired node daemon"
@@ -55,12 +70,24 @@ if [[ -d "$FLOW_PATH" ]]; then
   exit "$status"
 fi
 
+case "$(basename "$FLOW_PATH")" in
+  05_daemon_restart_replay.yml)
+    echo "Run scripts/e2e/maestro-daemon-restart.sh so the restart and exactly-once checks cannot be bypassed" >&2
+    exit 64
+    ;;
+  07_reload_ownership.yml)
+    echo "Run scripts/e2e/maestro-reload-ownership.sh so isolated Pi /reload and ownership checks cannot be bypassed" >&2
+    exit 64
+    ;;
+esac
+
 rendered_flow="$FLOW_PATH"
 cleanup_dir=""
 if [[ -f "$FLOW_PATH" ]]; then
-  cleanup_dir="$(mktemp -d)"
+  mkdir -p "$RUNTIME_BASE"
+  cleanup_dir="$(mktemp -d "$RUNTIME_BASE/render.XXXXXX")"
   trap '[[ -n "$cleanup_dir" ]] && rm -rf "$cleanup_dir"' EXIT
-  export FLOW_PATH APP_ID PAIRING_URL HISTORY_TITLE PONG PROMPT CLEANUP_DIR="$cleanup_dir"
+  export FLOW_PATH APP_ID PAIRING_URL HISTORY_TITLE PONG PROMPT UPDATE_VERSION_NAME CLEANUP_DIR="$cleanup_dir"
   rendered_flow="$(python - <<'PY'
 import os
 from pathlib import Path
@@ -73,6 +100,7 @@ replacements = {
     "${HISTORY_TITLE}": os.environ["HISTORY_TITLE"],
     "${PONG}": os.environ["PONG"],
     "${PROMPT}": os.environ["PROMPT"],
+    "${UPDATE_VERSION_NAME}": os.environ["UPDATE_VERSION_NAME"],
 }
 
 def render_file(src: Path, dst: Path) -> None:
@@ -99,7 +127,7 @@ run_maestro_flow() {
   local flow="$1"
   local artifact_dir="$2"
   local output_name="${3:-junit.xml}"
-  local args=(test "$flow" --debug-output "$artifact_dir/debug" --test-output-dir "$artifact_dir/output" --format JUNIT --output "$artifact_dir/$output_name" -e APP_ID="$APP_ID" -e PAIRING_URL="$PAIRING_URL" -e HISTORY_TITLE="$HISTORY_TITLE" -e PONG="$PONG" -e PROMPT="$PROMPT")
+  local args=(test "$flow" --debug-output "$artifact_dir/debug" --test-output-dir "$artifact_dir/output" --format JUNIT --output "$artifact_dir/$output_name" -e APP_ID="$APP_ID" -e PAIRING_URL="$PAIRING_URL" -e HISTORY_TITLE="$HISTORY_TITLE" -e PONG="$PONG" -e PROMPT="$PROMPT" -e UPDATE_VERSION_NAME="$UPDATE_VERSION_NAME")
   if [[ -n "$DEVICE" ]]; then
     args+=(--device "$DEVICE")
   fi
@@ -113,7 +141,12 @@ if [[ "$PRELAUNCH" != "0" && -n "$DEVICE" ]] && command -v adb >/dev/null 2>&1; 
 fi
 
 if [[ "$(basename "$FLOW_PATH")" == "02_pair_node.yml" && -n "$PAIRING_URL" && -n "$DEVICE" ]] && command -v adb >/dev/null 2>&1; then
-  pair_dir="${cleanup_dir:-$(mktemp -d)}"
+  mkdir -p "$RUNTIME_BASE"
+  if [[ -z "$cleanup_dir" ]]; then
+    cleanup_dir="$(mktemp -d "$RUNTIME_BASE/pair.XXXXXX")"
+    trap '[[ -n "$cleanup_dir" ]] && rm -rf "$cleanup_dir"' EXIT
+  fi
+  pair_dir="$cleanup_dir"
   prep_flow="$pair_dir/02_pair_node_prepare.yml"
   accept_flow="$pair_dir/02_pair_node_accept.yml"
   cat >"$prep_flow" <<EOF

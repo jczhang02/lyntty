@@ -76,7 +76,6 @@ interface Settings {
   chromeMode?: boolean
   sandboxConfig?: SandboxConfig
   serverUrl?: string
-  webappUrl?: string
 }
 
 const defaultSettings: Settings = {
@@ -108,6 +107,7 @@ export interface DaemonLocallyPersistedState {
   piExtensionToken?: string;
   startTime: string;
   startedWithCliVersion: string;
+  startedWithReleaseId?: string;
   lastHeartbeat?: string;
   daemonLogPath?: string;
 }

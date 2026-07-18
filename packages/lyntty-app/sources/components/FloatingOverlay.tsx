@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
 
@@ -8,7 +7,7 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
         borderRadius: 12,
         overflow: 'hidden',
         backgroundColor: theme.colors.surface,
-        borderWidth: Platform.OS === 'web' ? 0 : 0.5,
+        borderWidth: 0.5,
         borderColor: theme.colors.modal.border,
         shadowColor: theme.colors.shadow.color,
         shadowOffset: { width: 0, height: 2 },

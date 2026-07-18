@@ -1,6 +1,6 @@
 import fastify from "fastify";
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from "fastify-type-provider-zod";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { type Fastify } from "../types";
 // Cross-package contract check: the app's real update schema. apiTypes.ts is
 // pure zod (no react-native / @/ aliases), so it imports cleanly in node.
@@ -13,9 +13,9 @@ const {
     allocateUserSeqMock,
     emitUpdateSpy,
     emitEphemeralSpy,
-} = vi.hoisted(() => {
-    const emitUpdateSpy = vi.fn();
-    const emitEphemeralSpy = vi.fn();
+} = (() => {
+    const emitUpdateSpy = mock();
+    const emitEphemeralSpy = mock();
     const state = {
         existingMachine: null as any,
         created: [] as any[],
@@ -28,8 +28,8 @@ const {
         state.seq = 0;
     };
 
-    const machineFindFirst = vi.fn(async () => state.existingMachine);
-    const machineCreate = vi.fn(async (args: any) => {
+    const machineFindFirst = mock(async () => state.existingMachine);
+    const machineCreate = mock(async (args: any) => {
         // Mirror a Prisma Machine row: server defaults active=false on create
         // ("Default to offline - in case the user does not start daemon").
         const now = new Date("2026-01-01T00:00:00.000Z");
@@ -52,22 +52,18 @@ const {
     });
 
     const dbMock = { machine: { findFirst: machineFindFirst, create: machineCreate } };
-    const allocateUserSeqMock = vi.fn(async () => ++state.seq);
+    const allocateUserSeqMock = mock(async () => ++state.seq);
 
     return { state, dbMock, resetState, allocateUserSeqMock, emitUpdateSpy, emitEphemeralSpy };
-});
+})();
 
-// Keep the REAL event-builder functions (buildNewMachineUpdate etc.), but
-// replace the eventRouter singleton with a spy so we can capture exactly what
-// the create handler emits.
-vi.mock("@/app/events/eventRouter", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("@/app/events/eventRouter")>();
-    return { ...actual, eventRouter: { emitUpdate: emitUpdateSpy, emitEphemeral: emitEphemeralSpy } };
-});
-vi.mock("@/storage/db", () => ({ db: dbMock }));
-vi.mock("@/storage/seq", () => ({ allocateUserSeq: allocateUserSeqMock }));
-vi.mock("@/storage/inTx", () => ({ inTx: async (fn: any) => fn({}), afterTx: (_tx: any, cb: () => void) => cb() }));
-vi.mock("@/utils/log", () => ({ log: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+mock.module("@/app/events/eventRouter", () => ({
+    eventRouter: { emitUpdate: emitUpdateSpy, emitEphemeral: emitEphemeralSpy },
+}));
+mock.module("@/storage/db", () => ({ db: dbMock }));
+mock.module("@/storage/seq", () => ({ allocateUserSeq: allocateUserSeqMock }));
+mock.module("@/storage/inTx", () => ({ inTx: async (fn: any) => fn({}), afterTx: (_tx: any, cb: () => void) => cb() }));
+mock.module("@/utils/log", () => ({ log: mock(), warn: mock(), error: mock() }));
 
 import { machinesRoutes } from "./machinesRoutes";
 

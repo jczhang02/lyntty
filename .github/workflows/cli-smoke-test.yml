@@ -1,10 +1,9 @@
-name: CLI Smoke Test
+name: CLI Artifact Smoke Test
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
-  # GitHub can create failed 0-job push runs for dispatch-only workflows.
-  # Declare push explicitly and run a no-op push job; real smoke jobs stay manual.
-  push:
 
 permissions:
   contents: read
@@ -14,264 +13,124 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  push-noop:
-    if: github.event_name != 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - run: echo "CLI smoke is manual; push event intentionally no-ops."
-
-  smoke-test-linux:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
+  artifact-posix:
+    name: CLI artifact smoke (${{ matrix.target }})
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [26]
-
+        include:
+          - runner: ubuntu-latest
+            target: linux-x64
+            artifact_args: ''
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+            artifact_args: ''
+          - runner: macos-15-intel
+            target: darwin-x64
+            artifact_args: '--no-archive'
+          - runner: macos-15
+            target: darwin-arm64
+            artifact_args: '--no-archive'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Test and build current artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run --cwd packages/lyntty-cli typecheck
+          bun test --isolate --preload ./packages/lyntty-cli/src/test-setup.ts ./packages/lyntty-cli/src/distribution ./packages/lyntty-cli/src/daemon/service
+          bun run --cwd packages/lyntty-cli build:artifact --target "${{ matrix.target }}" ${{ matrix.artifact_args }}
+      - name: Exercise standalone artifact without runtime fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(bun -e 'console.log(require("./packages/lyntty-cli/package.json").version)')
+          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-${{ matrix.target }}"
+          GATE="$PWD/packages/lyntty-cli/dist/test-state/workflow-${{ matrix.target }}"
+          rm -rf "$GATE"
+          mkdir -p "$GATE/home" "$GATE/path"
+          export HOME="$GATE/home"
+          export USERPROFILE="$GATE/home"
+          export LYNTTY_HOME_DIR="$GATE/state"
+          export PI_CODING_AGENT_DIR="$GATE/pi-agent"
+          ORIGINAL_PATH=$PATH
+          export PATH="$ARTIFACT/tools"
+          "$ARTIFACT/lyntty" --self-check --json
+          test ! -e "$LYNTTY_HOME_DIR"
+          test ! -e "$PI_CODING_AGENT_DIR"
+          "$ARTIFACT/lynttyd" --build-info --json
+          PATH=$ORIGINAL_PATH rm -rf "$GATE"
+      - name: Validate systemd user unit
+        if: startsWith(matrix.target, 'linux-')
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(bun -e 'console.log(require("./packages/lyntty-cli/package.json").version)')
+          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-${{ matrix.target }}"
+          GATE="$PWD/packages/lyntty-cli/dist/test-state/systemd-lint"
+          mkdir -p "$GATE/home"
+          ARTIFACT="$ARTIFACT" GATE="$GATE" bun -e 'import { writeFile } from "node:fs/promises"; import { renderSystemdUserUnit } from "./packages/lyntty-cli/src/daemon/service/systemd.ts"; const root=process.env.GATE; const artifact=process.env.ARTIFACT; await writeFile(`${root}/lynttyd.service`, renderSystemdUserUnit({daemonExecutable:`${artifact}/lynttyd`,cliExecutable:`${artifact}/lyntty`,homeDir:`${root}/home`,lynttyHomeDir:`${root}/state`,servicePath:`${root}/lynttyd.service`,runtimePath:"/usr/local/bin:/usr/bin:/bin",uid:1000}));'
+          systemd-analyze verify "$GATE/lynttyd.service"
+          rm -rf "$GATE"
+      - name: Validate macOS LaunchAgent plist
+        if: startsWith(matrix.target, 'darwin-')
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(bun -e 'console.log(require("./packages/lyntty-cli/package.json").version)')
+          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-${{ matrix.target }}"
+          GATE="$PWD/packages/lyntty-cli/dist/test-state/launchd-lint"
+          mkdir -p "$GATE/home"
+          ARTIFACT="$ARTIFACT" GATE="$GATE" bun -e 'import { writeFile } from "node:fs/promises"; import { renderLaunchAgentPlist } from "./packages/lyntty-cli/src/daemon/service/launchd.ts"; const root=process.env.GATE; const artifact=process.env.ARTIFACT; await writeFile(`${root}/dev.jczhang.lynttyd.plist`, renderLaunchAgentPlist({daemonExecutable:`${artifact}/lynttyd`,cliExecutable:`${artifact}/lyntty`,homeDir:`${root}/home`,lynttyHomeDir:`${root}/state`,servicePath:`${root}/dev.jczhang.lynttyd.plist`,runtimePath:"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",uid:501}));'
+          plutil -lint "$GATE/dev.jczhang.lynttyd.plist"
+          rm -rf "$GATE"
 
-    - name: Install pnpm
-      uses: pnpm/action-setup@v4
-
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-
-    - name: Build package
-      run: pnpm --filter lyntty-cli build
-
-    # `lyntty server` resolves the self-host runtime and bundled webapp from
-    # lyntty-relay. The server package is JS/TS and lets npm install
-    # platform-specific dependencies such as Prisma and sharp normally.
-    - name: Generate Prisma client + bundle lyntty-relay webapp
-      run: |
-        pnpm --filter lyntty-relay generate
-        pnpm --filter lyntty-relay run bundle:webapp
-
-    - name: Pack packages
-      run: |
-        pnpm --filter lyntty-cli pack --pack-destination packages/lyntty-cli
-        pnpm --filter lyntty-relay pack --pack-destination packages/lyntty-relay
-
-    - name: Install packed packages globally
-      run: |
-        LYNTTY_PACKAGE_FILE=$(ls packages/lyntty-cli/*.tgz)
-        SERVER_PACKAGE_FILE=$(ls packages/lyntty-relay/*.tgz)
-        npm install -g "./$SERVER_PACKAGE_FILE" "./$LYNTTY_PACKAGE_FILE"
-
-    - name: Test binary execution
-      run: |
-        export HOME="$RUNNER_TEMP/lyntty-smoke-home"
-        export LYNTTY_HOME_DIR="$RUNNER_TEMP/lyntty-home"
-        mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
-
-        # Test that the binary starts successfully
-        echo "Testing lyntty --help..."
-        timeout 30s lyntty --help || {
-          echo "Error: lyntty --help failed or timed out"
-          exit 1
-        }
-
-        echo "Testing lyntty --version..."
-        timeout 10s lyntty --version || {
-          echo "Error: lyntty --version failed or timed out"
-          exit 1
-        }
-
-        echo "Testing lyntty doctor..."
-        timeout 30s lyntty doctor || {
-          echo "Error: lyntty doctor failed or timed out"
-          exit 1
-        }
-
-        echo "Testing lyntty daemon status..."
-        timeout 10s lyntty daemon status || {
-          echo "Error: lyntty daemon status failed or timed out"
-          exit 1
-        }
-
-        echo "Binary smoke test passed on Linux!"
-
-    - name: Test packaged server (lyntty server)
-      run: |
-        export HOME="$RUNNER_TEMP/lyntty-server-home"
-        LYNTTY_HOME_DIR="$(mktemp -d)"
-        export LYNTTY_HOME_DIR
-        mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
-
-        timeout 90s lyntty server --port 4505 --host 127.0.0.1 --no-persist --reset > /tmp/lyntty-relay.log 2>&1 &
-        SERVER_PID=$!
-        UP=0
-        for i in $(seq 1 60); do
-          if curl -sf -m 2 http://127.0.0.1:4505/ -o /dev/null; then UP=1; echo "server up after ${i}s"; break; fi
-          sleep 1
-        done
-        # Exercise the Prisma native query engine via a DB-backed read.
-        PK=$(node -e "console.log(Buffer.alloc(32).toString('base64'))")
-        BODY=$(curl -s -m 5 -G http://127.0.0.1:4505/v1/auth/request/status --data-urlencode "publicKey=$PK" || true)
-        echo "auth/request/status -> $BODY"
-        kill "$SERVER_PID" 2>/dev/null || true
-        wait "$SERVER_PID" 2>/dev/null || true
-        echo "=== lyntty server log ==="; cat /tmp/lyntty-relay.log || true
-        if [ "$UP" != "1" ]; then echo "Error: lyntty server did not become healthy"; exit 1; fi
-        if ! echo "$BODY" | grep -q '"status"'; then echo "Error: Prisma-backed endpoint did not respond"; exit 1; fi
-        if grep -qiE 'PrismaClientInitializationError|could not locate.*Query Engine' /tmp/lyntty-relay.log; then echo "Error: Prisma query engine failed to load"; exit 1; fi
-        echo "lyntty server smoke test passed (booted + Prisma query engine OK)"
-
-  smoke-test-windows:
-    if: github.event_name == 'workflow_dispatch'
+  artifact-windows:
+    name: CLI artifact smoke (windows-x64)
     runs-on: windows-latest
-    timeout-minutes: 35
-    strategy:
-      matrix:
-        node-version: [26]
-
+    timeout-minutes: 40
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install pnpm
-      uses: pnpm/action-setup@v4
-
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-
-    - name: Build package
-      run: pnpm --filter lyntty-cli build
-
-    - name: Pack package
-      run: pnpm --filter lyntty-cli pack --pack-destination packages/lyntty-cli
-
-    - name: Install packed package globally
-      shell: cmd
-      run: |
-        for %%f in (packages\lyntty-cli\*.tgz) do npm install -g "%%f"
-
-    - name: Debug npm global installation structure
-      shell: cmd
-      run: |
-        for /f "tokens=*" %%i in ('npm config get prefix') do set NPM_PREFIX=%%i
-        echo NPM_PREFIX: %NPM_PREFIX%
-        echo Listing npm prefix directory:
-        dir "%NPM_PREFIX%" 2>nul || echo Failed to list NPM_PREFIX
-        echo.
-        echo Checking for node_modules in npm prefix:
-        if exist "%NPM_PREFIX%\node_modules" (
-          echo Found node_modules directory
-          dir "%NPM_PREFIX%\node_modules" 2>nul
-          echo.
-          echo Checking for lyntty package:
-          if exist "%NPM_PREFIX%\node_modules\lyntty" (
-            echo Found lyntty package
-            dir "%NPM_PREFIX%\node_modules\lyntty" 2>nul
-            echo.
-            echo Checking for dist directory:
-            if exist "%NPM_PREFIX%\node_modules\lyntty\dist" (
-              echo Found dist directory
-              dir "%NPM_PREFIX%\node_modules\lyntty\dist" 2>nul
-            ) else (
-              echo No dist directory found
-            )
-          ) else (
-            echo No lyntty package found
-          )
-        ) else (
-          echo No node_modules directory found
-        )
-
-    - name: Test binary execution
-      shell: cmd
-      run: |
-        @echo on
-        set HOME=%RUNNER_TEMP%\lyntty-smoke-home
-        set LYNTTY_HOME_DIR=%RUNNER_TEMP%\lyntty-home
-        if not exist "%HOME%" mkdir "%HOME%"
-        if not exist "%LYNTTY_HOME_DIR%" mkdir "%LYNTTY_HOME_DIR%"
-
-        rem Get npm global prefix and add to PATH
-        for /f "tokens=*" %%i in ('npm config get prefix') do set NPM_PREFIX=%%i
-        set PATH=%NPM_PREFIX%;%PATH%
-        echo NPM_PREFIX: %NPM_PREFIX%
-        echo Current PATH: %PATH%
-
-        rem Debug: Check if lyntty exists in various locations
-        echo Checking for lyntty binary...
-        where lyntty 2>nul && echo Found lyntty in PATH || echo lyntty not found in PATH
-        if exist "%NPM_PREFIX%\lyntty.cmd" echo Found lyntty.cmd in NPM_PREFIX
-        if exist "%NPM_PREFIX%\node_modules\.bin\lyntty.cmd" echo Found lyntty.cmd in .bin directory
-        dir "%NPM_PREFIX%\*lyntty*" 2>nul || echo No lyntty files found in NPM_PREFIX
-
-        rem Debug: Check the actual contents and encoding of the installed file
-        if exist "%NPM_PREFIX%\lyntty.cmd" (
-          echo File size and type:
-          dir "%NPM_PREFIX%\lyntty.cmd"
-          echo.
-          echo First few lines of the file:
-          type "%NPM_PREFIX%\lyntty.cmd" | head -5
-          echo.
-          echo Hex dump of first 50 bytes to check line endings:
-          powershell -Command "Get-Content '%NPM_PREFIX%\lyntty.cmd' -Encoding Byte -TotalCount 50 | ForEach-Object { '{0:X2}' -f $_ } | Join-String -Separator ' '"
-          echo.
-          echo Testing with direct path...
-          "%NPM_PREFIX%\lyntty.cmd" --help
-        ) else (
-          echo Testing lyntty --help...
-          lyntty --help
-        )
-        if errorlevel 1 (
-          echo Error: lyntty --help failed
-          exit /b 1
-        )
-
-        rem Test version
-        if exist "%NPM_PREFIX%\lyntty.cmd" (
-          "%NPM_PREFIX%\lyntty.cmd" --version
-        ) else (
-          lyntty --version
-        )
-        if errorlevel 1 (
-          echo Error: lyntty --version failed
-          exit /b 1
-        )
-
-        rem Test doctor
-        echo Testing lyntty doctor...
-        if exist "%NPM_PREFIX%\lyntty.cmd" (
-          "%NPM_PREFIX%\lyntty.cmd" doctor
-        ) else (
-          lyntty doctor
-        )
-        if errorlevel 1 (
-          echo Error: lyntty doctor failed
-          exit /b 1
-        )
-
-        rem Test daemon status
-        echo Testing lyntty daemon status...
-        if exist "%NPM_PREFIX%\lyntty.cmd" (
-          "%NPM_PREFIX%\lyntty.cmd" daemon status
-        ) else (
-          lyntty daemon status
-        )
-        if errorlevel 1 (
-          echo Error: lyntty daemon status failed
-          exit /b 1
-        )
-
-        echo Smoke test passed on Windows!
-
-# We don't need a smoke test for macOS because most contributors are developing on macOS.
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Test and build Windows artifact
+        shell: pwsh
+        run: |
+          bun run --cwd packages/lyntty-cli typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          bun run --cwd packages/lyntty-cli build:artifact --target windows-x64 --no-archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise standalone Windows artifact
+        shell: pwsh
+        run: |
+          $version = (Get-Content packages/lyntty-cli/package.json | ConvertFrom-Json).version
+          $artifact = "$pwd/packages/lyntty-cli/dist/artifacts/lyntty-cli-$version-windows-x64"
+          $gate = "$pwd/packages/lyntty-cli/dist/test-state/workflow-windows-x64"
+          Remove-Item -Recurse -Force $gate -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force "$gate/home", "$gate/path" | Out-Null
+          $env:HOME = "$gate/home"
+          $env:USERPROFILE = "$gate/home"
+          $env:LYNTTY_HOME_DIR = "$gate/state"
+          $env:PI_CODING_AGENT_DIR = "$gate/pi-agent"
+          $env:PATH = "$artifact/tools"
+          & "$artifact/lyntty.exe" --self-check --json
+          if ($LASTEXITCODE -ne 0) { throw 'Windows self-check failed' }
+          if (Test-Path $env:LYNTTY_HOME_DIR) { throw 'Self-check wrote Lyntty state' }
+          if (Test-Path $env:PI_CODING_AGENT_DIR) { throw 'Self-check wrote Pi state' }
+          & "$artifact/lynttyd.exe" --build-info --json
+          if ($LASTEXITCODE -ne 0) { throw 'Windows daemon build-info failed' }
+          Remove-Item -Recurse -Force $gate

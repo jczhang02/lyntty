@@ -1,83 +1,47 @@
-# Terms of Use
+# Lyntty Terms of Use
 
-Last updated: January 2025
-
-## Acceptance of Terms
-
-By downloading, installing, or using Lyntty, you agree to be bound by these Terms of Use. If you do not agree to these terms, do not use Lyntty.
+Last updated: 2026-07-16
 
 ## About Lyntty
 
-Lyntty is a free, open-source mobile client for AI code assistance, released under the MIT License. The software is provided as-is by the open-source community without any warranties or guarantees.
+Lyntty is an open-source, Android-first remote-control client for local `pi` sessions. The Lyntty App connects through a self-hosted `relay` to `lynttyd` on a paired computer. Lyntty does not provide an AI model, hosted coding agent, subscription, or managed relay service.
 
 ## License
 
-Lyntty is licensed under the MIT License. This means you are free to:
+Lyntty is distributed under the repository's MIT License. These terms do not replace or restrict rights granted by that license.
 
-- Use the software for any purpose, including commercial use
-- Modify the source code
-- Distribute copies of the software
-- Distribute modified versions
+## Your responsibilities
 
-The full MIT License text is available in the source code repository.
+You are responsible for:
 
-## Acceptable Use
+- operating and securing your computer, `pi`, `lynttyd`, and self-hosted `relay`;
+- safeguarding pairing links, credentials, encryption keys, signing keys, backups, and devices;
+- reviewing commands and permission requests before approving them;
+- complying with applicable laws and with any terms that apply to software or services you independently use with `pi`; and
+- maintaining backups of canonical Pi JSONL history and other important data.
 
-You agree to use Lyntty responsibly and in compliance with all applicable laws. You must not:
+You must not use Lyntty to violate the law, access systems without authorization, interfere with other users or services, or bypass security controls.
 
-- Use Lyntty for any illegal or unauthorized purpose
-- Attempt to harm, disable, or impair the functionality of Lyntty
-- Use Lyntty to generate harmful, offensive, or inappropriate content
-- Violate the terms of service of any AI services you connect to through Lyntty
-- Attempt to reverse engineer security features or encryption protocols
+## Remote-control risk
 
-## Third-Party Services
+Lyntty can send input to and approve actions in an active local `pi` session. Those actions may read, modify, or delete files and may run commands with the permissions of the local user. Pair only devices and relays you trust. Keep the activation lock and other safety controls enabled.
 
-Lyntty may connect to third-party AI services (such as Claude, OpenAI, etc.). You acknowledge that:
+## Availability and changes
 
-- You are responsible for complying with their terms of service
-- You need valid API keys and accounts with these services
-- Lyntty is not responsible for the availability or performance of third-party services
-- Costs associated with API usage are your responsibility
+Lyntty is provided **"AS IS"**, without warranties of any kind. Features, wire capabilities, and compatibility windows may change between releases. Operators are responsible for upgrading compatible App, CLI/daemon, Relay, and Wire versions according to the published Compatibility BOM.
 
-## Independence and Disclaimers
+## Limitation of liability
 
-**Lyntty is an independent, community-driven project.** We are not affiliated with, endorsed by, or connected to Anthropic, Claude, OpenAI, or any other AI service providers. Lyntty is a third-party client that works with publicly available APIs.
-
-## Limitation of Liability
-
-**IMPORTANT:** Lyntty is provided "AS IS" without warranty of any kind. The developers, contributors, and distributors of Lyntty shall not be liable for:
-
-- Any direct, indirect, incidental, or consequential damages
-- Data loss or corruption
-- Lost profits or business interruption
-- Any claims arising from your use of Lyntty
+To the maximum extent permitted by law, Lyntty's maintainers and contributors are not liable for direct, indirect, incidental, special, consequential, or exemplary damages, including loss of data, code, credentials, profits, or service availability, arising from use of the software.
 
 ## Privacy
 
-Lyntty respects your privacy. The app:
+Data handling is described in the repository's Privacy Policy. Lyntty does not include product analytics, advertising, social features, or subscription tracking.
 
-- Does not collect personal information without your consent
-- Stores API keys locally on your device
-- Does not share your data with third parties (except when connecting to AI services you configure)
-- May use crash reporting and analytics tools as disclosed in the Privacy Policy
+## Changes
 
-## Changes to Terms
-
-We reserve the right to update these Terms of Use at any time. Continued use of Lyntty after changes constitutes acceptance of the new terms.
-
-## Governing Law
-
-These terms shall be governed by and construed in accordance with applicable laws, without regard to conflict of law principles.
+These terms may be updated with future releases. The version shipped with or linked from a release applies to that release.
 
 ## Contact
 
-For questions about these Terms of Use, please visit our GitHub repository or contact the maintainers through the project's official channels.
-
-## Severability
-
-If any provision of these Terms is found to be unenforceable or invalid, that provision will be limited or eliminated to the minimum extent necessary so that these Terms will otherwise remain in full force and effect.
-
-## Entire Agreement
-
-These Terms of Use constitute the entire agreement between you and the Lyntty project regarding the use of the software, superseding any prior agreements or understandings.
+Use the official Lyntty repository's issue tracker for project questions. Do not include credentials, pairing links, auth material, private code, or other secrets in an issue.

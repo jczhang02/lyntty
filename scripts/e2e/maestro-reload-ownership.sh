@@ -18,7 +18,11 @@ mkdir -p "$ARTIFACT_DIR"
 real_home="$(cd "$HOME" && pwd -P)"
 node_home="$(cd "$LYNTTY_E2E_NODE_HOME" && pwd -P)"
 pi_home="$(cd "$LYNTTY_E2E_PI_HOME" && pwd -P)"
-[[ "$node_home" == /tmp/* && "$pi_home" == /tmp/* ]]
+is_isolated_state() {
+  [[ "$1" == /tmp/lyntty-* || "$1" == "$ROOT"/dist/test-state/* ]]
+}
+is_isolated_state "$node_home"
+is_isolated_state "$pi_home"
 [[ "$node_home" != "$real_home" && "$pi_home" != "$real_home" && "$node_home" != "$pi_home" ]]
 
 read -r pane_id pane_pid < <(tmux list-panes -t "$LYNTTY_E2E_TMUX_SESSION" -F '#{pane_id} #{pane_pid}' | head -1)
@@ -26,14 +30,14 @@ read -r pane_id pane_pid < <(tmux list-panes -t "$LYNTTY_E2E_TMUX_SESSION" -F '#
 [[ "$(ps -o comm= -p "$pane_pid" | xargs)" == "pi" ]]
 tr '\0' '\n' < "/proc/$pane_pid/environ" | grep -Fqx "HOME=$pi_home"
 tr '\0' '\n' < "/proc/$pane_pid/environ" | grep -Fqx "LYNTTY_HOME_DIR=$node_home"
-tr '\0' ' ' < "/proc/$pane_pid/cmdline" | grep -Eq 'pi .*--session '
+tr '\0' ' ' < "/proc/$pane_pid/cmdline" | grep -Eq 'pi .*--session(-id)? '
 baseline_occurrences="$(tmux capture-pane -p -S -1200 -t "$pane_id" | grep -F -c "$LYNTTY_MAESTRO_PONG" || true)"
 [[ "$baseline_occurrences" -eq 0 ]]
 
-daemon_pid="$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync(process.argv[1]));process.stdout.write(String(p.pid))" "$node_home/daemon.state.json")"
+daemon_pid="$(bun -e 'const p = await Bun.file(process.argv[1]).json(); process.stdout.write(String(p.pid))' "$node_home/daemon.state.json")"
 tr '\0' '\n' < "/proc/$daemon_pid/environ" | grep -Fqx "HOME=$pi_home"
 tr '\0' '\n' < "/proc/$daemon_pid/environ" | grep -Fqx "LYNTTY_HOME_DIR=$node_home"
-daemon_log="$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync(process.argv[1]));process.stdout.write(p.daemonLogPath)" "$node_home/daemon.state.json")"
+daemon_log="$(bun -e 'const p = await Bun.file(process.argv[1]).json(); process.stdout.write(p.daemonLogPath)' "$node_home/daemon.state.json")"
 baseline_lines="$(wc -l < "$daemon_log")"
 baseline_instance="$(grep "activeExtensionInstanceId:" "$daemon_log" | tail -1 | cut -d"'" -f2)"
 [[ -n "$baseline_instance" ]]
@@ -44,7 +48,7 @@ tmux send-keys -t "$pane_id" Enter
 deadline=$((SECONDS + 60))
 until tail -n "+$((baseline_lines + 1))" "$daemon_log" | grep -q "eventReason: 'reload'"; do
   (( SECONDS < deadline )) || exit 1
-  sleep 1
+  read -r -t 1 _ || true
 done
 
 maestro test "$ROOT/e2e/maestro/07_reload_ownership.yml" \

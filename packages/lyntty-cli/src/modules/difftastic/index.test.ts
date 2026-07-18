@@ -2,7 +2,7 @@
  * Tests for difftastic module
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'bun:test';
 import { run } from './index';
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';

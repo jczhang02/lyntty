@@ -1,8 +1,7 @@
 import "reflect-metadata";
 
-import { db } from "./storage/db";
+import { closeDatabase, db } from "./storage/db";
 import { initEncrypt } from "./modules/encrypt";
-import { initGithub } from "./modules/github";
 import { loadFiles } from "./storage/files";
 import { auth } from "./app/auth/auth";
 import { activityCache } from "./app/presence/sessionCache";
@@ -20,28 +19,25 @@ export interface StartServerOptions extends StartApiOptions {
 }
 
 export async function startServer(opts: StartServerOptions): Promise<{ port: number; host: string }> {
-    process.env.DB_PROVIDER = process.env.DB_PROVIDER || "pglite";
     process.env.PGLITE_DIR = opts.pgliteDir;
-    process.env.HANDY_MASTER_SECRET = opts.masterSecret;
+    process.env.LYNTTY_MASTER_SECRET = opts.masterSecret;
 
     await db.$connect();
+    await db.$queryRaw`SELECT 1`;
     onShutdown("db", async () => {
-        await db.$disconnect();
+        await closeDatabase();
     });
     onShutdown("activity-cache", async () => {
         activityCache.shutdown();
     });
 
     await initEncrypt();
-    await initGithub();
     await loadFiles();
     await auth.init();
 
     const { port, host } = await startApi({
         port: opts.port,
         host: opts.host,
-        staticDir: opts.staticDir,
-        injectHtmlConfig: opts.injectHtmlConfig,
     });
     startDatabaseMetricsUpdater();
     startTimeout();

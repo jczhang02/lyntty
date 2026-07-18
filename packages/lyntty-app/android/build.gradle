@@ -1,5 +1,17 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
+def jsRuntimeExecutable = System.getenv('BUN_EXECUTABLE') ?: 'bun'
+def resolvedReactNativeDir = new File(
+  [jsRuntimeExecutable, "--print", "require.resolve('react-native/package.json')"]
+    .execute(null, rootDir)
+    .text
+    .trim()
+).getParentFile().getAbsoluteFile()
+
+ext {
+  REACT_NATIVE_NODE_MODULES_DIR = resolvedReactNativeDir.absolutePath
+}
+
 buildscript {
   repositories {
     google()

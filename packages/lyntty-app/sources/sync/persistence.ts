@@ -1,16 +1,10 @@
 import { MMKV } from 'react-native-mmkv';
 import { Settings, settingsDefaults, settingsParse, settingsToSyncPayload, SettingsSchema } from './settings';
 import { LocalSettings, localSettingsDefaults, localSettingsParse } from './localSettings';
-import { Purchases, purchasesDefaults, purchasesParse } from './purchases';
-import { Profile, profileDefaults, profileParse } from './profile';
-import type { PermissionModeKey } from '@/components/PermissionModeSelector';
 
 const mmkv = new MMKV();
 const NEW_SESSION_DRAFT_KEY = 'new-session-draft-v1';
 const REGISTERED_PUSH_TOKEN_KEY = 'registered-push-token-v1';
-const VOICE_SOFT_PAYWALL_SHOWN_KEY = 'voice-soft-paywall-shown';
-const VOICE_ONBOARDING_PROMPT_LOAD_COUNT_KEY = 'voice-onboarding-prompt-load-count';
-const VOICE_MESSAGE_COUNT_KEY = 'voice-message-count';
 const PENDING_OUTBOX_KEY = 'pending-message-outbox-v1';
 const PENDING_SYNTHETIC_OUTBOX_KEY = 'pending-synthetic-message-outbox-v1';
 
@@ -103,16 +97,12 @@ export function savePendingSyntheticOutbox(outbox: Map<string, PersistedSyntheti
     mmkv.set(PENDING_SYNTHETIC_OUTBOX_KEY, JSON.stringify(Object.fromEntries(outbox)));
 }
 
-export type NewSessionAgentType = 'pi' | 'claude' | 'codex' | 'gemini' | 'openclaw';
 export type NewSessionSessionType = 'simple' | 'worktree';
 
 export interface NewSessionDraft {
     input: string;
     selectedMachineId: string | null;
     selectedPath: string | null;
-    agentType: NewSessionAgentType;
-    permissionMode: PermissionModeKey;
-    modelMode: string;
     sessionType: NewSessionSessionType;
     worktreeKey: string | null;
     updatedAt: number;
@@ -187,24 +177,6 @@ export function loadThemePreference(): 'light' | 'dark' | 'adaptive' {
     return localSettingsDefaults.themePreference;
 }
 
-export function loadPurchases(): Purchases {
-    const purchases = mmkv.getString('purchases');
-    if (purchases) {
-        try {
-            const parsed = JSON.parse(purchases);
-            return purchasesParse(parsed);
-        } catch (e) {
-            console.error('Failed to parse purchases', e);
-            return { ...purchasesDefaults };
-        }
-    }
-    return { ...purchasesDefaults };
-}
-
-export function savePurchases(purchases: Purchases) {
-    mmkv.set('purchases', JSON.stringify(purchases));
-}
-
 export function loadSessionDrafts(): Record<string, string> {
     const drafts = mmkv.getString('session-drafts');
     if (drafts) {
@@ -236,13 +208,6 @@ export function loadNewSessionDraft(): NewSessionDraft | null {
         const input = typeof parsed.input === 'string' ? parsed.input : '';
         const selectedMachineId = typeof parsed.selectedMachineId === 'string' ? parsed.selectedMachineId : null;
         const selectedPath = typeof parsed.selectedPath === 'string' ? parsed.selectedPath : null;
-        const agentType: NewSessionAgentType = parsed.agentType === 'pi' || parsed.agentType === 'codex' || parsed.agentType === 'gemini' || parsed.agentType === 'openclaw' || parsed.agentType === 'claude'
-            ? parsed.agentType
-            : 'pi';
-        const permissionMode: PermissionModeKey = typeof parsed.permissionMode === 'string'
-            ? parsed.permissionMode
-            : 'default';
-        const modelMode: string = typeof parsed.modelMode === 'string' ? parsed.modelMode : 'default';
         const sessionType: NewSessionSessionType = parsed.sessionType === 'worktree' ? 'worktree' : 'simple';
         const worktreeKey = typeof parsed.worktreeKey === 'string' ? parsed.worktreeKey : null;
         const updatedAt = typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now();
@@ -251,9 +216,6 @@ export function loadNewSessionDraft(): NewSessionDraft | null {
             input,
             selectedMachineId,
             selectedPath,
-            agentType,
-            permissionMode,
-            modelMode,
             sessionType,
             worktreeKey,
             updatedAt,
@@ -335,24 +297,6 @@ export function saveSessionEffortLevels(levels: Record<string, string>) {
     mmkv.set('session-effort-levels', JSON.stringify(levels));
 }
 
-export function loadProfile(): Profile {
-    const profile = mmkv.getString('profile');
-    if (profile) {
-        try {
-            const parsed = JSON.parse(profile);
-            return profileParse(parsed);
-        } catch (e) {
-            console.error('Failed to parse profile', e);
-            return { ...profileDefaults };
-        }
-    }
-    return { ...profileDefaults };
-}
-
-export function saveProfile(profile: Profile) {
-    mmkv.set('profile', JSON.stringify(profile));
-}
-
 // Simple temporary text storage for passing large strings between screens
 export function storeTempText(content: string): string {
     const id = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -368,44 +312,6 @@ export function retrieveTempText(id: string): string | null {
         return content;
     }
     return null;
-}
-
-export function getVoiceSoftPaywallShownCount(): number {
-    return mmkv.getNumber(VOICE_SOFT_PAYWALL_SHOWN_KEY) ?? 0;
-}
-
-export function incrementVoiceSoftPaywallShown() {
-    mmkv.set(VOICE_SOFT_PAYWALL_SHOWN_KEY, getVoiceSoftPaywallShownCount() + 1);
-}
-
-export function getVoiceOnboardingPromptLoadCount(): number {
-    return mmkv.getNumber(VOICE_ONBOARDING_PROMPT_LOAD_COUNT_KEY) ?? 0;
-}
-
-export function incrementVoiceOnboardingPromptLoadCount() {
-    mmkv.set(VOICE_ONBOARDING_PROMPT_LOAD_COUNT_KEY, getVoiceOnboardingPromptLoadCount() + 1);
-}
-
-export function getVoiceMessageCount(): number {
-    return mmkv.getNumber(VOICE_MESSAGE_COUNT_KEY) ?? 0;
-}
-
-export function incrementVoiceMessageCount() {
-    mmkv.set(VOICE_MESSAGE_COUNT_KEY, getVoiceMessageCount() + 1);
-}
-
-export function getVoiceLocalCounters() {
-    return {
-        softPaywallShownCount: getVoiceSoftPaywallShownCount(),
-        onboardingPromptLoadCount: getVoiceOnboardingPromptLoadCount(),
-        voiceMessageCount: getVoiceMessageCount(),
-    };
-}
-
-export function resetVoiceLocalCounters() {
-    mmkv.delete(VOICE_SOFT_PAYWALL_SHOWN_KEY);
-    mmkv.delete(VOICE_ONBOARDING_PROMPT_LOAD_COUNT_KEY);
-    mmkv.delete(VOICE_MESSAGE_COUNT_KEY);
 }
 
 export function clearPersistence() {

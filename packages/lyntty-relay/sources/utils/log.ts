@@ -3,10 +3,11 @@ import pretty from 'pino-pretty';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
-// Single log file name created once at startup
+// Optional local file logging is explicitly opt-in for operator diagnostics.
+const fileLoggingEnabled = process.env.LYNTTY_FILE_LOGGING === '1';
 let consolidatedLogFile: string | undefined;
 
-if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING) {
+if (fileLoggingEnabled) {
     const logsDir = join(process.cwd(), '.logs');
     try {
         mkdirSync(logsDir, { recursive: true });
@@ -18,7 +19,7 @@ if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING) {
         const min = String(now.getMinutes()).padStart(2, '0');
         const sec = String(now.getSeconds()).padStart(2, '0');
         consolidatedLogFile = join(logsDir, `${month}-${day}-${hour}-${min}-${sec}.log`);
-        console.log(`[PINO] Remote debugging logs enabled - writing to ${consolidatedLogFile}`);
+        console.log(`[PINO] File logging enabled - writing to ${consolidatedLogFile}`);
     } catch (error) {
         console.error('Failed to create logs directory:', error);
     }
@@ -38,8 +39,8 @@ function formatLocalTime(timestamp?: number) {
 //
 // pino transports run the target (pino-pretty, pino/file) in a worker_thread,
 // which resolves the module from a real path on disk. lyntty-relay ships as a
-// single-file `bun build --compile` binary (see lyntty-cli `lyntty server`); inside
-// Bun's virtual $bunfs there is no node_modules/pino-pretty for the worker to
+// single-file `bun build --compile` binary; inside Bun's virtual $bunfs there is
+// no node_modules/pino-pretty for the worker to
 // load, so the threaded transport crashes at startup.
 //
 // Synchronous in-process streams (pino-pretty as a stream + pino.destination,
@@ -55,7 +56,7 @@ const prettyStream = pretty({
 
 const loggerStreams: pino.StreamEntry[] = [{ level: 'debug', stream: prettyStream }];
 
-if (process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedLogFile) {
+if (fileLoggingEnabled && consolidatedLogFile) {
     loggerStreams.push({
         level: 'debug',
         stream: pino.destination({ dest: consolidatedLogFile, mkdir: true }),
@@ -82,8 +83,9 @@ const baseOptions = {
 export const logger = pino(baseOptions, pino.multistream(loggerStreams));
 
 // Optional file-only logger for remote logs from CLI/mobile
-export const fileConsolidatedLogger = process.env.DANGEROUSLY_LOG_TO_SERVER_FOR_AI_AUTO_DEBUGGING && consolidatedLogFile ?
-    pino(baseOptions, pino.destination({ dest: consolidatedLogFile, mkdir: true })) : undefined;
+export const fileConsolidatedLogger = fileLoggingEnabled && consolidatedLogFile
+    ? pino(baseOptions, pino.destination({ dest: consolidatedLogFile, mkdir: true }))
+    : undefined;
 
 export function log(src: any, ...args: any[]) {
     logger.info(src, ...args);

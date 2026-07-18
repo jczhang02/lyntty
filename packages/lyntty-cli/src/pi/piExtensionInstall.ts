@@ -1,8 +1,11 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import { join } from 'node:path';
+import { writeFileAtomically } from '@/distribution/atomicFile';
 
-const LYNTTY_PI_EXTENSION_SOURCE = String.raw`import { createHash, randomUUID } from "node:crypto";
+export const LYNTTY_PI_EXTENSION_SOURCE = String.raw`// lyntty-managed-pi-extension:v1
+import { createHash, randomUUID } from "node:crypto";
 import { chmod, mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -22,17 +25,19 @@ let extensionInstanceId = randomUUID();
 type SessionSnapshot = ReturnType<typeof sessionSnapshot>;
 type QueuedPayload = { session: SessionSnapshot; event: Record<string, unknown>; extensionInstanceId: string; eventId: number; timestamp: number; attempts?: number };
 type PiCommandInfo = { name: string; description?: string; source: string; sourceInfo?: Record<string, unknown> };
+type RemoteImage = { type: "image"; data: string; mimeType: string };
+type RemoteMessageContent = { type: "text"; text: string } | RemoteImage;
 type RemotePiCommand =
-  | { type: "send_user_message"; text: string }
-  | { type: "follow_up"; text: string }
-  | { type: "steer"; text: string }
+  | { type: "send_user_message"; text: string; images?: RemoteImage[] }
+  | { type: "follow_up"; text: string; images?: RemoteImage[] }
+  | { type: "steer"; text: string; images?: RemoteImage[] }
   | { type: "abort" }
   | { type: "compact"; instructions?: string }
   | { type: "reload" }
   | { type: "internal_shutdown" }
   | { type: "set_session_name"; name: string }
   | { type: "get_commands" }
-  | { type: "invoke_pi_command"; commandLine: string; deliverAs?: "followUp" }
+  | { type: "invoke_pi_command"; commandLine: string; deliverAs?: "followUp"; images?: RemoteImage[] }
   | { type: "set_label"; entryId: string; label?: string };
 type RemotePiCommandEnvelope = { seq: number; deliveryToken: string; localKey?: string; mobileContext?: boolean; command: RemotePiCommand };
 type CommandAck = { seq: number; extensionInstanceId?: string; queueEpoch?: string; deliveryToken: string; status: "accepted_by_pi" | "failed"; error?: string; resultText?: string; commands?: PiCommandInfo[] };
@@ -460,7 +465,7 @@ function safePiCommands(pi: ExtensionAPI): PiCommandInfo[] {
       name: command.name,
       description: command.description,
       source: command.source,
-      sourceInfo: command.sourceInfo as Record<string, unknown> | undefined,
+      sourceInfo: command.sourceInfo as unknown as Record<string, unknown> | undefined,
     }));
 }
 
@@ -505,12 +510,19 @@ function waitForPromptAcceptance(text: string): Promise<void> {
 async function sendUserMessageAndWaitForAcceptance(
   pi: ExtensionAPI,
   text: string,
+  images: RemoteImage[] | undefined,
   deliverAs?: "steer" | "followUp",
 ): Promise<void> {
   const acceptance = waitForPromptAcceptance(text);
+  const content: string | RemoteMessageContent[] = images?.length
+    ? [
+        ...(text ? [{ type: "text" as const, text }] : []),
+        ...images,
+      ]
+    : text;
   try {
-    if (deliverAs) pi.sendUserMessage(text, { deliverAs });
-    else pi.sendUserMessage(text);
+    if (deliverAs) pi.sendUserMessage(content, { deliverAs });
+    else pi.sendUserMessage(content);
   } catch (error) {
     settlePromptAcceptance(text, error instanceof Error ? error : new Error(String(error)));
   }
@@ -522,15 +534,15 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
   switch (command.type) {
     case "send_user_message":
       await injectMobileContext(pi, envelope);
-      await sendUserMessageAndWaitForAcceptance(pi, command.text);
+      await sendUserMessageAndWaitForAcceptance(pi, command.text, command.images);
       return;
     case "follow_up":
       await injectMobileContext(pi, envelope, "followUp");
-      await sendUserMessageAndWaitForAcceptance(pi, command.text, "followUp");
+      await sendUserMessageAndWaitForAcceptance(pi, command.text, command.images, "followUp");
       return;
     case "steer":
       await injectMobileContext(pi, envelope, "steer");
-      await sendUserMessageAndWaitForAcceptance(pi, command.text, "steer");
+      await sendUserMessageAndWaitForAcceptance(pi, command.text, command.images, "steer");
       return;
     case "abort":
       ctx.abort();
@@ -564,6 +576,7 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
     }
     case "set_session_name":
       pi.setSessionName(command.name);
+      send(ctx, { type: "session_info_changed", name: command.name });
       return;
     case "get_commands":
       return { commands: safePiCommands(pi) };
@@ -581,9 +594,9 @@ async function executeRemoteCommand(pi: ExtensionAPI, ctx: ExtensionContext, env
       const expanded = await expandSkillCommand(pi, command.commandLine);
       await injectMobileContext(pi, envelope, command.deliverAs);
       if (command.deliverAs) {
-        await sendUserMessageAndWaitForAcceptance(pi, expanded, command.deliverAs);
+        await sendUserMessageAndWaitForAcceptance(pi, expanded, command.images, command.deliverAs);
       } else {
-        await sendUserMessageAndWaitForAcceptance(pi, expanded);
+        await sendUserMessageAndWaitForAcceptance(pi, expanded, command.images);
       }
       return { resultText: "Queued /" + name + "." };
     }
@@ -824,10 +837,6 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
     send(ctx, { type: "command_list", commands: safePiCommands(pi) });
   });
 
-  pi.on("session_info_changed", async (event, ctx) => {
-    send(ctx, { type: "session_info_changed", name: event.name });
-  });
-
   pi.on("before_agent_start", async (event) => {
     if (!settlePromptAcceptance(event.prompt)) settleAnyPromptAcceptance();
   });
@@ -876,7 +885,7 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
   });
 
   pi.on("tool_execution_end", async (event, ctx) => {
-    send(ctx, { type: "tool_execution_end", toolCallId: event.toolCallId, toolName: event.toolName, args: event.args, result: event.result, isError: event.isError });
+    send(ctx, { type: "tool_execution_end", toolCallId: event.toolCallId, toolName: event.toolName, result: event.result, isError: event.isError });
   });
 
   pi.on("agent_end", async (_event, ctx) => {
@@ -891,25 +900,74 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
 }
 `;
 
-export function lynttyPiExtensionPath(homeDir = os.homedir()): string {
-  return join(homeDir, '.pi', 'agent', 'extensions', 'lyntty', 'index.ts');
+export function lynttyPiExtensionSha256(): string {
+  return createHash('sha256').update(LYNTTY_PI_EXTENSION_SOURCE).digest('hex');
 }
 
-export async function installLynttyPiExtension(homeDir = os.homedir()): Promise<{ path: string; changed: boolean }> {
-  const path = lynttyPiExtensionPath(homeDir);
-  await mkdir(join(homeDir, '.pi', 'agent', 'extensions', 'lyntty'), { recursive: true });
+const KNOWN_PREVIOUS_EXTENSION_SHA256 = new Set([
+  // Last Pi extension shipped before atomic ownership checks were introduced.
+  '83c4971409b1397b574a4a407370928f7731a2765c63923fd4a1189d890a4f19',
+]);
 
-  let current: string | null = null;
+export interface InstallLynttyPiExtensionOptions {
+  homeDir?: string;
+  extensionPath?: string;
+  piAgentDir?: string;
+  replaceUnknown?: boolean;
+  allowedExistingSha256?: readonly string[];
+}
+
+function resolveExtensionPath(options: InstallLynttyPiExtensionOptions): string {
+  const explicitPath = options.extensionPath ?? process.env.LYNTTY_PI_EXTENSION_PATH?.trim();
+  if (explicitPath) return explicitPath;
+  const piAgentDir = options.piAgentDir ?? process.env.PI_CODING_AGENT_DIR?.trim();
+  if (piAgentDir) return join(piAgentDir, 'extensions', 'lyntty', 'index.ts');
+  return join(options.homeDir ?? os.homedir(), '.pi', 'agent', 'extensions', 'lyntty', 'index.ts');
+}
+
+export function lynttyPiExtensionPath(homeDir?: string): string {
+  return resolveExtensionPath(homeDir === undefined ? {} : { homeDir, piAgentDir: '' });
+}
+
+async function readExtension(path: string): Promise<string | null> {
   try {
-    current = await readFile(path, 'utf8');
-  } catch {
-    current = null;
+    return await readFile(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
   }
+}
 
+async function writeExtensionAtomically(path: string): Promise<void> {
+  await writeFileAtomically(path, LYNTTY_PI_EXTENSION_SOURCE, { mode: 0o600 });
+}
+
+export async function installLynttyPiExtension(
+  homeOrOptions: string | InstallLynttyPiExtensionOptions = {},
+): Promise<{ path: string; changed: boolean; previousSha256: string | null }> {
+  const options = typeof homeOrOptions === 'string'
+    ? { homeDir: homeOrOptions, piAgentDir: '' }
+    : homeOrOptions;
+  const path = resolveExtensionPath(options);
+  const current = await readExtension(path);
   if (current === LYNTTY_PI_EXTENSION_SOURCE) {
-    return { path, changed: false };
+    return { path, changed: false, previousSha256: lynttyPiExtensionSha256() };
   }
 
-  await writeFile(path, LYNTTY_PI_EXTENSION_SOURCE, 'utf8');
-  return { path, changed: true };
+  const previousSha256 = current === null
+    ? null
+    : createHash('sha256').update(current).digest('hex');
+  const allowedExisting = new Set([
+    ...KNOWN_PREVIOUS_EXTENSION_SHA256,
+    ...(options.allowedExistingSha256 ?? []),
+  ]);
+  if (current !== null && !options.replaceUnknown && !allowedExisting.has(previousSha256!)) {
+    throw new Error(
+      `Refusing to overwrite an unrecognized Pi extension at ${path}. `
+      + 'Back it up and rerun with --replace-extension if replacement is intentional.',
+    );
+  }
+
+  await writeExtensionAtomically(path);
+  return { path, changed: true, previousSha256 };
 }

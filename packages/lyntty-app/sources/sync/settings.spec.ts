@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { settingsParse, applySettings, settingsDefaults, settingsToSyncPayload, type Settings } from './settings';
+
+const expectAny = (value: unknown) => expect(value as any);
 
 describe('settings', () => {
     describe('settingsParse', () => {
@@ -39,7 +41,7 @@ describe('settings', () => {
                 anotherField: 123
             };
             const result = settingsParse(settingsWithExtra);
-            expect(result).toEqual({
+            expectAny(result).toEqual({
                 ...settingsDefaults,
                 viewInline: true,
                 unknownField: 'some value',
@@ -62,7 +64,7 @@ describe('settings', () => {
                 viewInline: null,
                 someOtherField: undefined
             };
-            expect(settingsParse(settingsWithNull)).toEqual({
+            expectAny(settingsParse(settingsWithNull)).toEqual({
                 ...settingsDefaults,
                 someOtherField: undefined
             });
@@ -78,7 +80,7 @@ describe('settings', () => {
                 }
             };
             const result = settingsParse(settingsWithNested);
-            expect(result).toEqual({
+            expectAny(result).toEqual({
                 ...settingsDefaults,
                 viewInline: false,
                 image: {
@@ -133,7 +135,7 @@ describe('settings', () => {
             const delta: Partial<Settings> = {
                 viewInline: false
             };
-            expect(applySettings(currentSettings, delta)).toEqual({
+            expectAny(applySettings(currentSettings, delta)).toEqual({
                 ...settingsDefaults,
                 viewInline: false,
                 extraField: 'value'
@@ -146,7 +148,7 @@ describe('settings', () => {
                 viewInline: false,
                 newField: 'new value'
             };
-            expect(applySettings(currentSettings, delta)).toEqual({
+            expectAny(applySettings(currentSettings, delta)).toEqual({
                 ...currentSettings,
                 viewInline: false,
                 newField: 'new value'
@@ -162,7 +164,7 @@ describe('settings', () => {
                 viewInline: false,
                 newExtra: 'add me'
             };
-            expect(applySettings(currentSettings, delta)).toEqual({
+            expectAny(applySettings(currentSettings, delta)).toEqual({
                 ...settingsDefaults,
                 viewInline: false,
                 existingExtra: 'keep me',
@@ -181,31 +183,17 @@ describe('settings', () => {
                 showLineNumbersInToolViews: false,
                 wrapLinesInDiffs: true,
                 diffStyle: 'unified',
-                analyticsOptOut: false,
-                inferenceOpenAIKey: null,
                 experiments: false,
                 alwaysShowContextSize: false,
-                agentInputEnterToSend: true,
                 avatarStyle: 'gradient',
-                showFlavorIcons: false,
                 hideInactiveSessions: false,
-                expResumeSession: false,
                 fileDiffsSidebar: false,
                 groupToolCalls: false,
-                expImageUpload: false,
                 sendMobileContextToPi: true,
                 reviewPromptAnswered: false,
                 reviewPromptLikedApp: null,
-                voiceAssistantLanguage: null,
-                voiceCustomAgentId: null,
-                voiceBypassToken: false,
                 preferredLanguage: null,
                 recentMachinePaths: [],
-                lastUsedAgent: null,
-                lastUsedPermissionMode: null,
-                lastUsedModelMode: null,
-                agentDefaultOverrides: {},
-                dismissedCLIWarnings: { perMachine: {}, global: {} },
             });
         });
 
@@ -215,33 +203,29 @@ describe('settings', () => {
         });
     });
 
-    describe('settingsToSyncPayload', () => {
-        it('omits empty agent default overrides', () => {
-            expect(settingsToSyncPayload(settingsDefaults)).not.toHaveProperty('agentDefaultOverrides');
+    describe('retired agent settings', () => {
+        const legacySettings = {
+            ...settingsDefaults,
+            lastUsedAgent: 'legacy-provider',
+            lastUsedPermissionMode: 'unsafe-mode',
+            lastUsedModelMode: 'legacy-model',
+            agentDefaultOverrides: { legacy: { modelMode: 'legacy-model' } },
+        };
+
+        it('drops retired controls while parsing synced settings', () => {
+            const parsed = settingsParse(legacySettings) as Settings & Record<string, unknown>;
+            expect(parsed).not.toHaveProperty('lastUsedAgent');
+            expect(parsed).not.toHaveProperty('lastUsedPermissionMode');
+            expect(parsed).not.toHaveProperty('lastUsedModelMode');
+            expect(parsed).not.toHaveProperty('agentDefaultOverrides');
         });
 
-        it('omits empty per-agent override objects', () => {
-            expect(settingsToSyncPayload({
-                ...settingsDefaults,
-                agentDefaultOverrides: {
-                    codex: {},
-                },
-            })).not.toHaveProperty('agentDefaultOverrides');
-        });
-
-        it('keeps user-selected agent default overrides', () => {
-            const settings = {
-                ...settingsDefaults,
-                agentDefaultOverrides: {
-                    codex: { modelMode: 'gpt-5.4' },
-                },
-            };
-
-            expect(settingsToSyncPayload(settings)).toMatchObject({
-                agentDefaultOverrides: {
-                    codex: { modelMode: 'gpt-5.4' },
-                },
-            });
+        it('does not send retired controls back to the relay', () => {
+            const payload = settingsToSyncPayload(legacySettings as Settings) as Record<string, unknown>;
+            expect(payload).not.toHaveProperty('lastUsedAgent');
+            expect(payload).not.toHaveProperty('lastUsedPermissionMode');
+            expect(payload).not.toHaveProperty('lastUsedModelMode');
+            expect(payload).not.toHaveProperty('agentDefaultOverrides');
         });
     });
 
@@ -274,7 +258,7 @@ describe('settings', () => {
                 viewInline: true
             };
             const result = applySettings(settingsWithFutureFields, delta);
-            expect(result).toEqual({
+            expectAny(result).toEqual({
                 ...settingsDefaults,
                 viewInline: true,
                 futureField1: 'value1',
@@ -346,13 +330,13 @@ describe('settings', () => {
 
             const pendingChanges: Partial<Settings> = {
                 experiments: true,
-                analyticsOptOut: true,
+                hideInactiveSessions: true,
             };
 
             const merged = applySettings(serverSettings, pendingChanges);
 
             expect(merged.experiments).toBe(true);
-            expect(merged.analyticsOptOut).toBe(true);
+            expect(merged.hideInactiveSessions).toBe(true);
             expect(merged.viewInline).toBe(false);
         });
 
@@ -417,41 +401,37 @@ describe('settings', () => {
             const serverSettings = settingsParse({
                 viewInline: false,
                 experiments: false,
-                analyticsOptOut: false
+                hideInactiveSessions: false
             });
 
             const pendingChanges: Partial<Settings> = {
                 viewInline: true,
-                analyticsOptOut: true
+                hideInactiveSessions: true
             };
 
             const merged = applySettings(serverSettings, pendingChanges);
 
             expect(merged.viewInline).toBe(true);
-            expect(merged.analyticsOptOut).toBe(true);
+            expect(merged.hideInactiveSessions).toBe(true);
             expect(merged.experiments).toBe(false);
         });
 
-        it('should preserve complex nested structures during merge', () => {
+        it('should preserve current nested structures during merge', () => {
             const serverSettings = settingsParse({
-                dismissedCLIWarnings: {
-                    perMachine: { 'machine-1': { claude: true } },
-                    global: { codex: true }
-                }
+                recentMachinePaths: [{ machineId: 'machine-a', path: '/repo-a' }],
             });
 
             const pendingChanges: Partial<Settings> = {
                 experiments: true,
-                dismissedCLIWarnings: {
-                    perMachine: { 'machine-2': { claude: true } },
-                    global: {}
-                }
+                recentMachinePaths: [{ machineId: 'machine-b', path: '/repo-b' }],
             };
 
             const merged = applySettings(serverSettings, pendingChanges);
 
             expect(merged.experiments).toBe(true);
-            expect(merged.dismissedCLIWarnings).toEqual(pendingChanges.dismissedCLIWarnings);
+            expect(merged.recentMachinePaths).toEqual([
+                { machineId: 'machine-b', path: '/repo-b' },
+            ]);
         });
     });
 });

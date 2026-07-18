@@ -3,7 +3,7 @@
     {
       "title": "Lyntty Android 1.0.0 (4) — 2026-07-07",
       "summary": "First clean Lyntty Android release line.",
-      "markdown": "## Highlights\n\n- Pi-only mobile control through `lynttyd` and `relay`.\n- Self-hosted relay at `https://relay.jczhang.cc`.\n- GitHub Releases APK update flow through relay `/v1/version`.\n- SHA-256 verification before the Android package installer opens.\n\n## Fixed\n\n- Replaced stale Happy launcher and splash assets with Lyntty assets.\n- Settings now shows native app version and build, for example `1.0.0 (4)`.\n- Replaced inherited Happy changelog text with fixed Lyntty release notes.\n- Session prose uses Source Serif 4 for English and LXGW Neo ZhiSong for Chinese.\n\n## Known gaps\n\n- Physical Android phone end-to-end smoke still needs recording after this build.\n- Backup restore and relay rollback drills remain pending."
+      "markdown": "## Highlights\n\n- Pi-only mobile control through `lynttyd` and `relay`.\n- Self-hosted relay at `https://relay.jczhang.cc`.\n- GitHub Releases APK update flow through relay `/v1/version`.\n- SHA-256 verification before the Android package installer opens.\n\n## Fixed\n\n- Refreshed launcher and splash assets with the current Lyntty identity.\n- Settings now shows native app version and build, for example `1.0.0 (4)`.\n- Standardized the in-app changelog on fixed Lyntty release notes.\n- Session prose uses Source Serif 4 for English and LXGW Neo ZhiSong for Chinese.\n\n## Known gaps\n\n- Physical Android phone end-to-end smoke still needs recording after this build.\n- Backup restore and relay rollback drills remain pending."
     }
   ],
   "latestTitle": "Lyntty Android 1.0.0 (4) — 2026-07-07"

@@ -2,7 +2,7 @@
  * Tests for low-level ripgrep wrapper
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { run } from './index'
 
 describe('ripgrep low-level wrapper', () => {

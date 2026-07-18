@@ -11,8 +11,8 @@ Make GitHub Releases the main Android APK distribution path for personal-use Lyn
 Hard requirements:
 
 - Production package id: `dev.jczhang.lyntty`.
-- Dev/E2E package id: `dev.jczhang.lyntty.dev`.
-- Production APK signed with permanent release keystore, not debug key.
+- Dev package id: `dev.jczhang.lyntty.dev`; Preview/E2E package id: `dev.jczhang.lyntty.preview`.
+- Production APK signed with permanent release keystore, not debug/preview key.
 - APK release workflow manually triggered only.
 - App discovers updates through relay `/v1/version`.
 - APK file lives on GitHub Releases.
@@ -31,7 +31,7 @@ Hard requirements:
 
 Rules:
 
-- Production and dev data are isolated by package id.
+- Production, preview, and development data are isolated by package id.
 - No automatic cross-package data migration.
 - If an old `dev.jczhang.lyntty` exists with different signing key, uninstall it once and reinstall the new production APK.
 
@@ -50,7 +50,7 @@ Rules:
 - Store CI copy in GitHub Secrets as base64 plus passwords.
 - Android background push notifications require a first-party Firebase project for `dev.jczhang.lyntty`.
 - Store `google-services.json` as a base64 GitHub Secret; keep the file out of git.
-- Store the Expo/EAS project id as a GitHub Actions repository variable so `expo-notifications` can request Expo push tokens.
+- Store the Expo project id as a GitHub Actions repository variable so `expo-notifications` can request Expo push tokens.
 - Do not print secret values in CI logs.
 
 GitHub Secrets:
@@ -66,8 +66,11 @@ LYNTTY_GOOGLE_SERVICES_JSON_BASE64
 GitHub Actions Variables:
 
 ```text
-LYNTTY_EAS_PROJECT_ID
+LYNTTY_EXPO_PROJECT_ID
+LYNTTY_ANDROID_CERT_SHA256
 ```
+
+`LYNTTY_ANDROID_CERT_SHA256` is the normalized SHA-256 fingerprint of the permanent production signing certificate. Production config validates the Expo project id as a UUID and never lets a generic `EXPO_PUBLIC_PROJECT_ID` override it. Legacy EAS variables are not accepted.
 
 Manual generation example, only when intentionally creating the permanent key:
 
@@ -94,9 +97,10 @@ Accepted direction: use checked-in `packages/lyntty-app/android/` as release sou
 
 Implemented behavior:
 
-- debug Gradle builds use dev identity (`dev.jczhang.lyntty.dev`) via `applicationIdSuffix`;
-- release Gradle builds use production identity (`dev.jczhang.lyntty`) so EAS credentials reads the correct native package id;
-- production release fails if signing/version properties are missing;
+- `APP_ENV=development` always selects `dev.jczhang.lyntty.dev`;
+- `APP_ENV=preview` always selects `dev.jczhang.lyntty.preview` and the checked-in preview-only signer for debug or release-style validation;
+- `APP_ENV=production` permits explicit Release tasks only, selects `dev.jczhang.lyntty`, and uses the injected permanent release keystore;
+- production release fails if signing/version properties are missing or if the output signer fingerprint differs from `LYNTTY_ANDROID_CERT_SHA256`;
 - production release fails if Firebase `google-services.json` is missing;
 - release signing uses injected keystore only in release workflow.
 
@@ -113,13 +117,11 @@ version_code: "4" # optional; defaults to GitHub workflow run number
 
 Version and release-note rules:
 
-- `versionName`: human version, e.g. `1.0.0`.
-- `versionCode`: GitHub workflow run number by default, or explicit numeric override.
-- Git tag: `android-v<versionName>-<versionCode>`.
-- Top `packages/lyntty-app/CHANGELOG.md` entry is the release-note source of truth.
-- Top changelog title must match `Lyntty Android <versionName> (<versionCode>) — YYYY-MM-DD`.
-- GitHub Release notes use the full top changelog entry.
-- `latest.json.notes` uses the one-line summary under that title.
+- App SemVer comes from `packages/lyntty-app/package.json`.
+- `versionCode` is a separate monotonic Android integer supplied by the candidate run.
+- Compatibility release tags include independent App/CLI/Relay/Wire versions plus the channel sequence.
+- The Android-only workflow is retained as a protected signing/build verification job. It uploads a short-lived candidate and cannot create a GitHub Release.
+- Formal release notes and channel advancement belong to the signed Compatibility BOM promotion.
 
 Build outline:
 
@@ -128,7 +130,9 @@ Build outline:
 printf '%s' "$LYNTTY_ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lyntty-release.jks"
 printf '%s' "$LYNTTY_GOOGLE_SERVICES_JSON_BASE64" | base64 -d > packages/lyntty-app/android/app/google-services.json
 cd packages/lyntty-app/android
-APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
+APP_ENV=production LYNTTY_EXPO_PROJECT_ID="$LYNTTY_EXPO_PROJECT_ID" \
+  ../scripts/gradle-runtime-audit.sh "$RUNNER_TEMP/android-exec-audit.txt" -- \
+  ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
   -x lintVitalAnalyzeRelease \
   -x lintVitalRelease \
   -PreactNativeArchitectures=arm64-v8a \
@@ -143,39 +147,17 @@ APP_ENV=production LYNTTY_EAS_PROJECT_ID="$LYNTTY_EAS_PROJECT_ID" ./gradlew asse
 
 Initial release builds target `arm64-v8a` only to keep GitHub Actions release time bounded for a personal-phone APK. Add more `reactNativeArchitectures` values later if x86 emulator or broader device coverage becomes a release requirement.
 
-Output assets:
+Android verification-candidate assets:
 
 ```text
 lyntty-android-v<versionName>-<versionCode>.apk
-latest.json
+android-artifact.json
+android-exec-audit.txt
+android-apk-audit.txt
+android-production-guard.txt
 ```
 
-GitHub Release:
-
-```text
-android-v<versionName>-<versionCode>
-```
-
-## `latest.json`
-
-Generated by CI, never hand-edited.
-
-Schema:
-
-```json
-{
-  "platform": "android",
-  "appId": "dev.jczhang.lyntty",
-  "versionName": "1.0.0",
-  "versionCode": 4,
-  "apkUrl": "https://github.com/jczhang02/lyntty/releases/download/android-v1.0.0-4/lyntty-android-v1.0.0-4.apk",
-  "sha256": "<hex-sha256>",
-  "notes": "First clean Lyntty Android release line.",
-  "publishedAt": "2026-07-06T00:00:00Z"
-}
-```
-
-`sha256` must be computed from the exact APK asset before upload or from the uploaded artifact bytes.
+Formal promotion publishes that exact APK alongside `compatibility-bom.json`, `compatibility-bom.sig.json`, SPDX SBOM, provenance, and release checksums. The BOM binds package id, `versionCode`, permanent certificate fingerprint, immutable APK URL, SHA-256, and size. See [Compatibility release and support policy](./compatibility-bom.md).
 
 ## Relay `/v1/version`
 
@@ -189,21 +171,25 @@ Content-Type: application/json
   "platform": "android",
   "app_id": "dev.jczhang.lyntty",
   "version": "1.0.0",
-  "version_code": 3
+  "version_code": 3,
+  "release_channel": "stable"
 }
 ```
 
-Planned response:
+Verified response:
 
 ```json
 {
   "update_required": true,
   "version_name": "1.0.0",
   "version_code": 4,
-  "apk_url": "https://github.com/jczhang02/lyntty/releases/download/android-v1.0.0-4/lyntty-android-v1.0.0-4.apk",
-  "update_url": "https://github.com/jczhang02/lyntty/releases/download/android-v1.0.0-4/lyntty-android-v1.0.0-4.apk",
+  "apk_url": "https://github.com/jczhang02/lyntty/releases/download/compat-v1.1.0_1.2.0_1.2.0_0.2.0-s18/lyntty-stable.apk",
+  "update_url": "https://github.com/jczhang02/lyntty/releases/download/compat-v1.1.0_1.2.0_1.2.0_0.2.0-s18/lyntty-stable.apk",
   "sha256": "<hex-sha256>",
-  "notes": "First clean Lyntty Android release line."
+  "release_channel": "stable",
+  "bom_release_id": "compat-v1.1.0_1.2.0_1.2.0_0.2.0-s18",
+  "bom_sequence": 18,
+  "bom_sha256": "<canonical-bom-sha256>"
 }
 ```
 
@@ -211,21 +197,23 @@ Rules:
 
 - Compare Android updates by `version_code`, not only semver.
 - Ignore manifests where `platform !== "android"` or `appId !== "dev.jczhang.lyntty"` for production app.
-- Relay reads `https://github.com/jczhang02/lyntty/releases/latest/download/latest.json` by default.
-- Relay caches manifest briefly, e.g. 5-15 minutes.
-- Env override may point relay at another manifest URL for rollback/testing.
+- Stable reads `LYNTTY_STABLE_BOM_URL`, defaulting to `https://github.com/jczhang02/lyntty/releases/latest/download/compatibility-bom.json`, plus its detached signature.
+- Preview reads only explicit `LYNTTY_PREVIEW_BOM_URL`; it never falls back to Stable.
+- Relay requires `LYNTTY_RELEASE_TRUST_ROOTS`, verifies Ed25519 signature, monotonic sequence, package/certificate pin, Relay repository, and compatibility matrix, then projects Android fields.
+- Stable and Preview caches and highest accepted in-process sequences are separate.
 
 Implemented behavior:
 
-- App sends native application version and Android `version_code` when available.
-- Relay returns snake_case `update_required`, `update_url`, `version_name`, `version_code`, `apk_url`, `sha256`, and `notes`.
+- App sends native application version, Android `version_code`, and a package-bound `release_channel` when available. Legacy production clients without the field are inferred as stable only for `dev.jczhang.lyntty`.
+- Relay returns snake_case `update_required`, `update_url`, `version_name`, `version_code`, `apk_url`, `sha256`, `release_channel`, and verified BOM identity fields.
+- App accepts an update only when the response channel matches its embedded package-bound channel.
 
 ## Expo-only APK install path
 
 Use existing Expo/React Native modules:
 
-- `expo-file-system` / `expo-file-system/legacy`
-- `expo-crypto`
+- `expo-file-system/legacy`
+- Android native `MessageDigest` streaming module
 - `expo-intent-launcher`
 
 Android permission:
@@ -239,12 +227,11 @@ Download and verify flow:
 1. Fetch relay `/v1/version`.
 2. If update exists, show native update banner/action.
 3. Download APK to app cache.
-4. Read downloaded APK bytes.
-5. Compute SHA-256 with `Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, bytes)`.
-6. Compare expected `sha256` from manifest.
-7. If mismatch, delete/ignore APK and do not open installer.
-8. Convert `file://` URI to `content://` via `getContentUriAsync` from `expo-file-system/legacy`.
-9. Start Android intent:
+4. Stream the downloaded APK through Android's native `MessageDigest` module using a fixed 1 MiB buffer; never base64/load the whole APK into the JS heap.
+5. Compare the resulting SHA-256 with expected `sha256` from the manifest.
+6. If mismatch, delete/ignore APK and do not open installer.
+7. Convert `file://` URI to `content://` via `getContentUriAsync` from `expo-file-system/legacy`.
+8. Start Android intent:
 
 ```ts
 await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
@@ -271,32 +258,27 @@ Important limits:
 - Android always shows system install confirmation.
 - App cannot silently install updates.
 - Expo has no reliable first-version preflight for `canRequestPackageInstalls()`, so UX must handle installer failure and provide remediation.
-- Reading full APK into memory is accepted for first version; low-memory failure must show clear error and not open installer.
+- APK verification is native and streaming because universal Preview APKs can exceed the Android JS heap; any hash/open failure must show a clear error and never open the installer.
 
-## EAS relationship
+## Expo push identity
 
-- `EAS Build`: cloud builds native binaries. Not main path.
-- `EAS Update`: OTA JS/assets update. Not native APK update path.
-- `EAS projectId`: still required by Expo push token registration on Android.
-- FCM v1 service-account credentials are uploaded to Expo/EAS for Expo Push Service delivery; they are not stored in GitHub.
+Lyntty does not use EAS Build, Submit, or Update. The Expo project id remains only because Android push-token registration requires that identity. The release workflow embeds `google-services.json` in the APK, but that file does not authorize Expo Push Service delivery. Operators must separately provision the FCM v1 service-account credential for the same Expo project; it stays outside Git and outside the APK.
 
 Lyntty main path:
 
 ```text
-GitHub Actions Gradle build -> GitHub Release APK/latest.json -> relay /v1/version -> app download/hash -> Android Package Installer
+protected candidate build -> signed Compatibility BOM promotion -> Stable/Preview GitHub Release -> relay BOM verification -> app download/hash -> Android Package Installer
 ```
-
-EAS Update may remain secondary for small JS/resource hotfixes if explicitly enabled with the Lyntty EAS project id, but it must not be the core release/update mechanism.
 
 ## Test plan
 
 Unit/focused:
 
 ```bash
-pnpm --filter ./packages/lyntty-app test
-pnpm --filter ./packages/lyntty-app typecheck
-pnpm --filter ./packages/lyntty-relay test
-pnpm --filter ./packages/lyntty-relay typecheck
+bun run --filter lyntty-app test
+bun run --filter lyntty-app typecheck
+bun run --filter lyntty-relay test
+bun run --filter lyntty-relay typecheck
 git diff --check
 ```
 
@@ -304,9 +286,12 @@ Release workflow checks:
 
 - CI decodes keystore and Firebase Android config without logging secrets.
 - Gradle production release fails without required signing/version properties.
-- APK asset exists and hash matches generated `latest.json`.
-- GitHub Release contains both APK and `latest.json`.
-- Production APK can register an Expo push token with `LYNTTY_EAS_PROJECT_ID` and Firebase Android config.
+- A dry-run regression gate rejects both `APP_ENV=production :app:assembleDebug` and ambiguous `:app:build` before packaging.
+- Gradle runs under `strace -f -e execve` with failing `node`, `npm`, `pnpm`, `npx`, and `tsx` sentinels; any Node-family execution fails release.
+- APK package, version, non-debuggable flag, v2 signature, and permanent certificate fingerprint are verified.
+- APK identity and hash match the canonical signed Compatibility BOM.
+- Candidate promotion, not the Android-only workflow, publishes APK, BOM/signature, checksums, SPDX, provenance, and audit summaries.
+- Production APK can register an Expo push token with `LYNTTY_EXPO_PROJECT_ID` and Firebase Android config.
 
 Device/emulator checks:
 
@@ -330,16 +315,16 @@ Device/emulator checks:
 ## Acceptance
 
 - [x] Production APK uses `dev.jczhang.lyntty`.
-- [x] Dev APK uses `dev.jczhang.lyntty.dev`.
+- [x] Dev APK uses `dev.jczhang.lyntty.dev`; Preview uses `dev.jczhang.lyntty.preview`.
 - [x] Production release uses permanent release keystore.
 - [x] Production APK includes Firebase Android config from GitHub Secret for push notifications.
-- [x] Production APK embeds Lyntty EAS project id for Expo push token registration.
-- [x] APK release workflow is manual.
-- [x] `versionCode` is monotonic and included in `latest.json`.
-- [x] `latest.json` is CI-generated.
-- [x] Relay returns planned snake_case update response.
+- [x] Production APK embeds the Lyntty Expo project id for Expo push token registration.
+- [x] APK release workflow is manual and audits production Gradle `execve` for forbidden Node-family runtimes.
+- [x] `versionCode` is monotonic and included in the signed Compatibility BOM.
+- [x] Stable `latest` resolves only a signed non-prerelease BOM; Preview is explicit and never latest.
+- [x] Relay verifies the signed BOM and returns the snake_case update projection.
 - [x] App downloads APK and verifies `sha256` before installer.
 - [x] Hash mismatch blocks install.
 - [x] Android Package Installer confirmation appears.
 - [x] No native updater shim added.
-- [x] EAS Update is not required for native updates.
+- [x] EAS/OTA update surfaces are absent; signed full APKs are the only App update unit.

@@ -15,7 +15,7 @@ import { configuration } from '@/configuration';
 import { startCaffeinate, stopCaffeinate } from '@/utils/caffeinate';
 import packageJson from '../../package.json';
 import { getEnvironmentInfo } from '@/ui/doctor';
-import { spawnLynttyCLI } from '@/utils/spawnLynttyCLI';
+import { currentLynttyShellCommand, spawnLynttyCLI } from '@/utils/spawnLynttyCLI';
 import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedPiCommandBoundary, readPersistedPiCommandOutcomes, readPersistedPiHistoryWatermark, readPersistedSessions, persistPiCommandBoundary, persistPiCommandOutcome, persistPiHistoryWatermark, persistSession } from '@/persistence';
 import type { PersistedSession } from '@/persistence';
 
@@ -24,28 +24,31 @@ import { startDaemonControlServer } from './controlServer';
 import { findBlockedSessionEnvironmentKeys } from './sessionEnvironment';
 import { statSync } from 'fs';
 import { join, resolve } from 'path';
-import { projectPath } from '@/projectPath';
+import { embeddedBuildIdentity } from '@/distribution/embeddedBuild';
+import { runtimeLayout } from '@/distribution/runtimeLayout';
+import { createDaemonHeartbeatState } from './daemonState';
 import { getTmuxUtilities, isTmuxAvailable, parseTmuxSessionIdentifier, formatTmuxSessionIdentifier } from '@/utils/tmux';
 import { expandEnvironmentVariables } from '@/utils/expandEnvVars';
 import { detectCLIAvailability } from '@/utils/detectCLI';
-import { buildResumeLaunch } from '@/resume/handleResumeCommand';
-import { detectResumeSupport } from '@/resume/localLynttyAgentAuth';
+import { detectResumeSupport } from '@/resume/localRemoteAuth';
 import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
-import { resolveActivePiSessionReuse, resolvePiActivationLock } from './activationLock';
+import { resolveActivePiSessionReuse, resolvePiActivationLock, shouldKeepWaitingForPiExtension } from './activationLock';
 import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
 import { discoverLocalPiSessions, discoverLocalPiSessionsPage, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
 import { mapPiSessionHistoryPageToEnvelopes, mapPiSessionHistoryToEnvelopes } from '@/pi/runPiHistory';
 import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalMirror';
 import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
 import { PiSessionProtocolMapper } from '@/pi/runPiSessionProtocol';
-import { createEnvelope, type SessionEnvelope } from 'lyntty-wire';
-import { isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiCommandInfo, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
+import { CURRENT_WIRE_OFFER, createEnvelope, type SessionEnvelope } from 'lyntty-wire';
+import { attachImagesToPiRemoteCommand, isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiCommandInfo, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
 import { consumePiCompletionNotificationDecision, PiCompletionNotificationTracker, sendPiDoneNotification } from '@/pi/piCompletionNotifications';
 import { applyPiCommandFailure, isStalePiCommandAck, removeTerminalPiCommandPrefix, resolvePiCommandAdmission, selectNextQueuedPiCommand } from './piCommandQueue';
 import { PiActivationLeaseRegistry } from './activationLeaseRegistry';
 import { isExternalPiMirrorActive, resolveExternalPiActivationLease, resolveStalePiMirrorCleanup } from './externalPiActivation';
 import { applyPiExtensionSequence } from './piExtensionSequence';
 import { claimPiExtensionInstance, isPiExtensionCommandOwner } from './piExtensionOwnership';
+import { bindPiRemoteInput, type PiRemoteImage } from '@/pi/piRemoteInput';
+import { resolvePiSessionDisplayName } from '@/pi/piSessionDisplayName';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -154,13 +157,16 @@ async function findPiSessionNearDirectory(sessionId: string, directory?: string,
   return machineSessions.find((session) => session.id === sessionId);
 }
 
+const distributionLayout = runtimeLayout();
+
 export const initialMachineMetadata: MachineMetadata = {
   host: os.hostname() + hostSuffix,
   platform: os.platform(),
   lynttyCliVersion: packageJson.version,
   homeDir: os.homedir(),
   lynttyHomeDir: configuration.lynttyHomeDir,
-  lynttyLibDir: projectPath(),
+  lynttyLibDir: distributionLayout.libraryDir,
+  wire: CURRENT_WIRE_OFFER,
   cliAvailability: detectCLIAvailability(),
   resumeSupport: { ...detectResumeSupport(), rpcAvailable: true },
 };
@@ -347,7 +353,7 @@ export async function startDaemon(): Promise<void> {
   if (!runningDaemonVersionMatches) {
     // TODO: This hand-rolled self-restart path is awkward to reason about and awkward to test.
     // We should probably migrate this daemon to native system service management
-    // (launchd/systemd, similar to OpenClaw's model), so startup/start-at-login and upgrades
+    // (launchd/systemd), so startup/start-at-login and upgrades
     // are owned by the OS instead of by the daemon trying to replace itself in-process.
     logger.debug('[DAEMON RUN] Daemon version mismatch detected, restarting daemon with current CLI version');
     await stopDaemon();
@@ -598,6 +604,12 @@ export async function startDaemon(): Promise<void> {
       const activationLeaseKey = `${targetMachineId}:${sessionId ?? `cwd:${directory}`}`;
       return piActivationLeases.run(activationLeaseKey, async () => {
         try {
+        if (shouldKeepWaitingForPiExtension(sessionId, options.takeoverChoice)) {
+          return {
+            type: 'error',
+            errorMessage: 'Waiting for Pi extension. No replacement runtime was started.',
+          };
+        }
         const externalActivation = await resolveExternalPiActivation(spawnOptions);
         if (externalActivation.type === 'reuse') {
           logger.debug(`[DAEMON RUN] Reusing extension-backed Pi runtime ${externalActivation.sessionId} for Pi session ${sessionId}`);
@@ -653,18 +665,7 @@ export async function startDaemon(): Promise<void> {
           pidToTrackedSession.delete(activationLock.activePid);
         }
 
-        // Build environment variables for session spawning
-        // Authentication tokens are resolved here
-
-        // Resolve authentication token if provided
-        const authEnv: Record<string, string> = {};
-        if (options.token) {
-          return {
-            type: 'error',
-            errorMessage: 'Lyntty pi runtime does not accept external agent tokens.',
-          };
-        }
-
+        // Build environment variables for the managed Pi session.
         const blockedEnvironmentKeys = findBlockedSessionEnvironmentKeys(options.environmentVariables);
         if (blockedEnvironmentKeys.length > 0) {
           return {
@@ -674,7 +675,6 @@ export async function startDaemon(): Promise<void> {
         }
 
         let extraEnv: Record<string, string> = {
-          ...authEnv,
           ...(options.environmentVariables ?? {}),
           // Managed SDK runtime owns relay command delivery; disable the global
           // ordinary-TUI extension in that child to prevent double consumption.
@@ -682,22 +682,6 @@ export async function startDaemon(): Promise<void> {
         };
         if (options.sessionId) {
           extraEnv.LYNTTY_PI_SESSION_ID = options.sessionId;
-        }
-        if (options.parentSessionId) {
-          extraEnv.LYNTTY_FORKED_FROM_SESSION_ID = options.parentSessionId;
-        }
-        if (options.forkedFromMessageId) {
-          extraEnv.LYNTTY_FORKED_FROM_MESSAGE_ID = options.forkedFromMessageId;
-        }
-        // For fork: spawned Lyntty CLI needs to know which Claude JSONL to
-        // backfill into the fresh Lyntty session row. Without this, the
-        // SDK reads the JSONL silently as context but never re-emits the
-        // historical messages, so the app shows an empty chat.
-        if (options.resumeClaudeSessionId) {
-          extraEnv.LYNTTY_FORK_CLAUDE_SESSION_ID = options.resumeClaudeSessionId;
-        }
-        if (options.resumeCodexThreadId) {
-          extraEnv.LYNTTY_FORK_CODEX_THREAD_ID = options.resumeCodexThreadId;
         }
         logger.debug(`[DAEMON RUN] Environment variable keys (before expansion) (${Object.keys(extraEnv).length}): ${Object.keys(extraEnv).join(', ')}`);
 
@@ -762,10 +746,10 @@ export async function startDaemon(): Promise<void> {
 
           const tmux = getTmuxUtilities(tmuxSessionName);
 
-          // Construct command for the CLI
-          const cliPath = join(projectPath(), 'dist', 'index.mjs');
+          // Construct a runtime-free command for release binaries. Source
+          // development still resolves through Bun's generated dist entrypoint.
           const agent = 'pi';
-          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --lyntty-starting-mode remote --started-by daemon`;
+          const fullCommand = currentLynttyShellCommand([agent, '--started-by', 'daemon']);
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:
@@ -855,7 +839,6 @@ export async function startDaemon(): Promise<void> {
           const agentCommand = 'pi';
           const args = [
             agentCommand,
-            '--lyntty-starting-mode', 'remote',
             '--started-by', 'daemon'
           ];
 
@@ -926,7 +909,7 @@ export async function startDaemon(): Promise<void> {
         pid: lynttyProcess.pid,
         childProcess: lynttyProcess,
         directory: cwd,
-        agent: args[0] === 'pi' ? 'pi' : (args[0] === 'codex' ? 'codex' : (args[0] === 'gemini' ? 'gemini' : (args[0] === 'openclaw' ? 'openclaw' : 'claude'))),
+        agent: 'pi',
         directoryCreated,
         message,
       };
@@ -1150,7 +1133,11 @@ export async function startDaemon(): Promise<void> {
       sendRemoteCommandNotice(mirror, reason);
     };
 
-    const queueRemotePiCommand = (mirror: ExternalPiMirrorState, message: { localKey?: string; content: { text: string }; meta?: { sentFrom?: string; sendMobileContextToPi?: boolean } }): void => {
+    const queueRemotePiCommand = (
+      mirror: ExternalPiMirrorState,
+      message: { localKey?: string; content: { text: string }; meta?: { sentFrom?: string; sendMobileContextToPi?: boolean } },
+      images: PiRemoteImage[],
+    ): void => {
       const localKey = message.localKey ?? `remote:${mirror.nextCommandSeq}`;
       const admission = resolvePiCommandAdmission({
         queuedCount: mirror.commands.length,
@@ -1165,12 +1152,16 @@ export async function startDaemon(): Promise<void> {
         markRemotePiCommandFailed(mirror, localKey, 'Pi command queue is full. Message was not delivered; retry after the queued commands finish.');
         return;
       }
-      const command = parseLynttyPiRemoteCommand(message.content.text, { isStreaming: mirror.isStreaming });
-      if (!command) {
+      const parsedCommand = parseLynttyPiRemoteCommand(message.content.text, {
+        isStreaming: mirror.isStreaming,
+        hasImages: images.length > 0,
+      });
+      if (!parsedCommand) {
         logger.debug('[pi] Rejected unsupported remote Pi command', { sessionId: mirror.sessionId, localKey });
         markRemotePiCommandFailed(mirror, localKey, remoteCommandRejectionText(message.content.text));
         return;
       }
+      const command = attachImagesToPiRemoteCommand(parsedCommand, images);
       if (command.type === 'abort') {
         mirror.completionNotifications.suppressCurrentTurn();
       }
@@ -1453,85 +1444,26 @@ export async function startDaemon(): Promise<void> {
       };
     };
 
-    const fetchServerSessionMetadata = async (sessionId: string, encryptionKey: Uint8Array, encryptionVariant: 'legacy' | 'dataKey'): Promise<Metadata | null> => {
-      try {
-        const response = await axios.get(`${configuration.serverUrl}/v1/sessions`, {
-          headers: { Authorization: `Bearer ${credentials.token}` },
-          timeout: 10_000,
-        });
-        const sessions = (response.data as { sessions: { id: string; metadata: string }[] }).sessions;
-        const matched = sessions.find(s => s.id === sessionId);
-        if (!matched) return null;
-        const decrypted = decrypt(encryptionKey, encryptionVariant, decodeBase64(matched.metadata));
-        return decrypted as Metadata | null;
-      } catch (error) {
-        logger.debug(`[DAEMON RUN] Failed to fetch session metadata from server: ${error instanceof Error ? error.message : error}`);
-        return null;
+    const resumeSession = async (lynttySessionId: string): Promise<SpawnSessionResult> => {
+      const tracked = findTrackedSessionById(lynttySessionId);
+      if (!tracked) {
+        return { type: 'error', errorMessage: `Session ${lynttySessionId} is not tracked by this daemon or belongs to another machine.` };
       }
-    };
-
-    const resumeSession = async (lynttySessionId: string, options?: { model?: string; permissionMode?: string }): Promise<SpawnSessionResult> => {
-      try {
-        const tracked = findTrackedSessionById(lynttySessionId);
-        if (!tracked) {
-          return { type: 'error', errorMessage: `Session ${lynttySessionId} is not tracked by this daemon. It may have been started before the daemon or on another machine.` };
-        }
-        if (!tracked.lynttySessionMetadataFromLocalWebhook) {
-          return { type: 'error', errorMessage: `Session ${lynttySessionId} has no metadata. Cannot resume.` };
-        }
-        if (!tracked.encryption) {
-          return { type: 'error', errorMessage: `Session ${lynttySessionId} has no stored encryption data. It was likely started before this feature was available. Restart the daemon and start a new session to enable resume.` };
-        }
-
-        // Webhook metadata may be stale (missing claudeSessionId/codexThreadId set after startup).
-        // Fetch fresh metadata from server if needed.
-        let metadata = tracked.lynttySessionMetadataFromLocalWebhook;
-        const needsFetch = (!metadata.claudeSessionId && (!metadata.flavor || metadata.flavor === 'claude'))
-          || (!metadata.codexThreadId && metadata.flavor === 'codex');
-        if (needsFetch) {
-          logger.debug(`[DAEMON RUN] Session ${lynttySessionId} missing agent session ID in webhook metadata, fetching from server`);
-          const serverMetadata = await fetchServerSessionMetadata(lynttySessionId, tracked.encryption.encryptionKey, tracked.encryption.encryptionVariant);
-          if (serverMetadata) {
-            metadata = serverMetadata;
-            tracked.lynttySessionMetadataFromLocalWebhook = serverMetadata;
-          }
-        }
-
-        const launch = buildResumeLaunch(
-          { id: lynttySessionId, active: true, metadata },
-          { startedBy: 'daemon', claudeStartingMode: 'remote' },
-        );
-
-        if (options?.model) {
-          launch.args.push('--model', options.model);
-        }
-        if (options?.permissionMode) {
-          launch.args.push('--permission-mode', options.permissionMode);
-        }
-
-        await fs.access(launch.cwd);
-
-        return spawnTrackedLynttyProcess({
-          args: launch.args,
-          cwd: launch.cwd,
-          env: {
-            ...process.env,
-            LYNTTY_RECONNECT_SESSION_ID: lynttySessionId,
-            LYNTTY_RECONNECT_ENCRYPTION_KEY: encodeBase64(tracked.encryption.encryptionKey),
-            LYNTTY_RECONNECT_ENCRYPTION_VARIANT: tracked.encryption.encryptionVariant,
-            LYNTTY_RECONNECT_SEQ: String(tracked.encryption.seq),
-            LYNTTY_RECONNECT_METADATA_VERSION: String(tracked.encryption.metadataVersion),
-            LYNTTY_RECONNECT_AGENT_STATE_VERSION: String(tracked.encryption.agentStateVersion),
-          },
-        });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : (error && typeof error === 'object' ? JSON.stringify(error) : String(error));
-        logger.debug(`[DAEMON RUN] Failed to resume session: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
-        return {
-          type: 'error',
-          errorMessage: `Failed to resume session: ${errorMessage}`,
-        };
+      const metadata = tracked.lynttySessionMetadataFromLocalWebhook;
+      if (!metadata || metadata.flavor !== 'pi' || !metadata.piSessionId) {
+        return { type: 'error', errorMessage: `Session ${lynttySessionId} is not a resumable Pi session.` };
       }
+
+      // Re-enter the same activation lease and extension-owner checks as a normal
+      // Pi spawn. Without an explicit takeover this can only reuse an active
+      // runtime; it must never start a duplicate SDK runtime behind a Pi TUI.
+      return spawnSession({
+        directory: metadata.path || tracked.directory || process.cwd(),
+        sessionId: metadata.piSessionId,
+        machineId,
+        agent: 'pi',
+        approvedNewDirectoryCreation: false,
+      });
     };
 
     // Stop a session by sessionId or PID fallback
@@ -1644,19 +1576,21 @@ export async function startDaemon(): Promise<void> {
     });
 
     // Capture the bundled CLI's mtime at startup so the heartbeat can detect
-    // when npm replaces `dist/index.mjs` on disk (= the user ran `npm i -g lyntty`).
+    // when an installed development bundle is replaced on disk.
     // We previously compared disk `package.json.version` to our bundled version,
     // but that produced infinite restart loops (#1107) when the manifest version
     // diverged from the bundled version (e.g. `lyntty-coder@0.13.1` deprecation
     // stub bumped package.json without rebuilding dist). File mtime is a more
     // reliable signal: it only changes when the bundle is actually replaced.
-    const bundlePath = join(projectPath(), 'dist', 'index.mjs');
+    const bundlePath = join(distributionLayout.libraryDir, 'dist', 'index.mjs');
     let initialBundleMtimeMs = 0;
-    try {
-      initialBundleMtimeMs = statSync(bundlePath).mtimeMs;
-    } catch {
-      // dist/index.mjs not present (e.g. dev mode via tsx) — skip upgrade detection.
-      logger.debug(`[DAEMON RUN] Bundle at ${bundlePath} not found; self-restart on upgrade disabled`);
+    if (!distributionLayout.compiled) {
+      try {
+        initialBundleMtimeMs = statSync(bundlePath).mtimeMs;
+      } catch {
+        // dist/index.mjs not present (e.g. dev mode via Bun) — skip upgrade detection.
+        logger.debug(`[DAEMON RUN] Bundle at ${bundlePath} not found; self-restart on upgrade disabled`);
+      }
     }
 
     // Prepare initial daemon state
@@ -1680,12 +1614,14 @@ export async function startDaemon(): Promise<void> {
 
     // Publish readiness only after relay machine registration and all callbacks
     // that depend on `machine` can run safely.
+    const releaseId = embeddedBuildIdentity().releaseId;
     const fileState: DaemonLocallyPersistedState = {
       pid: process.pid,
       httpPort: controlPort,
       piExtensionToken,
       startTime: new Date().toLocaleString(),
       startedWithCliVersion: packageJson.version,
+      ...(releaseId ? { startedWithReleaseId: releaseId } : {}),
       daemonLogPath: logger.logFilePath,
     };
     writeDaemonState(fileState);
@@ -1703,7 +1639,8 @@ export async function startDaemon(): Promise<void> {
 
       const local = await findPiSessionNearDirectory(piSessionId, options.directory, options.sessionFile);
       if (!local && !options.sessionFile) {
-        return { type: 'error' as const, errorMessage: `Pi session ${piSessionId} was not found on this node` };
+        logger.warn('[pi] Requested session was not found on this node', { piSessionId });
+        return { type: 'error' as const, errorMessage: 'This Pi session was not found on this node.' };
       }
 
       const sessionFile = local?.path ?? options.sessionFile;
@@ -1718,8 +1655,8 @@ export async function startDaemon(): Promise<void> {
         machineId: machine.id,
         homeDir: os.homedir(),
         lynttyHomeDir: configuration.lynttyHomeDir,
-        lynttyLibDir: projectPath(),
-        lynttyToolsDir: join(projectPath(), 'tools', 'unpacked'),
+        lynttyLibDir: distributionLayout.libraryDir,
+        lynttyToolsDir: distributionLayout.toolsDir,
         startedFromDaemon: true,
         hostPid: process.pid,
         startedBy: 'daemon',
@@ -1730,7 +1667,7 @@ export async function startDaemon(): Promise<void> {
         sharedControlEnabled: true,
         flavor: 'pi',
         piSessionId,
-        name: local?.name ?? local?.firstMessage ?? piSessionId,
+        name: resolvePiSessionDisplayName(local?.name, local?.firstMessage),
         piMessageCount: local?.messageCount ?? 0,
         piFirstMessage: local?.firstMessage,
         piHistoryCursor: page.nextCursor,
@@ -1964,8 +1901,16 @@ export async function startDaemon(): Promise<void> {
           recentAcceptedRemoteCommands: [],
         };
         externalPiMirrors.set(mirrorKey, mirrorState);
-        sessionClient.onUserMessage((message) => {
-          queueRemotePiCommand(mirrorState!, message);
+        bindPiRemoteInput(sessionClient, ({ message, images }) => {
+          queueRemotePiCommand(mirrorState!, message, images);
+        }, (error) => {
+          logger.warn('[pi] Failed to prepare terminal Pi attachments', {
+            sessionId: response.id,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          });
+        }, ({ message, reason }) => {
+          const localKey = message.localKey ?? `rejected:${randomUUID()}`;
+          markRemotePiCommandFailed(mirrorState!, localKey, reason);
         });
         sessionClient.rpcHandlerManager.registerHandler('killSession', async () => {
           const state = mirrorState;
@@ -2315,8 +2260,8 @@ export async function startDaemon(): Promise<void> {
         }
       }
 
-      // Check if daemon needs update by detecting whether `dist/index.mjs` was
-      // replaced on disk since the daemon started (npm install rewrites the file).
+      // Check if the daemon needs a development restart by detecting whether
+      // `dist/index.mjs` was replaced on disk since startup.
       // Skip if we never captured an initial mtime (dev mode).
       let bundleReplaced = false;
       if (initialBundleMtimeMs > 0) {
@@ -2369,15 +2314,14 @@ export async function startDaemon(): Promise<void> {
 
       // Heartbeat
       try {
-        const updatedState: DaemonLocallyPersistedState = {
+        const updatedState = createDaemonHeartbeatState({
+          initialState: fileState,
           pid: process.pid,
           httpPort: controlPort,
           piExtensionToken,
-          startTime: fileState.startTime,
-          startedWithCliVersion: packageJson.version,
-          lastHeartbeat: new Date().toLocaleString(),
-          daemonLogPath: fileState.daemonLogPath
-        };
+          cliVersion: packageJson.version,
+          heartbeat: new Date().toLocaleString(),
+        });
         writeDaemonState(updatedState);
         if (process.env.DEBUG) {
           logger.debug(`[DAEMON RUN] Health check completed at ${updatedState.lastHeartbeat}`);

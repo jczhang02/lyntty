@@ -1,4 +1,6 @@
 import { onShutdown } from "@/utils/shutdown";
+import packageJson from "../../../package.json";
+import { negotiateSocketWireOffer } from './socket/wireCompatibility';
 import { Fastify } from "./types";
 import { buildMachineActivityEphemeral, ClientConnection, eventRouter } from "@/app/events/eventRouter";
 import { Server } from "socket.io";
@@ -8,13 +10,10 @@ import { log } from "@/utils/log";
 import { auth } from "@/app/auth/auth";
 import { isClientTypeAllowedByToken } from "@/app/auth/authScope";
 import { getMetricsLabelsFromSocket, redisStreamLagMsGauge, websocketConnectionsGauge, websocketEventsCounter } from "../monitoring/metrics2";
-import { usageHandler } from "./socket/usageHandler";
 import { rpcHandler } from "./socket/rpcHandler";
 import { pingHandler } from "./socket/pingHandler";
 import { sessionUpdateHandler } from "./socket/sessionUpdateHandler";
 import { machineUpdateHandler } from "./socket/machineUpdateHandler";
-import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
-import { accessKeyHandler } from "./socket/accessKeyHandler";
 import { db } from "@/storage/db";
 
 const MAX_VISIBLE_SESSION_ID_LENGTH = 512;
@@ -164,11 +163,22 @@ export function startSocket(app: Fastify) {
             }
         }
 
+        const explicitWireOffer = socket.handshake.auth.wire;
+        const { decision: wireCompatibility, legacyPeer } = negotiateSocketWireOffer(explicitWireOffer);
+        if (!wireCompatibility.compatible) {
+            log({ module: 'websocket' }, `Wire compatibility rejected: ${wireCompatibility.details}`);
+            next(new Error(`Wire compatibility rejected: ${wireCompatibility.reason}`));
+            return;
+        }
+
         socket.data.userId = verified.userId;
         socket.data.clientType = clientType;
         socket.data.authExtras = verified.extras;
         socket.data.sessionId = sessionId;
         socket.data.machineId = machineId;
+        socket.data.wireCompatibility = wireCompatibility;
+        socket.data.legacyWirePeer = legacyPeer;
+        socket.data.component = socket.handshake.auth.component;
         socket.data.lynttyClient = socket.handshake.auth.lynttyClient as string
             || socket.handshake.headers['x-lyntty-client'] as string
             || undefined;
@@ -183,6 +193,11 @@ export function startSocket(app: Fastify) {
         const labels = getMetricsLabelsFromSocket(socket);
 
         log({ module: 'websocket' }, `Token verified: ${userId}, clientType: ${clientType || 'user-scoped'}, client: ${labels.client}, sessionId: ${sessionId || 'none'}, machineId: ${machineId || 'none'}, socketId: ${socket.id}`);
+        socket.emit('wire-negotiated', {
+            ...socket.data.wireCompatibility,
+            legacyPeer: socket.data.legacyWirePeer,
+            relay: { kind: 'relay', version: packageJson.version },
+        });
 
         // Store connection based on type
         const metadata = { clientType: clientType || 'user-scoped', sessionId, machineId };
@@ -293,12 +308,9 @@ export function startSocket(app: Fastify) {
 
         // Handlers
         rpcHandler(userId, socket, io);
-        usageHandler(userId, socket);
         sessionUpdateHandler(userId, socket, connection);
         pingHandler(socket);
         machineUpdateHandler(userId, socket, connection);
-        artifactUpdateHandler(userId, socket);
-        accessKeyHandler(userId, socket, connection);
 
         // Ready
         log({ module: 'websocket' }, `User connected: ${userId}`);

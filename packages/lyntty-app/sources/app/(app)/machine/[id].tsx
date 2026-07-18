@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl, Platform, Pressable, TextInput } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, Pressable, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Item } from '@/components/Item';
 import { ItemGroup } from '@/components/ItemGroup';
@@ -8,7 +8,15 @@ import { Typography } from '@/constants/Typography';
 import { useSessions, useAllMachines, useMachine } from '@/sync/storage';
 import { Ionicons, Octicons } from '@expo/vector-icons';
 import type { Session } from '@/sync/storageTypes';
-import { machineStopDaemon, machineUpdateMetadata, machineDelete, machineListPiSessions, type PiMachineSessionRecord } from '@/sync/ops';
+import {
+    machineDelete,
+    machineEnsurePiSessionMirror,
+    machineListPiSessions,
+    machineSpawnNewSession,
+    machineStopDaemon,
+    machineUpdateMetadata,
+    type PiMachineSessionRecord,
+} from '@/sync/ops';
 import { Modal } from '@/modal';
 import { shouldShowPiDiscoveredRecord } from '@/sync/piDiscoveredSessions';
 import { formatPathRelativeToHome, getSessionName, getSessionSubtitle } from '@/utils/sessionUtils';
@@ -17,7 +25,6 @@ import { sync } from '@/sync/sync';
 import { useUnistyles, StyleSheet } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
-import { machineSpawnNewSession } from '@/sync/ops';
 import { resolveAbsolutePath } from '@/utils/pathUtils';
 import { MultiTextInput, type MultiTextInputHandle } from '@/components/MultiTextInput';
 
@@ -38,7 +45,7 @@ const styles = StyleSheet.create((theme) => ({
         minHeight: 44,
         position: 'relative',
         paddingHorizontal: 12,
-        paddingVertical: Platform.select({ web: 10, ios: 8, default: 10 }) as any,
+        paddingVertical: 10,
     },
     inlineSendButton: {
         position: 'absolute',
@@ -55,11 +62,7 @@ const styles = StyleSheet.create((theme) => ({
     },
     inlineSendInactive: {
         // Use a darker neutral in light theme to avoid blending into input
-        backgroundColor: Platform.select({
-            ios: theme.colors.permissionButton?.inactive?.background ?? theme.colors.surfaceHigh,
-            android: theme.colors.permissionButton?.inactive?.background ?? theme.colors.surfaceHigh,
-            default: theme.colors.permissionButton?.inactive?.background ?? theme.colors.surfaceHigh,
-        }) as any,
+        backgroundColor: theme.colors.permissionButton?.inactive?.background ?? theme.colors.surfaceHigh,
     },
 }));
 
@@ -116,16 +119,16 @@ export default function MachineDetailScreen() {
 
     // Determine daemon status from metadata
     const daemonStatus = useMemo(() => {
-        if (!machine) return 'unknown';
+        if (!machine) return 'offline';
 
         // Check metadata for daemon status
         const metadata = machine.metadata as any;
         if (metadata?.daemonLastKnownStatus === 'shutting-down') {
-            return 'stopped';
+            return 'offline';
         }
 
         // Use machine online status as proxy for daemon status
-        return isMachineOnline(machine) ? 'likely alive' : 'stopped';
+        return isMachineOnline(machine) ? 'online' : 'offline';
     }, [machine]);
 
     const handleStopDaemon = async () => {
@@ -318,24 +321,20 @@ export default function MachineDetailScreen() {
             return;
         }
 
-        if (!piSession.cwd) {
-            Modal.alert(t('common.error'), t('appWide.piSessionHasNoWorkingDirectoryOnThisMachine'));
-            return;
-        }
-
         setIsSpawning(true);
         try {
-            const result = await machineSpawnNewSession({
+            // A discovered computer-side Pi session is first attached to its
+            // canonical relay identity. Never start a second runtime here.
+            const result = await machineEnsurePiSessionMirror({
                 machineId,
+                piSessionId: piSession.piSessionId,
                 directory: piSession.cwd,
-                sessionId: piSession.piSessionId,
-                agent: 'pi',
-                approvedNewDirectoryCreation: true,
             });
             if (result.type === 'success') {
+                await sync.refreshSessions();
                 router.back();
                 navigateToSession(result.sessionId);
-            } else if (result.type === 'error') {
+            } else {
                 Modal.alert(t('common.error'), result.errorMessage);
             }
         } finally {
@@ -344,12 +343,11 @@ export default function MachineDetailScreen() {
     }, [machineId, machine, navigateToSession, router]);
 
     const piSessionTitle = useCallback((piSession: PiMachineSessionRecord) => {
-        return piSession.name?.trim() || piSession.piSessionId;
+        return piSession.name?.trim() || piSession.firstMessage?.trim() || t('appWide.session');
     }, []);
 
     const piSessionSubtitle = useCallback((piSession: PiMachineSessionRecord) => {
         const bits = [
-            piSession.state === 'history_gap' || piSession.state === 'missing_local_history' ? undefined : piSession.state,
             piSession.cwd ? formatPathRelativeToHome(piSession.cwd, machine?.metadata?.homeDir) : undefined,
             `${piSession.messageCount} messages`,
         ];
@@ -529,19 +527,19 @@ export default function MachineDetailScreen() {
                 <ItemGroup title={t('machine.daemon')}>
                         <Item
                             title={t('machine.status')}
-                            detail={daemonStatus}
+                            detail={t(`status.${daemonStatus}`)}
                             detailStyle={{
-                                color: daemonStatus === 'likely alive' ? '#34C759' : '#FF9500'
+                                color: daemonStatus === 'online' ? '#34C759' : '#FF9500'
                             }}
                             showChevron={false}
                         />
                         <Item
                             title={t('machine.stopDaemon')}
                             titleStyle={{
-                                color: daemonStatus === 'stopped' ? '#999' : '#FF9500'
+                                color: daemonStatus === 'offline' ? '#999' : '#FF9500'
                             }}
-                            onPress={daemonStatus === 'stopped' ? undefined : handleStopDaemon}
-                            disabled={isStoppingDaemon || daemonStatus === 'stopped'}
+                            onPress={daemonStatus === 'offline' ? undefined : handleStopDaemon}
+                            disabled={isStoppingDaemon || daemonStatus === 'offline'}
                             rightElement={
                                 isStoppingDaemon ? (
                                     <ActivityIndicator size="small" color={theme.colors.textSecondary} />
@@ -549,45 +547,10 @@ export default function MachineDetailScreen() {
                                     <Ionicons
                                         name="stop-circle"
                                         size={20}
-                                        color={daemonStatus === 'stopped' ? '#999' : '#FF9500'}
+                                        color={daemonStatus === 'offline' ? '#999' : '#FF9500'}
                                     />
                                 )
                             }
-                        />
-                        {machine.daemonState && (
-                            <>
-                                {machine.daemonState.pid && (
-                                    <Item
-                                        title={t('machine.lastKnownPid')}
-                                        subtitle={String(machine.daemonState.pid)}
-                                        subtitleStyle={{ fontFamily: 'Menlo', fontSize: 13 }}
-                                    />
-                                )}
-                                {machine.daemonState.httpPort && (
-                                    <Item
-                                        title={t('machine.lastKnownHttpPort')}
-                                        subtitle={String(machine.daemonState.httpPort)}
-                                        subtitleStyle={{ fontFamily: 'Menlo', fontSize: 13 }}
-                                    />
-                                )}
-                                {machine.daemonState.startTime && (
-                                    <Item
-                                        title={t('machine.startedAt')}
-                                        subtitle={new Date(machine.daemonState.startTime).toLocaleString()}
-                                    />
-                                )}
-                                {machine.daemonState.startedWithCliVersion && (
-                                    <Item
-                                        title={t('machine.cliVersion')}
-                                        subtitle={machine.daemonState.startedWithCliVersion}
-                                        subtitleStyle={{ fontFamily: 'Menlo', fontSize: 13 }}
-                                    />
-                                )}
-                            </>
-                        )}
-                        <Item
-                            title={t('machine.daemonStateVersion')}
-                            subtitle={String(machine.daemonStateVersion)}
                         />
                 </ItemGroup>
 
@@ -602,11 +565,6 @@ export default function MachineDetailScreen() {
                                     {metadata.cliAvailability.pi ? t('machine.cliInstalled') : t('machine.cliNotFound')}
                                 </Text>
                             }
-                        />
-                        <Item
-                            title={t('machine.lastDetected')}
-                            subtitle={new Date(metadata.cliAvailability.detectedAt).toLocaleString()}
-                            showChevron={false}
                         />
                     </ItemGroup>
                 )}
@@ -658,7 +616,7 @@ export default function MachineDetailScreen() {
 
                 {/* Previous Sessions (relay cache) */}
                 {previousSessions.length > 0 && (
-                    <ItemGroup title={t('appWide.relaySessionsUpTo5MostRecent')}>
+                    <ItemGroup title={t('sessionHistory.title')}>
                         {previousSessions.map(session => (
                             <Item
                                 key={session.id}
@@ -675,45 +633,17 @@ export default function MachineDetailScreen() {
                 <ItemGroup title={t('machine.machineGroup')}>
                         <Item
                             title={t('machine.host')}
-                            subtitle={metadata?.host || machineId}
+                            subtitle={metadata?.host || t('status.unknown')}
                         />
-                        <Item
-                            title={t('machine.machineId')}
-                            subtitle={machineId}
-                            subtitleStyle={{ fontFamily: 'Menlo', fontSize: 12 }}
-                        />
-                        {metadata?.username && (
-                            <Item
-                                title={t('machine.username')}
-                                subtitle={metadata.username}
-                            />
-                        )}
-                        {metadata?.homeDir && (
-                            <Item
-                                title={t('machine.homeDirectory')}
-                                subtitle={metadata.homeDir}
-                                subtitleStyle={{ fontFamily: 'Menlo', fontSize: 13 }}
-                            />
-                        )}
                         {metadata?.platform && (
                             <Item
                                 title={t('machine.platform')}
                                 subtitle={metadata.platform}
                             />
                         )}
-                        {metadata?.arch && (
-                            <Item
-                                title={t('machine.architecture')}
-                                subtitle={metadata.arch}
-                            />
-                        )}
                         <Item
                             title={t('machine.lastSeen')}
                             subtitle={machine.activeAt ? new Date(machine.activeAt).toLocaleString() : t('machine.never')}
-                        />
-                        <Item
-                            title={t('machine.metadataVersion')}
-                            subtitle={String(machine.metadataVersion)}
                         />
                 </ItemGroup>
 

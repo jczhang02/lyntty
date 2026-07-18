@@ -1,124 +1,73 @@
-/**
- * Daemon doctor utilities
- *
- * Process discovery and cleanup functions for the daemon
- * Helps diagnose and fix issues with hung or orphaned processes
- */
-
 import psList from 'ps-list';
 import spawn from 'cross-spawn';
 
-/**
- * Find all Lyntty CLI processes (including current process)
- */
-export async function findAllLynttyProcesses(): Promise<Array<{ pid: number, command: string, type: string }>> {
+/** Find active Lyntty/Pi daemon and session processes. */
+export async function findAllLynttyProcesses(): Promise<Array<{ pid: number; command: string; type: string }>> {
   try {
     const processes = await psList();
-    const allProcesses: Array<{ pid: number, command: string, type: string }> = [];
-
+    const result: Array<{ pid: number; command: string; type: string }> = [];
     for (const proc of processes) {
-      const cmd = proc.cmd || '';
+      const command = proc.cmd || '';
       const name = proc.name || '';
-
-      // Check if it's a Lyntty process
-      const isLyntty = name.includes('lyntty') ||
-                      name === 'node' && (cmd.includes('lyntty-cli') || cmd.includes('dist/index.mjs')) ||
-                      cmd.includes('lyntty.mjs') ||
-                      cmd.includes('lyntty-coder') || // legacy npm package name
-                      cmd.includes('/lyntty/') ||
-                      (cmd.includes('tsx') && cmd.includes('src/index.ts') && cmd.includes('lyntty-cli'));
-
+      const isLyntty = name.includes('lyntty')
+        || command.includes('lyntty.mjs')
+        || command.includes('dist/index.mjs')
+        || command.includes('/lyntty/');
       if (!isLyntty) continue;
 
-      // Classify process type
       let type = 'unknown';
-      if (proc.pid === process.pid) {
-        type = 'current';
-      } else if (cmd.includes('--version')) {
-        type = cmd.includes('tsx') ? 'dev-daemon-version-check' : 'daemon-version-check';
-      } else if (cmd.includes('daemon start-sync') || cmd.includes('daemon start')) {
-        type = cmd.includes('tsx') ? 'dev-daemon' : 'daemon';
-      } else if (cmd.includes('--started-by daemon')) {
-        type = cmd.includes('tsx') ? 'dev-daemon-spawned' : 'daemon-spawned-session';
-      } else if (cmd.includes('doctor')) {
-        type = cmd.includes('tsx') ? 'dev-doctor' : 'doctor';
-      } else if (cmd.includes('--yolo')) {
-        type = 'dev-session';
-      } else {
-        type = cmd.includes('tsx') ? 'dev-related' : 'user-session';
-      }
-
-      allProcesses.push({ pid: proc.pid, command: cmd || name, type });
+      if (proc.pid === process.pid) type = 'current';
+      else if (command.includes('--version')) type = 'daemon-version-check';
+      else if (command.includes('daemon start-sync') || command.includes('daemon start')) type = 'daemon';
+      else if (command.includes('--started-by daemon')) type = 'daemon-spawned-session';
+      else if (command.includes('doctor')) type = 'doctor';
+      else type = 'user-session';
+      result.push({ pid: proc.pid, command: command || name, type });
     }
-
-    return allProcesses;
-  } catch (error) {
+    return result;
+  } catch {
     return [];
   }
 }
 
-/**
- * Find all runaway Lyntty CLI processes that should be killed
- */
-export async function findRunawayLynttyProcesses(): Promise<Array<{ pid: number, command: string }>> {
-  const allProcesses = await findAllLynttyProcesses();
-
-  // Filter to just runaway processes (excluding current process)
-  return allProcesses
-    .filter(p =>
-      p.pid !== process.pid && (
-        p.type === 'daemon' ||
-        p.type === 'dev-daemon' ||
-        p.type === 'daemon-spawned-session' ||
-        p.type === 'dev-daemon-spawned' ||
-        p.type === 'daemon-version-check' ||
-        p.type === 'dev-daemon-version-check'
-      )
-    )
-    .map(p => ({ pid: p.pid, command: p.command }));
+export async function findRunawayLynttyProcesses(): Promise<Array<{ pid: number; command: string }>> {
+  const processes = await findAllLynttyProcesses();
+  return processes
+    .filter(processInfo => processInfo.pid !== process.pid && (
+      processInfo.type === 'daemon'
+      || processInfo.type === 'daemon-spawned-session'
+      || processInfo.type === 'daemon-version-check'
+    ))
+    .map(processInfo => ({ pid: processInfo.pid, command: processInfo.command }));
 }
 
-/**
- * Kill all runaway Lyntty CLI processes
- */
-export async function killRunawayLynttyProcesses(): Promise<{ killed: number, errors: Array<{ pid: number, error: string }> }> {
-  const runawayProcesses = await findRunawayLynttyProcesses();
-  const errors: Array<{ pid: number, error: string }> = [];
+export async function killRunawayLynttyProcesses(): Promise<{
+  killed: number;
+  errors: Array<{ pid: number; error: string }>;
+}> {
+  const runaway = await findRunawayLynttyProcesses();
+  const errors: Array<{ pid: number; error: string }> = [];
   let killed = 0;
-
-  for (const { pid, command } of runawayProcesses) {
+  for (const { pid, command } of runaway) {
     try {
       console.log(`Killing runaway process PID ${pid}: ${command}`);
-
       if (process.platform === 'win32') {
-        // Windows: use taskkill
-        const result = spawn.sync('taskkill', ['/F', '/PID', pid.toString()], { stdio: 'pipe' });
+        const result = spawn.sync('taskkill', ['/F', '/PID', String(pid)], { stdio: 'pipe' });
         if (result.error) throw result.error;
         if (result.status !== 0) throw new Error(`taskkill exited with code ${result.status}`);
       } else {
-        // Unix: try SIGTERM first
         process.kill(pid, 'SIGTERM');
-
-        // Wait a moment
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Check if still alive
-        const processes = await psList();
-        const stillAlive = processes.find(p => p.pid === pid);
-        if (stillAlive) {
-          console.log(`Process PID ${pid} ignored SIGTERM, using SIGKILL`);
-          process.kill(pid, 'SIGKILL');
-        }
+        await new Promise(resolve => setTimeout(resolve, 1_000));
+        const current = await psList();
+        if (current.some(processInfo => processInfo.pid === pid)) process.kill(pid, 'SIGKILL');
       }
-
       console.log(`Successfully killed runaway process PID ${pid}`);
-      killed++;
+      killed += 1;
     } catch (error) {
-      const errorMessage = (error as Error).message;
-      errors.push({ pid, error: errorMessage });
-      console.log(`Failed to kill process PID ${pid}: ${errorMessage}`);
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push({ pid, error: message });
+      console.log(`Failed to kill process PID ${pid}: ${message}`);
     }
   }
-
   return { killed, errors };
 }

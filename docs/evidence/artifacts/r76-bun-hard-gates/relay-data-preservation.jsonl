@@ -1,0 +1,2 @@
+{"pgliteVersion":"0.3.15","preUpgradeMigrations":38,"seedAccountId":"bun-gate-account"}
+{"pgliteAccountId":"bun-gate-account","postgresAccountId":"bun-gate-postgres-account","appliedMigrations":39,"shutdownSessionActiveAfterReopen":false}

@@ -1,7 +1,7 @@
 import { StyleSheet, UnistylesRuntime } from 'react-native-unistyles';
 import { darkTheme, lightTheme } from './theme';
 import { loadThemePreference } from './sync/persistence';
-import { Appearance, Platform } from 'react-native';
+import { Appearance } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 
 //
@@ -38,12 +38,10 @@ const settings = themePreference === 'adaptive'
     ? {
         // When adaptive, let Unistyles handle theme switching automatically
         adaptiveThemes: true,
-        CSSVars: true, // Enable CSS variables for web
     }
     : {
         // When fixed theme, set the initial theme explicitly
         initialTheme: getInitialTheme(),
-        CSSVars: true, // Enable CSS variables for web
     };
 
 //
@@ -80,18 +78,3 @@ const setRootBackgroundColor = () => {
 
 // Set initial background color
 setRootBackgroundColor();
-
-// Re-sync theme when tab becomes visible (web only — Appearance API may miss changes while hidden)
-if (Platform.OS === 'web' && themePreference === 'adaptive') {
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            const themeName = Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
-            // Toggle adaptive off, set correct theme, toggle back on
-            UnistylesRuntime.setAdaptiveThemes(false);
-            UnistylesRuntime.setTheme(themeName);
-            UnistylesRuntime.setAdaptiveThemes(true);
-            const color = appThemes[themeName].colors.groupped.background;
-            UnistylesRuntime.setRootViewBackgroundColor(color);
-        }
-    });
-}

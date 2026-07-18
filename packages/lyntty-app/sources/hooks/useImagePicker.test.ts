@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-const mocks = vi.hoisted(() => ({
+const mocks = {
     platform: { OS: 'ios' },
     requestMediaLibraryPermissionsAsync: vi.fn(),
     launchImageLibraryAsync: vi.fn(),
     manipulateAsync: vi.fn(),
     generateThumbhash: vi.fn(),
-}));
+};
 
 vi.mock('react-native', () => ({
     Platform: mocks.platform,

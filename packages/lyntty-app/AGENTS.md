@@ -46,7 +46,7 @@ Unsupported slash commands need visible feedback and no retry loop. Do not pass 
 - Auth invalidation must clear volatile sync/socket/session state, not only credentials.
 - Server URL changes while authenticated should force logout/reconnect rather than leaving stale sockets.
 - Production builds must reject HTTP relay URLs; non-production local testing may use cleartext.
-- Non-production release-style APKs must disable Expo Updates to avoid stale OTA bundles.
+- App updates use complete signed APKs; do not reintroduce Expo Updates or OTA delivery.
 
 ## Android UX
 
@@ -60,8 +60,8 @@ Unsupported slash commands need visible feedback and no retry loop. Do not pass 
 Preferred checks:
 
 ```bash
-pnpm --filter ./packages/lyntty-app test
-pnpm --filter ./packages/lyntty-app typecheck
+bun run --cwd packages/lyntty-app test
+bun run --cwd packages/lyntty-app typecheck
 ```
 
 Focused tests should cover pure helpers/reducers where possible before APK validation. For E2E, use `scripts/e2e/run-maestro.sh` and record artifacts under `docs/evidence/artifacts/...` with secrets redacted.

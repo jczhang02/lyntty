@@ -1,6 +1,6 @@
 import { ReactNode, ComponentType } from 'react';
 
-export type ModalType = 'alert' | 'confirm' | 'prompt' | 'custom';
+export type ModalType = 'prompt' | 'custom';
 
 export interface AlertButton {
     text: string;
@@ -11,22 +11,6 @@ export interface AlertButton {
 export interface BaseModalConfig {
     id: string;
     type: ModalType;
-}
-
-export interface AlertModalConfig extends BaseModalConfig {
-    type: 'alert';
-    title: string;
-    message?: string;
-    buttons?: AlertButton[];
-}
-
-export interface ConfirmModalConfig extends BaseModalConfig {
-    type: 'confirm';
-    title: string;
-    message?: string;
-    cancelText?: string;
-    confirmText?: string;
-    destructive?: boolean;
 }
 
 export interface PromptModalConfig extends BaseModalConfig {
@@ -46,7 +30,7 @@ export interface CustomModalConfig extends BaseModalConfig {
     props?: any;
 }
 
-export type ModalConfig = AlertModalConfig | ConfirmModalConfig | PromptModalConfig | CustomModalConfig;
+export type ModalConfig = PromptModalConfig | CustomModalConfig;
 
 export interface ModalState {
     modals: ModalConfig[];

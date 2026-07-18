@@ -1,29 +1,10 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
-import sodium from 'libsodium-wrappers';
-
-// Mock expo-crypto to use Node.js crypto
-vi.mock('expo-crypto', () => ({
-    getRandomBytes: (n: number) => {
-        const { randomBytes } = require('crypto');
-        return new Uint8Array(randomBytes(n));
-    },
-}));
-
-// Mock the libsodium.lib import to use the Node.js libsodium-wrappers
-vi.mock('@/encryption/libsodium.lib', () => {
-    const s = require('libsodium-wrappers');
-    return { default: s };
-});
+import { describe, it, expect } from 'bun:test';
 
 import { encryptBlob, decryptBlob } from './blob';
 
 // 32-byte key for crypto_secretbox (NaCl symmetric encryption)
 const TEST_KEY = new Uint8Array(32);
 for (let i = 0; i < 32; i++) TEST_KEY[i] = i;
-
-beforeAll(async () => {
-    await sodium.ready;
-});
 
 describe('blob encryption', () => {
     it('should encrypt and decrypt a small blob', () => {

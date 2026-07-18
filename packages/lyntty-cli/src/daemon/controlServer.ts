@@ -12,6 +12,7 @@ import { decodeBase64 } from '@/api/encryption';
 import { TrackedSession, SessionEncryptionData } from './types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
 import type { LynttyPiCommandInfo, LynttyPiExtensionPayload, LynttyPiRemoteCommandAck, LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
+import { MAX_REMOTE_IMAGES_PER_MESSAGE, MAX_REMOTE_IMAGE_BYTES } from '@/pi/piRemoteInput';
 import { findBlockedSessionEnvironmentKeys } from './sessionEnvironment';
 
 export function startDaemonControlServer({
@@ -127,19 +128,32 @@ export function startDaemonControlServer({
       sourceInfo: z.record(z.string(), z.unknown()).optional(),
     });
 
+    const maxRemoteImageBase64Length = Math.ceil(MAX_REMOTE_IMAGE_BYTES / 3) * 4;
+    const PiRemoteImageSchema = z.object({
+      type: z.literal('image'),
+      data: z.string().min(1).max(maxRemoteImageBase64Length),
+      mimeType: z.string().min(1).max(128).refine((value) => value.startsWith('image/'), 'Expected image MIME type'),
+    });
+    const PiRemoteImagesSchema = z.array(PiRemoteImageSchema).min(1).max(MAX_REMOTE_IMAGES_PER_MESSAGE).optional();
     const PiRemoteCommandSchema = z.discriminatedUnion('type', [
-      z.object({ type: z.literal('send_user_message'), text: z.string().min(1).max(PI_EXTENSION_TEXT_MAX) }),
-      z.object({ type: z.literal('follow_up'), text: z.string().min(1).max(PI_EXTENSION_TEXT_MAX) }),
-      z.object({ type: z.literal('steer'), text: z.string().min(1).max(PI_EXTENSION_TEXT_MAX) }),
+      z.object({ type: z.literal('send_user_message'), text: z.string().max(PI_EXTENSION_TEXT_MAX), images: PiRemoteImagesSchema }),
+      z.object({ type: z.literal('follow_up'), text: z.string().max(PI_EXTENSION_TEXT_MAX), images: PiRemoteImagesSchema }),
+      z.object({ type: z.literal('steer'), text: z.string().max(PI_EXTENSION_TEXT_MAX), images: PiRemoteImagesSchema }),
       z.object({ type: z.literal('abort') }),
       z.object({ type: z.literal('compact'), instructions: z.string().max(PI_EXTENSION_TEXT_MAX).optional() }),
       z.object({ type: z.literal('reload') }),
       z.object({ type: z.literal('internal_shutdown') }),
       z.object({ type: z.literal('set_session_name'), name: z.string().min(1).max(512) }),
       z.object({ type: z.literal('get_commands') }),
-      z.object({ type: z.literal('invoke_pi_command'), commandLine: z.string().min(1).max(PI_EXTENSION_TEXT_MAX), deliverAs: z.enum(['followUp']).optional() }),
+      z.object({ type: z.literal('invoke_pi_command'), commandLine: z.string().min(1).max(PI_EXTENSION_TEXT_MAX), deliverAs: z.enum(['followUp']).optional(), images: PiRemoteImagesSchema }),
       z.object({ type: z.literal('set_label'), entryId: z.string().min(1).max(PI_EXTENSION_ID_MAX), label: z.string().max(512).optional() }),
-    ]);
+    ]).superRefine((command, ctx) => {
+      if ((command.type === 'send_user_message' || command.type === 'follow_up' || command.type === 'steer')
+        && command.text.trim().length === 0
+        && !command.images?.length) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Text or images are required' });
+      }
+    });
 
     typed.post('/pi-extension/status', {
       schema: {
