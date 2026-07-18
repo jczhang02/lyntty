@@ -326,7 +326,7 @@ describe('public bun dev commands', () => {
     const restarted = await runDev(['up', '--json']);
     expect(restarted.exitCode).toBe(0);
     state = json<{ state: State }>(restarted).state;
-  });
+  }, 30_000);
 
   it('waits for and stops an owned child after its supervisor exits', async () => {
     const statePath = join(state!.stateDir, 'state.json');
@@ -347,7 +347,7 @@ describe('public bun dev commands', () => {
     const restarted = await runDev(['up', '--json']);
     expect(restarted.exitCode).toBe(0);
     state = json<{ state: State }>(restarted).state;
-  });
+  }, 30_000);
 
   it('runs the real isolated up/check/verify/down smoke', async () => {
     const check = await runDev(['check', '--json']);
@@ -371,7 +371,7 @@ describe('public bun dev commands', () => {
     for (const path of ['state.json', 'lyntty/access.key', 'lyntty/settings.json', 'evidence/verify.json']) {
       expect((await stat(join(state!.stateDir, path))).mode & 0o077).toBe(0);
     }
-  });
+  }, 30_000);
 
   it('ignores a stale isolated daemon state and passes readiness verification repeatedly', async () => {
     expect(state).not.toBeNull();

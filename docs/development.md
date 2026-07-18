@@ -1,6 +1,6 @@
 # Isolated local development
 
-Run development commands from the root of a Git worktree. Bun is the only JavaScript runtime used by project commands.
+Run development commands from the root of a Git worktree. Bun is the only JavaScript runtime used by project commands. On macOS, install the OS locking utility once with `brew install flock`; Linux distributions normally provide it with util-linux.
 
 ```bash
 bun install --frozen-lockfile

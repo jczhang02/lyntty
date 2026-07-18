@@ -9,10 +9,12 @@ export interface PGliteLease {
 }
 
 function resolveFlock(): string {
+    const fromPath = Bun.which("flock");
+    if (fromPath) return fromPath;
     for (const candidate of ["/usr/bin/flock", "/bin/flock"]) {
         if (existsSync(candidate)) return candidate;
     }
-    throw new Error("flock is required for safe PGlite lifecycle operations");
+    throw new Error("flock is required for safe PGlite lifecycle operations (macOS: brew install flock)");
 }
 
 export async function acquirePGliteLease(dataDir: string, purpose: string): Promise<PGliteLease> {
