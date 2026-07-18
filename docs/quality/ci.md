@@ -29,7 +29,7 @@ Every package job installs with `bun install --frozen-lockfile`. Actions are pin
 
 | Workflow | Trigger | Tier | Notes |
 | --- | --- | --- | --- |
-| `.github/workflows/cli-smoke-test.yml` | manual | compiled CLI smoke | Builds standalone `lyntty` and `lynttyd` on Linux and Windows; uses temporary `HOME`/`LYNTTY_HOME_DIR` and verifies isolated Pi extension installation. |
+| `.github/workflows/cli-smoke-test.yml` | manual | CLI artifact smoke | Builds complete standalone archives on Linux/macOS and a Windows artifact, runs exact-inventory self-checks with isolated state and no runtime fallback, and exercises native service/transaction unit gates. It does not publish. |
 | `.github/workflows/relay-image.yml` | PR + manual | Relay image verification | Builds the compiled Relay image without publishing. Ordinary main pushes do not publish stable images. |
 | `.github/workflows/relay-deploy.yml` | manual | production deployment | Requires an explicitly pinned image and remains separate from release. |
 | `.github/workflows/android-release.yml` | manual | Android release APK | Builds the signed full APK; protected Android credentials are required. |
@@ -48,5 +48,5 @@ Compatibility-BOM publication, component tags, installers, native signing, and r
 
 - Android release-style APK and Maestro E2E remain manual/evidence-driven because they require isolated emulator state and signing inputs.
 - Relay image verification does not publish; production deployment is a separate authorized operation.
-- CLI packaging smoke is manual because it compiles and exercises platform binaries, while the fast gate already covers source builds and tests.
+- CLI packaging smoke is manual because it compiles complete platform artifacts. `lyntty --self-check` must not create HOME/Pi state, and install/update tests keep all mutable fixtures under ignored package build state rather than the live user environment.
 - iOS is best-effort and does not block Android releases.

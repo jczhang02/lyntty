@@ -51,6 +51,8 @@ The supported components are independently versioned:
 - Canonical `LYNTTY_MASTER_SECRET` with compatibility-only legacy fallback.
 - Compiled Relay smoke covering help, all migrations, health serving, and graceful shutdown.
 - Compiled CLI/`lynttyd` integration against an isolated compiled Relay, with temporary HOME/state/port and forbidden-runtime sentinels.
+- Complete CLI artifact layout with embedded identity, exact self-check, bundled Pi assets/tools, deterministic archives, and five target builds.
+- Atomic CLI install/update/rollback journal, ownership-safe Pi extension updates, systemd user service, macOS LaunchAgent, and hash-pinned bootstrap. See `docs/evidence/r79-cli-artifact-service-update.md`.
 - Protected `main`; implementation remains on `refactor/bun-migration` until the complete compatibility/release gate is ready.
 
 ## Remaining delivery phases
