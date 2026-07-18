@@ -143,7 +143,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await runDev(['down', '--json']);
+  const stopped = await runDev(['down', '--json']);
+  if (stopped.exitCode !== 0) {
+    throw new Error(`dev:down failed; preserving ownership state for safe recovery\n${stopped.stdout}${stopped.stderr}`);
+  }
   if (state) await rm(state.stateDir, { recursive: true, force: true });
 });
 
@@ -273,13 +276,15 @@ describe('public bun dev commands', () => {
     await writeFile(statePath, `${JSON.stringify(partial, null, 2)}\n`);
     await chmod(statePath, 0o600);
 
-    const up = await runDev(['up', '--json']);
-    expect(up.exitCode).not.toBe(0);
-    expect(json<{ error: string }>(up).error).toMatch(/missing live supervisor role: daemon/i);
-    expect(JSON.parse(await readFile(statePath, 'utf8')).status).toBe('running');
-
-    await writeFile(statePath, original);
-    await chmod(statePath, 0o600);
+    try {
+      const up = await runDev(['up', '--json']);
+      expect(up.exitCode).not.toBe(0);
+      expect(json<{ error: string }>(up).error).toMatch(/missing live supervisor role: daemon/i);
+      expect(JSON.parse(await readFile(statePath, 'utf8')).status).toBe('running');
+    } finally {
+      await writeFile(statePath, original);
+      await chmod(statePath, 0o600);
+    }
   });
 
   it('fails closed on an unowned live PID without signaling it', async () => {
@@ -291,12 +296,14 @@ describe('public bun dev commands', () => {
     await writeFile(statePath, `${JSON.stringify(corrupted, null, 2)}\n`);
     await chmod(statePath, 0o600);
 
-    const down = await runDev(['down', '--json']);
-    expect(down.exitCode).not.toBe(0);
-    expect(JSON.parse(original).status).toBe('running');
-
-    await writeFile(statePath, original);
-    await chmod(statePath, 0o600);
+    try {
+      const down = await runDev(['down', '--json']);
+      expect(down.exitCode).not.toBe(0);
+      expect(JSON.parse(original).status).toBe('running');
+    } finally {
+      await writeFile(statePath, original);
+      await chmod(statePath, 0o600);
+    }
     const restoredCheck = await runDev(['check', '--json']);
     expect(restoredCheck.exitCode).toBe(0);
   });
