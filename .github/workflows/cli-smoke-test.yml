@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           bun run --cwd packages/lyntty-cli typecheck
-          bun test --isolate --preload packages/lyntty-cli/src/test-setup.ts packages/lyntty-cli/src/distribution packages/lyntty-cli/src/daemon/service
+          bun test --isolate --preload ./packages/lyntty-cli/src/test-setup.ts ./packages/lyntty-cli/src/distribution ./packages/lyntty-cli/src/daemon/service
           bun run --cwd packages/lyntty-cli build:artifact --target "${{ matrix.target }}" ${{ matrix.artifact_args }}
       - name: Exercise standalone artifact without runtime fallback
         shell: bash
@@ -111,8 +111,11 @@ jobs:
         shell: pwsh
         run: |
           bun run --cwd packages/lyntty-cli typecheck
-          bun test --isolate --preload packages/lyntty-cli/src/test-setup.ts packages/lyntty-cli/src/distribution
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          bun test --isolate --preload ./packages/lyntty-cli/src/test-setup.ts ./packages/lyntty-cli/src/distribution
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun run --cwd packages/lyntty-cli build:artifact --target windows-x64 --no-archive
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Exercise standalone Windows artifact
         shell: pwsh
         run: |

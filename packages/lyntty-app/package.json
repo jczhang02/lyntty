@@ -5,7 +5,7 @@
     "scripts": {
         "start": "expo start",
         "android": "expo run:android",
-        "test": "bun test --preload ./sources/bunTestSetup.ts sources",
+        "test": "bun test --max-concurrency 1 --preload ./sources/bunTestSetup.ts sources",
         "lint:i18n": "eslint \"sources/**/*.{ts,tsx}\" --config eslint.i18n.config.mjs",
         "test:e2e:pi-reply": "bun test --preload ./sources/bunTestSetup.ts sources/sync/piReplyVisibility.e2e.test.ts",
         "typecheck": "tsc --noEmit",

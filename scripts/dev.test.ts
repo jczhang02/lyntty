@@ -138,9 +138,11 @@ async function findFreePortBlock(start = 58_000): Promise<{ relayPort: number; m
 beforeAll(async () => {
   await runDev(['down', '--json']);
   const started = await runDev(['up', '--json']);
-  expect(started.exitCode).toBe(0);
+  if (started.exitCode !== 0) {
+    throw new Error(`dev:up failed during suite setup\n${started.stdout}${started.stderr}`);
+  }
   state = json<{ state: State }>(started).state;
-});
+}, 30_000);
 
 afterAll(async () => {
   const stopped = await runDev(['down', '--json']);
@@ -148,7 +150,7 @@ afterAll(async () => {
     throw new Error(`dev:down failed; preserving ownership state for safe recovery\n${stopped.stdout}${stopped.stderr}`);
   }
   if (state) await rm(state.stateDir, { recursive: true, force: true });
-});
+}, 30_000);
 
 describe('public bun dev commands', () => {
   it('parses Darwin numeric process start time and exact argv/environment boundaries', () => {

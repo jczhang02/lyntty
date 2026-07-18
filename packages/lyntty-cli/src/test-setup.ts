@@ -5,9 +5,40 @@
  * Temporary state lives under the ignored package dist directory and is removed.
  */
 
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterAll } from 'bun:test'
+
+function prepareBundledTestTools(): void {
+    const toolTarget = `${process.arch}-${process.platform}`
+    const supportedTargets = new Set([
+        'arm64-darwin',
+        'arm64-linux',
+        'arm64-win32',
+        'x64-darwin',
+        'x64-linux',
+        'x64-win32',
+    ])
+    if (!supportedTargets.has(toolTarget)) return
+
+    const toolsDir = resolve(import.meta.dir, '..', 'tools')
+    const unpackedDir = join(toolsDir, 'unpacked')
+    mkdirSync(unpackedDir, { recursive: true })
+    const executableSuffix = process.platform === 'win32' ? '.exe' : ''
+    for (const tool of ['difftastic', 'ripgrep'] as const) {
+        const executable = join(unpackedDir, `${tool === 'difftastic' ? 'difft' : 'rg'}${executableSuffix}`)
+        if (existsSync(executable)) continue
+        const archive = join(toolsDir, 'archives', `${tool}-${toolTarget}.tar.gz`)
+        const extracted = Bun.spawnSync(['tar', '-xzf', archive, '-C', unpackedDir])
+        if (extracted.exitCode !== 0) {
+            throw new Error(`Unable to extract ${tool} test tool: ${extracted.stderr.toString()}`)
+        }
+        if (!existsSync(executable)) throw new Error(`Missing extracted ${tool} test executable`)
+        if (process.platform !== 'win32') chmodSync(executable, 0o755)
+    }
+}
+
+prepareBundledTestTools()
 
 const managedKeys = [
     'HOME',

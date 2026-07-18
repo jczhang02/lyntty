@@ -20,7 +20,7 @@
         "standalone": "bun ./sources/standalone.ts",
         "standalone:dev": "bun --env-file=.env.dev ./sources/standalone.ts migrate && bun --env-file=.env.dev ./sources/standalone.ts serve",
         "dev": "lsof -ti tcp:3005 | xargs kill -9 || true; bun --env-file=.env --env-file=.env.dev ./sources/main.ts",
-        "test": "bun test sources",
+        "test": "bun test --isolate sources",
         "test:compiled": "bash ./scripts/compiled-smoke.sh",
         "test:container": "bash ./scripts/container-smoke.sh",
         "test:postgres": "bun run build:standalone && bash ./scripts/postgres-integration.sh",
