@@ -107,6 +107,7 @@ export interface DaemonLocallyPersistedState {
   piExtensionToken?: string;
   startTime: string;
   startedWithCliVersion: string;
+  startedWithReleaseId?: string;
   lastHeartbeat?: string;
   daemonLogPath?: string;
 }

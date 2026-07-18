@@ -2,7 +2,7 @@
  * Global configuration for lyntty CLI
  *
  * Centralizes all configuration including environment variables and paths
- * Environment files should be loaded using Node's --env-file flag
+ * Standalone binaries do not auto-load environment files.
  */
 
 import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
@@ -33,7 +33,8 @@ class Configuration {
   constructor() {
     // Check if we're running as daemon based on process args
     const args = process.argv.slice(2)
-    this.isDaemonProcess = args.length >= 2 && args[0] === 'daemon' && (args[1] === 'start-sync')
+    this.isDaemonProcess = process.env.LYNTTY_DAEMON_PROCESS === '1'
+      || (args.length >= 2 && args[0] === 'daemon' && args[1] === 'start-sync')
 
     // Directory configuration - Priority: LYNTTY_HOME_DIR env > default home dir
     if (process.env.LYNTTY_HOME_DIR) {

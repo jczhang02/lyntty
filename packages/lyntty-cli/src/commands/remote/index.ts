@@ -82,13 +82,13 @@ export async function handleRemoteCommand(args: string[]): Promise<void> {
 
 async function handleInstall(args: string[]): Promise<void> {
     if (hasHelp(args)) {
-        console.log('Usage: lyntty remote install');
+        console.log('Usage: lyntty remote install [--replace-extension]');
         return;
     }
-    if (args.length > 0) {
+    if (args.some(arg => arg !== '--replace-extension') || args.filter(arg => arg === '--replace-extension').length > 1) {
         throw new Error(`Unknown remote install argument: ${args[0]}`);
     }
-    const result = await installLynttyPiExtension();
+    const result = await installLynttyPiExtension({ replaceUnknown: args.includes('--replace-extension') });
     console.log(`${result.changed ? 'Installed' : 'Already installed'} Lyntty Pi extension: ${result.path}`);
 }
 
@@ -614,7 +614,7 @@ function remoteUsage(): string {
   lyntty remote history <session-id> [--limit <n>] [--json]
   lyntty remote stop <session-id>
   lyntty remote wait <session-id> [--timeout <seconds>]
-  lyntty remote install`;
+  lyntty remote install [--replace-extension]`;
 }
 
 function showAuthHelp(): void {

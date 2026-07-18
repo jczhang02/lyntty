@@ -20,8 +20,11 @@ Use a temporary `HOME` and `LYNTTY_HOME_DIR` for daemon, authentication, or Pi-e
 ```text
 lyntty                         Start a managed Pi session
 lyntty auth login              Pair this computer with the Android app
-lyntty daemon start            Start lynttyd
+lyntty daemon install          Repair/start the managed native user service
+lyntty daemon start            Start the installed lynttyd user service
 lyntty daemon status           Inspect lynttyd
+lyntty update status           Inspect the transactional installation
+lyntty update rollback         Restore the previous known-good release
 lyntty remote install          Install the local Pi extension
 lyntty remote list             List remote sessions
 lyntty remote send …           Send a message to a Pi session
@@ -39,9 +42,13 @@ Pi manages its own model and provider credentials. Lyntty does not run Claude, C
 | --- | --- |
 | `LYNTTY_SERVER_URL` | Relay API URL; defaults to the configured Lyntty Relay |
 | `LYNTTY_HOME_DIR` | Local daemon, credential, and session state; defaults to `~/.lyntty` |
-| `LYNTTY_PI_EXTENSION_PATH` | Isolated Pi extension path override for tests |
+| `LYNTTY_PI_EXTENSION_PATH` | Explicit Pi extension path override; primarily for isolated tests |
+| `PI_CODING_AGENT_DIR` | Pi agent directory used before the default `~/.pi/agent` path |
+| `LYNTTY_INSTALL_ROOT` | Transactional release root override |
 
-Release builds compile `lyntty` and `lynttyd` as standalone Bun executables. End users do not need Bun or Node. Release installers and checksums are published through GitHub Releases; Relay deployment is a separate operator workflow.
+`lyntty daemon install` uses a systemd user service on Linux and a per-user LaunchAgent on macOS. It never uses sudo, and it refuses to install before authentication. Windows artifacts are available for smoke testing, but Windows service installation and update are not yet supported.
+
+Release builds compile `lyntty` and `lynttyd` as standalone Bun executables. End users do not need Bun or Node. `lyntty --self-check --json` verifies the complete artifact. Installation and update require hashes bound by the signed release Compatibility BOM; see [`docs/release/cli.md`](../../docs/release/cli.md). Relay deployment is a separate operator workflow.
 
 ## License
 

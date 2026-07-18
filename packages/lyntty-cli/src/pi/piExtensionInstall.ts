@@ -1,8 +1,11 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import { join } from 'node:path';
+import { writeFileAtomically } from '@/distribution/atomicFile';
 
-const LYNTTY_PI_EXTENSION_SOURCE = String.raw`import { createHash, randomUUID } from "node:crypto";
+export const LYNTTY_PI_EXTENSION_SOURCE = String.raw`// lyntty-managed-pi-extension:v1
+import { createHash, randomUUID } from "node:crypto";
 import { chmod, mkdir, open, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -897,25 +900,74 @@ export default function lynttyRemoteExtension(pi: ExtensionAPI) {
 }
 `;
 
-export function lynttyPiExtensionPath(homeDir = os.homedir()): string {
-  return join(homeDir, '.pi', 'agent', 'extensions', 'lyntty', 'index.ts');
+export function lynttyPiExtensionSha256(): string {
+  return createHash('sha256').update(LYNTTY_PI_EXTENSION_SOURCE).digest('hex');
 }
 
-export async function installLynttyPiExtension(homeDir = os.homedir()): Promise<{ path: string; changed: boolean }> {
-  const path = lynttyPiExtensionPath(homeDir);
-  await mkdir(join(homeDir, '.pi', 'agent', 'extensions', 'lyntty'), { recursive: true });
+const KNOWN_PREVIOUS_EXTENSION_SHA256 = new Set([
+  // Last Pi extension shipped before atomic ownership checks were introduced.
+  '83c4971409b1397b574a4a407370928f7731a2765c63923fd4a1189d890a4f19',
+]);
 
-  let current: string | null = null;
+export interface InstallLynttyPiExtensionOptions {
+  homeDir?: string;
+  extensionPath?: string;
+  piAgentDir?: string;
+  replaceUnknown?: boolean;
+  allowedExistingSha256?: readonly string[];
+}
+
+function resolveExtensionPath(options: InstallLynttyPiExtensionOptions): string {
+  const explicitPath = options.extensionPath ?? process.env.LYNTTY_PI_EXTENSION_PATH?.trim();
+  if (explicitPath) return explicitPath;
+  const piAgentDir = options.piAgentDir ?? process.env.PI_CODING_AGENT_DIR?.trim();
+  if (piAgentDir) return join(piAgentDir, 'extensions', 'lyntty', 'index.ts');
+  return join(options.homeDir ?? os.homedir(), '.pi', 'agent', 'extensions', 'lyntty', 'index.ts');
+}
+
+export function lynttyPiExtensionPath(homeDir?: string): string {
+  return resolveExtensionPath(homeDir === undefined ? {} : { homeDir, piAgentDir: '' });
+}
+
+async function readExtension(path: string): Promise<string | null> {
   try {
-    current = await readFile(path, 'utf8');
-  } catch {
-    current = null;
+    return await readFile(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
   }
+}
 
+async function writeExtensionAtomically(path: string): Promise<void> {
+  await writeFileAtomically(path, LYNTTY_PI_EXTENSION_SOURCE, { mode: 0o600 });
+}
+
+export async function installLynttyPiExtension(
+  homeOrOptions: string | InstallLynttyPiExtensionOptions = {},
+): Promise<{ path: string; changed: boolean; previousSha256: string | null }> {
+  const options = typeof homeOrOptions === 'string'
+    ? { homeDir: homeOrOptions, piAgentDir: '' }
+    : homeOrOptions;
+  const path = resolveExtensionPath(options);
+  const current = await readExtension(path);
   if (current === LYNTTY_PI_EXTENSION_SOURCE) {
-    return { path, changed: false };
+    return { path, changed: false, previousSha256: lynttyPiExtensionSha256() };
   }
 
-  await writeFile(path, LYNTTY_PI_EXTENSION_SOURCE, 'utf8');
-  return { path, changed: true };
+  const previousSha256 = current === null
+    ? null
+    : createHash('sha256').update(current).digest('hex');
+  const allowedExisting = new Set([
+    ...KNOWN_PREVIOUS_EXTENSION_SHA256,
+    ...(options.allowedExistingSha256 ?? []),
+  ]);
+  if (current !== null && !options.replaceUnknown && !allowedExisting.has(previousSha256!)) {
+    throw new Error(
+      `Refusing to overwrite an unrecognized Pi extension at ${path}. `
+      + 'Back it up and rerun with --replace-extension if replacement is intentional.',
+    );
+  }
+
+  await writeExtensionAtomically(path);
+  return { path, changed: true, previousSha256 };
 }

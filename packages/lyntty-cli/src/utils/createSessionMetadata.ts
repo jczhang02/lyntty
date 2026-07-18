@@ -8,11 +8,9 @@
  */
 
 import os from 'node:os';
-import { resolve } from 'node:path';
-
 import type { AgentState, Metadata } from '@/api/types';
 import { configuration } from '@/configuration';
-import { projectPath } from '@/projectPath';
+import { runtimeLayout } from '@/distribution/runtimeLayout';
 import packageJson from '../../package.json';
 
 /**
@@ -62,6 +60,7 @@ export interface SessionMetadataResult {
  * ```
  */
 export function createSessionMetadata(opts: CreateSessionMetadataOptions): SessionMetadataResult {
+    const layout = runtimeLayout();
     const state: AgentState = {
         controlledByUser: false,
     };
@@ -74,8 +73,8 @@ export function createSessionMetadata(opts: CreateSessionMetadataOptions): Sessi
         machineId: opts.machineId,
         homeDir: os.homedir(),
         lynttyHomeDir: configuration.lynttyHomeDir,
-        lynttyLibDir: projectPath(),
-        lynttyToolsDir: resolve(projectPath(), 'tools', 'unpacked'),
+        lynttyLibDir: layout.libraryDir,
+        lynttyToolsDir: layout.toolsDir,
         startedFromDaemon: opts.startedBy === 'daemon',
         hostPid: process.pid,
         startedBy: opts.startedBy || 'terminal',

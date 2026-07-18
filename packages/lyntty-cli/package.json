@@ -3,7 +3,7 @@
     "version": "1.1.10",
     "private": true,
     "description": "Mobile control for local pi sessions",
-    "author": "Kirill Dubovitskiy",
+    "author": "JC Zhang",
     "license": "MIT",
     "type": "module",
     "homepage": "https://github.com/jczhang02/lyntty",
@@ -45,12 +45,15 @@
         "bin",
         "tools/archives",
         "tools/licenses",
+        "install",
         "package.json"
     ],
     "scripts": {
         "typecheck": "bunx tsc --noEmit",
         "build": "rm -rf dist && bunx tsc --noEmit && bunx pkgroll",
-        "build:compiled": "rm -rf dist/compiled && mkdir -p dist/compiled && bun build --compile ./src/index.ts --outfile dist/compiled/lyntty && bun build --compile ./src/daemon/entry.ts --outfile dist/compiled/lynttyd",
+        "build:compiled": "rm -rf dist/compiled && mkdir -p dist/compiled && bun build --compile --no-compile-autoload-dotenv --no-compile-autoload-bunfig --no-compile-autoload-package-json ./src/index.ts --outfile dist/compiled/lyntty && bun build --compile --no-compile-autoload-dotenv --no-compile-autoload-bunfig --no-compile-autoload-package-json ./src/daemon/entry.ts --outfile dist/compiled/lynttyd",
+        "build:artifact": "bun ./scripts/build-artifact.ts",
+        "build:artifacts": "bun ./scripts/build-artifact.ts --all",
         "test": "bun test --isolate --preload ./src/test-setup.ts src",
         "test:integration": "bun run build:compiled && bun run --cwd ../lyntty-relay build:standalone && bun ./scripts/compiled-daemon-integration.ts"
     },

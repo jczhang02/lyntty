@@ -2,6 +2,7 @@ import { type SpawnOptions, type ChildProcess } from 'node:child_process';
 import { spawn as crossSpawn } from 'cross-spawn';
 import { join, posix, win32 } from 'node:path';
 import { projectPath } from '@/projectPath';
+import { isCompiledBunMain } from '@/distribution/runtimeLayout';
 import { logger } from '@/ui/logger';
 import { existsSync } from 'node:fs';
 
@@ -16,7 +17,7 @@ export function resolveLynttySpawnTarget(options: {
   projectDir: string;
   configuredExecutable?: string;
 }): LynttySpawnTarget {
-  if (options.bunMain.startsWith('/$bunfs/')) {
+  if (isCompiledBunMain(options.bunMain)) {
     const configured = options.configuredExecutable?.trim();
     if (configured) {
       return { command: configured, prefixArgs: [] };

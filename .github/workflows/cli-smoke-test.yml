@@ -1,4 +1,4 @@
-name: CLI Smoke Test
+name: CLI Artifact Smoke Test
 
 on:
   workflow_dispatch:
@@ -17,12 +17,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - run: echo "CLI smoke is manual; push event intentionally no-ops."
+      - run: echo "CLI artifact smoke is manual; push event intentionally no-ops."
 
-  smoke-linux:
+  artifact-posix:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: linux-x64
+            artifact_args: ''
+          - runner: macos-14
+            target: darwin-x64
+            artifact_args: '--no-archive'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -32,29 +42,62 @@ jobs:
           bun-version: 1.3.14
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Compile CLI and daemon
-        run: |
-          mkdir -p build/cli-smoke
-          bun build --compile packages/lyntty-cli/src/index.ts --outfile build/cli-smoke/lyntty
-          bun build --compile packages/lyntty-cli/src/daemon/entry.ts --outfile build/cli-smoke/lynttyd
-      - name: Exercise standalone binaries
+      - name: Test and build current artifact
+        shell: bash
         run: |
           set -euo pipefail
-          export HOME="$RUNNER_TEMP/lyntty-smoke-home"
-          export LYNTTY_HOME_DIR="$RUNNER_TEMP/lyntty-smoke-state"
-          mkdir -p "$HOME" "$LYNTTY_HOME_DIR"
-          build/cli-smoke/lyntty --help
-          build/cli-smoke/lyntty --version
-          build/cli-smoke/lyntty doctor
-          build/cli-smoke/lyntty daemon status
-          build/cli-smoke/lyntty remote install
-          build/cli-smoke/lynttyd --version
-          test -s "$HOME/.pi/agent/extensions/lyntty/index.ts"
+          bun run --cwd packages/lyntty-cli typecheck
+          bun test --isolate --preload packages/lyntty-cli/src/test-setup.ts packages/lyntty-cli/src/distribution packages/lyntty-cli/src/daemon/service
+          bun run --cwd packages/lyntty-cli build:artifact --target "${{ matrix.target }}" ${{ matrix.artifact_args }}
+      - name: Exercise standalone artifact without runtime fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(bun -e 'console.log(require("./packages/lyntty-cli/package.json").version)')
+          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-${{ matrix.target }}"
+          GATE="$PWD/packages/lyntty-cli/dist/test-state/workflow-${{ matrix.target }}"
+          rm -rf "$GATE"
+          mkdir -p "$GATE/home" "$GATE/state" "$GATE/path"
+          export HOME="$GATE/home"
+          export USERPROFILE="$GATE/home"
+          export LYNTTY_HOME_DIR="$GATE/state"
+          export PI_CODING_AGENT_DIR="$GATE/pi-agent"
+          ORIGINAL_PATH=$PATH
+          export PATH="$ARTIFACT/tools"
+          "$ARTIFACT/lyntty" --self-check --json
+          test ! -e "$LYNTTY_HOME_DIR"
+          test ! -e "$PI_CODING_AGENT_DIR"
+          "$ARTIFACT/lynttyd" --build-info --json
+          PATH=$ORIGINAL_PATH rm -rf "$GATE"
+      - name: Validate systemd user unit
+        if: matrix.target == 'linux-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(bun -e 'console.log(require("./packages/lyntty-cli/package.json").version)')
+          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-linux-x64"
+          GATE="$PWD/packages/lyntty-cli/dist/test-state/systemd-lint"
+          mkdir -p "$GATE/home"
+          ARTIFACT="$ARTIFACT" GATE="$GATE" bun -e 'import { writeFile } from "node:fs/promises"; import { renderSystemdUserUnit } from "./packages/lyntty-cli/src/daemon/service/systemd.ts"; const root=process.env.GATE; const artifact=process.env.ARTIFACT; await writeFile(`${root}/lynttyd.service`, renderSystemdUserUnit({daemonExecutable:`${artifact}/lynttyd`,cliExecutable:`${artifact}/lyntty`,homeDir:`${root}/home`,lynttyHomeDir:`${root}/state`,servicePath:`${root}/lynttyd.service`,runtimePath:"/usr/local/bin:/usr/bin:/bin",uid:1000}));'
+          systemd-analyze verify "$GATE/lynttyd.service"
+          rm -rf "$GATE"
+      - name: Validate macOS LaunchAgent plist
+        if: matrix.target == 'darwin-x64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(bun -e 'console.log(require("./packages/lyntty-cli/package.json").version)')
+          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-darwin-x64"
+          GATE="$PWD/packages/lyntty-cli/dist/test-state/launchd-lint"
+          mkdir -p "$GATE/home"
+          ARTIFACT="$ARTIFACT" GATE="$GATE" bun -e 'import { writeFile } from "node:fs/promises"; import { renderLaunchAgentPlist } from "./packages/lyntty-cli/src/daemon/service/launchd.ts"; const root=process.env.GATE; const artifact=process.env.ARTIFACT; await writeFile(`${root}/dev.jczhang.lynttyd.plist`, renderLaunchAgentPlist({daemonExecutable:`${artifact}/lynttyd`,cliExecutable:`${artifact}/lyntty`,homeDir:`${root}/home`,lynttyHomeDir:`${root}/state`,servicePath:`${root}/dev.jczhang.lynttyd.plist`,runtimePath:"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",uid:501}));'
+          plutil -lint "$GATE/dev.jczhang.lynttyd.plist"
+          rm -rf "$GATE"
 
-  smoke-windows:
+  artifact-windows:
     if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -64,22 +107,29 @@ jobs:
           bun-version: 1.3.14
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Compile CLI and daemon
+      - name: Test and build Windows artifact
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force build/cli-smoke | Out-Null
-          bun build --compile packages/lyntty-cli/src/index.ts --outfile build/cli-smoke/lyntty.exe
-          bun build --compile packages/lyntty-cli/src/daemon/entry.ts --outfile build/cli-smoke/lynttyd.exe
-      - name: Exercise standalone binaries
+          bun run --cwd packages/lyntty-cli typecheck
+          bun test --isolate --preload packages/lyntty-cli/src/test-setup.ts packages/lyntty-cli/src/distribution
+          bun run --cwd packages/lyntty-cli build:artifact --target windows-x64 --no-archive
+      - name: Exercise standalone Windows artifact
         shell: pwsh
         run: |
-          $env:HOME = "$env:RUNNER_TEMP/lyntty-smoke-home"
-          $env:LYNTTY_HOME_DIR = "$env:RUNNER_TEMP/lyntty-smoke-state"
-          New-Item -ItemType Directory -Force $env:HOME, $env:LYNTTY_HOME_DIR | Out-Null
-          & build/cli-smoke/lyntty.exe --help
-          & build/cli-smoke/lyntty.exe --version
-          & build/cli-smoke/lyntty.exe doctor
-          & build/cli-smoke/lyntty.exe daemon status
-          & build/cli-smoke/lyntty.exe remote install
-          & build/cli-smoke/lynttyd.exe --version
-          if (-not (Test-Path "$env:HOME/.pi/agent/extensions/lyntty/index.ts")) { throw 'Pi extension was not installed' }
+          $version = (Get-Content packages/lyntty-cli/package.json | ConvertFrom-Json).version
+          $artifact = "$pwd/packages/lyntty-cli/dist/artifacts/lyntty-cli-$version-windows-x64"
+          $gate = "$pwd/packages/lyntty-cli/dist/test-state/workflow-windows-x64"
+          Remove-Item -Recurse -Force $gate -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force "$gate/home", "$gate/path" | Out-Null
+          $env:HOME = "$gate/home"
+          $env:USERPROFILE = "$gate/home"
+          $env:LYNTTY_HOME_DIR = "$gate/state"
+          $env:PI_CODING_AGENT_DIR = "$gate/pi-agent"
+          $env:PATH = "$artifact/tools"
+          & "$artifact/lyntty.exe" --self-check --json
+          if ($LASTEXITCODE -ne 0) { throw 'Windows self-check failed' }
+          if (Test-Path $env:LYNTTY_HOME_DIR) { throw 'Self-check wrote Lyntty state' }
+          if (Test-Path $env:PI_CODING_AGENT_DIR) { throw 'Self-check wrote Pi state' }
+          & "$artifact/lynttyd.exe" --build-info --json
+          if ($LASTEXITCODE -ne 0) { throw 'Windows daemon build-info failed' }
+          Remove-Item -Recurse -Force $gate

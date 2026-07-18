@@ -13,7 +13,7 @@ mock.module('@/ui/logger', () => ({
   logger: { debug: mock() },
 }));
 
-import { listDaemonSessions } from './controlClient';
+import { isDaemonRunningExpectedRelease, listDaemonSessions } from './controlClient';
 
 describe('daemon control client authentication', () => {
   beforeEach(() => {
@@ -26,6 +26,21 @@ describe('daemon control client authentication', () => {
       startedWithCliVersion: '1.0.0',
     });
     spyOn(process, 'kill').mockImplementation(() => true);
+  });
+
+  it('requires the exact embedded release identity for update health gates', async () => {
+    readDaemonState.mockResolvedValue({
+      pid: process.pid,
+      httpPort: 43210,
+      piExtensionToken: 'control-secret',
+      startTime: 'now',
+      startedWithCliVersion: '2.0.0',
+      startedWithReleaseId: 'release-exact',
+    });
+    spyOn(globalThis, 'fetch').mockResolvedValue(new Response('OK'));
+
+    await expect(isDaemonRunningExpectedRelease('release-exact')).resolves.toBe(true);
+    await expect(isDaemonRunningExpectedRelease('same-version-different-build')).resolves.toBe(false);
   });
 
   it('authenticates every daemon HTTP request with the state token', async () => {

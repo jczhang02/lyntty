@@ -1,6 +1,5 @@
 import { generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const packageDir = resolve(import.meta.dir, '..');
@@ -8,7 +7,9 @@ const repoRoot = resolve(packageDir, '..', '..');
 const relayBinary = join(repoRoot, 'packages', 'lyntty-relay', 'dist', 'lyntty-relay');
 const cliBinary = join(packageDir, 'dist', 'compiled', process.platform === 'win32' ? 'lyntty.exe' : 'lyntty');
 const daemonBinary = join(packageDir, 'dist', 'compiled', process.platform === 'win32' ? 'lynttyd.exe' : 'lynttyd');
-const gateDir = await mkdtemp(join(tmpdir(), 'lyntty-compiled-daemon-'));
+const gateBase = join(packageDir, 'dist', 'test-state');
+await mkdir(gateBase, { recursive: true });
+const gateDir = await mkdtemp(join(gateBase, 'compiled-daemon-'));
 const homeDir = join(gateDir, 'home');
 const lynttyHomeDir = join(gateDir, 'lyntty');
 const pgliteDir = join(gateDir, 'relay', 'pglite');
@@ -180,11 +181,13 @@ try {
         PATH: `${sentinelDir}:${baseEnv.PATH ?? ''}`,
     };
 
-    const startOutput = await run([cliBinary, 'daemon', 'start'], runtimeEnv);
-    if (!startOutput.includes('Daemon started successfully')) {
-        throw new Error(`CLI did not confirm daemon start: ${startOutput}`);
-    }
-    await waitFor('compiled CLI daemon state', async () => {
+    foregroundDaemon = Bun.spawn([daemonBinary], {
+        cwd: repoRoot,
+        env: runtimeEnv,
+        stdout: 'pipe',
+        stderr: 'pipe',
+    });
+    await waitFor('standalone lynttyd state', async () => {
         const pid = await readDaemonPid();
         return pid !== null && processIsAlive(pid);
     });
@@ -211,6 +214,8 @@ try {
     if (firstDaemonPid) {
         await waitFor('compiled CLI daemon shutdown', () => !processIsAlive(firstDaemonPid));
     }
+    await foregroundDaemon.exited;
+    foregroundDaemon = null;
 
     foregroundDaemon = Bun.spawn([daemonBinary], {
         cwd: repoRoot,

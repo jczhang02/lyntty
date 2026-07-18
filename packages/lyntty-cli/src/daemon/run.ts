@@ -24,7 +24,9 @@ import { startDaemonControlServer } from './controlServer';
 import { findBlockedSessionEnvironmentKeys } from './sessionEnvironment';
 import { statSync } from 'fs';
 import { join, resolve } from 'path';
-import { projectPath } from '@/projectPath';
+import { embeddedBuildIdentity } from '@/distribution/embeddedBuild';
+import { runtimeLayout } from '@/distribution/runtimeLayout';
+import { createDaemonHeartbeatState } from './daemonState';
 import { getTmuxUtilities, isTmuxAvailable, parseTmuxSessionIdentifier, formatTmuxSessionIdentifier } from '@/utils/tmux';
 import { expandEnvironmentVariables } from '@/utils/expandEnvVars';
 import { detectCLIAvailability } from '@/utils/detectCLI';
@@ -155,13 +157,15 @@ async function findPiSessionNearDirectory(sessionId: string, directory?: string,
   return machineSessions.find((session) => session.id === sessionId);
 }
 
+const distributionLayout = runtimeLayout();
+
 export const initialMachineMetadata: MachineMetadata = {
   host: os.hostname() + hostSuffix,
   platform: os.platform(),
   lynttyCliVersion: packageJson.version,
   homeDir: os.homedir(),
   lynttyHomeDir: configuration.lynttyHomeDir,
-  lynttyLibDir: projectPath(),
+  lynttyLibDir: distributionLayout.libraryDir,
   cliAvailability: detectCLIAvailability(),
   resumeSupport: { ...detectResumeSupport(), rpcAvailable: true },
 };
@@ -1577,13 +1581,15 @@ export async function startDaemon(): Promise<void> {
     // diverged from the bundled version (e.g. `lyntty-coder@0.13.1` deprecation
     // stub bumped package.json without rebuilding dist). File mtime is a more
     // reliable signal: it only changes when the bundle is actually replaced.
-    const bundlePath = join(projectPath(), 'dist', 'index.mjs');
+    const bundlePath = join(distributionLayout.libraryDir, 'dist', 'index.mjs');
     let initialBundleMtimeMs = 0;
-    try {
-      initialBundleMtimeMs = statSync(bundlePath).mtimeMs;
-    } catch {
-      // dist/index.mjs not present (e.g. dev mode via Bun) — skip upgrade detection.
-      logger.debug(`[DAEMON RUN] Bundle at ${bundlePath} not found; self-restart on upgrade disabled`);
+    if (!distributionLayout.compiled) {
+      try {
+        initialBundleMtimeMs = statSync(bundlePath).mtimeMs;
+      } catch {
+        // dist/index.mjs not present (e.g. dev mode via Bun) — skip upgrade detection.
+        logger.debug(`[DAEMON RUN] Bundle at ${bundlePath} not found; self-restart on upgrade disabled`);
+      }
     }
 
     // Prepare initial daemon state
@@ -1607,12 +1613,14 @@ export async function startDaemon(): Promise<void> {
 
     // Publish readiness only after relay machine registration and all callbacks
     // that depend on `machine` can run safely.
+    const releaseId = embeddedBuildIdentity().releaseId;
     const fileState: DaemonLocallyPersistedState = {
       pid: process.pid,
       httpPort: controlPort,
       piExtensionToken,
       startTime: new Date().toLocaleString(),
       startedWithCliVersion: packageJson.version,
+      ...(releaseId ? { startedWithReleaseId: releaseId } : {}),
       daemonLogPath: logger.logFilePath,
     };
     writeDaemonState(fileState);
@@ -1646,8 +1654,8 @@ export async function startDaemon(): Promise<void> {
         machineId: machine.id,
         homeDir: os.homedir(),
         lynttyHomeDir: configuration.lynttyHomeDir,
-        lynttyLibDir: projectPath(),
-        lynttyToolsDir: join(projectPath(), 'tools', 'unpacked'),
+        lynttyLibDir: distributionLayout.libraryDir,
+        lynttyToolsDir: distributionLayout.toolsDir,
         startedFromDaemon: true,
         hostPid: process.pid,
         startedBy: 'daemon',
@@ -2305,15 +2313,14 @@ export async function startDaemon(): Promise<void> {
 
       // Heartbeat
       try {
-        const updatedState: DaemonLocallyPersistedState = {
+        const updatedState = createDaemonHeartbeatState({
+          initialState: fileState,
           pid: process.pid,
           httpPort: controlPort,
           piExtensionToken,
-          startTime: fileState.startTime,
-          startedWithCliVersion: packageJson.version,
-          lastHeartbeat: new Date().toLocaleString(),
-          daemonLogPath: fileState.daemonLogPath
-        };
+          cliVersion: packageJson.version,
+          heartbeat: new Date().toLocaleString(),
+        });
         writeDaemonState(updatedState);
         if (process.env.DEBUG) {
           logger.debug(`[DAEMON RUN] Health check completed at ${updatedState.lastHeartbeat}`);

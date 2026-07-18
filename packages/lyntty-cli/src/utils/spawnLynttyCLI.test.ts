@@ -24,7 +24,7 @@ describe('resolveLynttySpawnTarget', () => {
 
   it('lets compiled lynttyd spawn the sibling CLI', () => {
     expect(resolveLynttySpawnTarget({
-      bunMain: '/$bunfs/root/lynttyd',
+      bunMain: 'C:\\~BUN\\root\\lynttyd.exe',
       execPath: 'C:\\Lyntty\\lynttyd.exe',
       projectDir: 'C:\\unused',
     })).toEqual({ command: 'C:\\Lyntty\\lyntty.exe', prefixArgs: [] });

@@ -221,6 +221,12 @@ export async function isDaemonRunningCurrentlyInstalledLynttyVersion(): Promise<
   return currentCliVersion === state.startedWithCliVersion;
 }
 
+export async function isDaemonRunningExpectedRelease(releaseId: string): Promise<boolean> {
+  if (!await checkIfDaemonRunningAndCleanupStaleState()) return false;
+  const state = await readDaemonState();
+  return state?.startedWithReleaseId === releaseId;
+}
+
 export async function cleanupDaemonState(): Promise<void> {
   try {
     await clearDaemonState();
