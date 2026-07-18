@@ -57,6 +57,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Install process audit tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends strace
+
       - name: Prepare release metadata
         id: release
         env:
@@ -125,13 +130,16 @@ jobs:
           cp packages/lyntty-app/google-services.json packages/lyntty-app/android/app/google-services.json
           chmod 600 packages/lyntty-app/google-services.json packages/lyntty-app/android/app/google-services.json
 
+      - name: Verify production task guard
+        working-directory: packages/lyntty-app/android
+        run: ../scripts/gradle-production-guard-test.sh "$RUNNER_TEMP/android-production-guard.txt"
+
       - name: Build signed production APK
         working-directory: packages/lyntty-app/android
         env:
           APP_ENV: production
           LYNTTY_BUILD_COMMIT_SHA: ${{ github.sha }}
-          # Keep the pre-migration repository variable as a compatibility fallback.
-          LYNTTY_EXPO_PROJECT_ID: ${{ vars.LYNTTY_EXPO_PROJECT_ID || vars.LYNTTY_EAS_PROJECT_ID }}
+          LYNTTY_EXPO_PROJECT_ID: ${{ vars.LYNTTY_EXPO_PROJECT_ID }}
           LYNTTY_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEYSTORE_PASSWORD }}
           LYNTTY_ANDROID_KEY_ALIAS: ${{ secrets.LYNTTY_ANDROID_KEY_ALIAS }}
           LYNTTY_ANDROID_KEY_PASSWORD: ${{ secrets.LYNTTY_ANDROID_KEY_PASSWORD }}
@@ -139,19 +147,33 @@ jobs:
           VERSION_CODE: ${{ steps.release.outputs.version_code }}
         run: |
           set -euo pipefail
-          : "${LYNTTY_EXPO_PROJECT_ID:?Repository variable LYNTTY_EXPO_PROJECT_ID (or legacy LYNTTY_EAS_PROJECT_ID) is required for Expo push tokens}"
+          : "${LYNTTY_EXPO_PROJECT_ID:?Repository variable LYNTTY_EXPO_PROJECT_ID is required for Expo push tokens}"
           [[ "$LYNTTY_EXPO_PROJECT_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$ ]] || {
             echo 'LYNTTY_EXPO_PROJECT_ID must be a UUID' >&2
             exit 1
           }
-          ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
-            -x lintVitalAnalyzeRelease \
-            -x lintVitalRelease \
-            -PreactNativeArchitectures=arm64-v8a \
-            -Pandroid.enablePngCrunchInReleaseBuilds=false \
-            -PlynttyVersionName="$VERSION_NAME" \
-            -PlynttyVersionCode="$VERSION_CODE" \
-            -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks"
+          ../scripts/gradle-runtime-audit.sh "$RUNNER_TEMP/android-exec-audit.txt" -- \
+            ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
+              -x lintVitalAnalyzeRelease \
+              -x lintVitalRelease \
+              -PreactNativeArchitectures=arm64-v8a \
+              -Pandroid.enablePngCrunchInReleaseBuilds=false \
+              -PlynttyVersionName="$VERSION_NAME" \
+              -PlynttyVersionCode="$VERSION_CODE" \
+              -PlynttyKeystoreFile="$RUNNER_TEMP/lyntty-release.jks"
+
+      - name: Verify signed production APK
+        env:
+          EXPECTED_CERT_SHA256: ${{ vars.LYNTTY_ANDROID_CERT_SHA256 }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          : "${EXPECTED_CERT_SHA256:?Production environment variable LYNTTY_ANDROID_CERT_SHA256 is required}"
+          packages/lyntty-app/scripts/apk-audit.sh \
+            packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk \
+            dev.jczhang.lyntty "$VERSION_NAME" "$VERSION_CODE" "$EXPECTED_CERT_SHA256" \
+            > "$RUNNER_TEMP/android-apk-audit.txt"
 
       - name: Generate latest.json
         env:
@@ -174,6 +196,7 @@ jobs:
           const manifest = {
             platform: 'android',
             appId: 'dev.jczhang.lyntty',
+            releaseChannel: 'stable',
             versionName: process.env.VERSION_NAME,
             versionCode: Number(process.env.VERSION_CODE),
             apkUrl: process.env.APK_URL,
@@ -194,5 +217,8 @@ jobs:
           gh release create "$TAG" \
             "$RUNNER_TEMP/$APK_NAME" \
             "$RUNNER_TEMP/latest.json" \
+            "$RUNNER_TEMP/android-exec-audit.txt" \
+            "$RUNNER_TEMP/android-apk-audit.txt" \
+            "$RUNNER_TEMP/android-production-guard.txt" \
             --title "Lyntty Android $TAG" \
             --notes-file "$RUNNER_TEMP/release-notes.txt"

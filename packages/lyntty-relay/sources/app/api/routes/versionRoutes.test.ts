@@ -9,6 +9,7 @@ const originalFetch = globalThis.fetch;
 const manifest = {
     platform: "android" as const,
     appId: "dev.jczhang.lyntty",
+    releaseChannel: "stable" as const,
     versionName: "1.7.1",
     versionCode: 178,
     apkUrl: "https://github.com/jczhang02/lyntty/releases/download/android-v1.7.1-178/lyntty-android-v1.7.1-178.apk",
@@ -42,6 +43,8 @@ describe("versionRoutes", () => {
         globalThis.fetch = originalFetch;
         mock.restore();
         delete process.env.LYNTTY_ANDROID_UPDATE_MANIFEST_URL;
+        delete process.env.LYNTTY_ANDROID_STABLE_MANIFEST_URL;
+        delete process.env.LYNTTY_ANDROID_PREVIEW_MANIFEST_URL;
         delete process.env.LYNTTY_UPDATE_MANIFEST_CACHE_MS;
     });
 
@@ -69,6 +72,7 @@ describe("versionRoutes", () => {
             update_url: manifest.apkUrl,
             sha256: manifest.sha256,
             notes: "test release",
+            release_channel: "stable",
         });
     });
 
@@ -93,10 +97,61 @@ describe("versionRoutes", () => {
 
     it("does not offer production APK to another app id", () => {
         expect(shouldUpdateAndroid(manifest, {
-            appId: "dev.jczhang.lyntty.dev",
+            appId: "dev.jczhang.lyntty.preview",
+            releaseChannel: "preview",
             version: "1.7.0",
             versionCode: 1,
         })).toBe(false);
+    });
+
+    it("uses only the explicitly configured preview channel for preview packages", async () => {
+        process.env.LYNTTY_ANDROID_PREVIEW_MANIFEST_URL = "https://example.invalid/preview.json";
+        const previewManifest = {
+            ...manifest,
+            appId: "dev.jczhang.lyntty.preview",
+            releaseChannel: "preview" as const,
+        };
+        globalThis.fetch = mock(async () => ({
+            ok: true,
+            json: async () => previewManifest,
+        })) as unknown as typeof fetch;
+        app = await createApp();
+
+        const response = await app.inject({
+            method: "POST",
+            url: "/v1/version",
+            payload: {
+                platform: "android",
+                app_id: "dev.jczhang.lyntty.preview",
+                release_channel: "preview",
+                version: "1.7.0",
+                version_code: 177,
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({
+            update_required: true,
+            release_channel: "preview",
+            update_url: previewManifest.apkUrl,
+        });
+    });
+
+    it("does not fall back from preview to the stable manifest", async () => {
+        app = await createApp();
+        const response = await app.inject({
+            method: "POST",
+            url: "/v1/version",
+            payload: {
+                platform: "android",
+                app_id: "dev.jczhang.lyntty.preview",
+                release_channel: "preview",
+                version_code: 1,
+            },
+        });
+        const body = response.json() as unknown;
+        expect(body).toEqual({ update_required: false, update_url: null });
+        expect(fetch).not.toHaveBeenCalled();
     });
 
     it("ignores non-Android platforms", async () => {

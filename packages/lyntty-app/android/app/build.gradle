@@ -4,6 +4,30 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 def jsRuntimeExecutable = System.getenv('BUN_EXECUTABLE') ?: 'bun'
+def lynttyAppEnv = (System.getenv('APP_ENV') ?: 'development').toString()
+def lynttyApplicationIds = [
+    development: 'dev.jczhang.lyntty.dev',
+    preview: 'dev.jczhang.lyntty.preview',
+    production: 'dev.jczhang.lyntty'
+]
+def lynttyAppNames = [
+    development: 'Lyntty (dev)',
+    preview: 'Lyntty (preview)',
+    production: 'Lyntty'
+]
+def lynttyReleaseChannels = [
+    development: 'development',
+    preview: 'preview',
+    production: 'stable'
+]
+if (!lynttyApplicationIds.containsKey(lynttyAppEnv)) {
+    throw new GradleException("APP_ENV must be development, preview, or production; got ${lynttyAppEnv}")
+}
+def lynttyApplicationId = lynttyApplicationIds[lynttyAppEnv]
+def lynttyAppName = lynttyAppNames[lynttyAppEnv]
+def lynttyReleaseChannel = lynttyReleaseChannels[lynttyAppEnv]
+def isProductionAppEnv = lynttyAppEnv == 'production'
+def isPreviewAppEnv = lynttyAppEnv == 'preview'
 def resolvedReactNativeDir = new File([jsRuntimeExecutable, "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
 ext.REACT_NATIVE_NODE_MODULES_DIR = resolvedReactNativeDir.absolutePath
 def lynttyVersionName = (findProperty('lynttyVersionName') ?: System.getenv('LYNTTY_ANDROID_VERSION_NAME') ?: '1.0.0').toString()
@@ -13,8 +37,8 @@ def lynttyKeystorePassword = (findProperty('lynttyKeystorePassword') ?: System.g
 def lynttyKeyAlias = (findProperty('lynttyKeyAlias') ?: System.getenv('LYNTTY_ANDROID_KEY_ALIAS'))?.toString()
 def lynttyKeyPassword = (findProperty('lynttyKeyPassword') ?: System.getenv('LYNTTY_ANDROID_KEY_PASSWORD'))?.toString()
 def hasLynttyReleaseSigning = lynttyKeystoreFile && lynttyKeystorePassword && lynttyKeyAlias && lynttyKeyPassword
-def isReleaseBuildRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
-def isProductionAppEnv = (System.getenv('APP_ENV') ?: 'development') == 'production'
+def requestedTaskNames = gradle.startParameter.taskNames.collect { it.toLowerCase() }
+def isReleaseBuildRequested = requestedTaskNames.any { it.contains('release') }
 def isProductionReleaseBuild = isReleaseBuildRequested && isProductionAppEnv
 // Fixed, preview-only development signer. Its password is intentionally public;
 // production builds never select this signing config.
@@ -32,6 +56,29 @@ if (isProductionReleaseBuild && !hasLynttyGoogleServices) {
 
 if (hasLynttyGoogleServices) {
     apply plugin: "com.google.gms.google-services"
+}
+
+def lynttyAppProject = project
+gradle.taskGraph.whenReady { taskGraph ->
+    if (!isProductionAppEnv) return
+    def appTaskNames = taskGraph.allTasks
+        .findAll { task -> task.project == lynttyAppProject }
+        .collect { task -> task.name }
+    def debugPackagingTask = appTaskNames.find { taskName ->
+        taskName ==~ /(?i)^(assemble|bundle|install|package).*debug.*$/
+    }
+    if (debugPackagingTask) {
+        throw new GradleException("APP_ENV=production permits explicit Release tasks only; task graph includes ${debugPackagingTask}")
+    }
+    def releasePackagingTask = appTaskNames.find { taskName ->
+        taskName ==~ /(?i)^(assemble|bundle|install|package).*release.*$/
+    }
+    if (releasePackagingTask && !hasLynttyReleaseSigning) {
+        throw new GradleException('Production release builds require Lyntty release signing properties')
+    }
+    if (releasePackagingTask && !hasLynttyGoogleServices) {
+        throw new GradleException('Production release builds require Firebase google-services.json for Android push notifications')
+    }
 }
 
 /**
@@ -118,17 +165,18 @@ android {
 
     namespace 'dev.jczhang.lyntty.dev'
     defaultConfig {
-        applicationId 'dev.jczhang.lyntty'
+        applicationId lynttyApplicationId
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode lynttyVersionCode
         versionName lynttyVersionName
         manifestPlaceholders = [
-            lynttyAppName: 'Lyntty',
-            usesCleartextTraffic: 'false'
+            lynttyAppName: lynttyAppName,
+            usesCleartextTraffic: isProductionAppEnv ? 'false' : 'true'
         ]
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+        buildConfigField "String", "LYNTTY_RELEASE_CHANNEL", "\"${lynttyReleaseChannel}\""
     }
     signingConfigs {
         debug {
@@ -154,22 +202,18 @@ android {
     }
     buildTypes {
         debug {
-            applicationIdSuffix '.dev'
-            resValue 'bool', 'lyntty_uses_cleartext', 'true'
+            resValue 'bool', 'lyntty_uses_cleartext', isProductionAppEnv ? 'false' : 'true'
             manifestPlaceholders = [
-                lynttyAppName: 'Lyntty (dev)',
-                usesCleartextTraffic: 'true'
+                lynttyAppName: lynttyAppName,
+                usesCleartextTraffic: isProductionAppEnv ? 'false' : 'true'
             ]
-            signingConfig signingConfigs.debug
+            signingConfig isPreviewAppEnv ? signingConfigs.preview : signingConfigs.debug
         }
         release {
             resValue 'bool', 'lyntty_uses_cleartext', isProductionAppEnv ? 'false' : 'true'
-            if (!isProductionAppEnv) {
-                applicationIdSuffix '.dev'
-            }
             manifestPlaceholders = [
-                lynttyAppName: isProductionAppEnv ? 'Lyntty' : 'Lyntty (dev)',
-                usesCleartextTraffic: isProductionAppEnv ? false : true
+                lynttyAppName: lynttyAppName,
+                usesCleartextTraffic: isProductionAppEnv ? 'false' : 'true'
             ]
             signingConfig isProductionAppEnv ? signingConfigs.release : signingConfigs.preview
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'

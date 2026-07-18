@@ -43,6 +43,7 @@ import { mergePiDiscoveredSessions } from './piDiscoveredSessions';
 import { canControlSession } from './sessionControlPolicy';
 import { applyPiHistoryPageResult, type PiHistoryPageResult } from './piHistoryPage';
 import { listPiSessionsResultSchema, parseMachineRpcResult } from './machineRpcSchemas';
+import { resolveAndroidUpdateChannel } from './nativeUpdateChannel';
 
 type V3GetSessionMessagesResponse = {
     messages: ApiMessage[];
@@ -1271,20 +1272,18 @@ class Sync {
 
     private fetchNativeUpdate = async () => {
         try {
-            // Skip in development
-            if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
-                return;
-            }
+            if (Platform.OS !== 'android') return;
 
             const serverUrl = getServerUrl();
 
             // Get platform and app identifiers
             const platform = Platform.OS;
             const version = Application.nativeApplicationVersion || Constants.expoConfig?.version;
-            const appId = Application.applicationId || (Platform.OS === 'ios' ? Constants.expoConfig?.ios?.bundleIdentifier : Constants.expoConfig?.android?.package);
-            if (!version || !appId) {
-                return;
-            }
+            const appId = Application.applicationId || Constants.expoConfig?.android?.package;
+            if (!version || !appId) return;
+            const appEnv = Constants.expoConfig?.extra?.app?.appEnv;
+            const releaseChannel = resolveAndroidUpdateChannel(appEnv, appId);
+            if (!releaseChannel) return;
             const parsedBuildVersion = Number(Application.nativeBuildVersion);
             const versionCode = Platform.OS === 'android' && Number.isFinite(parsedBuildVersion)
                 ? parsedBuildVersion
@@ -1301,6 +1300,7 @@ class Sync {
                     version,
                     app_id: appId,
                     version_code: versionCode,
+                    release_channel: releaseChannel,
                 }),
             });
 
@@ -1313,7 +1313,7 @@ class Sync {
             console.log('[fetchNativeUpdate] Data:', data);
 
             // Apply update status to storage
-            if (data.update_required && data.update_url) {
+            if (data.update_required && data.update_url && data.release_channel === releaseChannel) {
                 storage.getState().applyNativeUpdateStatus({
                     available: true,
                     updateUrl: data.update_url,

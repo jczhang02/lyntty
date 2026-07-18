@@ -2,12 +2,13 @@ import { z } from "zod";
 import { type Fastify } from "../types";
 import * as semver from "semver";
 
-const DEFAULT_ANDROID_MANIFEST_URL = "https://github.com/jczhang02/lyntty/releases/latest/download/latest.json";
+const DEFAULT_ANDROID_STABLE_MANIFEST_URL = "https://github.com/jczhang02/lyntty/releases/latest/download/latest.json";
 const DEFAULT_MANIFEST_CACHE_MS = 10 * 60 * 1000;
 
 const AndroidUpdateManifestSchema = z.object({
     platform: z.literal("android"),
     appId: z.string(),
+    releaseChannel: z.enum(["stable", "preview"]),
     versionName: z.string(),
     versionCode: z.number().int().nonnegative(),
     apkUrl: z.string().url(),
@@ -18,21 +19,26 @@ const AndroidUpdateManifestSchema = z.object({
 
 type AndroidUpdateManifest = z.infer<typeof AndroidUpdateManifestSchema>;
 
+type AndroidReleaseChannel = AndroidUpdateManifest["releaseChannel"];
+
 type CachedManifest = {
     manifest: AndroidUpdateManifest;
     expiresAt: number;
 };
 
-let cachedAndroidManifest: CachedManifest | null = null;
-let androidManifestFetchInFlight: Promise<AndroidUpdateManifest | null> | null = null;
+const cachedAndroidManifests = new Map<AndroidReleaseChannel, CachedManifest>();
+const androidManifestFetches = new Map<AndroidReleaseChannel, Promise<AndroidUpdateManifest | null>>();
 
 export function resetVersionRouteCacheForTests() {
-    cachedAndroidManifest = null;
-    androidManifestFetchInFlight = null;
+    cachedAndroidManifests.clear();
+    androidManifestFetches.clear();
 }
 
-function getAndroidManifestUrl() {
-    return process.env.LYNTTY_ANDROID_UPDATE_MANIFEST_URL || DEFAULT_ANDROID_MANIFEST_URL;
+function getAndroidManifestUrl(channel: AndroidReleaseChannel): string | null {
+    if (channel === "preview") return process.env.LYNTTY_ANDROID_PREVIEW_MANIFEST_URL || null;
+    return process.env.LYNTTY_ANDROID_STABLE_MANIFEST_URL
+        || process.env.LYNTTY_ANDROID_UPDATE_MANIFEST_URL
+        || DEFAULT_ANDROID_STABLE_MANIFEST_URL;
 }
 
 function getManifestCacheMs() {
@@ -43,19 +49,30 @@ function getManifestCacheMs() {
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_MANIFEST_CACHE_MS;
 }
 
-async function fetchAndroidManifest(): Promise<AndroidUpdateManifest> {
-    const response = await fetch(getAndroidManifestUrl(), {
+async function fetchAndroidManifest(channel: AndroidReleaseChannel): Promise<AndroidUpdateManifest | null> {
+    const manifestUrl = getAndroidManifestUrl(channel);
+    if (!manifestUrl) return null;
+    const response = await fetch(manifestUrl, {
         headers: { "Accept": "application/json" },
     });
     if (!response.ok) {
         throw new Error(`manifest request failed with ${response.status}`);
     }
 
-    return AndroidUpdateManifestSchema.parse(await response.json());
+    const manifest = AndroidUpdateManifestSchema.parse(await response.json());
+    if (manifest.releaseChannel !== channel) {
+        throw new Error(`manifest channel ${manifest.releaseChannel} does not match requested ${channel}`);
+    }
+    return manifest;
 }
 
-export function shouldUpdateAndroid(manifest: AndroidUpdateManifest, current: { appId: string; version?: string; versionCode?: number }) {
-    if (manifest.appId !== current.appId) return false;
+export function shouldUpdateAndroid(manifest: AndroidUpdateManifest, current: {
+    appId: string;
+    releaseChannel: AndroidReleaseChannel;
+    version?: string;
+    versionCode?: number;
+}) {
+    if (manifest.appId !== current.appId || manifest.releaseChannel !== current.releaseChannel) return false;
     if (typeof current.versionCode === "number") return manifest.versionCode > current.versionCode;
     if (current.version && semver.valid(current.version) && semver.valid(manifest.versionName)) {
         return semver.gt(manifest.versionName, current.version);
@@ -63,30 +80,30 @@ export function shouldUpdateAndroid(manifest: AndroidUpdateManifest, current: { 
     return false;
 }
 
-async function getAndroidManifest(): Promise<AndroidUpdateManifest | null> {
-    const now = Date.now();
-    if (cachedAndroidManifest && cachedAndroidManifest.expiresAt > now) {
-        return cachedAndroidManifest.manifest;
-    }
+async function getAndroidManifest(channel: AndroidReleaseChannel): Promise<AndroidUpdateManifest | null> {
+    const cached = cachedAndroidManifests.get(channel);
+    if (cached && cached.expiresAt > Date.now()) return cached.manifest;
 
-    if (!androidManifestFetchInFlight) {
-        androidManifestFetchInFlight = fetchAndroidManifest()
+    if (!androidManifestFetches.has(channel)) {
+        androidManifestFetches.set(channel, fetchAndroidManifest(channel)
             .then((manifest) => {
-                cachedAndroidManifest = {
-                    manifest,
-                    expiresAt: Date.now() + getManifestCacheMs(),
-                };
+                if (manifest) {
+                    cachedAndroidManifests.set(channel, {
+                        manifest,
+                        expiresAt: Date.now() + getManifestCacheMs(),
+                    });
+                }
                 return manifest;
             })
             .finally(() => {
-                androidManifestFetchInFlight = null;
-            });
+                androidManifestFetches.delete(channel);
+            }));
     }
 
     try {
-        return await androidManifestFetchInFlight;
+        return await androidManifestFetches.get(channel)!;
     } catch {
-        return cachedAndroidManifest?.manifest ?? null;
+        return cachedAndroidManifests.get(channel)?.manifest ?? null;
     }
 }
 
@@ -98,6 +115,7 @@ export function versionRoutes(app: Fastify) {
                 version: z.string().optional(),
                 version_code: z.number().int().nonnegative().optional(),
                 app_id: z.string(),
+                release_channel: z.enum(["stable", "preview"]).optional(),
             }),
             response: {
                 200: z.object({
@@ -108,26 +126,35 @@ export function versionRoutes(app: Fastify) {
                     update_url: z.string().url().nullable(),
                     sha256: z.string().optional(),
                     notes: z.string().optional(),
+                    release_channel: z.enum(["stable", "preview"]).optional(),
                 })
             }
         }
     }, async (request, reply) => {
-        const { platform, version, version_code, app_id } = request.body;
+        const { platform, version, version_code, app_id, release_channel } = request.body;
 
         if (platform.toLowerCase() !== 'android') {
             reply.send({ update_required: false, update_url: null });
             return;
         }
 
-        const manifest = await getAndroidManifest();
+        const requestedChannel = release_channel
+            ?? (app_id === "dev.jczhang.lyntty" ? "stable" : null);
+        if (!requestedChannel) {
+            reply.send({ update_required: false, update_url: null });
+            return;
+        }
+
+        const manifest = await getAndroidManifest(requestedChannel);
         if (!manifest) {
-            request.log.warn({ manifestUrl: getAndroidManifestUrl() }, 'Android update manifest unavailable');
+            request.log.warn({ releaseChannel: requestedChannel }, 'Android update manifest unavailable');
             reply.send({ update_required: false, update_url: null });
             return;
         }
 
         const updateRequired = shouldUpdateAndroid(manifest, {
             appId: app_id,
+            releaseChannel: requestedChannel,
             version,
             versionCode: version_code,
         });
@@ -145,6 +172,7 @@ export function versionRoutes(app: Fastify) {
             update_url: manifest.apkUrl,
             sha256: manifest.sha256,
             notes: manifest.notes,
+            release_channel: manifest.releaseChannel,
         });
     });
 }

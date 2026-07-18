@@ -8,9 +8,9 @@ tags:
 - stopApp
 - launchApp
 - extendedWaitUntil:
-    visible: "R75 Maestro Pi Session"
+    visible: "${HISTORY_TITLE}"
     timeout: 120000
-- tapOn: "R75 Maestro Pi Session"
+- tapOn: "${HISTORY_TITLE}"
 - extendedWaitUntil:
     visible: "${PONG}"
     timeout: 120000

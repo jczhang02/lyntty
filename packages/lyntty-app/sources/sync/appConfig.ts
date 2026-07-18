@@ -3,7 +3,8 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 
 export interface AppConfig {
     consoleLoggingDefault?: boolean;
-    appEnv?: string;
+    appEnv?: 'development' | 'preview' | 'production';
+    releaseChannel?: 'development' | 'preview' | 'stable';
     serverUrl?: string;
     buildCommitSha?: string;
     buildCommitTimestamp?: string;

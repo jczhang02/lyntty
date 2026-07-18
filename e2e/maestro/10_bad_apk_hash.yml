@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: Lyntty blocks a full APK with the wrong digest
+tags:
+  - release
+  - update-integrity
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "App Update Available ${UPDATE_VERSION_NAME}"
+    timeout: 120000
+- tapOn: "App Update Available ${UPDATE_VERSION_NAME}"
+- extendedWaitUntil:
+    visible: "Update failed"
+    timeout: 120000
+- assertVisible: "Downloaded APK SHA-256 did not match.*"
+- tapOn: "OK"

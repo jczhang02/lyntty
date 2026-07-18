@@ -1,6 +1,10 @@
 const { execFileSync } = require('node:child_process');
 
 const variant = process.env.APP_ENV || 'development';
+const variants = new Set(['development', 'preview', 'production']);
+if (!variants.has(variant)) {
+    throw new Error(`APP_ENV must be development, preview, or production; got ${variant}`);
+}
 const name = {
     development: "Lyntty (dev)",
     preview: "Lyntty (preview)",
@@ -16,13 +20,12 @@ const consoleLoggingDefault = {
     preview: true,
     production: false,
 }[variant];
-const releaseExpoProjectId = process.env.LYNTTY_EXPO_PROJECT_ID
-    || process.env.LYNTTY_EAS_PROJECT_ID;
+const releaseExpoProjectId = process.env.LYNTTY_EXPO_PROJECT_ID;
 const expoProjectId = releaseExpoProjectId
     || (variant === 'production' ? undefined : process.env.EXPO_PUBLIC_PROJECT_ID);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 if (variant === 'production' && (!expoProjectId || !uuidPattern.test(expoProjectId))) {
-    throw new Error('Production builds require LYNTTY_EXPO_PROJECT_ID (or legacy LYNTTY_EAS_PROJECT_ID) as a UUID');
+    throw new Error('Production builds require LYNTTY_EXPO_PROJECT_ID as a UUID');
 }
 
 function git(args) {
@@ -185,6 +188,7 @@ export default {
             app: {
                 consoleLoggingDefault,
                 appEnv: variant,
+                releaseChannel: variant === 'production' ? 'stable' : variant,
                 expoProjectId,
                 buildCommitSha: buildMetadata.commitSha,
                 buildCommitTimestamp: buildMetadata.commitTimestamp,

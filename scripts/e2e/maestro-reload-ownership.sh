@@ -18,7 +18,11 @@ mkdir -p "$ARTIFACT_DIR"
 real_home="$(cd "$HOME" && pwd -P)"
 node_home="$(cd "$LYNTTY_E2E_NODE_HOME" && pwd -P)"
 pi_home="$(cd "$LYNTTY_E2E_PI_HOME" && pwd -P)"
-[[ "$node_home" == /tmp/* && "$pi_home" == /tmp/* ]]
+is_isolated_state() {
+  [[ "$1" == /tmp/lyntty-* || "$1" == "$ROOT"/dist/test-state/* ]]
+}
+is_isolated_state "$node_home"
+is_isolated_state "$pi_home"
 [[ "$node_home" != "$real_home" && "$pi_home" != "$real_home" && "$node_home" != "$pi_home" ]]
 
 read -r pane_id pane_pid < <(tmux list-panes -t "$LYNTTY_E2E_TMUX_SESSION" -F '#{pane_id} #{pane_pid}' | head -1)
@@ -26,7 +30,7 @@ read -r pane_id pane_pid < <(tmux list-panes -t "$LYNTTY_E2E_TMUX_SESSION" -F '#
 [[ "$(ps -o comm= -p "$pane_pid" | xargs)" == "pi" ]]
 tr '\0' '\n' < "/proc/$pane_pid/environ" | grep -Fqx "HOME=$pi_home"
 tr '\0' '\n' < "/proc/$pane_pid/environ" | grep -Fqx "LYNTTY_HOME_DIR=$node_home"
-tr '\0' ' ' < "/proc/$pane_pid/cmdline" | grep -Eq 'pi .*--session '
+tr '\0' ' ' < "/proc/$pane_pid/cmdline" | grep -Eq 'pi .*--session(-id)? '
 baseline_occurrences="$(tmux capture-pane -p -S -1200 -t "$pane_id" | grep -F -c "$LYNTTY_MAESTRO_PONG" || true)"
 [[ "$baseline_occurrences" -eq 0 ]]
 
