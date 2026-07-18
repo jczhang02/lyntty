@@ -126,7 +126,7 @@ jobs:
             import { readArtifactManifest } from "./packages/lyntty-cli/src/distribution/artifactManifest.ts";
             import { verifyArtifactFiles } from "./packages/lyntty-cli/src/distribution/selfCheck.ts";
             const manifest=await readArtifactManifest(`${process.env.ROOT}/artifact-manifest.json`);
-            if (manifest.version!==process.env.VERSION || manifest.releaseId!==`lyntty-cli-${process.env.VERSION}-${process.env.TARGET}` || `${manifest.target.os}-${manifest.target.arch}`!==process.env.TARGET) throw new Error("native archive identity mismatch");
+            if (manifest.version!==process.env.VERSION || manifest.releaseId!==`lyntty-cli-${process.env.VERSION}-${process.env.TARGET}` || `${manifest.target.os}-${manifest.target.arch}`!==process.env.TARGET || manifest.sourceCommit!==process.env.SOURCE_SHA) throw new Error("native archive identity/source mismatch");
             await verifyArtifactFiles(process.env.ROOT,manifest);
             if (!manifest.files.some(file=>file.path==="lyntty"&&file.executable)) throw new Error("primary CLI is not an executable manifest entry");
             await writeFile(`${process.env.ROOT}/../executables.txt`,manifest.files.filter(file=>file.executable).map(file=>file.path).join("\n")+"\n");
@@ -216,7 +216,7 @@ jobs:
           import { readArtifactManifest } from "./packages/lyntty-cli/src/distribution/artifactManifest.ts";
           import { verifyArtifactFiles } from "./packages/lyntty-cli/src/distribution/selfCheck.ts";
           const manifest=await readArtifactManifest(`${process.env.ROOT}/artifact-manifest.json`);
-          if (manifest.version!==process.env.VERSION || manifest.releaseId!==`lyntty-cli-${process.env.VERSION}-${process.env.TARGET}` || `${manifest.target.os}-${manifest.target.arch}`!==process.env.TARGET) throw new Error("native archive identity mismatch");
+          if (manifest.version!==process.env.VERSION || manifest.releaseId!==`lyntty-cli-${process.env.VERSION}-${process.env.TARGET}` || `${manifest.target.os}-${manifest.target.arch}`!==process.env.TARGET || manifest.sourceCommit!==process.env.SOURCE_SHA) throw new Error("native archive identity/source mismatch");
           await verifyArtifactFiles(process.env.ROOT,manifest);
           if (!manifest.files.some(file=>file.path==="lyntty.exe"&&file.executable)) throw new Error("primary CLI is not an executable manifest entry");
           await writeFile(`${process.env.ROOT}/../executables.txt`,manifest.files.filter(file=>file.executable).map(file=>file.path).join("\n")+"\n");

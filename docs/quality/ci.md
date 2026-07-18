@@ -17,20 +17,20 @@ Workflow: `.github/workflows/typecheck.yml`
 
 | Job | Command | Purpose |
 | --- | --- | --- |
-| `repo-hygiene` | `bun run test:repo-hardening` + Git whitespace check | workflow/evidence hardening and diff hygiene |
+| `repo-hygiene` | frozen install + `bun pm untrusted` + hardening/release tests + Git whitespace check | lifecycle trust, workflow/evidence/release contracts, and diff hygiene |
 | `wire` | `bun run ci:audit` + `bun run ci:wire` | dependency audit, shared protocol build and tests |
 | `cli` | `bun run ci:cli` | `lyntty`/`lynttyd` typecheck and tests |
 | `relay` | `bun run ci:relay` | Relay typecheck, compiled build, and tests |
 | `app` | `bun run ci:app` | Android app typecheck, i18n guard, tests, and Expo config inspection |
 | `dev-isolation` | `bun run ci:dev` | Real isolated Relay/daemon lifecycle, crash receipts, exact ownership, and fail-closed shutdown on Ubuntu and macOS |
 
-Every package job installs with `bun install --frozen-lockfile`. Actions are pinned to full commit SHAs. The workflow has `contents: read` and `cancel-in-progress: true`.
+Every package job installs with `bun install --frozen-lockfile`. The separately required CLI artifact-smoke workflow runs all five supported target/host pairs on pull requests: Linux x64/arm64, macOS x64/arm64, and Windows x64. Actions are pinned to full commit SHAs. The workflows have `contents: read` and cancel stale runs.
 
 ## Manual / release tiers
 
 | Workflow | Trigger | Tier | Notes |
 | --- | --- | --- | --- |
-| `.github/workflows/cli-smoke-test.yml` | manual | CLI artifact smoke | Builds complete standalone archives on Linux/macOS and a Windows artifact, runs exact-inventory self-checks with isolated state and no runtime fallback, and exercises native service/transaction unit gates. It does not publish. |
+| `.github/workflows/cli-smoke-test.yml` | PR + manual | CLI artifact smoke | Builds and executes all five supported target artifacts on matching Linux/macOS/Windows architectures, runs exact-inventory self-checks with isolated state and no runtime fallback, and validates native service definitions. It does not publish. |
 | `.github/workflows/relay-image.yml` | PR + manual | Relay image verification | Builds the compiled Relay image without publishing. Ordinary main pushes do not publish stable images. |
 | `.github/workflows/native-signing.yml` | manual | native signature verification | On matching macOS/Windows runners, verifies the exact externally signed CLI archives, notarization or Authenticode identity/timestamp, complete inventory, source SHA, and emits pinned GitHub attestations. It does not publish. |
 | `.github/workflows/release-candidate.yml` | manual | build-once candidate | Builds channel-bound App/CLI/Relay bytes, SPDX/provenance, signed BOM, checksums, and rolling matrix under a candidate environment; uploads an attested Actions artifact and cannot publish. |
@@ -54,5 +54,5 @@ Compatibility-BOM publication, component tags, installers, native signing, and r
 
 - Android release-style APK and Maestro E2E remain manual/evidence-driven because they require isolated emulator state and signing inputs.
 - Relay image verification does not publish; production deployment is a separate authorized operation.
-- CLI packaging smoke is manual because it compiles complete platform artifacts. `lyntty --self-check` must not create HOME/Pi state, and install/update tests keep all mutable fixtures under ignored package build state rather than the live user environment.
+- CLI packaging smoke is a protected PR gate. `lyntty --self-check` must not create HOME/Pi state, and install/update tests keep all mutable fixtures under ignored package build state rather than the live user environment.
 - iOS is best-effort and does not block Android releases.

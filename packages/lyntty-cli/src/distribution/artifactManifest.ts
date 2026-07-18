@@ -24,6 +24,8 @@ export interface ArtifactManifestV1 {
   product: 'lyntty-cli';
   releaseId: string;
   version: string;
+  /** Optional only for compatibility with pre-provenance local artifacts. */
+  sourceCommit?: string;
   stateSchema: 1;
   target: ArtifactTarget;
   extensionSha256: string;
@@ -31,6 +33,7 @@ export interface ArtifactManifestV1 {
 }
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const SOURCE_COMMIT_PATTERN = /^[a-f0-9]{40}$/;
 const RELEASE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 function assertRecord(value: unknown, label: string): asserts value is Record<string, unknown> {
@@ -99,6 +102,9 @@ export function parseArtifactManifest(value: unknown): ArtifactManifestV1 {
   if (typeof value.version !== 'string' || !value.version.trim()) {
     throw new Error('artifact manifest version is invalid');
   }
+  if (value.sourceCommit !== undefined && (typeof value.sourceCommit !== 'string' || !SOURCE_COMMIT_PATTERN.test(value.sourceCommit))) {
+    throw new Error('artifact manifest source commit is invalid');
+  }
   if (value.stateSchema !== 1) throw new Error(`Unsupported local state schema: ${String(value.stateSchema)}`);
   if (typeof value.extensionSha256 !== 'string' || !SHA256_PATTERN.test(value.extensionSha256)) {
     throw new Error('artifact manifest extension SHA-256 is invalid');
@@ -113,6 +119,7 @@ export function parseArtifactManifest(value: unknown): ArtifactManifestV1 {
     product: 'lyntty-cli',
     releaseId: value.releaseId,
     version: value.version,
+    ...(value.sourceCommit ? { sourceCommit: value.sourceCommit } : {}),
     stateSchema: 1,
     target: parseTarget(value.target),
     extensionSha256: value.extensionSha256,

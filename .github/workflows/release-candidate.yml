@@ -185,11 +185,11 @@ jobs:
             else
               tar -xOzf "$archive" "$stem/artifact-manifest.json" > "$manifest"
             fi
-            EXPECTED_TARGET="$target" EXPECTED_VERSION="$CLI_VERSION" bun -e '
+            EXPECTED_TARGET="$target" EXPECTED_VERSION="$CLI_VERSION" EXPECTED_SOURCE="$GITHUB_SHA" bun -e '
               import { parseArtifactManifest } from "./packages/lyntty-cli/src/distribution/artifactManifest.ts";
               const manifest=parseArtifactManifest(await Bun.file(process.argv[1]).json());
               const target=`${manifest.target.os}-${manifest.target.arch}`;
-              if (manifest.version!==process.env.EXPECTED_VERSION || manifest.releaseId!==`lyntty-cli-${process.env.EXPECTED_VERSION}-${process.env.EXPECTED_TARGET}` || target!==process.env.EXPECTED_TARGET) throw new Error("signed native archive identity mismatch");
+              if (manifest.version!==process.env.EXPECTED_VERSION || manifest.releaseId!==`lyntty-cli-${process.env.EXPECTED_VERSION}-${process.env.EXPECTED_TARGET}` || target!==process.env.EXPECTED_TARGET || manifest.sourceCommit!==process.env.EXPECTED_SOURCE) throw new Error("signed native archive identity/source mismatch");
             ' "$manifest"
             local extracted="$RUNNER_TEMP/signed-${target}"
             rm -rf "$extracted"; mkdir "$extracted"

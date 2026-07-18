@@ -1,8 +1,9 @@
 name: CLI Artifact Smoke Test
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
-  push:
 
 permissions:
   contents: read
@@ -12,15 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  push-noop:
-    if: github.event_name != 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - run: echo "CLI artifact smoke is manual; push event intentionally no-ops."
-
   artifact-posix:
-    if: github.event_name == 'workflow_dispatch'
+    name: CLI artifact smoke (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
@@ -28,8 +22,14 @@ jobs:
           - runner: ubuntu-latest
             target: linux-x64
             artifact_args: ''
-          - runner: macos-14
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+            artifact_args: ''
+          - runner: macos-15-intel
             target: darwin-x64
+            artifact_args: '--no-archive'
+          - runner: macos-15
+            target: darwin-arm64
             artifact_args: '--no-archive'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
@@ -70,24 +70,24 @@ jobs:
           "$ARTIFACT/lynttyd" --build-info --json
           PATH=$ORIGINAL_PATH rm -rf "$GATE"
       - name: Validate systemd user unit
-        if: matrix.target == 'linux-x64'
+        if: startsWith(matrix.target, 'linux-')
         shell: bash
         run: |
           set -euo pipefail
           VERSION=$(bun -e 'console.log(require("./packages/lyntty-cli/package.json").version)')
-          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-linux-x64"
+          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-${{ matrix.target }}"
           GATE="$PWD/packages/lyntty-cli/dist/test-state/systemd-lint"
           mkdir -p "$GATE/home"
           ARTIFACT="$ARTIFACT" GATE="$GATE" bun -e 'import { writeFile } from "node:fs/promises"; import { renderSystemdUserUnit } from "./packages/lyntty-cli/src/daemon/service/systemd.ts"; const root=process.env.GATE; const artifact=process.env.ARTIFACT; await writeFile(`${root}/lynttyd.service`, renderSystemdUserUnit({daemonExecutable:`${artifact}/lynttyd`,cliExecutable:`${artifact}/lyntty`,homeDir:`${root}/home`,lynttyHomeDir:`${root}/state`,servicePath:`${root}/lynttyd.service`,runtimePath:"/usr/local/bin:/usr/bin:/bin",uid:1000}));'
           systemd-analyze verify "$GATE/lynttyd.service"
           rm -rf "$GATE"
       - name: Validate macOS LaunchAgent plist
-        if: matrix.target == 'darwin-x64'
+        if: startsWith(matrix.target, 'darwin-')
         shell: bash
         run: |
           set -euo pipefail
           VERSION=$(bun -e 'console.log(require("./packages/lyntty-cli/package.json").version)')
-          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-darwin-x64"
+          ARTIFACT="$PWD/packages/lyntty-cli/dist/artifacts/lyntty-cli-$VERSION-${{ matrix.target }}"
           GATE="$PWD/packages/lyntty-cli/dist/test-state/launchd-lint"
           mkdir -p "$GATE/home"
           ARTIFACT="$ARTIFACT" GATE="$GATE" bun -e 'import { writeFile } from "node:fs/promises"; import { renderLaunchAgentPlist } from "./packages/lyntty-cli/src/daemon/service/launchd.ts"; const root=process.env.GATE; const artifact=process.env.ARTIFACT; await writeFile(`${root}/dev.jczhang.lynttyd.plist`, renderLaunchAgentPlist({daemonExecutable:`${artifact}/lynttyd`,cliExecutable:`${artifact}/lyntty`,homeDir:`${root}/home`,lynttyHomeDir:`${root}/state`,servicePath:`${root}/dev.jczhang.lynttyd.plist`,runtimePath:"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",uid:501}));'
@@ -95,7 +95,7 @@ jobs:
           rm -rf "$GATE"
 
   artifact-windows:
-    if: github.event_name == 'workflow_dispatch'
+    name: CLI artifact smoke (windows-x64)
     runs-on: windows-latest
     timeout-minutes: 40
     steps:

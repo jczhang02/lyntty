@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { parseArtifactManifest } from './artifactManifest';
 
 const digest = 'a'.repeat(64);
+const sourceCommit = 'b'.repeat(40);
 
 function manifest(overrides: Record<string, unknown> = {}): unknown {
   return {
@@ -10,6 +11,7 @@ function manifest(overrides: Record<string, unknown> = {}): unknown {
     product: 'lyntty-cli',
     releaseId: 'lyntty-cli-2.0.0-linux-x64',
     version: '2.0.0',
+    sourceCommit,
     stateSchema: 1,
     target: { os: 'linux', arch: 'x64', libc: 'glibc' },
     extensionSha256: digest,
@@ -22,6 +24,7 @@ describe('artifact manifest', () => {
   it('accepts a canonical supported manifest', () => {
     const parsed = parseArtifactManifest(manifest());
     expect(parsed.releaseId).toBe('lyntty-cli-2.0.0-linux-x64');
+    expect(parsed.sourceCommit).toBe(sourceCommit);
     expect(parsed.target).toEqual({ os: 'linux', arch: 'x64', libc: 'glibc' });
     expect(parsed.files).toHaveLength(1);
   });
@@ -44,6 +47,11 @@ describe('artifact manifest', () => {
         { path: 'lyntty', sha256: digest, size: 1, executable: true },
       ],
     }))).toThrow('duplicate artifact file path');
+  });
+
+  it('accepts legacy manifests without provenance but rejects malformed source commits', () => {
+    expect(parseArtifactManifest(manifest({ sourceCommit: undefined })).sourceCommit).toBeUndefined();
+    expect(() => parseArtifactManifest(manifest({ sourceCommit: 'not-a-commit' }))).toThrow('source commit');
   });
 
   it('rejects malformed hashes, sizes, and executable flags', () => {

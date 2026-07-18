@@ -44,6 +44,7 @@ const TARGETS: Record<BuildTargetId, BuildTarget> = {
 
 const packageDir = resolve(import.meta.dir, '..');
 const repoRoot = resolve(packageDir, '..', '..');
+const SOURCE_COMMIT_PATTERN = /^[a-f0-9]{40}$/;
 
 function parseArgs(args: string[]): { targets: BuildTarget[]; outputDir: string; archive: boolean } {
   let requestedTarget: string | null = null;
@@ -224,7 +225,7 @@ async function canonicalizeArtifactModes(root: string, target: BuildTarget, curr
   }
 }
 
-async function makeManifest(root: string, target: BuildTarget, releaseId: string): Promise<ArtifactManifestV1> {
+async function makeManifest(root: string, target: BuildTarget, releaseId: string, sourceCommit: string): Promise<ArtifactManifestV1> {
   const files: ArtifactFile[] = [];
   for (const relativePath of await listFiles(root)) {
     if (relativePath === 'artifact-manifest.json') continue;
@@ -242,6 +243,7 @@ async function makeManifest(root: string, target: BuildTarget, releaseId: string
     product: 'lyntty-cli',
     releaseId,
     version: packageJson.version,
+    sourceCommit,
     stateSchema: 1,
     target: target.manifestTarget,
     extensionSha256: lynttyPiExtensionSha256(),
@@ -276,7 +278,22 @@ async function createArchive(outputDir: string, artifactName: string, suffix: Bu
   return archivePath;
 }
 
-async function buildTarget(target: BuildTarget, outputDir: string, archive: boolean): Promise<void> {
+async function resolveSourceCommit(): Promise<string> {
+  const headCommit = (await run(['git', 'rev-parse', 'HEAD'], { cwd: repoRoot })).trim();
+  if (!SOURCE_COMMIT_PATTERN.test(headCommit)) {
+    throw new Error('Artifact source commit must be an exact 40-character Git commit');
+  }
+  if (process.env.GITHUB_SHA !== undefined && process.env.GITHUB_SHA !== headCommit) {
+    throw new Error('Artifact GITHUB_SHA does not match the checked-out Git commit');
+  }
+  const dirtyPaths = (await run(['git', 'status', '--porcelain=v1', '--untracked-files=all'], { cwd: repoRoot })).trim();
+  if (dirtyPaths) {
+    throw new Error(`Refusing to attribute an artifact to a dirty source tree:\n${dirtyPaths}`);
+  }
+  return headCommit;
+}
+
+async function buildTarget(target: BuildTarget, outputDir: string, archive: boolean, sourceCommit: string): Promise<void> {
   const artifactName = `lyntty-cli-${packageJson.version}-${target.id}`;
   const artifactRoot = join(outputDir, artifactName);
   await rm(artifactRoot, { recursive: true, force: true });
@@ -314,7 +331,7 @@ async function buildTarget(target: BuildTarget, outputDir: string, archive: bool
   ].join('\n'));
 
   await canonicalizeArtifactModes(artifactRoot, target);
-  const manifest = await makeManifest(artifactRoot, target, artifactName);
+  const manifest = await makeManifest(artifactRoot, target, artifactName, sourceCommit);
   const manifestPath = join(artifactRoot, 'artifact-manifest.json');
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o644 });
   await chmod(manifestPath, 0o644);
@@ -329,5 +346,6 @@ async function buildTarget(target: BuildTarget, outputDir: string, archive: bool
 }
 
 const { targets, outputDir, archive } = parseArgs(process.argv.slice(2));
+const sourceCommit = await resolveSourceCommit();
 await mkdir(outputDir, { recursive: true });
-for (const target of targets) await buildTarget(target, outputDir, archive);
+for (const target of targets) await buildTarget(target, outputDir, archive, sourceCommit);

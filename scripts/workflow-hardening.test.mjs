@@ -13,8 +13,10 @@ const androidGradlePath = new URL('../packages/lyntty-app/android/app/build.grad
 const maestroRunnerPath = new URL('./e2e/run-maestro.sh', import.meta.url);
 const codeownersPath = new URL('../.github/CODEOWNERS', import.meta.url);
 const typecheckWorkflowPath = new URL('../.github/workflows/typecheck.yml', import.meta.url);
+const cliSmokeWorkflowPath = new URL('../.github/workflows/cli-smoke-test.yml', import.meta.url);
+const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-artifact.ts', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
@@ -26,6 +28,8 @@ const [relayDeploy, relayImage, androidRelease, releaseCandidate, releasePromote
   readFile(maestroRunnerPath, 'utf8'),
   readFile(codeownersPath, 'utf8'),
   readFile(typecheckWorkflowPath, 'utf8'),
+  readFile(cliSmokeWorkflowPath, 'utf8'),
+  readFile(cliArtifactBuilderPath, 'utf8'),
 ]);
 
 test('relay deploy resolves only a signed stable BOM to an immutable image', () => {
@@ -92,7 +96,10 @@ test('candidate builds once under channel isolation and never publishes', () => 
   assert.match(releaseCandidate, /native-signing\.yml/);
   assert.match(releaseCandidate, /--signer-digest "\$GITHUB_SHA"/);
   assert.match(releaseCandidate, /native-\$\{target\}-attestation\.json/);
-  assert.match(releaseCandidate, /signed native archive identity mismatch/);
+  assert.match(releaseCandidate, /signed native archive identity\/source mismatch/);
+  assert.match(releaseCandidate, /manifest\.sourceCommit!==process\.env\.EXPECTED_SOURCE/);
+  assert.match(cliArtifactBuilder, /git', 'status', '--porcelain=v1', '--untracked-files=all'/);
+  assert.match(cliArtifactBuilder, /Refusing to attribute an artifact to a dirty source tree/);
   assert.match(releaseCandidate, /signed native archive trust roots do not match candidate/);
   assert.match(releaseCandidate, /test fixture BOM roots are never publishable/);
   assert.ok(releaseCandidate.indexOf('test fixture BOM roots are never publishable') > releaseCandidate.indexOf('bun install --frozen-lockfile'));
@@ -181,9 +188,27 @@ test('native signature verification pins platform identities and attests exact a
   assert.match(nativeSigning, /\$primarySignature = Get-AuthenticodeSignature -LiteralPath \$primary/);
   assert.match(nativeSigning, /WINDOWS_CERT_THUMBPRINT/);
   assert.match(nativeSigning, /primarySignature\.TimeStamperCertificate/);
+  assert.ok((nativeSigning.match(/manifest\.sourceCommit!==process\.env\.SOURCE_SHA/g) ?? []).length >= 2);
   assert.doesNotMatch(nativeSigning, /^\s*! printf '%s\\n'/m);
   assert.match(nativeSigning, /actions\/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35/);
   assert.match(nativeSigning, /bun install --frozen-lockfile/);
+});
+
+test('required PR hygiene verifies lifecycle trust and release contracts', () => {
+  assert.match(typecheckWorkflow, /bun pm untrusted/);
+  assert.match(typecheckWorkflow, /Found 0 untrusted dependencies with scripts/);
+  assert.match(typecheckWorkflow, /bun test scripts\/release\.test\.ts/);
+});
+
+test('supported CLI artifacts run on every release architecture in PR CI', () => {
+  assert.match(cliSmokeWorkflow, /pull_request:/);
+  for (const target of ['linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64']) {
+    assert.match(cliSmokeWorkflow, new RegExp(`target: ${target}`));
+  }
+  assert.match(cliSmokeWorkflow, /--target windows-x64/);
+  assert.match(cliSmokeWorkflow, /runner: ubuntu-24\.04-arm/);
+  assert.match(cliSmokeWorkflow, /CLI artifact smoke \(\$\{\{ matrix\.target \}\}\)/);
+  assert.match(cliSmokeWorkflow, /--self-check --json/);
 });
 
 test('isolated development lifecycle runs on Linux and macOS CI', () => {

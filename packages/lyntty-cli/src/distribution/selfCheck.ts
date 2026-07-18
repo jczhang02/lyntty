@@ -13,6 +13,7 @@ export interface SelfCheckResult {
   ok: true;
   releaseId: string;
   version: string;
+  sourceCommit?: string;
   target: ArtifactManifestV1['target'];
   checkedFiles: number;
   daemonVersion: string;
@@ -130,6 +131,7 @@ export async function runSelfCheck(): Promise<SelfCheckResult> {
     ok: true,
     releaseId: manifest.releaseId,
     version: manifest.version,
+    ...(manifest.sourceCommit ? { sourceCommit: manifest.sourceCommit } : {}),
     target: manifest.target,
     checkedFiles: manifest.files.length,
     daemonVersion: daemonInfo.version,
