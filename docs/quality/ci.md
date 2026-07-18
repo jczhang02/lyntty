@@ -31,11 +31,15 @@ Every package job installs with `bun install --frozen-lockfile`. Actions are pin
 | --- | --- | --- | --- |
 | `.github/workflows/cli-smoke-test.yml` | manual | CLI artifact smoke | Builds complete standalone archives on Linux/macOS and a Windows artifact, runs exact-inventory self-checks with isolated state and no runtime fallback, and exercises native service/transaction unit gates. It does not publish. |
 | `.github/workflows/relay-image.yml` | PR + manual | Relay image verification | Builds the compiled Relay image without publishing. Ordinary main pushes do not publish stable images. |
-| `.github/workflows/relay-deploy.yml` | manual | production deployment | Requires an explicitly pinned image and remains separate from release. |
-| `.github/workflows/android-release.yml` | manual | Android release APK | Builds the signed full APK; protected Android credentials are required. |
+| `.github/workflows/native-signing.yml` | manual | native signature verification | On matching macOS/Windows runners, verifies the exact externally signed CLI archives, notarization or Authenticode identity/timestamp, complete inventory, source SHA, and emits pinned GitHub attestations. It does not publish. |
+| `.github/workflows/release-candidate.yml` | manual | build-once candidate | Builds channel-bound App/CLI/Relay bytes, SPDX/provenance, signed BOM, checksums, and rolling matrix under a candidate environment; uploads an attested Actions artifact and cannot publish. |
+| `.github/workflows/release-promote.yml` | manual | protected promotion | Verifies the exact candidate, pushes the existing OCI layout by digest, re-verifies native attestations, resumes an exact draft safely, attests assets, and atomically publishes Stable or Preview without rebuilding. |
+| `.github/workflows/release-rollback.yml` | manual | protected Stable rollback | Reuses retained immutable bytes in a new higher signed BOM; no component build runs. |
+| `.github/workflows/relay-deploy.yml` | manual | production deployment | Verifies the current signed Stable head plus image signature/provenance/SBOM, deploys its monotonic `@sha256:` image after backup/migrate/doctor, and remains separate from publication while sharing its Stable serialization lock. |
+| `.github/workflows/android-release.yml` | manual | Android candidate verification | Builds and audits the signed Stable APK under protected Android credentials, then uploads a short-lived artifact without publishing. |
 | `.github/workflows/docs.yml` | docs/main + manual | docs | Checks/builds the Fumadocs site and deploys Pages. |
 
-Compatibility-BOM publication, component tags, installers, native signing, and release promotion belong to the dedicated release workflow; they must not be side effects of a normal main push.
+Compatibility-BOM publication, component tags, installers, native signing, and release promotion are explicit protected workflows; they are never side effects of a normal main push. Stable is the only non-prerelease GitHub latest channel; Preview always uses its separate prerelease identity.
 
 ## Local developer commands
 

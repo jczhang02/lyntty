@@ -33,6 +33,9 @@ See:
 - `docs/roadmap.zh.md`
 - `docs/research/lyntty-product-boundary.md`
 - `docs/research/lyntty-session-discovery.md`
+- `docs/release/compatibility-bom.md`
+- `docs/release/android-apk.md`
+- `docs/release/cli.md`
 
 ## Development status
 

@@ -66,6 +66,11 @@ Encrypted attachments use the local filesystem by default. Setting `S3_HOST` ena
 | `PORT` | No | `3005` | API port |
 | `HOST` | No | `0.0.0.0` | API bind address |
 | `REDIS_URL` | No | — | Socket.IO multi-process adapter |
+| `LYNTTY_RELEASE_TRUST_ROOTS` | Required for Android updates | — | Reviewed public Ed25519 roots plus Stable/Preview package, certificate, and image pins |
+| `LYNTTY_STABLE_BOM_URL` | No | GitHub latest Stable BOM | Override signed Stable Compatibility BOM discovery |
+| `LYNTTY_PREVIEW_BOM_URL` | Preview only | — | Explicit signed Preview BOM; never falls back to Stable |
+| `LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE` | No | `0` | Persistent operator replay floor for Stable metadata |
+| `LYNTTY_PREVIEW_MINIMUM_BOM_SEQUENCE` | No | `0` | Persistent operator replay floor for Preview metadata |
 | `S3_HOST` | No | — | Enable S3-compatible attachment storage |
 | `S3_PORT` | No | provider default | S3 port |
 | `S3_USE_SSL` | No | `true` | S3 TLS setting |

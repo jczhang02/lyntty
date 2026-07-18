@@ -53,9 +53,12 @@ The supported components are independently versioned:
 - Compiled CLI/`lynttyd` integration against an isolated compiled Relay, with temporary HOME/state/port and forbidden-runtime sentinels.
 - Complete CLI artifact layout with embedded identity, exact self-check, bundled Pi assets/tools, deterministic archives, and five target builds.
 - Atomic CLI install/update/rollback journal, ownership-safe Pi extension updates, systemd user service, macOS LaunchAgent, and hash-pinned bootstrap. See `docs/evidence/r79-cli-artifact-service-update.md`.
-- Protected `main`; implementation remains on `refactor/bun-migration` until the complete compatibility/release gate is ready.
+- Relay standalone migration, backup/restore, schema leases, and runtime-free multiarch OCI verification. See `docs/evidence/r80-relay-standalone-migration-recovery.md`.
+- Android Stable/Preview identity isolation, Node-family Gradle execution audit, native streaming APK hash, Package Installer upgrade, and isolated Maestro matrix. See `docs/evidence/r81-android-release-update.md`.
+- Wire `1.1` one-minor capability negotiation, canonical Ed25519 Compatibility BOM, signed Relay/CLI consumers, build-once candidate, protected promotion, monotonic rollback, SPDX/provenance, and digest-only Relay deploy workflow. See `docs/release/compatibility-bom.md`.
+- Protected `main`; implementation remains on `refactor/bun-migration` until final integration and protected PR review are complete.
 
-## Remaining delivery phases
+## Delivery phases and remaining external execution
 
 ### 1. Reproducible artifacts
 

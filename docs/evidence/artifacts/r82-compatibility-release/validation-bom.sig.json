@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "Ed25519",
+  "keyId": "stable-test-key",
+  "channel": "stable",
+  "payloadSha256": "fa8896865d1293add4dca2a7df6000c6e7c5c6ae599d8baa34e9ef564577602f",
+  "signatureBase64": "seCja8GYy3L33yWBpbRS+X2lmans+PPwTxakaH9T2CBiUew5pLAMLY2CvmlHfrYc9fKM3oSaQ8vjt4E1RPSeBA=="
+}

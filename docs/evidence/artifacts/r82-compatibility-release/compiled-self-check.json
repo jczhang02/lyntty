@@ -1,0 +1,1 @@
+{"ok":true,"releaseId":"lyntty-cli-1.2.0-linux-x64","version":"1.2.0","target":{"os":"linux","arch":"x64","libc":"glibc"},"checkedFiles":178,"daemonVersion":"1.2.0","wire":{"protocolMajor":1,"protocolMinor":1,"capabilities":["pi.activation-lock.v1","pi.command-idempotency.v1","pi.history-gap.v1","pi.history-pagination.v1","pi.owner-epoch.v1","pi.shared-control.v1"]}}

@@ -2,7 +2,7 @@
 
 Canonical wire specification package for Lyntty clients and services.
 
-This package defines shared wire contracts as TypeScript types + Zod schemas. It is intentionally small and focused on protocol-level data only.
+This package defines shared wire contracts, runtime capability negotiation, and the signed Compatibility BOM interface as TypeScript types + Zod schemas.
 
 ## Quick Examples (Legacy vs New)
 
@@ -106,6 +106,8 @@ Wire-level encrypted container (same for legacy and new):
 - encrypted message/update payloads
 - session protocol envelope and event stream
 - helper for creating valid session envelopes
+- one-minor Wire capability negotiation
+- canonical signed Compatibility BOM validation and artifact selection
 
 The goal is to keep CLI/app/server/agent on the same wire contract and avoid schema drift.
 
@@ -114,7 +116,7 @@ The goal is to keep CLI/app/server/agent on the same wire contract and avoid sch
 - Name: `lyntty-wire`
 - Workspace path: `packages/lyntty-wire`
 - Entry: `src/index.ts`
-- Runtime deps: `zod`, `@paralleldrive/cuid2`
+- Runtime deps: `zod`, `semver`, `@paralleldrive/cuid2`
 
 ## Public Exports
 
@@ -122,6 +124,9 @@ The goal is to keep CLI/app/server/agent on the same wire contract and avoid sch
 - `src/messages.ts`
 - `src/legacyProtocol.ts`
 - `src/sessionProtocol.ts`
+- `src/wireCompatibility.ts`
+
+The release seam is intentionally separate: `lyntty-wire/compatibility` exports the pure BOM interface, while Node/Bun release tools and Relay/CLI consumers import `lyntty-wire/compatibility/node` for Ed25519. App bundles do not load the BOM/semver or Node-only modules.
 
 ### `messages.ts` exports
 
