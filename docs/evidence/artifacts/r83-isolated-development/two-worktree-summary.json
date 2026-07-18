@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-18T16:39:42.204Z",
+  "simultaneousStart": true,
+  "worktrees": [
+    {
+      "worktree": "dev-isolation-a",
+      "worktreeHash": "cf2f33d7bb313e49",
+      "stateDir": "dist/dev/cf2f33d7bb313e49",
+      "ports": {
+        "relay": 57442,
+        "metro": 57443
+      },
+      "roles": [
+        "daemon",
+        "relay"
+      ],
+      "androidRequested": false
+    },
+    {
+      "worktree": "dev-isolation-b",
+      "worktreeHash": "c0e9bd986bfadd9e",
+      "stateDir": "dist/dev/c0e9bd986bfadd9e",
+      "ports": {
+        "relay": 53796,
+        "metro": 53797
+      },
+      "roles": [
+        "daemon",
+        "relay"
+      ],
+      "androidRequested": false
+    }
+  ],
+  "distinctStateRoots": true,
+  "distinctPortBlocks": true,
+  "verification": [
+    {
+      "worktree": "dev-isolation-a",
+      "ok": true,
+      "relayHealthy": true,
+      "ownershipProven": true,
+      "registeredMachines": 1,
+      "cliDaemonRunning": true,
+      "cliListUsable": true
+    },
+    {
+      "worktree": "dev-isolation-b",
+      "ok": true,
+      "relayHealthy": true,
+      "ownershipProven": true,
+      "registeredMachines": 1,
+      "cliDaemonRunning": true,
+      "cliListUsable": true
+    }
+  ],
+  "unsafeDown": {
+    "rejected": true,
+    "error": "Refusing to signal an unowned live PID (relay): command-mismatch",
+    "unrelatedProcessSurvived": true,
+    "allOriginalSupervisorsSurvived": true
+  },
+  "crashRecovery": {
+    "durableSupervisorReceipt": true,
+    "receiptOwnedGroupsStopped": true,
+    "launchMetadataRemoved": true
+  },
+  "cleanup": {
+    "allSupervisorsStopped": true,
+    "coordinationMetadataRemoved": true
+  }
+}

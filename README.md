@@ -37,9 +37,18 @@ See:
 - `docs/release/android-apk.md`
 - `docs/release/cli.md`
 
-## Development status
+## Development
 
-Lyntty is consolidating on a Bun-only, Pi-only delivery model. Legacy upstream product surfaces are being removed while the Android interaction quality, encrypted relay, and shared-control session path are preserved.
+Lyntty uses a Bun-only, Pi-only workspace. Start an isolated worktree-local Relay and daemon with:
+
+```bash
+bun install --frozen-lockfile
+bun dev:up
+bun dev:verify
+bun dev:down
+```
+
+Android is explicit with `bun dev:up --android`. See [`docs/development.md`](docs/development.md) for state, port, evidence, and process-ownership safety.
 
 ## License
 

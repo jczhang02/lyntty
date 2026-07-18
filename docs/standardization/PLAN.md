@@ -56,6 +56,7 @@ The supported components are independently versioned:
 - Relay standalone migration, backup/restore, schema leases, and runtime-free multiarch OCI verification. See `docs/evidence/r80-relay-standalone-migration-recovery.md`.
 - Android Stable/Preview identity isolation, Node-family Gradle execution audit, native streaming APK hash, Package Installer upgrade, and isolated Maestro matrix. See `docs/evidence/r81-android-release-update.md`.
 - Wire `1.1` one-minor capability negotiation, canonical Ed25519 Compatibility BOM, signed Relay/CLI consumers, build-once candidate, protected promotion, monotonic rollback, SPDX/provenance, and digest-only Relay deploy workflow. See `docs/release/compatibility-bom.md`.
+- Worktree-local `dev:up/check/verify/down` lifecycle with deterministic collision-free port blocks, isolated state/auth/PGlite, durable launch receipts, exact process-group ownership, and explicit `--android`. See `docs/development.md`.
 - Protected `main`; implementation remains on `refactor/bun-migration` until final integration and protected PR review are complete.
 
 ## Delivery phases and remaining external execution

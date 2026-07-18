@@ -22,6 +22,7 @@ Workflow: `.github/workflows/typecheck.yml`
 | `cli` | `bun run ci:cli` | `lyntty`/`lynttyd` typecheck and tests |
 | `relay` | `bun run ci:relay` | Relay typecheck, compiled build, and tests |
 | `app` | `bun run ci:app` | Android app typecheck, i18n guard, tests, and Expo config inspection |
+| `dev-isolation` | `bun run ci:dev` | Real isolated Relay/daemon lifecycle, crash receipts, exact ownership, and fail-closed shutdown on Ubuntu and macOS |
 
 Every package job installs with `bun install --frozen-lockfile`. Actions are pinned to full commit SHAs. The workflow has `contents: read` and `cancel-in-progress: true`.
 
@@ -43,8 +44,9 @@ Compatibility-BOM publication, component tags, installers, native signing, and r
 
 ## Local developer commands
 
-- `bun run ci:fast` — repository hardening, audit, all four workspace gates, and `git diff --check`.
+- `bun run ci:fast` — repository hardening, audit, all four workspace gates, isolated development lifecycle, and `git diff --check`.
 - `bun run ci:wire`, `bun run ci:cli`, `bun run ci:relay`, `bun run ci:app` — workspace-scoped gates.
+- `bun run ci:dev` — isolated development lifecycle and crash/ownership safety gate.
 - `bun install --frozen-lockfile` — prove the lockfile is complete.
 - `bun pm untrusted` — must report zero blocked lifecycle scripts.
 
