@@ -1,4 +1,4 @@
-name: Android release
+name: Android stable candidate verification
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: android-release
@@ -85,31 +85,13 @@ jobs:
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "apk_name=$apk_name" >> "$GITHUB_OUTPUT"
-          VERSION_CODE="$version_code" bun - <<'BUN'
-          const fs = require('node:fs');
-
-          const changelog = fs.readFileSync('packages/lyntty-app/CHANGELOG.md', 'utf8');
-          const match = changelog.match(/^# (.+)\n\n([\s\S]*?)(?=\n# |\s*$)/);
-          if (!match) {
-            throw new Error('CHANGELOG.md must start with a fixed Lyntty Android release entry');
+          package_version="$(bun -e 'const x=await Bun.file("packages/lyntty-app/package.json").json();process.stdout.write(x.version)')"
+          [[ "$VERSION_NAME" == "$package_version" ]] || {
+            echo "version_name must match packages/lyntty-app/package.json ($package_version)" >&2
+            exit 1
           }
-
-          const [, title, body] = match;
-          const expectedTitle = `Lyntty Android ${process.env.VERSION_NAME} (${process.env.VERSION_CODE})`;
-          const titlePattern = new RegExp(`^${expectedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} — \\d{4}-\\d{2}-\\d{2}$`);
-          if (!titlePattern.test(title)) {
-            throw new Error(`Top changelog title must be "${expectedTitle} — YYYY-MM-DD"; got "${title}"`);
-          }
-
-          const summary = body.split('\n').map((line) => line.trim()).find((line) => line && !line.startsWith('#') && !line.startsWith('-'));
-          if (!summary) {
-            throw new Error('Top changelog entry must include a one-line summary before sections');
-          }
-
-          const notes = `# ${title}\n\n${body.trim()}\n`;
-          fs.writeFileSync(`${process.env.RUNNER_TEMP}/release-notes.txt`, notes);
-          fs.writeFileSync(`${process.env.RUNNER_TEMP}/release-summary.txt`, `${summary}\n`);
-          BUN
+          printf 'Verified Android Stable candidate %s (%s) from %s\n' "$VERSION_NAME" "$version_code" "$GITHUB_SHA" > "$RUNNER_TEMP/release-summary.txt"
+          cp "$RUNNER_TEMP/release-summary.txt" "$RUNNER_TEMP/release-notes.txt"
 
       - name: Decode release keystore
         env:
@@ -175,7 +157,7 @@ jobs:
             dev.jczhang.lyntty "$VERSION_NAME" "$VERSION_CODE" "$EXPECTED_CERT_SHA256" \
             > "$RUNNER_TEMP/android-apk-audit.txt"
 
-      - name: Generate latest.json
+      - name: Generate unsigned candidate inventory
         env:
           VERSION_NAME: ${{ inputs.version_name }}
           VERSION_CODE: ${{ steps.release.outputs.version_code }}
@@ -189,7 +171,7 @@ jobs:
           export SHA256
           SHA256=$(sha256sum "$RUNNER_TEMP/$APK_NAME" | awk '{print $1}')
           export APK_URL="https://github.com/jczhang02/lyntty/releases/download/${TAG}/${APK_NAME}"
-          export MANIFEST_PATH="$RUNNER_TEMP/latest.json"
+          export MANIFEST_PATH="$RUNNER_TEMP/android-artifact.json"
           bun - <<'BUN'
           const fs = require('node:fs');
           const notes = fs.readFileSync(`${process.env.RUNNER_TEMP}/release-summary.txt`, 'utf8').trim();
@@ -207,18 +189,16 @@ jobs:
           fs.writeFileSync(process.env.MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
           BUN
 
-      - name: Publish GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.release.outputs.tag }}
-          APK_NAME: ${{ steps.release.outputs.apk_name }}
-        run: |
-          set -euo pipefail
-          gh release create "$TAG" \
-            "$RUNNER_TEMP/$APK_NAME" \
-            "$RUNNER_TEMP/latest.json" \
-            "$RUNNER_TEMP/android-exec-audit.txt" \
-            "$RUNNER_TEMP/android-apk-audit.txt" \
-            "$RUNNER_TEMP/android-production-guard.txt" \
-            --title "Lyntty Android $TAG" \
-            --notes-file "$RUNNER_TEMP/release-notes.txt"
+      - name: Upload verified candidate without publishing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-stable-candidate-${{ github.sha }}-${{ steps.release.outputs.version_code }}
+          path: |
+            ${{ runner.temp }}/${{ steps.release.outputs.apk_name }}
+            ${{ runner.temp }}/android-artifact.json
+            ${{ runner.temp }}/android-exec-audit.txt
+            ${{ runner.temp }}/android-apk-audit.txt
+            ${{ runner.temp }}/android-production-guard.txt
+            ${{ runner.temp }}/release-notes.txt
+          if-no-files-found: error
+          retention-days: 14

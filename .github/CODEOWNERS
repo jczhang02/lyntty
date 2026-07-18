@@ -1,0 +1,21 @@
+# Release trust, compatibility, and production promotion require owner review.
+/.github/CODEOWNERS @jczhang02
+/.github/workflows/ @jczhang02
+/.dockerignore @jczhang02
+/Dockerfile @jczhang02
+/package.json @jczhang02
+/bun.lock @jczhang02
+/packages/*/package.json @jczhang02
+/scripts/release.ts @jczhang02
+/scripts/workflow-hardening.test.mjs @jczhang02
+/packages/lyntty-app/android/app/build.gradle @jczhang02
+/packages/lyntty-app/scripts/apk-audit.sh @jczhang02
+/packages/lyntty-app/scripts/gradle-runtime-audit.sh @jczhang02
+/packages/lyntty-cli/scripts/build-artifact.ts @jczhang02
+/packages/lyntty-cli/src/distribution/ @jczhang02
+/packages/lyntty-cli/src/api/wireAuth.ts @jczhang02
+/packages/lyntty-relay/scripts/ @jczhang02
+/packages/lyntty-relay/sources/ @jczhang02
+/packages/lyntty-wire/src/ @jczhang02
+/docs/release/ @jczhang02
+/docs/deploy/relay-vps.md @jczhang02

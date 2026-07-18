@@ -10,4 +10,11 @@ node_modules
 **/dist
 **/.expo
 **/ios/Pods
+google-services.json
+**/google-services.json
+*.jks
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pfx
 **/target

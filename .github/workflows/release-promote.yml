@@ -1,0 +1,349 @@
+name: Promote compatibility release
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Candidate channel
+        required: true
+        type: choice
+        options: [preview, stable]
+      candidate_run_id:
+        description: Successful Compatibility release candidate run ID
+        required: true
+        type: string
+      candidate_tag:
+        description: Immutable candidate tag from that run
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: compatibility-promotion-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ inputs.channel == 'stable' && 'release-stable' || 'release-preview' }}
+    env:
+      CHANNEL: ${{ inputs.channel }}
+      CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+      LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
+    steps:
+      - name: Checkout protected main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate protected promotion request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          if [[ "$CHANNEL" == stable ]]; then
+            [[ "$CANDIDATE_TAG" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
+          else
+            [[ "$CANDIDATE_TAG" =~ ^compat-preview-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
+          fi
+          : "${LYNTTY_RELEASE_TRUST_ROOTS:?protected channel trust roots are required}"
+          if existing_request_release="$(gh release view "$CANDIDATE_TAG" --json isDraft 2>/dev/null)"; then
+            RELEASE_JSON="$existing_request_release" bun -e 'const x=JSON.parse(process.env.RELEASE_JSON);if(!x.isDraft)throw new Error("release tag is already published")'
+          else
+            test -z "$(git ls-remote --tags origin "refs/tags/$CANDIDATE_TAG")"
+          fi
+          run="$(gh run view "$CANDIDATE_RUN_ID" --json conclusion,event,headSha,workflowName)"
+          RUN_JSON="$run" bun -e '
+            const run=JSON.parse(process.env.RUN_JSON);
+            if (run.conclusion!=="success" || run.event!=="workflow_dispatch" || run.workflowName!=="Compatibility release candidate") throw new Error("candidate run identity is invalid");
+          '
+          echo "$run" > "$RUNNER_TEMP/candidate-run.json"
+          printf '%s\n' "$LYNTTY_RELEASE_TRUST_ROOTS" > "$RUNNER_TEMP/trust-roots.json"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install deterministic verifier dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download exact candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: compatibility-candidate-${{ inputs.candidate_tag }}
+          path: ${{ runner.temp }}/download
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id }}
+
+      - name: Verify candidate attestation, checksums, source, signature, and matrix
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/download/$CANDIDATE_TAG.candidate.tar.gz"
+          test -f "$archive"
+          candidate_source="$(bun -e 'const x=await Bun.file(process.argv[1]).json();process.stdout.write(x.headSha)' "$RUNNER_TEMP/candidate-run.json")"
+          gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY" --source-digest "$candidate_source"
+          mkdir "$RUNNER_TEMP/unpacked"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/unpacked"
+          CANDIDATE="$RUNNER_TEMP/unpacked/candidate"
+          (cd "$CANDIDATE" && sha256sum -c checksums.txt)
+          bun --no-install scripts/release.ts verify \
+            --bom "$CANDIDATE/compatibility-bom.json" \
+            --signature "$CANDIDATE/compatibility-bom.sig.json" \
+            --trust-store "$RUNNER_TEMP/trust-roots.json" \
+            --channel "$CHANNEL" > "$RUNNER_TEMP/bom-verification.json"
+          predecessor_args=()
+          while IFS= read -r file; do [[ -z "$file" ]] || predecessor_args+=(--predecessor "$file"); done < "$CANDIDATE/predecessor-paths.txt"
+          bun --no-install scripts/release.ts verify-history --current "$CANDIDATE/compatibility-bom.json" "${predecessor_args[@]}"
+          CANDIDATE="$CANDIDATE" RUN_JSON="$(cat "$RUNNER_TEMP/candidate-run.json")" bun -e '
+            const bom=await Bun.file(`${process.env.CANDIDATE}/compatibility-bom.json`).json();
+            const run=JSON.parse(process.env.RUN_JSON);
+            if (bom.releaseId!==process.env.CANDIDATE_TAG || bom.channel!==process.env.CHANNEL || bom.source.commit!==run.headSha) throw new Error("candidate BOM identity does not match approved run");
+          '
+          source_sha="$(bun -e 'const b=await Bun.file(process.argv[1]).json();process.stdout.write(b.source.commit)' "$CANDIDATE/compatibility-bom.json")"
+          git fetch --no-tags origin main
+          [[ "$source_sha" == "$(git rev-parse origin/main)" ]] || { echo 'candidate source is no longer current protected main' >&2; exit 1; }
+          if [[ "$CHANNEL" == stable ]]; then
+            for native_archive in "$CANDIDATE/cli/"*darwin-*.tar.gz "$CANDIDATE/cli/"*windows-x64.zip; do
+              [[ -f "$native_archive" ]]
+              gh attestation verify "$native_archive" --repo "$GITHUB_REPOSITORY" --source-digest "$source_sha" \
+                --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/native-signing.yml" --signer-digest "$source_sha" >/dev/null
+            done
+          fi
+          echo "candidate=$CANDIDATE" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Revalidate monotonic channel head under promotion lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE: ${{ steps.verify.outputs.candidate }}
+        run: |
+          set -euo pipefail
+          if [[ "$CHANNEL" == stable ]]; then
+            filter='select(.prerelease == false and .draft == false and (.tag_name | startswith("compat-v")))'
+          else
+            filter='select(.prerelease == true and .draft == false and (.tag_name | startswith("compat-preview-v")))'
+          fi
+          release_rows="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --jq ".[] | $filter | [.published_at, .id, .tag_name] | @tsv")"
+          expected_tags=()
+          if [[ -n "$release_rows" ]]; then
+            mapfile -t expected_tags < <(printf '%s\n' "$release_rows" | sort -t$'\t' -k1,1r -k2,2nr | awk -F '\t' 'NR <= 2 { print $3 }')
+          fi
+          if [[ "$CHANNEL" == stable && "${#expected_tags[@]}" -gt 0 ]]; then
+            [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "${expected_tags[0]}" ]]
+          fi
+          head_root="$RUNNER_TEMP/channel-head"
+          mkdir "$head_root"
+          for tag in "${expected_tags[@]}"; do
+            dir="$head_root/$tag"; mkdir "$dir"
+            gh release download "$tag" -p compatibility-bom.json -p compatibility-bom.sig.json -D "$dir"
+            bun --no-install scripts/release.ts verify \
+              --bom "$dir/compatibility-bom.json" --signature "$dir/compatibility-bom.sig.json" \
+              --trust-store "$RUNNER_TEMP/trust-roots.json" --channel "$CHANNEL" > "$dir/verified.json"
+          done
+          CANDIDATE="$CANDIDATE" HEAD_ROOT="$head_root" EXPECTED_TAGS="$(printf '%s\n' "${expected_tags[@]}")" bun - <<'BUN'
+          import { createHash } from 'node:crypto';
+          import { readFile } from 'node:fs/promises';
+          const candidate=await Bun.file(`${process.env.CANDIDATE}/compatibility-bom.json`).json();
+          const tags=process.env.EXPECTED_TAGS ? process.env.EXPECTED_TAGS.trim().split('\n').filter(Boolean) : [];
+          if (candidate.predecessors.length!==tags.length) throw new Error('candidate predecessor count is stale');
+          for (let index=0; index<tags.length; index++) {
+            const tag=tags[index];
+            const reference=candidate.predecessors[index];
+            const referencedTag=decodeURIComponent(new URL(reference.bom.url).pathname.split('/')[5] ?? '');
+            if (referencedTag!==tag) throw new Error('candidate predecessor chain is stale');
+            const bytes=await readFile(`${process.env.HEAD_ROOT}/${tag}/compatibility-bom.json`);
+            const digest=createHash('sha256').update(bytes).digest('hex');
+            if (reference.bom.sha256!==digest || reference.bom.size!==bytes.byteLength) throw new Error('candidate predecessor bytes do not match current channel head');
+          }
+          if (tags.length) {
+            const head=await Bun.file(`${process.env.HEAD_ROOT}/${tags[0]}/compatibility-bom.json`).json();
+            if (candidate.sequence<=head.sequence) throw new Error('candidate sequence does not advance current channel head');
+            if (candidate.components.app.android.versionCode<=head.components.app.android.versionCode) throw new Error('candidate Android versionCode does not advance current channel head');
+          }
+          BUN
+
+      - name: Install registry promotion tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends skopeo
+
+      - name: Login to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v3
+
+      - name: Promote existing Relay OCI bytes by digest
+        id: image
+        env:
+          CANDIDATE: ${{ steps.verify.outputs.candidate }}
+        run: |
+          set -euo pipefail
+          read -r repository digest < <(bun -e '
+            const b=await Bun.file(process.argv[1]).json();
+            process.stdout.write(`${b.components.relay.image.repository} ${b.components.relay.image.digest}`);
+          ' "$CANDIDATE/compatibility-bom.json")
+          expected_repository="ghcr.io/jczhang02/lyntty-relay-preview"
+          [[ "$CHANNEL" == stable ]] && expected_repository="ghcr.io/jczhang02/lyntty-relay"
+          [[ "$repository" == "$expected_repository" ]]
+          if skopeo inspect "docker://$repository:$CANDIDATE_TAG" >/dev/null 2>&1; then
+            remote_digest="sha256:$(skopeo inspect --raw "docker://$repository:$CANDIDATE_TAG" | sha256sum | awk '{print $1}')"
+            [[ "$remote_digest" == "$digest" ]] || { echo 'existing candidate image tag has a different digest' >&2; exit 1; }
+          else
+            skopeo copy --all "oci-archive:$CANDIDATE/relay/lyntty-relay.oci.tar" "docker://$repository:$CANDIDATE_TAG"
+            remote_digest="sha256:$(skopeo inspect --raw "docker://$repository:$CANDIDATE_TAG" | sha256sum | awk '{print $1}')"
+            [[ "$remote_digest" == "$digest" ]]
+          fi
+          cosign sign --yes "$repository@$digest"
+          docker run --rm "$repository@$digest" version --json > "$RUNNER_TEMP/relay-build-info.json"
+          CANDIDATE="$CANDIDATE" bun -e '
+            const bom=await Bun.file(`${process.env.CANDIDATE}/compatibility-bom.json`).json();
+            const info=await Bun.file(process.argv[1]).json();
+            if (info.component!=="lyntty-relay" || info.version!==bom.components.relay.version || info.relaySchema!==bom.components.relay.schema.current || info.minimumRelaySchema!==bom.components.relay.schema.minimum || info.wire.protocolMajor!==bom.components.relay.wire.protocolMajor || info.wire.protocolMinor!==bom.components.relay.wire.protocolMinor) throw new Error("Relay runtime identity does not match Compatibility BOM");
+          ' "$RUNNER_TEMP/relay-build-info.json"
+          cosign verify \
+            --certificate-identity "https://github.com/$GITHUB_REPOSITORY/.github/workflows/release-promote.yml@refs/heads/main" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$repository@$digest" >/dev/null
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest Relay image provenance
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-name: ${{ steps.image.outputs.repository }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest Relay image SBOM
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-name: ${{ steps.image.outputs.repository }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          sbom-path: ${{ steps.verify.outputs.candidate }}/evidence/relay.spdx.json
+          push-to-registry: true
+
+      - name: Prepare exact release assets
+        id: assets
+        env:
+          CANDIDATE: ${{ steps.verify.outputs.candidate }}
+        run: |
+          set -euo pipefail
+          assets="$RUNNER_TEMP/release-assets"
+          mkdir "$assets"
+          cp "$CANDIDATE/compatibility-bom.json" "$CANDIDATE/compatibility-bom.sig.json" \
+            "$CANDIDATE/compatibility-matrix.json" "$CANDIDATE/bom-verification.json" "$assets/"
+          cp "$CANDIDATE/app/"*.apk "$assets/"
+          cp "$CANDIDATE/cli/"*.tar.gz "$CANDIDATE/cli/"*.zip "$CANDIDATE/cli/"*.manifest.sha256 "$assets/"
+          cp "$CANDIDATE/evidence/"*.spdx.json "$CANDIDATE/evidence/"*.intoto.json \
+            "$CANDIDATE/evidence/android-exec-audit.txt" "$CANDIDATE/evidence/android-apk-audit.txt" \
+            "$CANDIDATE/evidence/cli-self-check.json" "$CANDIDATE/evidence/relay-build-info.json" \
+            "$CANDIDATE/evidence/relay-schema-doctor.json" "$CANDIDATE/evidence/retained-runtime-verification.json" "$assets/"
+          if compgen -G "$CANDIDATE/evidence/native-*-attestation.json" >/dev/null; then
+            cp "$CANDIDATE/evidence/"native-*-attestation.json "$assets/"
+          fi
+          (cd "$assets" && sha256sum * | sort -k2 > release-checksums.txt)
+          echo "path=$assets" >> "$GITHUB_OUTPUT"
+
+      - name: Attest released files
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: ${{ steps.assets.outputs.path }}/**
+
+      - name: Attest Android SBOM
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: ${{ steps.assets.outputs.path }}/*.apk
+          sbom-path: ${{ steps.assets.outputs.path }}/app.spdx.json
+
+      - name: Attest CLI SBOM
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: ${{ steps.assets.outputs.path }}/lyntty-cli-*
+          sbom-path: ${{ steps.assets.outputs.path }}/cli.spdx.json
+
+      - name: Resume draft assets and publish atomically
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSETS: ${{ steps.assets.outputs.path }}
+          SOURCE_SHA: ${{ steps.verify.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find "$ASSETS" -maxdepth 1 -type f -print | sort)
+          notes="$RUNNER_TEMP/release-notes.md"
+          {
+            echo "# Lyntty Compatibility release $CANDIDATE_TAG"
+            echo
+            echo "Channel: \`$CHANNEL\`"
+            echo "Source: \`$SOURCE_SHA\`"
+            echo "Relay: \`${{ steps.image.outputs.repository }}@${{ steps.image.outputs.digest }}\`"
+            echo
+            echo 'Verify with `gh attestation verify <asset> --repo jczhang02/lyntty` and the detached Compatibility BOM signature.'
+          } > "$notes"
+          if release_json="$(gh release view "$CANDIDATE_TAG" --json isDraft,targetCommitish,title 2>/dev/null)"; then
+            RELEASE_JSON="$release_json" SOURCE_SHA="$SOURCE_SHA" bun -e '
+              const release=JSON.parse(process.env.RELEASE_JSON);
+              if (!release.isDraft || release.targetCommitish!==process.env.SOURCE_SHA) throw new Error("existing release is not the exact resumable draft");
+            '
+          else
+            gh release create "$CANDIDATE_TAG" --draft --target "$SOURCE_SHA" \
+              --title "Lyntty $CHANNEL $CANDIDATE_TAG" --notes-file "$notes"
+          fi
+          existing_dir="$RUNNER_TEMP/existing-draft-assets"; mkdir "$existing_dir"
+          mapfile -t existing < <(gh release view "$CANDIDATE_TAG" --json assets --jq '.assets[].name' | sort)
+          for name in "${existing[@]}"; do
+            [[ -f "$ASSETS/$name" ]] || { echo "unexpected draft asset: $name" >&2; exit 1; }
+            gh release download "$CANDIDATE_TAG" -p "$name" -D "$existing_dir" --clobber
+            cmp "$existing_dir/$name" "$ASSETS/$name"
+          done
+          for file in "${files[@]}"; do
+            name="$(basename "$file")"
+            printf '%s\n' "${existing[@]}" | grep -Fqx "$name" || gh release upload "$CANDIDATE_TAG" "$file"
+          done
+          desired_names="$(printf '%s\n' "${files[@]##*/}" | sort)"
+          published_names="$(gh release view "$CANDIDATE_TAG" --json assets --jq '.assets[].name' | sort)"
+          [[ "$published_names" == "$desired_names" ]]
+          if [[ "$CHANNEL" == stable ]]; then
+            gh release edit "$CANDIDATE_TAG" --draft=false --latest
+          else
+            gh release edit "$CANDIDATE_TAG" --draft=false --prerelease
+          fi
+
+      - name: Verify published channel cannot cross-contaminate latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSETS: ${{ steps.assets.outputs.path }}
+        run: |
+          set -euo pipefail
+          verify="$RUNNER_TEMP/release-verify"
+          mkdir "$verify"
+          gh release download "$CANDIDATE_TAG" -D "$verify"
+          (cd "$verify" && sha256sum -c release-checksums.txt)
+          if [[ "$CHANNEL" == stable ]]; then
+            latest_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+            [[ "$latest_tag" == "$CANDIDATE_TAG" ]]
+            curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/compatibility-bom.json" \
+              | cmp - "$ASSETS/compatibility-bom.json"
+          else
+            latest_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+            [[ "$latest_tag" != "$CANDIDATE_TAG" ]]
+            [[ "$latest_tag" != compat-preview-* ]]
+          fi
