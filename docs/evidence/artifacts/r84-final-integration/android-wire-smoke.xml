@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty_r84_api35" tests="1" failures="0" time="12.0">
+    <testcase id="R84 signed preview Wire and account smoke" name="R84 signed preview Wire and account smoke" classname="R84 signed preview Wire and account smoke" file="dist/test-state/r84-final/android-wire-smoke.yml" time="12.0" status="SUCCESS"/>
+  </testsuite>
+</testsuites>
