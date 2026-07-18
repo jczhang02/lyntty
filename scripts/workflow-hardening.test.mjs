@@ -12,8 +12,9 @@ const nativeSigningPath = new URL('../.github/workflows/native-signing.yml', imp
 const androidGradlePath = new URL('../packages/lyntty-app/android/app/build.gradle', import.meta.url);
 const maestroRunnerPath = new URL('./e2e/run-maestro.sh', import.meta.url);
 const codeownersPath = new URL('../.github/CODEOWNERS', import.meta.url);
+const typecheckWorkflowPath = new URL('../.github/workflows/typecheck.yml', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
@@ -24,6 +25,7 @@ const [relayDeploy, relayImage, androidRelease, releaseCandidate, releasePromote
   readFile(androidGradlePath, 'utf8'),
   readFile(maestroRunnerPath, 'utf8'),
   readFile(codeownersPath, 'utf8'),
+  readFile(typecheckWorkflowPath, 'utf8'),
 ]);
 
 test('relay deploy resolves only a signed stable BOM to an immutable image', () => {
@@ -184,12 +186,20 @@ test('native signature verification pins platform identities and attests exact a
   assert.match(nativeSigning, /bun install --frozen-lockfile/);
 });
 
+test('isolated development lifecycle runs on Linux and macOS CI', () => {
+  assert.match(typecheckWorkflow, /dev-isolation:/);
+  assert.match(typecheckWorkflow, /os: \[ubuntu-latest, macos-15\]/);
+  assert.match(typecheckWorkflow, /bun install --frozen-lockfile/);
+  assert.match(typecheckWorkflow, /bun run ci:dev/);
+});
+
 test('CODEOWNERS covers release trust inputs and its own policy', () => {
   for (const path of [
     '/.github/CODEOWNERS', '/.dockerignore', '/Dockerfile', '/bun.lock',
     '/packages/lyntty-app/android/app/build.gradle',
     '/packages/lyntty-cli/scripts/build-artifact.ts',
     '/packages/lyntty-cli/src/distribution/',
+    '/scripts/dev.ts',
     '/packages/lyntty-relay/sources/',
     '/packages/lyntty-wire/src/',
   ]) assert.match(codeowners, new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
