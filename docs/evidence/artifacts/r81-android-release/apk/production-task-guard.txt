@@ -1,0 +1,2 @@
+:app:assembleDebug=blocked
+:app:build=blocked

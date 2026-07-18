@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty_v03_api35" tests="1" failures="0" time="7.0">
+    <testcase id="Lyntty recovers latest Pi reply after app restart" name="Lyntty recovers latest Pi reply after app restart" classname="Lyntty recovers latest Pi reply after app restart" file="dist/test-state/r81-android-e2e/maestro-runtime/render.VZDAk4/06_recovered_reply.yml" time="7.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="reliability, app-restart, reply-recovery"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

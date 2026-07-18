@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="lyntty_v03_api35" tests="1" failures="0" time="72.0">
+    <testcase id="Lyntty queues Pi input across daemon restart" name="Lyntty queues Pi input across daemon restart" classname="Lyntty queues Pi input across daemon restart" file="e2e/maestro/05_daemon_restart_replay.yml" time="72.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="reliability, daemon-restart, command-replay"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

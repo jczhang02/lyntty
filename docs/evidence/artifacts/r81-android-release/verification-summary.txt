@@ -1,0 +1,10 @@
+Bun: 1.3.14
+App: 791 tests, 3182 assertions, 0 failures; tsc --noEmit passed
+Relay: 112 tests, 321 assertions, 0 failures; tsc --noEmit passed
+Repository hardening: 8 tests, 0 failures
+Android workflow YAML: parsed
+Shell syntax: APK/runtime/production-guard and Maestro scripts passed
+Preview release-style APK: dev.jczhang.lyntty.preview 1.0.4 (900012), non-debuggable, fixed preview signer, Node-family execve 0
+Production-config APK: dev.jczhang.lyntty 1.0.0 (900020), non-debuggable, local validation signer, Node-family execve 0
+Production task guard: :app:assembleDebug and :app:build rejected
+Maestro: 01-10 accepted paths passed; full APK update installed 900012 and retained R81 Pi shared control; bad SHA-256 left versionCode 900012

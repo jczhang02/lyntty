@@ -1,0 +1,6 @@
+flow=e2e/maestro/07_reload_ownership.yml
+interactive_reload_reason_observed=true
+new_owner_claimed=true
+owner_epoch_changed=true
+baseline_occurrences=0
+pane_occurrences=1
