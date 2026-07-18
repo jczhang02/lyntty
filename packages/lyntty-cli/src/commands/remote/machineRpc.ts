@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import type { Config } from './config';
 import type { DecryptedMachine } from './api';
 import { decodeBase64, encodeBase64, encrypt, decrypt } from './encryption';
+import { createCliSocketAuth } from '../../api/wireAuth';
 
 export type SupportedAgent = 'pi';
 
@@ -90,9 +91,10 @@ export async function spawnSessionOnMachine(
     },
 ): Promise<SpawnMachineSessionResult> {
     const socket = io(config.serverUrl, {
-        auth: {
+        auth: createCliSocketAuth({
             token,
-        },
+            clientType: 'user-scoped' as const,
+        }, 'cli-remote'),
         path: '/v1/updates',
         transports: ['websocket'],
         autoConnect: false,

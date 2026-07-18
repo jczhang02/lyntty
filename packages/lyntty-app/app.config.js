@@ -1,4 +1,5 @@
 const { execFileSync } = require('node:child_process');
+const packageJson = require('./package.json');
 
 const variant = process.env.APP_ENV || 'development';
 const variants = new Set(['development', 'preview', 'production']);
@@ -63,7 +64,7 @@ export default {
         name,
         slug: "lyntty",
         platforms: ["android", "ios"],
-        version: "1.0.0",
+        version: packageJson.version,
         orientation: "default",
         icon: "./sources/assets/images/icon.png",
         scheme: "lyntty",

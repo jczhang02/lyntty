@@ -4,6 +4,7 @@
  */
 
 import { io, Socket } from 'socket.io-client';
+import { createCliSocketAuth } from './wireAuth';
 import { logger } from '@/ui/logger';
 import {
     createManagedWorktree,
@@ -352,12 +353,11 @@ export class ApiMachineClient {
 
         this.socket = io(serverUrl, {
             transports: ['websocket'],
-            auth: {
+            auth: createCliSocketAuth({
                 token: this.token,
                 clientType: 'machine-scoped' as const,
                 machineId: this.machine.id,
-                lynttyClient: `cli-daemon/${configuration.currentCliVersion}`
-            },
+            }, 'cli-daemon'),
             path: '/v1/updates',
             reconnection: false,
         });

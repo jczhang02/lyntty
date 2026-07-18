@@ -1,3 +1,4 @@
+import { WireOfferSchema } from 'lyntty-wire';
 import { z } from "zod";
 
 //
@@ -157,6 +158,7 @@ export const MachineMetadataSchema = z.object({
     lynttyCliVersion: z.string(),
     lynttyHomeDir: z.string(), // Directory for Lyntty auth, settings, logs (usually .lyntty/ or .lyntty-dev/)
     homeDir: z.string(), // User's home directory (matches CLI field name)
+    wire: WireOfferSchema.optional(),
     // Optional fields that may be added in future versions
     username: z.string().optional(),
     arch: z.string().optional(),

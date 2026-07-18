@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
+import { ReleaseTrustStoreSchema } from 'lyntty-wire/compatibility';
+
 import packageJson from '../package.json';
 import { ARTIFACT_MANIFEST_SCHEMA_VERSION, type ArtifactFile, type ArtifactManifestV1, type ArtifactTarget } from '../src/distribution/artifactManifest';
 import { lynttyPiExtensionSha256 } from '../src/pi/piExtensionInstall';
@@ -279,6 +281,16 @@ async function buildTarget(target: BuildTarget, outputDir: string, archive: bool
   const artifactRoot = join(outputDir, artifactName);
   await rm(artifactRoot, { recursive: true, force: true });
   await mkdir(join(artifactRoot, 'runtime', 'pi'), { recursive: true });
+  const releaseTrustRoots = process.env.LYNTTY_RELEASE_TRUST_ROOTS;
+  if (releaseTrustRoots) {
+    const parsedTrustRoots = ReleaseTrustStoreSchema.parse(JSON.parse(releaseTrustRoots));
+    await mkdir(join(artifactRoot, 'runtime', 'release'), { recursive: true });
+    await writeFile(
+      join(artifactRoot, 'runtime', 'release', 'trust-roots.json'),
+      `${JSON.stringify(parsedTrustRoots, null, 2)}\n`,
+      { mode: 0o644 },
+    );
+  }
   await mkdir(join(artifactRoot, 'tools'), { recursive: true });
   await mkdir(join(artifactRoot, 'licenses'), { recursive: true });
 

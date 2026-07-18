@@ -12,6 +12,7 @@ import { RpcHandlerManager } from './rpc/RpcHandlerManager';
 import { registerCommonHandlers } from '../modules/common/registerCommonHandlers';
 import { shouldReconnect } from '@/utils/lidState';
 import { createEnvelope, type CreateEnvelopeOptions, type SessionEnvelope } from 'lyntty-wire';
+import { createCliSocketAuth } from './wireAuth';
 import { InvalidateSync } from '@/utils/sync';
 import axios from 'axios';
 
@@ -159,12 +160,11 @@ export class ApiSessionClient extends EventEmitter {
         //
 
         this.socket = io(configuration.serverUrl, {
-            auth: {
+            auth: createCliSocketAuth({
                 token: this.token,
                 clientType: 'session-scoped' as const,
                 sessionId: this.sessionId,
-                lynttyClient: `cli-coding-session/${configuration.currentCliVersion}`
-            },
+            }, 'cli-coding-session'),
             path: '/v1/updates',
             reconnection: false,
             transports: ['websocket'],

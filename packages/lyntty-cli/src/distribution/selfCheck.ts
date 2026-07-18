@@ -4,6 +4,7 @@ import { constants } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 import { lynttyPiExtensionSha256 } from '@/pi/piExtensionInstall';
+import { CURRENT_WIRE_OFFER, type WireOffer } from 'lyntty-wire';
 import { readArtifactManifest, type ArtifactManifestV1 } from './artifactManifest';
 import { runtimeLayout } from './runtimeLayout';
 import { getBuildInfo, type BuildInfo } from './buildInfo';
@@ -15,6 +16,7 @@ export interface SelfCheckResult {
   target: ArtifactManifestV1['target'];
   checkedFiles: number;
   daemonVersion: string;
+  wire: Readonly<WireOffer>;
 }
 
 function currentTargetMatches(target: ArtifactManifestV1['target']): boolean {
@@ -131,6 +133,7 @@ export async function runSelfCheck(): Promise<SelfCheckResult> {
     target: manifest.target,
     checkedFiles: manifest.files.length,
     daemonVersion: daemonInfo.version,
+    wire: CURRENT_WIRE_OFFER,
   };
 }
 

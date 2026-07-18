@@ -1,4 +1,7 @@
 import { readCredentials } from '@/persistence';
+import packageJson from '../../package.json';
+import { join } from 'node:path';
+import { configuration } from '@/configuration';
 import {
   checkIfDaemonRunningAndCleanupStaleState,
   isDaemonRunningExpectedRelease,
@@ -10,6 +13,20 @@ import { resolveInstallPaths } from '@/distribution/installPaths';
 import { applyInstallCandidate, rollbackInstallCandidate } from '@/distribution/installTransaction';
 import { readInstallState } from '@/distribution/installState';
 import { runtimeLayout } from '@/distribution/runtimeLayout';
+import { loadReleaseTrustStore, resolveChannelUpdate } from '@/distribution/channelUpdate';
+import {
+  readAcceptedReleaseChannelState,
+  rememberAcceptedReleaseChannelState,
+} from '@/distribution/releaseChannelState';
+import type { ReleaseChannel } from 'lyntty-wire/compatibility';
+
+interface ParsedCheckOptions {
+  channel: ReleaseChannel;
+  bomUrl?: string;
+  signatureUrl?: string;
+  trustStorePath?: string;
+  json: boolean;
+}
 
 interface ParsedApplyOptions {
   manifestSha256: string;
@@ -21,6 +38,27 @@ function valueAfter(args: string[], index: number, flag: string): string {
   const value = args[index + 1];
   if (!value || value.startsWith('--')) throw new Error(`${flag} requires a value`);
   return value;
+}
+
+export function parseUpdateCheckOptions(args: string[]): ParsedCheckOptions {
+  let channel: ReleaseChannel = 'stable';
+  let bomUrl: string | undefined;
+  let signatureUrl: string | undefined;
+  let trustStorePath: string | undefined;
+  let json = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]!;
+    if (arg === '--channel') {
+      const value = valueAfter(args, index++, arg);
+      if (value !== 'stable' && value !== 'preview') throw new Error('--channel must be stable or preview');
+      channel = value;
+    } else if (arg === '--bom-url') bomUrl = valueAfter(args, index++, arg);
+    else if (arg === '--signature-url') signatureUrl = valueAfter(args, index++, arg);
+    else if (arg === '--trust-store') trustStorePath = valueAfter(args, index++, arg);
+    else if (arg === '--json') json = true;
+    else throw new Error(`Unknown update check argument: ${arg}`);
+  }
+  return { channel, bomUrl, signatureUrl, trustStorePath, json };
 }
 
 export function parseUpdateApplyOptions(args: string[]): ParsedApplyOptions {
@@ -89,6 +127,39 @@ async function applyCurrentArtifact(args: string[]): Promise<void> {
   console.log(`Launcher: ${paths.userBinDir}/lyntty`);
 }
 
+async function check(args: string[]): Promise<void> {
+  const parsed = parseUpdateCheckOptions(args);
+  const trustStore = await loadReleaseTrustStore(parsed.trustStorePath);
+  const stateRoot = join(configuration.lynttyHomeDir, 'release-channels');
+  const accepted = await readAcceptedReleaseChannelState(stateRoot, parsed.channel);
+  const resolution = await resolveChannelUpdate({
+    channel: parsed.channel,
+    currentVersion: packageJson.version,
+    bomUrl: parsed.bomUrl,
+    signatureUrl: parsed.signatureUrl,
+    trustStore,
+    minimumSequence: accepted?.sequence,
+  });
+  await rememberAcceptedReleaseChannelState(stateRoot, {
+    channel: parsed.channel,
+    sequence: resolution.sequence,
+    bomSha256: resolution.bomSha256,
+    releaseId: resolution.releaseId,
+  });
+  if (parsed.json) {
+    console.log(JSON.stringify(resolution));
+    return;
+  }
+  if (!resolution.available) {
+    console.log(`Lyntty CLI ${resolution.currentVersion} is current on ${resolution.channel}`);
+    return;
+  }
+  console.log(`Lyntty CLI ${resolution.candidateVersion} is available from signed release ${resolution.releaseId}`);
+  console.log(`Archive: ${resolution.archive.url}`);
+  console.log(`SHA-256: ${resolution.archive.sha256}`);
+  console.log(`Artifact manifest SHA-256: ${resolution.archive.artifactManifestSha256}`);
+}
+
 async function rollback(args: string[]): Promise<void> {
   if (args.length > 0) throw new Error('Usage: lyntty update rollback [no options]');
   await requireAuthenticatedInstall();
@@ -120,11 +191,12 @@ async function status(args: string[]): Promise<void> {
 function showHelp(): void {
   console.log(`Usage:
   lyntty update status [--json]
+  lyntty update check [--channel stable|preview] [--bom-url <url>] [--signature-url <url>] [--trust-store <path>] [--json]
   lyntty update rollback
   lyntty update apply --manifest-sha256 <sha256> [--install-root <path>]
 
 The release installer invokes "update apply" from the verified candidate artifact.
-Channel discovery and promotion metadata are verified separately by the release Compatibility BOM.`);
+"update check" accepts only a signed Compatibility BOM and selects the archive for this platform.`);
 }
 
 export async function handleUpdateCommand(args: string[]): Promise<void> {
@@ -133,6 +205,7 @@ export async function handleUpdateCommand(args: string[]): Promise<void> {
     showHelp();
     return;
   }
+  if (command === 'check') return check(args.slice(1));
   if (command === 'apply') return applyCurrentArtifact(args.slice(1));
   if (command === 'rollback') return rollback(args.slice(1));
   if (command === 'status') return status(args.slice(1));

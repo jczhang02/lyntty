@@ -39,7 +39,7 @@ import { mapPiSessionHistoryPageToEnvelopes, mapPiSessionHistoryToEnvelopes } fr
 import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalMirror';
 import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
 import { PiSessionProtocolMapper } from '@/pi/runPiSessionProtocol';
-import { createEnvelope, type SessionEnvelope } from 'lyntty-wire';
+import { CURRENT_WIRE_OFFER, createEnvelope, type SessionEnvelope } from 'lyntty-wire';
 import { attachImagesToPiRemoteCommand, isLifecyclePiExtensionEvent, parseLynttyPiRemoteCommand, toPiAgentSessionEvent, type LynttyPiCommandInfo, type LynttyPiExtensionPayload, type LynttyPiRemoteCommand, type LynttyPiRemoteCommandAck, type LynttyPiRemoteCommandEnvelope } from '@/pi/piExtensionEvent';
 import { consumePiCompletionNotificationDecision, PiCompletionNotificationTracker, sendPiDoneNotification } from '@/pi/piCompletionNotifications';
 import { applyPiCommandFailure, isStalePiCommandAck, removeTerminalPiCommandPrefix, resolvePiCommandAdmission, selectNextQueuedPiCommand } from './piCommandQueue';
@@ -166,6 +166,7 @@ export const initialMachineMetadata: MachineMetadata = {
   homeDir: os.homedir(),
   lynttyHomeDir: configuration.lynttyHomeDir,
   lynttyLibDir: distributionLayout.libraryDir,
+  wire: CURRENT_WIRE_OFFER,
   cliAvailability: detectCLIAvailability(),
   resumeSupport: { ...detectResumeSupport(), rpcAvailable: true },
 };

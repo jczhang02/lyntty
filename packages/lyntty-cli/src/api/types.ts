@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Update, UpdateMachineBody } from 'lyntty-wire';
+import { WireOfferSchema, type Update, type UpdateMachineBody } from 'lyntty-wire';
 
 export {
   SessionMessageContentSchema,
@@ -106,6 +106,7 @@ export const MachineMetadataSchema = z.object({
   homeDir: z.string(),
   lynttyHomeDir: z.string(),
   lynttyLibDir: z.string(),
+  wire: WireOfferSchema.optional(),
   cliAvailability: z.object({
     pi: z.boolean(),
     detectedAt: z.number(),

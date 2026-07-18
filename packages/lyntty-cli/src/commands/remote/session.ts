@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { io, Socket } from 'socket.io-client';
 import { decodeBase64, decrypt } from './encryption';
 import type { EncryptionVariant } from './api';
+import { createCliSocketAuth } from '../../api/wireAuth';
 
 // --- Types ---
 
@@ -109,11 +110,11 @@ export class SessionClient extends EventEmitter {
         this.on('error', () => {});
 
         this.socket = io(opts.serverUrl, {
-            auth: {
+            auth: createCliSocketAuth({
                 token: opts.token,
                 clientType: 'session-scoped' as const,
                 sessionId: opts.sessionId,
-            },
+            }, 'cli-remote-session'),
             path: '/v1/updates',
             reconnection: true,
             reconnectionAttempts: Infinity,

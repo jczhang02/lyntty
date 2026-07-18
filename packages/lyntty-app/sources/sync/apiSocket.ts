@@ -1,3 +1,4 @@
+import { CURRENT_WIRE_OFFER } from 'lyntty-wire';
 import { io, Socket } from 'socket.io-client';
 import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
@@ -80,6 +81,8 @@ class ApiSocket {
                 token: this.config.token,
                 clientType: 'user-scoped' as const,
                 lynttyClient: getLynttyClientId(),
+                wire: CURRENT_WIRE_OFFER,
+                component: { kind: 'app', version: Constants.expoConfig?.version || '0.0.0' },
                 ...buildAppPresencePayload(getCurrentAppState(), this.visibleSessionId),
             },
             transports: ['websocket'],

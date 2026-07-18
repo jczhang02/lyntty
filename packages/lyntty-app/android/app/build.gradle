@@ -30,7 +30,8 @@ def isProductionAppEnv = lynttyAppEnv == 'production'
 def isPreviewAppEnv = lynttyAppEnv == 'preview'
 def resolvedReactNativeDir = new File([jsRuntimeExecutable, "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
 ext.REACT_NATIVE_NODE_MODULES_DIR = resolvedReactNativeDir.absolutePath
-def lynttyVersionName = (findProperty('lynttyVersionName') ?: System.getenv('LYNTTY_ANDROID_VERSION_NAME') ?: '1.0.0').toString()
+def packageVersion = new groovy.json.JsonSlurper().parse(new File(projectRoot, 'package.json')).version.toString()
+def lynttyVersionName = (findProperty('lynttyVersionName') ?: System.getenv('LYNTTY_ANDROID_VERSION_NAME') ?: packageVersion).toString()
 def lynttyVersionCode = (findProperty('lynttyVersionCode') ?: System.getenv('LYNTTY_ANDROID_VERSION_CODE') ?: '1').toString().toInteger()
 def lynttyKeystoreFile = (findProperty('lynttyKeystoreFile') ?: System.getenv('LYNTTY_ANDROID_KEYSTORE_FILE'))?.toString()
 def lynttyKeystorePassword = (findProperty('lynttyKeystorePassword') ?: System.getenv('LYNTTY_ANDROID_KEYSTORE_PASSWORD'))?.toString()

@@ -21,6 +21,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { createHash } from "node:crypto";
 import { Pool, PoolClient } from "pg";
+import { CURRENT_WIRE_OFFER } from 'lyntty-wire';
+import packageJson from '../package.json';
 import { createPGlite } from "./storage/pgliteLoader";
 import { resolveDatabaseProvider } from "./storage/databaseProvider";
 import { resolveMasterSecret } from "./masterSecret";
@@ -477,6 +479,7 @@ function printStandaloneHelp(): void {
     console.log(`lyntty-relay - portable distribution
 
 Usage:
+  lyntty-relay version [--json]     Print component, schema, and Wire identity
   lyntty-relay migrate              Apply database migrations
   lyntty-relay doctor [--json]      Check secret, provider, and schema compatibility
   lyntty-relay backup <path>        Create an atomic PGlite or PostgreSQL backup
@@ -494,8 +497,25 @@ Environment variables:
 `);
 }
 
+export function relayBuildInfo() {
+    return {
+        component: 'lyntty-relay' as const,
+        version: packageJson.version,
+        relaySchema: RELAY_SCHEMA_COMPATIBILITY_VERSION,
+        minimumRelaySchema: RELAY_SCHEMA_COMPATIBILITY_VERSION,
+        wire: CURRENT_WIRE_OFFER,
+    };
+}
+
 export async function runStandaloneCommand(command: string | undefined, args: readonly string[] = []): Promise<number> {
     switch (command) {
+        case "version":
+        case "--version":
+            if (args.some(arg => arg !== '--json') || args.filter(arg => arg === '--json').length > 1) {
+                throw new Error('Usage: lyntty-relay version [--json]');
+            }
+            console.log(args.includes('--json') ? JSON.stringify(relayBuildInfo()) : packageJson.version);
+            return 0;
         case "migrate":
             if (args.length) throw new Error("Usage: lyntty-relay migrate");
             await runMigrations({ pgliteDir });

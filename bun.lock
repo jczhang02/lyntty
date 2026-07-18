@@ -4,10 +4,13 @@
   "workspaces": {
     "": {
       "name": "lyntty-monorepo",
+      "devDependencies": {
+        "lyntty-wire": "workspace:*",
+      },
     },
     "packages/lyntty-app": {
       "name": "lyntty-app",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "dependencies": {
         "@expo/ui": "~55.0.5",
         "@expo/vector-icons": "^15.0.2",
@@ -95,7 +98,7 @@
     },
     "packages/lyntty-cli": {
       "name": "lyntty-cli",
-      "version": "1.1.10",
+      "version": "1.2.0",
       "bin": {
         "lyntty": "./bin/lyntty.mjs",
       },
@@ -112,6 +115,7 @@
         "lyntty-wire": "workspace:*",
         "ps-list": "^8.1.1",
         "qrcode-terminal": "^0.12.0",
+        "semver": "^7.7.2",
         "socket.io-client": "^4.8.1",
         "tmp": "^0.2.7",
         "tweetnacl": "^1.0.3",
@@ -122,6 +126,7 @@
         "@types/cross-spawn": "^6.0.6",
         "@types/node": ">=20",
         "@types/qrcode-terminal": "^0.12.2",
+        "@types/semver": "^7.7.0",
         "@types/tmp": "^0.2.6",
         "pkgroll": "^2.14.2",
         "typescript": "5.9.3",
@@ -129,7 +134,7 @@
     },
     "packages/lyntty-relay": {
       "name": "lyntty-relay",
-      "version": "1.1.11",
+      "version": "1.2.0",
       "dependencies": {
         "@electric-sql/pglite": "0.3.15",
         "@fastify/cors": "^10.0.1",
@@ -166,14 +171,16 @@
     },
     "packages/lyntty-wire": {
       "name": "lyntty-wire",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@paralleldrive/cuid2": "^2.2.2",
+        "semver": "^7.7.2",
         "zod": "^4.0.0",
       },
       "devDependencies": {
         "@types/bun": "1.3.14",
         "@types/node": ">=20",
+        "@types/semver": "^7.7.0",
         "typescript": "5.9.3",
       },
     },

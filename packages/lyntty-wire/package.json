@@ -1,6 +1,6 @@
 {
   "name": "lyntty-wire",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Shared message wire types and Zod schemas for Lyntty clients and services",
   "author": "Kirill Dubovitskiy",
@@ -13,7 +13,11 @@
   "module": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./compatibility": "./src/compatibilityBom.ts",
+    "./compatibility/node": "./src/compatibilityBom.node.ts",
+    "./compatibility/fetch": "./src/boundedJsonFetch.ts",
+    "./compatibility/testing": "./src/compatibilityBom.testing.ts"
   },
   "scripts": {
     "typecheck": "bunx tsc --noEmit",
@@ -22,11 +26,13 @@
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^2.2.2",
+    "semver": "^7.7.2",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/bun": "1.3.14",
     "@types/node": ">=20",
+    "@types/semver": "^7.7.0",
     "typescript": "5.9.3"
   }
 }
