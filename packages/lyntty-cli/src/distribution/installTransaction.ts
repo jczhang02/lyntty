@@ -87,12 +87,32 @@ async function readOptionalFile(path: string): Promise<Buffer | null> {
 }
 
 async function restoreClaimedSymlink(claimedPath: string, path: string): Promise<void> {
-  if (await pathKind(path) !== 'missing') return;
-  if (await pathKind(claimedPath) !== 'symlink') throw new Error(`Claimed path is not a symlink: ${claimedPath}`);
+  const currentKind = await pathKind(path);
+  if (currentKind !== 'missing') throw new Error(`restore target is occupied by ${currentKind}`);
+  if (await pathKind(claimedPath) !== 'symlink') throw new Error(`claimed path is not a symlink`);
   await symlink(await readlink(claimedPath), path, 'dir');
 }
 
-async function replaceOwnedSymlink(path: string, target: string, allowedExistingTargets: readonly string[]): Promise<void> {
+async function failWithPreservedClaim(claimedPath: string, path: string, primaryMessage: string): Promise<never> {
+  try {
+    await restoreClaimedSymlink(claimedPath, path);
+  } catch (restoreError) {
+    throw new Error(`${primaryMessage}; failed to restore the previous pointer, which is preserved at ${claimedPath}: ${restoreError instanceof Error ? restoreError.message : String(restoreError)}`);
+  }
+  try {
+    await rm(claimedPath, { force: true });
+  } catch (cleanupError) {
+    throw new Error(`${primaryMessage}; restored the previous pointer but could not remove ${claimedPath}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
+  }
+  throw new Error(primaryMessage);
+}
+
+export async function replaceOwnedSymlink(
+  path: string,
+  target: string,
+  allowedExistingTargets: readonly string[],
+  afterClaim?: (claimedPath: string) => Promise<void>,
+): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   const kind = await pathKind(path);
   if (kind === 'symlink' && await readlink(path) === target) return;
@@ -107,10 +127,9 @@ async function replaceOwnedSymlink(path: string, target: string, allowedExisting
     const claimedKind = await pathKind(claimedPath);
     const claimedTarget = claimedKind === 'symlink' ? await readlink(claimedPath) : null;
     if (!claimedTarget || !allowedExistingTargets.includes(claimedTarget)) {
-      await restoreClaimedSymlink(claimedPath, path).catch(() => undefined);
-      await rm(claimedPath, { force: true });
-      throw new Error(`Refusing to replace unrecognized symlink at ${path}`);
+      await failWithPreservedClaim(claimedPath, path, `Refusing to replace unrecognized symlink at ${path}`);
     }
+    await afterClaim?.(claimedPath);
   }
 
   try {
@@ -119,11 +138,11 @@ async function replaceOwnedSymlink(path: string, target: string, allowedExisting
     // Darwin rejects link(2) on symbolic links with EPERM.
     await symlink(target, path, 'dir');
   } catch (error) {
-    if (claimed) await restoreClaimedSymlink(claimedPath, path).catch(() => undefined);
-    throw new Error(`Failed to publish owned symlink ${path} without clobbering: ${error instanceof Error ? error.message : String(error)}`);
-  } finally {
-    if (claimed) await rm(claimedPath, { force: true });
+    const message = `Failed to publish owned symlink ${path} without clobbering: ${error instanceof Error ? error.message : String(error)}`;
+    if (claimed) await failWithPreservedClaim(claimedPath, path, message);
+    throw new Error(message);
   }
+  if (claimed) await rm(claimedPath, { force: true });
 }
 
 async function removeOwnedSymlink(path: string, allowedTargets: readonly string[]): Promise<void> {
@@ -135,9 +154,7 @@ async function removeOwnedSymlink(path: string, allowedTargets: readonly string[
   const claimedKind = await pathKind(claimedPath);
   const claimedTarget = claimedKind === 'symlink' ? await readlink(claimedPath) : null;
   if (!claimedTarget || !allowedTargets.includes(claimedTarget)) {
-    await restoreClaimedSymlink(claimedPath, path).catch(() => undefined);
-    await rm(claimedPath, { force: true });
-    throw new Error(`Refusing to remove unrecognized symlink at ${path}`);
+    await failWithPreservedClaim(claimedPath, path, `Refusing to remove unrecognized symlink at ${path}`);
   }
   await rm(claimedPath, { force: true });
 }

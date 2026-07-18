@@ -7,7 +7,7 @@ import type { DaemonServiceManager, DaemonServiceState } from '@/daemon/service'
 import { lynttyPiExtensionSha256, LYNTTY_PI_EXTENSION_SOURCE } from '@/pi/piExtensionInstall';
 import type { ArtifactManifestV1 } from './artifactManifest';
 import type { InstallPaths } from './installPaths';
-import { applyInstallCandidate, recoverInterruptedInstall, rollbackInstallCandidate } from './installTransaction';
+import { applyInstallCandidate, recoverInterruptedInstall, replaceOwnedSymlink, rollbackInstallCandidate } from './installTransaction';
 import { readInstallState } from './installState';
 
 const roots: string[] = [];
@@ -221,6 +221,27 @@ describe('atomic install transaction', () => {
     })).rejects.toThrow('manual recovery');
     expect(await readFile(first.paths.currentPath, 'utf8')).toBe('raced user file');
     expect((await readInstallState(first.paths.statePath))?.currentReleaseId).toBe('release-1');
+  });
+
+  it('preserves a claimed pointer when publication and restoration both fail', async () => {
+    const data = await fixture();
+    await mkdir(data.paths.rootDir, { recursive: true });
+    const previousTarget = join('versions', 'release-1');
+    await symlink(previousTarget, data.paths.currentPath);
+    let claimedPath = '';
+
+    await expect(replaceOwnedSymlink(
+      data.paths.currentPath,
+      join('versions', 'release-2'),
+      [previousTarget],
+      async claimed => {
+        claimedPath = claimed;
+        await writeFile(data.paths.currentPath, 'raced user file');
+      },
+    )).rejects.toThrow(/previous pointer.*preserved/i);
+
+    expect(await readFile(data.paths.currentPath, 'utf8')).toBe('raced user file');
+    expect(await readlink(claimedPath)).toBe(previousTarget);
   });
 
   it('recovers an interrupted rollback from its private journal', async () => {
