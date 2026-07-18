@@ -24,6 +24,15 @@ import { Pool, PoolClient } from "pg";
 import { createPGlite } from "./storage/pgliteLoader";
 import { resolveDatabaseProvider } from "./storage/databaseProvider";
 import { resolveMasterSecret } from "./masterSecret";
+import { backupRelayDatabase, restoreRelayDatabase } from "./backup";
+import { acquirePGliteLease, type PGliteLease } from "./pgliteLock";
+import {
+    inspectMigrationState,
+    migrationSetChecksum,
+    migrationStateFailure,
+    RELAY_SCHEMA_COMPATIBILITY_VERSION,
+    type RelayMigrationState,
+} from "./migrationState";
 
 const dataDir = process.env.DATA_DIR || "./data";
 const pgliteDir = process.env.PGLITE_DIR || path.join(dataDir, "pglite");
@@ -59,6 +68,7 @@ function resolveMigrations(migrationsDir?: string): MigrationFile[] {
         .filter(name => fs.statSync(path.join(resolvedDir, name)).isDirectory())
         .sort()
         .flatMap(name => {
+            if (!/^[0-9A-Za-z_]+$/.test(name)) throw new Error(`Unsafe migration directory name: ${name}`);
             const sqlFile = path.join(resolvedDir, name, "migration.sql");
             if (!fs.existsSync(sqlFile)) {
                 return [];
@@ -86,6 +96,62 @@ async function prepareMigrationTable(database: MigrationDatabase): Promise<void>
         );
         ALTER TABLE "_prisma_migrations" ADD COLUMN IF NOT EXISTS "checksum" TEXT;
         ALTER TABLE "_prisma_migrations" ADD COLUMN IF NOT EXISTS "rolled_back_at" TIMESTAMPTZ;
+    `);
+}
+
+async function updateSchemaCompatibility(
+    database: MigrationDatabase,
+    currentState: RelayMigrationState,
+    migrations: readonly MigrationFile[],
+): Promise<void> {
+    // Never invent or advance compatibility metadata for unknown future
+    // migrations. Their owning Relay must attest the complete applied set.
+    if (currentState.unknownApplied.length > 0) return;
+    const head = [...migrations].sort((left, right) => left.name.localeCompare(right.name)).at(-1);
+    if (!head) throw new Error("No Relay migrations are available to attest");
+    const setChecksum = migrationSetChecksum(migrations.map(migration => ({
+        name: migration.name,
+        checksum: migration.checksum,
+    })));
+    if (!setChecksum) throw new Error("Relay migrations cannot be attested without checksums");
+    await database.exec(`
+        CREATE TABLE IF NOT EXISTS "_lyntty_schema_compatibility" (
+            "id" INTEGER PRIMARY KEY CHECK ("id" = 1),
+            "minimum_relay_schema" INTEGER NOT NULL,
+            "current_relay_schema" INTEGER NOT NULL,
+            "attested_migration_head" TEXT,
+            "attested_migration_checksum" TEXT,
+            "attested_migration_count" INTEGER,
+            "attested_migration_set_checksum" TEXT,
+            "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        ALTER TABLE "_lyntty_schema_compatibility" ADD COLUMN IF NOT EXISTS "attested_migration_head" TEXT;
+        ALTER TABLE "_lyntty_schema_compatibility" ADD COLUMN IF NOT EXISTS "attested_migration_checksum" TEXT;
+        ALTER TABLE "_lyntty_schema_compatibility" ADD COLUMN IF NOT EXISTS "attested_migration_count" INTEGER;
+        ALTER TABLE "_lyntty_schema_compatibility" ADD COLUMN IF NOT EXISTS "attested_migration_set_checksum" TEXT;
+        INSERT INTO "_lyntty_schema_compatibility" (
+            "id", "minimum_relay_schema", "current_relay_schema",
+            "attested_migration_head", "attested_migration_checksum",
+            "attested_migration_count", "attested_migration_set_checksum"
+        ) VALUES (
+            1, 1, ${RELAY_SCHEMA_COMPATIBILITY_VERSION},
+            '${head.name}', '${head.checksum}',
+            ${migrations.length}, '${setChecksum}'
+        )
+        ON CONFLICT ("id") DO UPDATE SET
+            "current_relay_schema" = GREATEST(
+                "_lyntty_schema_compatibility"."current_relay_schema",
+                EXCLUDED."current_relay_schema"
+            ),
+            "attested_migration_head" = EXCLUDED."attested_migration_head",
+            "attested_migration_checksum" = EXCLUDED."attested_migration_checksum",
+            "attested_migration_count" = EXCLUDED."attested_migration_count",
+            "attested_migration_set_checksum" = EXCLUDED."attested_migration_set_checksum",
+            "updated_at" = now();
+        ALTER TABLE "_lyntty_schema_compatibility" ALTER COLUMN "attested_migration_head" SET NOT NULL;
+        ALTER TABLE "_lyntty_schema_compatibility" ALTER COLUMN "attested_migration_checksum" SET NOT NULL;
+        ALTER TABLE "_lyntty_schema_compatibility" ALTER COLUMN "attested_migration_count" SET NOT NULL;
+        ALTER TABLE "_lyntty_schema_compatibility" ALTER COLUMN "attested_migration_set_checksum" SET NOT NULL;
     `);
 }
 
@@ -147,6 +213,8 @@ async function applyMigrations(database: MigrationDatabase, migrations: Migratio
         }
     }
 
+    const stateBeforeCompatibilityUpdate = await inspectMigrationState(database, migrations);
+    await updateSchemaCompatibility(database, stateBeforeCompatibilityUpdate, migrations);
     return appliedCount;
 }
 
@@ -162,10 +230,54 @@ class PostgresMigrationDatabase implements MigrationDatabase {
     }
 }
 
-export async function runMigrations(opts: { pgliteDir: string; migrationsDir?: string } = { pgliteDir }) {
+interface PostgresSchemaLease {
+    database: PostgresMigrationDatabase;
+    release(): Promise<void>;
+}
+
+async function acquirePostgresSchemaLease(connectionString: string, shared: boolean): Promise<PostgresSchemaLease> {
+    const pool = new Pool({ connectionString, max: 1 });
+    const client = await pool.connect();
+    const lockFunction = shared ? "pg_advisory_lock_shared" : "pg_advisory_lock";
+    const unlockFunction = shared ? "pg_advisory_unlock_shared" : "pg_advisory_unlock";
+    try {
+        await client.query(
+            `SELECT ${lockFunction}(hashtext($1), hashtext($2))`,
+            ["lyntty-relay", "schema-migrations"],
+        );
+    } catch (error) {
+        client.release();
+        await pool.end();
+        throw error;
+    }
+    let released = false;
+    return {
+        database: new PostgresMigrationDatabase(client),
+        async release() {
+            if (released) return;
+            released = true;
+            try {
+                await client.query(
+                    `SELECT ${unlockFunction}(hashtext($1), hashtext($2))`,
+                    ["lyntty-relay", "schema-migrations"],
+                );
+            } finally {
+                client.release();
+                await pool.end();
+            }
+        },
+    };
+}
+
+export async function runMigrations(opts: {
+    pgliteDir: string;
+    migrationsDir?: string;
+    pgliteLeaseHeld?: boolean;
+} = { pgliteDir }) {
     const migrations = resolveMigrations(opts.migrationsDir);
     const provider = resolveDatabaseProvider();
     let appliedCount: number;
+    let finalState: RelayMigrationState;
 
     if (provider === "postgres") {
         const connectionString = process.env.DATABASE_URL;
@@ -182,7 +294,9 @@ export async function runMigrations(opts: { pgliteDir: string; migrationsDir?: s
                 ["lyntty-relay", "schema-migrations"],
             );
             migrationLockAcquired = true;
-            appliedCount = await applyMigrations(new PostgresMigrationDatabase(client), migrations);
+            const database = new PostgresMigrationDatabase(client);
+            appliedCount = await applyMigrations(database, migrations);
+            finalState = await inspectMigrationState(database, migrations);
         } finally {
             try {
                 if (migrationLockAcquired) {
@@ -199,16 +313,23 @@ export async function runMigrations(opts: { pgliteDir: string; migrationsDir?: s
     } else if (provider === "pglite") {
         console.log(`Migrating database in ${opts.pgliteDir}...`);
         fs.mkdirSync(opts.pgliteDir, { recursive: true });
-        const database = createPGlite(opts.pgliteDir);
+        const lease = opts.pgliteLeaseHeld ? null : await acquirePGliteLease(opts.pgliteDir, "migration");
+        let database: ReturnType<typeof createPGlite> | null = null;
         try {
+            database = createPGlite(opts.pgliteDir);
             appliedCount = await applyMigrations(database, migrations);
+            finalState = await inspectMigrationState(database, migrations);
         } finally {
-            await database.close();
+            await database?.close();
+            await lease?.release();
         }
     } else {
         throw new Error(`Unsupported DB_PROVIDER: ${provider}`);
     }
 
+    if (!finalState!.compatible) {
+        throw new Error(`Database remains incompatible after migration: ${migrationStateFailure(finalState!)}`);
+    }
     if (appliedCount === 0) {
         console.log("No new migrations to apply.");
     } else {
@@ -216,32 +337,108 @@ export async function runMigrations(opts: { pgliteDir: string; migrationsDir?: s
     }
 }
 
+export function pgliteDataDirectoryInitialized(directory: string): boolean {
+    try {
+        return fs.statSync(directory).isDirectory() && fs.readdirSync(directory).length > 0;
+    } catch {
+        return false;
+    }
+}
+
+export async function inspectConfiguredDatabase(
+    opts: {
+        pgliteDir: string;
+        migrationsDir?: string;
+        pgliteLeaseHeld?: boolean;
+        postgresDatabase?: PostgresMigrationDatabase;
+    } = { pgliteDir },
+): Promise<RelayMigrationState> {
+    const migrations = resolveMigrations(opts.migrationsDir);
+    const provider = resolveDatabaseProvider();
+    if (provider === "postgres") {
+        if (opts.postgresDatabase) return inspectMigrationState(opts.postgresDatabase, migrations);
+        const connectionString = process.env.DATABASE_URL;
+        if (!connectionString) throw new Error("DATABASE_URL is required when DB_PROVIDER=postgres");
+        const lease = await acquirePostgresSchemaLease(connectionString, true);
+        try {
+            return await inspectMigrationState(lease.database, migrations);
+        } finally {
+            await lease.release();
+        }
+    }
+    if (!pgliteDataDirectoryInitialized(opts.pgliteDir)) {
+        throw new Error(`PGlite database is not initialized: ${opts.pgliteDir}`);
+    }
+    const lease = opts.pgliteLeaseHeld ? null : await acquirePGliteLease(opts.pgliteDir, "doctor");
+    let database: ReturnType<typeof createPGlite> | null = null;
+    try {
+        database = createPGlite(opts.pgliteDir);
+        return await inspectMigrationState(database, migrations);
+    } finally {
+        await database?.close();
+        await lease?.release();
+    }
+}
+
+async function doctor(json: boolean): Promise<RelayMigrationState> {
+    resolveMasterSecret();
+    const provider = resolveDatabaseProvider();
+    const state = await inspectConfiguredDatabase({ pgliteDir });
+    const result = { ok: state.compatible, provider, ...state };
+    if (json) console.log(JSON.stringify(result));
+    else {
+        console.log(`Relay database provider: ${provider}`);
+        console.log(`Applied migrations: ${state.applied.length}`);
+        console.log(`Pending migrations: ${state.pending.length}`);
+        console.log(`Schema compatibility: ${state.compatible ? "ok" : "failed"}`);
+        if (state.missingChecksums.length) {
+            console.log(`Legacy checksums to backfill: ${state.missingChecksums.join(", ")}`);
+        }
+    }
+    if (!state.compatible) throw new Error(migrationStateFailure(state));
+    return state;
+}
+
 async function serve() {
     // Resolve once so serve and migrate cannot choose different databases.
     const provider = resolveDatabaseProvider();
     process.env.DB_PROVIDER = provider;
-    if (provider === "pglite") {
-        process.env.PGLITE_DIR = process.env.PGLITE_DIR || pgliteDir;
-    }
-
     const masterSecret = resolveMasterSecret();
+    let pgliteLease: PGliteLease | null = null;
+    let postgresLease: PostgresSchemaLease | null = null;
+    try {
+        if (provider === "pglite") {
+            process.env.PGLITE_DIR = process.env.PGLITE_DIR || pgliteDir;
+            pgliteLease = await acquirePGliteLease(process.env.PGLITE_DIR, "serve");
+            await runMigrations({ pgliteDir: process.env.PGLITE_DIR, pgliteLeaseHeld: true });
+        } else {
+            const connectionString = process.env.DATABASE_URL;
+            if (!connectionString) throw new Error("DATABASE_URL is required when DB_PROVIDER=postgres");
+            // Hold a shared schema lease for the full server lifetime. Every
+            // migration takes the exclusive form, closing inspect/start races.
+            postgresLease = await acquirePostgresSchemaLease(connectionString, true);
+            const state = await inspectConfiguredDatabase({ pgliteDir, postgresDatabase: postgresLease.database });
+            if (!state.compatible) {
+                throw new Error(`PostgreSQL schema is not ready: ${migrationStateFailure(state)}. Run the explicit migration job.`);
+            }
+        }
 
-    const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
-    const host = process.env.HOST || "0.0.0.0";
-
-    const { awaitShutdown } = await import("./utils/shutdown");
-    const shutdown = awaitShutdown();
-    const { startServer } = await import("./index");
-    await startServer({
-        pgliteDir: process.env.PGLITE_DIR!,
-        masterSecret,
-        port,
-        host,
-    });
-
-    // Block until shutdown so the process stays alive.
-    await shutdown;
-    process.exit(0);
+        const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
+        const host = process.env.HOST || "0.0.0.0";
+        const { awaitShutdown } = await import("./utils/shutdown");
+        const shutdown = awaitShutdown();
+        const { startServer } = await import("./index");
+        await startServer({
+            pgliteDir: process.env.PGLITE_DIR!,
+            masterSecret,
+            port,
+            host,
+        });
+        await shutdown;
+    } finally {
+        await postgresLease?.release().catch(() => undefined);
+        await pgliteLease?.release().catch(() => undefined);
+    }
 }
 
 // CLI — only when this file is invoked directly, not when imported as a library.
@@ -263,21 +460,29 @@ export function isStandaloneEntrypoint(invokedFile: string): boolean {
 }
 
 export function standaloneCommandFromArgv(argv: readonly string[]): string | undefined {
+    return standaloneArgumentsFromArgv(argv)[0];
+}
+
+export function standaloneArgumentsFromArgv(argv: readonly string[]): string[] {
     const firstArgument = argv[1];
     // Source execution: [bun, standalone.ts, command]. Compiled execution:
     // [lyntty-relay, command]. Bun compiled executables do not retain a script
     // path in argv, so the old argv[2]-only dispatch silently became a no-op.
     return firstArgument && isStandaloneEntrypoint(firstArgument)
-        ? argv[2]
-        : firstArgument;
+        ? [...argv.slice(2)]
+        : [...argv.slice(1)];
 }
 
 function printStandaloneHelp(): void {
     console.log(`lyntty-relay - portable distribution
 
 Usage:
-  lyntty-relay migrate    Apply database migrations
-  lyntty-relay serve      Start the server
+  lyntty-relay migrate              Apply database migrations
+  lyntty-relay doctor [--json]      Check secret, provider, and schema compatibility
+  lyntty-relay backup <path>        Create an atomic PGlite or PostgreSQL backup
+  lyntty-relay restore <path> --force
+                                    Restore a verified backup while Relay is stopped
+  lyntty-relay serve                Migrate PGlite or fail closed on PostgreSQL schema, then serve
 
 Environment variables:
   DATA_DIR              Base data directory (default: ./data)
@@ -289,12 +494,55 @@ Environment variables:
 `);
 }
 
-async function runStandaloneCommand(command: string | undefined): Promise<number> {
+export async function runStandaloneCommand(command: string | undefined, args: readonly string[] = []): Promise<number> {
     switch (command) {
         case "migrate":
+            if (args.length) throw new Error("Usage: lyntty-relay migrate");
             await runMigrations({ pgliteDir });
             return 0;
+        case "doctor": {
+            if (args.some(arg => arg !== "--json") || args.filter(arg => arg === "--json").length > 1) {
+                throw new Error("Usage: lyntty-relay doctor [--json]");
+            }
+            await doctor(args.includes("--json"));
+            return 0;
+        }
+        case "backup": {
+            const force = args.includes("--force");
+            const positional = args.filter(arg => arg !== "--force");
+            if (positional.length !== 1 || args.filter(arg => arg === "--force").length > 1) {
+                throw new Error("Usage: lyntty-relay backup <path> [--force]");
+            }
+            const provider = resolveDatabaseProvider();
+            const result = await backupRelayDatabase({
+                provider,
+                destination: positional[0]!,
+                pgliteDir,
+                databaseUrl: process.env.DATABASE_URL,
+                force,
+            });
+            console.log(JSON.stringify(result));
+            return 0;
+        }
+        case "restore": {
+            const force = args.includes("--force");
+            const positional = args.filter(arg => arg !== "--force");
+            if (!force || positional.length !== 1 || args.filter(arg => arg === "--force").length > 1) {
+                throw new Error("Usage: lyntty-relay restore <path> --force");
+            }
+            const provider = resolveDatabaseProvider();
+            await restoreRelayDatabase({
+                provider,
+                source: positional[0]!,
+                pgliteDir,
+                databaseUrl: process.env.DATABASE_URL,
+                force: true,
+            });
+            console.log(JSON.stringify({ ok: true, provider, restoredFrom: path.resolve(positional[0]!) }));
+            return 0;
+        }
         case "serve":
+            if (args.length) throw new Error("Usage: lyntty-relay serve");
             await serve();
             return 0;
         default:
@@ -304,7 +552,8 @@ async function runStandaloneCommand(command: string | undefined): Promise<number
 }
 
 if (import.meta.main) {
-    runStandaloneCommand(standaloneCommandFromArgv(process.argv))
+    const standaloneArguments = standaloneArgumentsFromArgv(process.argv);
+    runStandaloneCommand(standaloneArguments[0], standaloneArguments.slice(1))
         .then(code => process.exit(code))
         .catch(error => {
             console.error(error);

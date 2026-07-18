@@ -43,3 +43,8 @@ export function createPGlite(dataDir: string): PGlite {
     }
     return new PGlite(dataDir);
 }
+
+export function createPGliteFromDump(dataDir: string, dump: Blob): PGlite {
+    const wasmOpts = findWasmFiles();
+    return new PGlite({ dataDir, loadDataDir: dump, ...(wasmOpts ?? {}) });
+}
