@@ -16,6 +16,7 @@ export function resolveLynttySpawnTarget(options: {
   execPath: string;
   projectDir: string;
   configuredExecutable?: string;
+  configuredSourceEntry?: string;
 }): LynttySpawnTarget {
   if (isCompiledBunMain(options.bunMain)) {
     const configured = options.configuredExecutable?.trim();
@@ -40,9 +41,10 @@ export function resolveLynttySpawnTarget(options: {
     return { command: options.execPath, prefixArgs: [] };
   }
 
+  const configuredSourceEntry = options.configuredSourceEntry?.trim();
   return {
     command: 'bun',
-    prefixArgs: [join(options.projectDir, 'dist', 'index.mjs')],
+    prefixArgs: [configuredSourceEntry || join(options.projectDir, 'dist', 'index.mjs')],
   };
 }
 
@@ -52,6 +54,7 @@ function currentLynttySpawnTarget(): LynttySpawnTarget {
     execPath: process.execPath,
     projectDir: projectPath(),
     configuredExecutable: process.env.LYNTTY_CLI_EXECUTABLE,
+    configuredSourceEntry: process.env.LYNTTY_CLI_SOURCE_ENTRY,
   });
 }
 

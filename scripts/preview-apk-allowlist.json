@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "sourceCommit": "4043171d3b6e89ef32a5a7a3c56d5c7b7ab9b40c",
+      "applicationId": "dev.jczhang.lyntty.preview",
+      "versionName": "1.1.0",
+      "versionCode": 910003,
+      "sha256": "d0e0a335fa0db34b882fa2c71a89a65e416ecdd1ed21995719aba6a2be99da06",
+      "signerSha256": "ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c"
+    }
+  ]
+}
