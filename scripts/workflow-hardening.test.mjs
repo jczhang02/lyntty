@@ -5,6 +5,8 @@ import { test } from 'bun:test';
 const relayDeployPath = new URL('../.github/workflows/relay-deploy.yml', import.meta.url);
 const relayImagePath = new URL('../.github/workflows/relay-image.yml', import.meta.url);
 const androidReleasePath = new URL('../.github/workflows/android-release.yml', import.meta.url);
+const androidPreviewCandidatePath = new URL('../.github/workflows/android-preview-candidate.yml', import.meta.url);
+const androidPreviewPromotePath = new URL('../.github/workflows/android-preview-promote.yml', import.meta.url);
 const releaseCandidatePath = new URL('../.github/workflows/release-candidate.yml', import.meta.url);
 const releasePromotePath = new URL('../.github/workflows/release-promote.yml', import.meta.url);
 const releaseRollbackPath = new URL('../.github/workflows/release-rollback.yml', import.meta.url);
@@ -15,11 +17,16 @@ const codeownersPath = new URL('../.github/CODEOWNERS', import.meta.url);
 const typecheckWorkflowPath = new URL('../.github/workflows/typecheck.yml', import.meta.url);
 const cliSmokeWorkflowPath = new URL('../.github/workflows/cli-smoke-test.yml', import.meta.url);
 const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-artifact.ts', import.meta.url);
+const rootPackagePath = new URL('../package.json', import.meta.url);
+const previewRelayGatePath = new URL('../e2e/maestro/standalone/preview_first_run.yml', import.meta.url);
+const previewReleaseNotesPath = new URL('../docs/release/preview-apk-release-notes.md', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, previewRelayGate] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
+  readFile(androidPreviewCandidatePath, 'utf8'),
+  readFile(androidPreviewPromotePath, 'utf8'),
   readFile(releaseCandidatePath, 'utf8'),
   readFile(releasePromotePath, 'utf8'),
   readFile(releaseRollbackPath, 'utf8'),
@@ -30,7 +37,11 @@ const [relayDeploy, relayImage, androidRelease, releaseCandidate, releasePromote
   readFile(typecheckWorkflowPath, 'utf8'),
   readFile(cliSmokeWorkflowPath, 'utf8'),
   readFile(cliArtifactBuilderPath, 'utf8'),
+  readFile(rootPackagePath, 'utf8'),
+  readFile(previewRelayGatePath, 'utf8'),
 ]);
+const rootPackage = JSON.parse(rootPackageText);
+const previewReleaseNotes = await readFile(previewReleaseNotesPath, 'utf8');
 
 test('relay deploy resolves only a signed stable BOM to an immutable image', () => {
   assert.match(relayDeploy, /environment: production-relay/);
@@ -81,6 +92,84 @@ test('Android component workflow verifies a candidate but cannot publish', () =>
   assert.doesNotMatch(androidRelease, /contents: write/);
   assert.doesNotMatch(androidRelease, /gh release create/);
   assert.doesNotMatch(androidRelease, /LYNTTY_EAS_PROJECT_ID/);
+});
+
+test('Preview APK candidate builds audited dual-ABI bytes without publishing', () => {
+  assert.match(androidPreviewCandidate, /workflow_dispatch/);
+  assert.match(androidPreviewCandidate, /GITHUB_REF[^\n]*refs\/heads\/main/);
+  assert.match(androidPreviewCandidate, /APP_ENV: preview/);
+  assert.match(androidPreviewCandidate, /reactNativeArchitectures=x86_64,arm64-v8a/);
+  assert.match(androidPreviewCandidate, /dev\.jczhang\.lyntty\.preview/);
+  assert.match(androidPreviewCandidate, /ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c/);
+  assert.match(androidPreviewCandidate, /Refusing unreviewed Preview build input/);
+  assert.match(androidPreviewCandidate, /EXPO_PUBLIC_\*/);
+  assert.match(androidPreviewCandidate, /gradle-runtime-audit\.sh/);
+  assert.match(androidPreviewCandidate, /apk-audit\.sh/);
+  assert.match(androidPreviewCandidate, /GITHUB_REF_PROTECTED/);
+  assert.match(androidPreviewCandidate, /\[\[ "\$VERSION_CODE" == 920001 \]\]/);
+  assert.match(androidPreviewCandidate, /\[\[ "\$version_name" == 1\.2\.0 \]\]/);
+  assert.match(androidPreviewCandidate, /arm64-v8a,x86_64/);
+  assert.match(androidPreviewCandidate, /source_commit=%s/);
+  assert.match(androidPreviewCandidate, /sha256=%s/);
+  assert.match(androidPreviewCandidate, /candidate-manifest\.json/);
+  assert.match(androidPreviewCandidate, /\(HTTP 404\)/);
+  assert.match(androidPreviewCandidate, /release_list_json="\$\(gh release list/);
+  assert.doesNotMatch(androidPreviewCandidate, /done < <\(gh release list/);
+  assert.match(androidPreviewCandidate, /subject-path:[^\n]*candidate-manifest\.json/);
+  assert.match(androidPreviewCandidate, /actions\/attest@/);
+  assert.match(androidPreviewCandidate, /actions\/upload-artifact@/);
+  assert.doesNotMatch(androidPreviewCandidate, /contents: write/);
+  assert.doesNotMatch(androidPreviewCandidate, /gh release create/);
+});
+
+test('Preview APK promotion publishes only exact tested candidate bytes', () => {
+  assert.match(androidPreviewPromote, /workflow_dispatch/);
+  assert.match(androidPreviewPromote, /candidate_run_id/);
+  assert.match(androidPreviewPromote, /expected_sha256/);
+  assert.match(androidPreviewPromote, /physical_phone_accepted/);
+  assert.match(androidPreviewPromote, /LYNTTY_IMMUTABLE_RELEASES_ENABLED/);
+  assert.match(androidPreviewPromote, /LYNTTY_PREVIEW_TAG_RULESET_ID/);
+  assert.match(androidPreviewPromote, /GITHUB_REF_PROTECTED/g);
+  assert.match(androidPreviewPromote, /contents: write/);
+  assert.match(androidPreviewPromote, /actions: read/);
+  assert.match(androidPreviewPromote, /android-preview-candidate\.yml/);
+  assert.match(androidPreviewPromote, /gh run download/);
+  assert.match(androidPreviewPromote, /gh attestation verify/);
+  assert.match(androidPreviewPromote, /native_abis=arm64-v8a,x86_64/);
+  assert.match(androidPreviewPromote, /debuggable=false/);
+  assert.match(androidPreviewPromote, /signer_count=1/);
+  assert.match(androidPreviewPromote, /Node-family execve matches: 0/);
+  assert.match(androidPreviewPromote, /candidate-manifest\.json/);
+  assert.match(androidPreviewPromote, /scripts\/preview-apk-allowlist\.json/);
+  assert.match(androidPreviewPromote, /docs\/evidence\/r86-preview-apk-candidate\.md/);
+  assert.match(androidPreviewPromote, /git diff --no-renames --name-status/);
+  assert.match(androidPreviewPromote, /A\s+docs\/evidence\/r86-preview-apk-candidate\.md/);
+  assert.match(androidPreviewPromote, /M\s+scripts\/preview-apk-allowlist\.json/);
+  assert.match(androidPreviewPromote, /sourceTree/);
+  assert.match(androidPreviewPromote, /isImmutable/);
+  assert.match(androidPreviewPromote, /bypass_actors/);
+  assert.match(androidPreviewPromote, /\["deletion", "update"\]/);
+  assert.match(androidPreviewPromote, /release_list_json="\$\(gh release list/g);
+  assert.match(androidPreviewPromote, /jq -j '\.body \/\/ ""'/);
+  assert.doesNotMatch(androidPreviewPromote, /jq -r '\.body \/\/ ""'/);
+  assert.match(androidPreviewPromote, /\(HTTP 404\)/);
+  assert.match(androidPreviewPromote, /\.name/);
+  assert.match(androidPreviewPromote, /already_published/);
+  assert.doesNotMatch(androidPreviewPromote, /--json[^\n]*\btitle\b/);
+  assert.match(androidPreviewPromote, /git\/refs/);
+  assert.match(androidPreviewPromote, /refs\/tags\/\$RELEASE_TAG/);
+  assert.match(androidPreviewPromote, /gh release create[\s\S]{0,240}--draft[^\n]*--prerelease/);
+  assert.match(androidPreviewPromote, /pre-publish-assets/);
+  assert.match(androidPreviewPromote, /post-publish-assets/);
+  assert.match(androidPreviewPromote, /gh release edit[^\n]*--draft=false[^\n]*--prerelease[^\n]*--latest=false/);
+  assert.match(androidPreviewPromote, /android-preview-v/);
+  assert.doesNotMatch(androidPreviewPromote, /gradlew|assembleRelease/);
+});
+
+test('Preview release body extraction preserves exact trailing bytes', () => {
+  assert.match(previewReleaseNotes, /\n$/);
+  const apiPayload = JSON.stringify({ body: previewReleaseNotes });
+  assert.equal(JSON.parse(apiPayload).body, previewReleaseNotes);
 });
 
 test('candidate builds once under channel isolation and never publishes', () => {
@@ -240,6 +329,13 @@ test('Android Gradle binds stable, preview, and development to distinct identiti
 });
 
 test('Maestro reliability flows cannot bypass guarded orchestration', () => {
+  assert.equal(
+    rootPackage.scripts['e2e:maestro:preview-first-run'],
+    'LYNTTY_MAESTRO_APP_ID=dev.jczhang.lyntty.preview scripts/e2e/run-maestro.sh e2e/maestro/standalone/preview_first_run.yml',
+  );
+  assert.match(previewRelayGate, /visible: "Connect to Relay"/);
+  assert.match(previewRelayGate, /assertNotVisible: "Create account"/);
+  assert.doesNotMatch(previewRelayGate, /optional: true/);
   assert.match(maestroRunner, /maestro-daemon-restart\.sh/);
   assert.match(maestroRunner, /maestro-reload-ownership\.sh/);
   assert.match(maestroRunner, /Run scripts\/e2e\/maestro-daemon-restart\.sh/);

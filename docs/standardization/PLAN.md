@@ -58,6 +58,7 @@ The supported components are independently versioned:
 - Wire `1.1` one-minor capability negotiation, canonical Ed25519 Compatibility BOM, signed Relay/CLI consumers, build-once candidate, protected promotion, monotonic rollback, SPDX/provenance, and digest-only Relay deploy workflow. See `docs/release/compatibility-bom.md`.
 - Worktree-local `dev:up/check/verify/down` lifecycle with deterministic collision-free port blocks, isolated state/auth/PGlite, durable launch receipts, exact process-group ownership, and explicit `--android`. See `docs/development.md`.
 - Physical-phone `preview:test/status/logs/stop/reset` lifecycle with reviewed standalone APK reuse, local-LAN Relay, persistent isolated pairing, current source daemon, managed Pi launch, and ownership-safe cleanup. See `docs/development.md` and `docs/evidence/r85-preview-manual-test-harness.md`.
+- APK-only Android Preview prerelease with mandatory local Relay setup, exact-byte candidate/Promotion separation, dual-ABI audit, allowlisted physical validation, and Mole-style bilingual notes. See `docs/release/android-apk.md` and `docs/evidence/r86-preview-apk-prerelease.md`.
 - Protected `main`; implementation remains on `refactor/bun-migration` until final integration and protected PR review are complete.
 
 ## Delivery phases and remaining external execution

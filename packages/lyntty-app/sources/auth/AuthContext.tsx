@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { TokenStorage, AuthCredentials } from '@/auth/tokenStorage';
-import { syncCreate, syncReset } from '@/sync/sync';
-import { clearPersistence, loadRegisteredPushToken } from '@/sync/persistence';
-import { unregisterPushToken } from '@/sync/apiPush';
+import { TokenStorage, type AuthCredentials } from '@/auth/tokenStorage';
 import { subscribeAuthInvalidation } from '@/auth/authInvalidation';
+import { clearStoredAuthState } from './bootstrapAuth';
 
 interface AuthContextType {
     isAuthenticated: boolean;
@@ -19,9 +17,7 @@ export function AuthProvider({ children, initialCredentials }: { children: React
     const [credentials, setCredentials] = useState<AuthCredentials | null>(initialCredentials);
 
     const clearLocalAuth = async () => {
-        syncReset();
-        clearPersistence();
-        await TokenStorage.removeCredentials();
+        await clearStoredAuthState();
         setCredentials(null);
         setIsAuthenticated(false);
     };
@@ -30,6 +26,10 @@ export function AuthProvider({ children, initialCredentials }: { children: React
     useEffect(() => {
         setCurrentAuth(credentials ? { isAuthenticated, credentials, login, logout } : null);
     }, [isAuthenticated, credentials]);
+
+    useEffect(() => () => {
+        setCurrentAuth(null);
+    }, []);
 
     useEffect(() => {
         return subscribeAuthInvalidation(async () => {
@@ -43,7 +43,7 @@ export function AuthProvider({ children, initialCredentials }: { children: React
         if (success) {
             setCredentials(newCredentials);
             setIsAuthenticated(true);
-            void syncCreate(newCredentials).catch((error) => {
+            void import('@/sync/sync').then(({ syncCreate }) => syncCreate(newCredentials)).catch((error) => {
                 console.error('Failed to initialize sync after login:', error);
             });
         } else {
@@ -52,12 +52,18 @@ export function AuthProvider({ children, initialCredentials }: { children: React
     };
 
     const logout = async (options?: { skipPushUnregister?: boolean }) => {
-        const registeredPushToken = credentials && !options?.skipPushUnregister ? loadRegisteredPushToken() : null;
-        if (credentials && registeredPushToken) {
-            try {
-                await unregisterPushToken(credentials, registeredPushToken);
-            } catch (error) {
-                console.log('Failed to unregister push token during logout:', error);
+        if (credentials && !options?.skipPushUnregister) {
+            const [{ loadRegisteredPushToken }, { unregisterPushToken }] = await Promise.all([
+                import('@/sync/persistence'),
+                import('@/sync/apiPush'),
+            ]);
+            const registeredPushToken = loadRegisteredPushToken();
+            if (registeredPushToken) {
+                try {
+                    await unregisterPushToken(credentials, registeredPushToken);
+                } catch (error) {
+                    console.log('Failed to unregister push token during logout:', error);
+                }
             }
         }
         await clearLocalAuth();

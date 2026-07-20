@@ -250,6 +250,13 @@ export const pt: TranslationStructure = {
     server: {
         // Used by Server Configuration screen (app/(app)/server.tsx)
         serverConfiguration: 'Configuração do servidor',
+        previewSetupTitle: 'Conectar ao Relay',
+        previewSetupDescription: 'O Lyntty (preview) precisa do Relay local antes de criar ou restaurar uma conta.',
+        previewSetupFooter: 'Execute `bun preview:test` no computador e informe a URL do Relay local exibida no terminal.',
+        clearRelay: 'Limpar Relay',
+        clearRelayConfirm: 'Limpar o Relay salvo e exigir nova configuração?',
+        previewHttpRequiresLocalNetwork: 'O Relay HTTP do Preview deve usar localhost ou um endereço LAN privado.',
+        failedToClearOldAccount: 'Não foi possível limpar a conta anterior. O Relay não foi alterado.',
         enterServerUrl: 'Por favor, insira uma URL do servidor',
         notValidLynttyServer: 'Não é um servidor Lyntty válido',
         changeServer: 'Alterar servidor',

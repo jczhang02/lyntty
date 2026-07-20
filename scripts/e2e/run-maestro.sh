@@ -87,7 +87,7 @@ if [[ -f "$FLOW_PATH" ]]; then
   mkdir -p "$RUNTIME_BASE"
   cleanup_dir="$(mktemp -d "$RUNTIME_BASE/render.XXXXXX")"
   trap '[[ -n "$cleanup_dir" ]] && rm -rf "$cleanup_dir"' EXIT
-  export FLOW_PATH APP_ID PAIRING_URL HISTORY_TITLE PONG PROMPT UPDATE_VERSION_NAME CLEANUP_DIR="$cleanup_dir"
+  export FLOW_PATH APP_ID PAIRING_URL HISTORY_TITLE PONG PROMPT UPDATE_VERSION_NAME SERVER_URL CLEANUP_DIR="$cleanup_dir"
   rendered_flow="$(python - <<'PY'
 import os
 from pathlib import Path
@@ -101,6 +101,7 @@ replacements = {
     "${PONG}": os.environ["PONG"],
     "${PROMPT}": os.environ["PROMPT"],
     "${UPDATE_VERSION_NAME}": os.environ["UPDATE_VERSION_NAME"],
+    "${SERVER_URL}": os.environ["SERVER_URL"],
 }
 
 def render_file(src: Path, dst: Path) -> None:

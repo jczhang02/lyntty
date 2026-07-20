@@ -1,0 +1,237 @@
+name: Android Preview candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: Monotonic Android Preview versionCode
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: android-preview-candidate
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact main source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Validate protected source and release identity
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
+          [[ "$VERSION_CODE" == 920001 ]]
+          version_name="$(bun -e 'const x=await Bun.file("packages/lyntty-app/package.json").json();process.stdout.write(x.version)')"
+          [[ "$version_name" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$version_name" == 1.2.0 ]]
+          tag="android-preview-v${version_name}-${VERSION_CODE}"
+          apk_name="lyntty-preview-v${version_name}-${VERSION_CODE}.apk"
+          release_error="$RUNNER_TEMP/preview-release-lookup.err"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > /dev/null 2>"$release_error"; then
+            echo "Preview release already exists: $tag" >&2
+            exit 1
+          elif ! grep -Fq '(HTTP 404)' "$release_error"; then
+            cat "$release_error" >&2
+            exit 1
+          fi
+          tag_error="$RUNNER_TEMP/preview-tag-lookup.err"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" > /dev/null 2>"$tag_error"; then
+            echo "Preview tag already exists: $tag" >&2
+            exit 1
+          elif ! grep -Fq '(HTTP 404)' "$tag_error"; then
+            cat "$tag_error" >&2
+            exit 1
+          fi
+          max_allowlisted="$(bun -e 'const x=await Bun.file("scripts/preview-apk-allowlist.json").json();process.stdout.write(String(Math.max(0,...x.artifacts.map(a=>a.versionCode))))')"
+          (( VERSION_CODE > max_allowlisted ))
+          release_list_json="$(gh release list --limit 1000 --json tagName)"
+          existing_tags="$(jq -r '.[].tagName' <<< "$release_list_json")"
+          while IFS= read -r existing_tag; do
+            if [[ "$existing_tag" =~ ^android-preview-v[0-9]+\.[0-9]+\.[0-9]+-([0-9]+)$ ]]; then
+              (( VERSION_CODE > BASH_REMATCH[1] )) || {
+                echo "versionCode must advance every published Preview APK" >&2
+                exit 1
+              }
+            fi
+          done <<< "$existing_tags"
+          {
+            echo "version_name=$version_name"
+            echo "version_code=$VERSION_CODE"
+            echo "tag=$tag"
+            echo "apk_name=$apk_name"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install process audit tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends strace
+
+      - name: Reject unreviewed Android configuration
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          env_files=(packages/lyntty-app/.env*)
+          for path in "${env_files[@]}" packages/lyntty-app/google-services.json packages/lyntty-app/android/app/google-services.json; do
+            [[ ! -e "$path" ]] || {
+              echo "Refusing unreviewed Preview build input: $path" >&2
+              exit 1
+            }
+          done
+
+      - name: Build dual-ABI Preview APK
+        working-directory: packages/lyntty-app/android
+        env:
+          APP_ENV: preview
+          NODE_ENV: production
+          BUN_EXECUTABLE: bun
+          LYNTTY_BUILD_COMMIT_SHA: ${{ github.sha }}
+          VERSION_NAME: ${{ steps.release.outputs.version_name }}
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          while IFS='=' read -r key _; do
+            [[ "$key" == EXPO_PUBLIC_* ]] && unset "$key"
+          done < <(env)
+          ../scripts/gradle-runtime-audit.sh "$RUNNER_TEMP/android-preview-runtime-audit.txt" -- \
+            ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2 \
+              -x lintVitalAnalyzeRelease \
+              -x lintVitalRelease \
+              -Pandroid.enablePngCrunchInReleaseBuilds=false \
+              -PreactNativeArchitectures=x86_64,arm64-v8a \
+              -PlynttyVersionName="$VERSION_NAME" \
+              -PlynttyVersionCode="$VERSION_CODE"
+
+      - name: Audit and stage candidate
+        env:
+          APK_NAME: ${{ steps.release.outputs.apk_name }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TITLE: V${{ steps.release.outputs.version_name }} Local First 📡
+          VERSION_NAME: ${{ steps.release.outputs.version_name }}
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+          PREVIEW_SIGNER_SHA256: ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c
+          EXPECTED_ABIS: arm64-v8a,x86_64
+        run: |
+          set -euo pipefail
+          candidate="$RUNNER_TEMP/android-preview-candidate"
+          mkdir -p "$candidate"
+          apk="$candidate/$APK_NAME"
+          cp packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk "$apk"
+          cp "$RUNNER_TEMP/android-preview-runtime-audit.txt" "$candidate/android-preview-runtime-audit.txt"
+          sha256="$(sha256sum "$apk" | awk '{print $1}')"
+          embedded_commit="$(unzip -p "$apk" assets/app.config | jq -er '.extra.app.buildCommitSha')"
+          [[ "$embedded_commit" == "$GITHUB_SHA" ]]
+          audit="$candidate/${APK_NAME%.apk}.audit.txt"
+          packages/lyntty-app/scripts/apk-audit.sh \
+            "$apk" dev.jczhang.lyntty.preview "$VERSION_NAME" "$VERSION_CODE" "$PREVIEW_SIGNER_SHA256" "$EXPECTED_ABIS" \
+            > "$audit"
+          printf 'source_commit=%s\nsha256=%s\n' "$embedded_commit" "$sha256" >> "$audit"
+          printf '%s  %s\n' "$sha256" "$APK_NAME" > "$candidate/$APK_NAME.sha256"
+          export APK_NAME RELEASE_TAG RELEASE_TITLE VERSION_NAME VERSION_CODE PREVIEW_SIGNER_SHA256
+          export SHA256="$sha256" SOURCE_TREE="$(git rev-parse 'HEAD^{tree}')"
+          export APK_SIZE="$(stat -c '%s' "$apk")"
+          bun - <<'BUN'
+          const provenance = {
+            schemaVersion: 1,
+            artifact: process.env.APK_NAME,
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: '.github/workflows/android-preview-candidate.yml',
+            candidateRunId: Number(process.env.GITHUB_RUN_ID),
+            sourceCommit: process.env.GITHUB_SHA,
+            sourceTree: process.env.SOURCE_TREE,
+            applicationId: 'dev.jczhang.lyntty.preview',
+            versionName: process.env.VERSION_NAME,
+            versionCode: Number(process.env.VERSION_CODE),
+            releaseTag: process.env.RELEASE_TAG,
+            releaseTitle: process.env.RELEASE_TITLE,
+            signerSha256: process.env.PREVIEW_SIGNER_SHA256,
+            abis: ['arm64-v8a', 'x86_64'],
+            sha256: process.env.SHA256,
+            size: Number(process.env.APK_SIZE),
+          };
+          await Bun.write(`${process.env.RUNNER_TEMP}/android-preview-candidate/android-preview-provenance.json`, `${JSON.stringify(provenance, null, 2)}\n`);
+          const template = await Bun.file('docs/release/preview-apk-release-notes.md').text();
+          const notes = template
+            .replaceAll('{{VERSION_NAME}}', process.env.VERSION_NAME)
+            .replaceAll('{{VERSION_CODE}}', process.env.VERSION_CODE)
+            .replaceAll('{{APK_NAME}}', process.env.APK_NAME)
+            .replaceAll('{{APK_NAME_NO_EXT}}', process.env.APK_NAME.replace(/\.apk$/, ''))
+            .replaceAll('{{TAG}}', process.env.RELEASE_TAG)
+            .replaceAll('{{SHA256}}', process.env.SHA256)
+            .replaceAll('{{SOURCE_COMMIT}}', process.env.GITHUB_SHA);
+          if (/\{\{[A-Z0-9_]+\}\}/.test(notes)) throw new Error('unresolved release-note placeholder');
+          await Bun.write(`${process.env.RUNNER_TEMP}/android-preview-candidate/release-notes.md`, notes);
+          BUN
+          printf '%s\n' "$RELEASE_TITLE" > "$candidate/release-title.txt"
+          export CANDIDATE="$candidate"
+          bun - <<'BUN'
+          const names = [
+            process.env.APK_NAME,
+            `${process.env.APK_NAME}.sha256`,
+            `${process.env.APK_NAME.replace(/\.apk$/, '')}.audit.txt`,
+            'android-preview-runtime-audit.txt',
+            'android-preview-provenance.json',
+            'release-notes.md',
+            'release-title.txt',
+          ].sort();
+          const files = [];
+          for (const name of names) {
+            const file = Bun.file(`${process.env.CANDIDATE}/${name}`);
+            if (!await file.exists()) throw new Error(`missing candidate file: ${name}`);
+            const hasher = new Bun.CryptoHasher('sha256');
+            for await (const chunk of file.stream()) hasher.update(chunk);
+            files.push({ name, size: file.size, sha256: hasher.digest('hex') });
+          }
+          const manifest = { schemaVersion: 1, sourceCommit: process.env.GITHUB_SHA, files };
+          await Bun.write(`${process.env.CANDIDATE}/candidate-manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+          BUN
+
+      - name: Attest exact Preview APK
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: ${{ runner.temp }}/android-preview-candidate/${{ steps.release.outputs.apk_name }}
+
+      - name: Attest exact candidate manifest
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: ${{ runner.temp }}/android-preview-candidate/candidate-manifest.json
+
+      - name: Upload candidate without publishing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-preview-candidate-${{ github.run_id }}
+          path: ${{ runner.temp }}/android-preview-candidate/
+          if-no-files-found: error
+          retention-days: 30

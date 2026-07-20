@@ -1,0 +1,133 @@
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
+
+const mocks = {
+    getCredentials: vi.fn(),
+    setCredentials: vi.fn(),
+    removeCredentials: vi.fn(),
+    syncRestore: vi.fn(),
+    syncReset: vi.fn(),
+    clearPersistence: vi.fn(),
+};
+
+vi.mock('./tokenStorage', () => ({
+    TokenStorage: {
+        getCredentials: mocks.getCredentials,
+        setCredentials: mocks.setCredentials,
+        removeCredentials: mocks.removeCredentials,
+    },
+}));
+
+vi.mock('@/sync/sync', () => ({
+    syncRestore: mocks.syncRestore,
+    syncReset: mocks.syncReset,
+}));
+
+vi.mock('@/sync/persistence', () => ({
+    clearPersistence: mocks.clearPersistence,
+}));
+
+const { bootstrapAuth, clearStoredAuthState, getBootstrapRouteGate } = await import('./bootstrapAuth');
+
+describe('bootstrapAuth', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mocks.getCredentials.mockResolvedValue(null);
+        mocks.setCredentials.mockResolvedValue(true);
+        mocks.removeCredentials.mockResolvedValue(true);
+        mocks.syncRestore.mockResolvedValue(undefined);
+    });
+
+    it('clears stale state without reading credentials or restoring sync while Preview setup is required', async () => {
+        const credentials = await bootstrapAuth({
+            requiresServerSetup: true,
+            devCredentials: { token: 'must-not-load', secret: 'must-not-load' },
+        });
+
+        expect(credentials).toBeNull();
+        expect(mocks.syncReset).not.toHaveBeenCalled();
+        expect(mocks.clearPersistence).toHaveBeenCalledTimes(1);
+        expect(mocks.removeCredentials).toHaveBeenCalledTimes(1);
+        expect(mocks.getCredentials).not.toHaveBeenCalled();
+        expect(mocks.setCredentials).not.toHaveBeenCalled();
+        expect(mocks.syncRestore).not.toHaveBeenCalled();
+    });
+
+    it('fails closed before sync state is loaded when stale credentials cannot be removed', async () => {
+        mocks.removeCredentials.mockResolvedValue(false);
+
+        await expect(bootstrapAuth({
+            requiresServerSetup: true,
+            devCredentials: null,
+        })).rejects.toThrow('Failed to remove stored credentials');
+
+        expect(mocks.clearPersistence).not.toHaveBeenCalled();
+        expect(mocks.syncReset).not.toHaveBeenCalled();
+        expect(mocks.syncRestore).not.toHaveBeenCalled();
+    });
+
+    it('does not reset runtime state before credential deletion succeeds', async () => {
+        mocks.removeCredentials.mockResolvedValue(false);
+
+        await expect(clearStoredAuthState()).rejects.toThrow('Failed to remove stored credentials');
+
+        expect(mocks.clearPersistence).not.toHaveBeenCalled();
+        expect(mocks.syncReset).not.toHaveBeenCalled();
+    });
+
+    it('keeps the root bootstrap module free of eager sync and navigator imports', async () => {
+        const source = await Bun.file(new URL('../app/_layout.tsx', import.meta.url)).text();
+        expect(source).not.toContain("from '@/sync/storage'");
+        expect(source).not.toContain("from '@/components/SidebarNavigator'");
+        expect(source).not.toContain("from '@/auth/AuthContext'");
+        expect(source).toContain('React.lazy');
+        expect(source).toContain('<Redirect href={PREVIEW_SETUP_SERVER_PATH} />');
+        expect(source).not.toContain("router.replace('/server')");
+    });
+
+    it('keeps mandatory setup in an independent route group with no business index', async () => {
+        const setupLayout = await Bun.file(new URL('../app/(setup)/_layout.tsx', import.meta.url)).text();
+        const setupServer = Bun.file(new URL('../app/(setup)/setup/server.tsx', import.meta.url));
+        expect(await setupServer.exists()).toBe(true);
+        expect(setupLayout).toContain('name="setup/server"');
+        expect(setupLayout).not.toContain('(app)');
+        expect(setupLayout).not.toContain('index');
+        expect(setupLayout).not.toContain('@/sync/');
+        expect(setupLayout).not.toContain('SidebarNavigator');
+    });
+
+    it('blocks deep-linked routes until Preview Relay setup is complete', () => {
+        expect(getBootstrapRouteGate(false, true, '/restore')).toBe('wait');
+        expect(getBootstrapRouteGate(true, true, '/restore')).toBe('redirect-to-server');
+        expect(getBootstrapRouteGate(true, true, '/server')).toBe('redirect-to-server');
+        expect(getBootstrapRouteGate(true, true, '/setup/server')).toBe('render');
+        expect(getBootstrapRouteGate(true, false, '/restore')).toBe('render');
+    });
+
+    it('restores stored credentials when Relay setup is complete', async () => {
+        const stored = { token: 'stored-token', secret: 'stored-secret' };
+        mocks.getCredentials.mockResolvedValue(stored);
+
+        const credentials = await bootstrapAuth({
+            requiresServerSetup: false,
+            devCredentials: null,
+        });
+
+        expect(credentials).toEqual(stored);
+        expect(mocks.syncRestore).toHaveBeenCalledWith(stored);
+        expect(mocks.removeCredentials).not.toHaveBeenCalled();
+    });
+
+    it('persists and restores changed development credentials after setup', async () => {
+        mocks.getCredentials.mockResolvedValue({ token: 'old', secret: 'old' });
+        const development = { token: 'development-token', secret: 'development-secret' };
+
+        const credentials = await bootstrapAuth({
+            requiresServerSetup: false,
+            devCredentials: development,
+        });
+
+        expect(mocks.setCredentials).toHaveBeenCalledWith(development);
+        expect(credentials).toEqual(development);
+        expect(mocks.syncRestore).toHaveBeenCalledWith(development);
+    });
+});

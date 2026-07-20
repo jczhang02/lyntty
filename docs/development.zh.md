@@ -37,7 +37,7 @@ bun preview:test
 1. 复用内容匹配的缓存 APK；或者从 `~/Downloads` 导入带审计 sidecar、与当前 App/Wire 源码一致的 `lyntty-preview-*.apk`；内存充足时才允许原生重建；
 2. 在电脑的局域网地址和固定测试端口启动当前源码 Relay；
 3. 显示 APK 路径与 Relay URL；
-4. 提示在 **Lyntty (preview)** 中确认该 Server URL、创建本地测试账号并扫描终端二维码；
+4. 要求 **Lyntty (preview)** 1.2 或更高版本先验证并保存该 Server URL，之后才允许创建本地测试账号和扫描终端二维码；
 5. 直接启动当前源码 daemon，不安装全局 Pi extension；
 6. 使用现有 Pi 模型配置启动一条新的 managed Pi session。
 
@@ -47,7 +47,7 @@ bun preview:test
 LYNTTY_PREVIEW_LAN_IP=192.168.1.20 bun preview:test
 ```
 
-导入的普通 Preview APK 可能仍以 `relay.jczhang.cc` 为初始默认值。框架会在配对前暂停；必须先在 **设置 → Server** 中设置或确认命令显示的本地 URL，确认生效后再创建测试账号。打开旧 APK 到完成切换之间，App 可能短暂初始化原默认配置；正式手测只从本地 URL 确认后开始。App 会持久保存这个设置，后续运行会复用账号、配对、Relay 数据、APK 和端口，不需要再次扫码。
+Preview 1.2 及更高版本会在首次启动时 fail closed：**连接到 Relay** 通过规范 `/health` 验证并保存本地 URL 之前，不读取凭据，也不启动同步。旧 Preview APK 可能仍以 `relay.jczhang.cc` 为默认值，因此框架仍会在配对前要求确认本地 URL。已保存的本地设置会在 Preview 原位升级后保留，后续运行继续复用账号、配对、Relay 数据、APK 和端口。
 
 人工检查只包含：
 
@@ -65,7 +65,7 @@ bun preview:stop     # 只停止已证明归属的进程组，保留账号和配
 bun preview:reset    # 安全停止后删除当前 worktree 的手测状态
 ```
 
-私有状态位于 ignored `dist/manual-preview/<worktree-hash>/`，目录模式为 `0700`、敏感文件为 `0600`。`preview:stop` 不删除状态；`preview:reset` 会删除本地 Relay 账号和电脑配对，但不会清除手机 App 数据。
+私有状态位于 ignored `dist/manual-preview/<worktree-hash>/`，目录模式为 `0700`、敏感文件为 `0600`。`preview:stop` 不删除状态；`preview:reset` 会删除本地 Relay 账号和电脑配对，但不会清除手机 App 数据。Preview 设置中的 **清除 Relay** 会删除已保存 URL、清理旧认证状态，并让 App 回到强制设置页。
 
 APK 导入会 fail closed：SHA-256 必须存在于已审阅的 `scripts/preview-apk-allowlist.json`，同时还要匹配 `.audit.txt`、APK 内嵌 build commit、当前 App/Wire 输入、Preview package/signer 和 standalone bundle。未进入 allowlist 的 APK 会被拒绝。可用以下方式指定 APK：
 

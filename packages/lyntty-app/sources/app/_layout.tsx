@@ -4,22 +4,20 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Fonts from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { FontAwesome } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { AuthCredentials, TokenStorage } from '@/auth/tokenStorage';
-import { AuthProvider } from '@/auth/AuthContext';
+import { Redirect, Slot, usePathname, useRouter } from 'expo-router';
+import type { AuthCredentials } from '@/auth/tokenStorage';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { initialWindowMetrics, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SidebarNavigator } from '@/components/SidebarNavigator';
 import sodium from '@/encryption/libsodium.lib';
 import { View, Platform, AppState } from 'react-native';
 import { ModalProvider } from '@/modal';
-import { syncRestore } from '@/sync/sync';
+import { bootstrapAuth, getBootstrapRouteGate, PREVIEW_SETUP_SERVER_PATH } from '@/auth/bootstrapAuth';
+import { isPreviewServerSetupRequired, subscribeServerConfig } from '@/sync/serverConfig';
 import { StatusBarProvider } from '@/components/StatusBarProvider';
 // import * as SystemUI from 'expo-system-ui';
-import { initConsoleLogging, setConsoleOutputEnabled } from '@/utils/consoleLogging';
-import { useLocalSetting } from '@/sync/storage';
+import { initConsoleLogging } from '@/utils/consoleLogging';
 import { useUnistyles } from 'react-native-unistyles';
 import { AsyncLock } from '@/utils/lock';
 import { getSessionRouteFromNotificationResponse } from '@/utils/notificationRouting';
@@ -87,6 +85,8 @@ function HorizontalSafeAreaWrapper({ children }: { children: React.ReactNode }) 
     );
 }
 
+const BootstrappedNavigator = React.lazy(() => import('@/components/BootstrappedNavigator'));
+
 let lock = new AsyncLock();
 let loaded = false;
 
@@ -140,6 +140,7 @@ function getDevEnvironmentCredentials(): AuthCredentials | null {
 
 export default function RootLayout() {
     const router = useRouter();
+    const pathname = usePathname();
     const { theme } = useUnistyles();
     const navigationTheme = React.useMemo(() => {
         if (theme.dark) {
@@ -164,32 +165,23 @@ export default function RootLayout() {
     // Init sequence
     //
     const [initState, setInitState] = React.useState<{ credentials: AuthCredentials | null } | null>(null);
+    const [serverSetupRequired, setServerSetupRequired] = React.useState(isPreviewServerSetupRequired);
+    React.useEffect(() => subscribeServerConfig(() => {
+        setServerSetupRequired(isPreviewServerSetupRequired());
+    }), []);
+
     React.useEffect(() => {
         (async () => {
             try {
                 await loadFonts();
                 await sodium.ready;
 
-                let credentials = await TokenStorage.getCredentials();
-                const devCredentials = getDevEnvironmentCredentials();
-
-                if (devCredentials) {
-                    const credentialsChanged = credentials?.token !== devCredentials.token
-                        || credentials?.secret !== devCredentials.secret;
-
-                    if (credentialsChanged) {
-                        const saved = await TokenStorage.setCredentials(devCredentials);
-                        if (saved) {
-                            credentials = devCredentials;
-                        }
-                    }
-
-                }
-
-                if (credentials) {
-                    await syncRestore(credentials);
-                }
-
+                const requiresServerSetup = isPreviewServerSetupRequired();
+                const credentials = await bootstrapAuth({
+                    requiresServerSetup,
+                    devCredentials: getDevEnvironmentCredentials(),
+                });
+                setServerSetupRequired(requiresServerSetup);
                 setInitState({ credentials });
             } catch (error) {
                 console.error('Error initializing:', error);
@@ -198,12 +190,12 @@ export default function RootLayout() {
     }, []);
 
     React.useEffect(() => {
-        if (initState) {
+        if (initState && (!serverSetupRequired || pathname === PREVIEW_SETUP_SERVER_PATH)) {
             setTimeout(() => {
                 SplashScreen.hideAsync();
             }, 100);
         }
-    }, [initState]);
+    }, [initState, pathname, serverSetupRequired]);
 
     const handledNotificationIds = React.useRef<Set<string>>(new Set());
     const handleNotificationResponse = React.useCallback(async (response: Notifications.NotificationResponse | null) => {
@@ -259,7 +251,7 @@ export default function RootLayout() {
     }, [router]);
 
     React.useEffect(() => {
-        if (!initState) {
+        if (!initState || serverSetupRequired) {
             return;
         }
 
@@ -283,41 +275,44 @@ export default function RootLayout() {
             active = false;
             subscription.remove();
         };
-    }, [handleNotificationResponse, initState]);
+    }, [handleNotificationResponse, initState, serverSetupRequired]);
 
-
-    // Sync console output toggle from local debug settings.
-    const consoleLoggingEnabled = useLocalSetting('consoleLoggingEnabled');
-    React.useEffect(() => {
-        setConsoleOutputEnabled(consoleLoggingEnabled);
-    }, [consoleLoggingEnabled]);
 
     //
     // Not inited
     //
 
-    if (!initState) {
+    const routeGate = getBootstrapRouteGate(Boolean(initState), serverSetupRequired, pathname);
+    if (routeGate === 'wait' || !initState) {
         return null;
+    }
+    if (routeGate === 'redirect-to-server') {
+        return <Redirect href={PREVIEW_SETUP_SERVER_PATH} />;
     }
 
     //
     // Boot
     //
 
-    let providers = (
+    const content = serverSetupRequired
+        ? <Slot />
+        : (
+            <React.Suspense fallback={null}>
+                <BootstrappedNavigator initialCredentials={initState.credentials} />
+            </React.Suspense>
+        );
+    const providers = (
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
             <KeyboardProvider preload={true}>
                 <GestureHandlerRootView style={{ flex: 1 }}>
-                    <AuthProvider initialCredentials={initState.credentials}>
-                        <ThemeProvider value={navigationTheme}>
-                            <StatusBarProvider />
-                            <ModalProvider>
-                                <HorizontalSafeAreaWrapper>
-                                    <SidebarNavigator />
-                                </HorizontalSafeAreaWrapper>
-                            </ModalProvider>
-                        </ThemeProvider>
-                    </AuthProvider>
+                    <ThemeProvider value={navigationTheme}>
+                        <StatusBarProvider />
+                        <ModalProvider>
+                            <HorizontalSafeAreaWrapper>
+                                {content}
+                            </HorizontalSafeAreaWrapper>
+                        </ModalProvider>
+                    </ThemeProvider>
                 </GestureHandlerRootView>
             </KeyboardProvider>
         </SafeAreaProvider>

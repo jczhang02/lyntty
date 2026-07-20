@@ -374,7 +374,8 @@ describe('public Preview manual-test commands', () => {
   it('imports only an allowlisted audited current-source Preview APK', async () => {
     const fixtureDir = join(repositoryRoot, 'dist', 'test-state', `preview-apk-import-${process.pid}`);
     await mkdir(fixtureDir, { recursive: true });
-    const apkPath = join(fixtureDir, 'lyntty-preview-1.1.0-919999.apk');
+    const appPackage = JSON.parse(await readFile(join(repositoryRoot, 'packages', 'lyntty-app', 'package.json'), 'utf8')) as { version: string };
+    const apkPath = join(fixtureDir, `lyntty-preview-${appPackage.version}-919999.apk`);
     const apkContent = 'audited Preview APK fixture';
     await writeFile(apkPath, apkContent);
     const sha256 = createHash('sha256').update(apkContent).digest('hex');
@@ -385,7 +386,7 @@ describe('public Preview manual-test commands', () => {
       artifacts: [{
         sourceCommit,
         applicationId: 'dev.jczhang.lyntty.preview',
-        versionName: '1.1.0',
+        versionName: appPackage.version,
         versionCode: 919999,
         sha256,
         signerSha256: 'ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c',
@@ -395,7 +396,7 @@ describe('public Preview manual-test commands', () => {
       'Lyntty standalone Preview APK',
       `source_commit=${sourceCommit}`,
       'application_id=dev.jczhang.lyntty.preview',
-      'version_name=1.1.0',
+      `version_name=${appPackage.version}`,
       'version_code=919999',
       `sha256=${sha256}`,
       'debuggable=false',

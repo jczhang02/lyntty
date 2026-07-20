@@ -34,6 +34,7 @@ export LYNTTY_MAESTRO_UPDATE_VERSION_NAME='1.0.4'
 Single flows:
 
 ```bash
+bun run e2e:maestro:preview-first-run
 scripts/e2e/run-maestro.sh e2e/maestro/01_first_run.yml
 scripts/e2e/run-maestro.sh e2e/maestro/02_pair_node.yml
 scripts/e2e/run-maestro.sh e2e/maestro/03_history_send_reply.yml
@@ -56,7 +57,8 @@ When `LYNTTY_MAESTRO_NODE_HOME` is set, the runner starts `lyntty daemon start` 
 
 ## Coverage
 
-- `01_first_run.yml`: onboarding/account creation into empty Sessions Home.
+- `01_first_run.yml`: development/legacy onboarding and account creation into empty Sessions Home.
+- `standalone/preview_first_run.yml`: standalone Preview-only assertion that Relay setup is mandatory before account actions. Run it through `bun run e2e:maestro:preview-first-run`; the subdirectory keeps it out of the stateful folder sequence.
 - `02_pair_node.yml`: terminal deep-link pairing through the Pair Node accept screen. On Android the runner uses an adb deep-link fallback because Maestro `openLink` can report success without delivering the custom `lyntty://` scheme to Expo Router.
 - `03_history_send_reply.yml`: Sessions Home Pi history row open, deleted-session regression guard, prompt send, visible Pi reply token. The prompt intentionally does **not** contain the expected reply token to avoid passing on the user bubble.
 - `04_reconnect_smoke.yml`: visible session survives app relaunch. This is an app relaunch smoke, not a daemon/relay restart test.

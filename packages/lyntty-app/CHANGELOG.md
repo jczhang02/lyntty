@@ -1,3 +1,21 @@
+# Lyntty Preview 1.2.0 — 2026-07-20
+
+Makes local Relay setup mandatory and fail-closed for the independent Android Preview package.
+
+## Highlights
+
+- Preview blocks credential restoration, account creation, and sync until a local Relay is explicitly configured.
+- Relay discovery uses canonical `/health` identity instead of legacy homepage copy.
+- Cleartext Preview HTTP is limited to localhost and private LAN addresses.
+- Existing valid local Relay settings survive an in-place Preview update; clearing or changing Relay removes stale authentication state.
+- Candidate and public prerelease workflows are separated so the exact physically tested APK bytes are promoted without rebuilding.
+
+## Distribution
+
+- Package: `dev.jczhang.lyntty.preview`
+- Version code: `920001`
+- GitHub prerelease only; no hosted Preview Relay and no Stable replacement.
+
 # Lyntty Android 1.1.0 — 2026-07-18
 
 Adds signed Compatibility BOM updates and channel-isolated Stable/Preview delivery.

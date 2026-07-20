@@ -35,6 +35,38 @@ Rules:
 - No automatic cross-package data migration.
 - If an old `dev.jczhang.lyntty` exists with different signing key, uninstall it once and reinstall the new production APK.
 
+## APK-only Preview prerelease
+
+The developer Preview APK is distributed independently from the signed Compatibility release system:
+
+- package `dev.jczhang.lyntty.preview` and the checked-in Preview-only signer;
+- public GitHub prerelease, never `latest`;
+- no hosted Preview Relay, Relay OCI, CLI archive, Compatibility BOM, or Play publication;
+- manual GitHub download and Android Package Installer update;
+- local testing through `bun preview:test` and its isolated Relay;
+- first-run Preview UI requires an explicit local Relay before credentials or sync can load;
+- Stable behavior and the production signing path remain unchanged.
+
+Candidate and publication remain separate:
+
+1. `.github/workflows/android-preview-candidate.yml` builds one `arm64-v8a + x86_64` APK from protected `main`, audits it, attests it, and uploads a 30-day workflow artifact without publishing.
+2. A protected allowlist PR on CODEOWNERS-owned trust paths binds the candidate SHA-256 and source inputs. From Candidate to Promotion, protected `main` must change by exactly the allowlist plus `docs/evidence/r86-preview-apk-candidate*.md` and the five reviewed text/JSON sidecars under `docs/evidence/artifacts/r86-preview-apk-candidate/`; any other path requires a new Candidate.
+3. The operator upgrades and fresh-start tests the exact candidate on physical Android.
+4. Before Promotion, repository release immutability must be enabled and an active no-bypass tag ruleset must block updates/deletion for `android-preview-v*`. After verifying both through the admin API, set repository variables `LYNTTY_IMMUTABLE_RELEASES_ENABLED=true` and `LYNTTY_PREVIEW_TAG_RULESET_ID=<numeric id>`; Promotion also requires an explicit dispatch confirmation and post-publication `isImmutable=true`.
+5. Only after a separate release confirmation, `.github/workflows/android-preview-promote.yml` verifies the run, protected ref, reviewed allowlist delta, physical-test confirmation, APK and manifest attestations, SHA-256, complete provenance/audits, immutable tag, exact assets, and final protected `main`, then publishes those exact bytes as a non-Latest prerelease. It re-downloads every release asset immediately before and after publication and requires `isImmutable=true`.
+
+Release identity for this cycle:
+
+```text
+Tag: android-preview-v1.2.0-920001
+Title: V1.2.0 Local First 📡
+APK: lyntty-preview-v1.2.0-920001.apk
+```
+
+Release notes are generated from `docs/release/preview-apk-release-notes.md`. Promotion publishes the APK, checksum, APK audit, runtime audit, and provenance only.
+
+Physical-phone acceptance must cover the `910003 → 920001` in-place update, preservation of an existing valid Relay, fresh-data Relay gating before account actions, Android Back exiting the mandatory setup screen, Clear Relay returning to that gate, local pairing and managed Pi round-trip, and recovery after reopening the App. The dedicated automation seam is `bun run e2e:maestro:preview-first-run` (`e2e/maestro/standalone/preview_first_run.yml`); it is standalone and does not replace physical acceptance.
+
 ## Signing key
 
 Create one permanent release keystore:
