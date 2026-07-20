@@ -23,8 +23,9 @@ It does not publish or deploy Stable Android, CLI/daemon archives, Relay OCI, Co
 
 Preview now requires a persisted, validated Relay before authentication or sync can initialize:
 
-- no configured Relay means stored credentials are cleared without being read or restored;
-- navigation remains on **Connect to Relay** until setup succeeds;
+- no configured or policy-invalid Relay means stored credentials are cleared without being read or restored;
+- credential deletion failures stop bootstrap or Relay replacement before the new URL can be persisted;
+- deep links cannot mount account routes while navigation remains on **Connect to Relay**;
 - validation probes canonical `GET /health` and requires `status: ok` plus `service: lyntty-relay`;
 - Preview HTTP accepts only localhost, loopback, private RFC1918/CGNAT IPv4, or local IPv6; HTTPS remains available;
 - existing valid custom Relay settings survive an in-place Preview update;
@@ -40,18 +41,18 @@ After the candidate SHA-256 is reviewed into `scripts/preview-apk-allowlist.json
 ## Verification completed before candidate
 
 - focused URL/health policy tests went red before implementation and pass afterward;
-- focused bootstrap policy tests went red before implementation and pass afterward;
+- focused bootstrap policy tests went red before implementation and pass afterward, including deletion failure and deep-link route blocking;
 - workflow hardening tests went red while the two workflows were absent and pass afterward;
 - TypeScript and i18n gates pass for the implemented App surface.
 
-Local `bun run ci:fast` passed at the implementation head: repo hardening 18; Wire 33; CLI 585; Relay 119 / 332 assertions; App 802 / 3,236 assertions across 89 isolated files; dev/Preview lifecycle 35 / 194 assertions. Both workflows also passed YAML parsing, extracted Bash ShellCheck, and `git diff --check`. Protected PR CI is still pending.
+Final local `bun run ci:fast` passed at the review-hardened head: repo hardening 18; Wire 33; CLI 585; Relay 119 / 332 assertions; App 806 / 3,252 assertions across 89 isolated files; dev/Preview lifecycle 35 / 194 assertions. Both workflows also passed YAML parsing, extracted Bash ShellCheck, and `git diff --check`. Protected PR CI is still pending.
 
 ## Not run yet
 
 - GitHub candidate workflow;
 - APK audit on the `920001` candidate;
 - in-place physical update from `910003` to `920001`;
-- fresh-data mandatory Relay setup, pairing, Pi message round trip, and reopen;
+- fresh-data mandatory Relay setup, Android Back behavior, Clear Relay re-gating, pairing, Pi message round trip, and reopen;
 - public Promotion workflow.
 
 No public Release exists from this work at this stage.

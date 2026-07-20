@@ -21,3 +21,5 @@ Tag: android-preview-v1.2.0-920001
 Title: V1.2.0 Local First 📡
 APK: lyntty-preview-v1.2.0-920001.apk
 ```
+
+实体手机验收必须覆盖：`910003 → 920001` 原位升级、已有有效 Relay 保留、清除 App 数据后账号操作前强制设置 Relay、设置页按 Android 返回键退出、Clear Relay 后重新进入门禁、本地配对和 managed Pi 消息往返，以及重开 App 恢复。专用自动化 seam 为 `e2e/maestro/01_preview_relay_gate.yml`，不能替代实体手机验收。
