@@ -273,6 +273,8 @@ export const pl: TranslationStructure = {
         previewSetupFooter: 'Uruchom `bun preview:test` na komputerze, a następnie wpisz adres lokalnego Relay wyświetlony w terminalu.',
         clearRelay: 'Wyczyść Relay',
         clearRelayConfirm: 'Wyczyścić zapisany Relay i ponownie wymagać konfiguracji?',
+        previewHttpRequiresLocalNetwork: 'Relay HTTP w wersji Preview musi używać localhost lub prywatnego adresu LAN.',
+        failedToClearOldAccount: 'Nie udało się wyczyścić poprzedniego konta. Relay nie został zmieniony.',
         enterServerUrl: 'Proszę wprowadzić URL serwera',
         notValidLynttyServer: 'To nie jest prawidłowy serwer Lyntty',
         changeServer: 'Zmień serwer',

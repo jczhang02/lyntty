@@ -26,14 +26,14 @@ vi.mock('@/sync/persistence', () => ({
     clearPersistence: mocks.clearPersistence,
 }));
 
-const { bootstrapAuth } = await import('./bootstrapAuth');
+const { bootstrapAuth, clearStoredAuthState, getBootstrapRouteGate } = await import('./bootstrapAuth');
 
 describe('bootstrapAuth', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.getCredentials.mockResolvedValue(null);
         mocks.setCredentials.mockResolvedValue(true);
-        mocks.removeCredentials.mockResolvedValue(undefined);
+        mocks.removeCredentials.mockResolvedValue(true);
         mocks.syncRestore.mockResolvedValue(undefined);
     });
 
@@ -44,12 +44,41 @@ describe('bootstrapAuth', () => {
         });
 
         expect(credentials).toBeNull();
-        expect(mocks.syncReset).toHaveBeenCalledTimes(1);
+        expect(mocks.syncReset).not.toHaveBeenCalled();
         expect(mocks.clearPersistence).toHaveBeenCalledTimes(1);
         expect(mocks.removeCredentials).toHaveBeenCalledTimes(1);
         expect(mocks.getCredentials).not.toHaveBeenCalled();
         expect(mocks.setCredentials).not.toHaveBeenCalled();
         expect(mocks.syncRestore).not.toHaveBeenCalled();
+    });
+
+    it('fails closed before sync state is loaded when stale credentials cannot be removed', async () => {
+        mocks.removeCredentials.mockResolvedValue(false);
+
+        await expect(bootstrapAuth({
+            requiresServerSetup: true,
+            devCredentials: null,
+        })).rejects.toThrow('Failed to remove stored credentials');
+
+        expect(mocks.clearPersistence).not.toHaveBeenCalled();
+        expect(mocks.syncReset).not.toHaveBeenCalled();
+        expect(mocks.syncRestore).not.toHaveBeenCalled();
+    });
+
+    it('does not reset runtime state before credential deletion succeeds', async () => {
+        mocks.removeCredentials.mockResolvedValue(false);
+
+        await expect(clearStoredAuthState()).rejects.toThrow('Failed to remove stored credentials');
+
+        expect(mocks.clearPersistence).not.toHaveBeenCalled();
+        expect(mocks.syncReset).not.toHaveBeenCalled();
+    });
+
+    it('blocks deep-linked routes until Preview Relay setup is complete', () => {
+        expect(getBootstrapRouteGate(false, true, '/restore')).toBe('wait');
+        expect(getBootstrapRouteGate(true, true, '/restore')).toBe('redirect-to-server');
+        expect(getBootstrapRouteGate(true, true, '/server')).toBe('render');
+        expect(getBootstrapRouteGate(true, false, '/restore')).toBe('render');
     });
 
     it('restores stored credentials when Relay setup is complete', async () => {

@@ -257,6 +257,8 @@ export const zhHant: TranslationStructure = {
         previewSetupFooter: '請先在電腦上執行 `bun preview:test`，然後輸入終端機顯示的本機 Relay URL。',
         clearRelay: '清除 Relay',
         clearRelayConfirm: '清除已儲存的 Relay 並重新進行設定？',
+        previewHttpRequiresLocalNetwork: 'Preview 的 HTTP Relay 必須使用 localhost 或私人區域網路位址。',
+        failedToClearOldAccount: '無法清除舊帳號，Relay 未變更。',
         enterServerUrl: '請輸入伺服器 URL',
         notValidLynttyServer: '不是有效的 Lyntty 伺服器',
         changeServer: '更改伺服器',

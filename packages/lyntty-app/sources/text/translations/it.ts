@@ -256,6 +256,8 @@ export const it: TranslationStructure = {
         previewSetupFooter: 'Esegui `bun preview:test` sul computer, quindi inserisci l’URL del Relay locale mostrato nel terminale.',
         clearRelay: 'Cancella Relay',
         clearRelayConfirm: 'Cancellare il Relay salvato e richiedere una nuova configurazione?',
+        previewHttpRequiresLocalNetwork: 'Il Relay HTTP di Preview deve usare localhost o un indirizzo LAN privato.',
+        failedToClearOldAccount: 'Impossibile cancellare il vecchio account. Il Relay non è stato modificato.',
         enterServerUrl: 'Inserisci un URL del server',
         notValidLynttyServer: 'Non è un Lyntty Relay valido',
         changeServer: 'Cambia server',

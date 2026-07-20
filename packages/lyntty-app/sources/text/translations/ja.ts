@@ -258,6 +258,8 @@ export const ja: TranslationStructure = {
         previewSetupFooter: 'パソコンで `bun preview:test` を実行し、ターミナルに表示されたローカル Relay URL を入力してください。',
         clearRelay: 'Relay を消去',
         clearRelayConfirm: '保存済みの Relay を消去して、もう一度設定しますか？',
+        previewHttpRequiresLocalNetwork: 'Preview の HTTP Relay には localhost またはプライベート LAN アドレスを使用してください。',
+        failedToClearOldAccount: '以前のアカウントを消去できなかったため、Relay は変更されませんでした。',
         enterServerUrl: 'サーバーURLを入力してください',
         notValidLynttyServer: '有効なLyntty Relayではありません',
         changeServer: 'サーバーを変更',

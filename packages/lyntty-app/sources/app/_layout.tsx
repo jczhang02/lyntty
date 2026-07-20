@@ -5,7 +5,7 @@ import * as Fonts from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { FontAwesome } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
-import { AuthCredentials } from '@/auth/tokenStorage';
+import type { AuthCredentials } from '@/auth/tokenStorage';
 import { AuthProvider } from '@/auth/AuthContext';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -15,7 +15,7 @@ import { SidebarNavigator } from '@/components/SidebarNavigator';
 import sodium from '@/encryption/libsodium.lib';
 import { View, Platform, AppState } from 'react-native';
 import { ModalProvider } from '@/modal';
-import { bootstrapAuth } from '@/auth/bootstrapAuth';
+import { bootstrapAuth, getBootstrapRouteGate } from '@/auth/bootstrapAuth';
 import { isPreviewServerSetupRequired, subscribeServerConfig } from '@/sync/serverConfig';
 import { StatusBarProvider } from '@/components/StatusBarProvider';
 // import * as SystemUI from 'expo-system-ui';
@@ -295,7 +295,8 @@ export default function RootLayout() {
     // Not inited
     //
 
-    if (!initState) {
+    const routeGate = getBootstrapRouteGate(Boolean(initState), serverSetupRequired, pathname);
+    if (routeGate !== 'render' || !initState) {
         return null;
     }
 

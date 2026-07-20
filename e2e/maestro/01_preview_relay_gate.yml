@@ -1,0 +1,36 @@
+appId: ${APP_ID}
+name: Preview first run requires Relay
+tags:
+  - preview
+  - onboarding
+---
+- clearState
+- launchApp
+- runFlow:
+    when:
+      visible: "DEVELOPMENT SERVERS"
+    commands:
+      - tapOn: "http://10.0.2.2:8081"
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - tapOn:
+          point: "90%,46%"
+- extendedWaitUntil:
+    visible: "Connect to Relay"
+    timeout: 60000
+- assertNotVisible: "Create account"
+- tapOn:
+    id: "lyntty-server-url-input"
+- inputText: "${SERVER_URL}"
+- tapOn:
+    id: "lyntty-server-save"
+- extendedWaitUntil:
+    visible: "Create account"
+    timeout: 60000

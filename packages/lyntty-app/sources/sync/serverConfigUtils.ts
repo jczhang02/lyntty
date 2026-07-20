@@ -33,7 +33,13 @@ function isLocalPreviewHostname(hostname: string): boolean {
         || isLoopbackIpv4(normalized);
 }
 
-export function validateServerUrlForEnvironment(url: string, appEnv: AppEnvironment = process.env.APP_ENV): { valid: boolean; error?: string } {
+export type ServerUrlValidationResult = {
+    valid: boolean;
+    error?: string;
+    errorCode?: 'preview-http-requires-local-network';
+};
+
+export function validateServerUrlForEnvironment(url: string, appEnv: AppEnvironment = process.env.APP_ENV): ServerUrlValidationResult {
     if (!url || !url.trim()) {
         return { valid: false, error: 'Server URL cannot be empty' };
     }
@@ -50,6 +56,7 @@ export function validateServerUrlForEnvironment(url: string, appEnv: AppEnvironm
             return {
                 valid: false,
                 error: 'Preview HTTP requires a localhost or private LAN relay address',
+                errorCode: 'preview-http-requires-local-network',
             };
         }
         return { valid: true };
@@ -62,7 +69,23 @@ export function requiresPreviewServerSetupForEnvironment(
     appEnv: AppEnvironment,
     configuredServerUrl: string | null | undefined,
 ): boolean {
-    return appEnv === 'preview' && !configuredServerUrl?.trim();
+    return appEnv === 'preview' && (
+        !configuredServerUrl?.trim()
+        || !validateServerUrlForEnvironment(configuredServerUrl, appEnv).valid
+    );
+}
+
+export async function replaceServerUrlWithAuthBoundary(options: {
+    currentUrl: string | null;
+    nextUrl: string | null;
+    clearAuth: () => Promise<void>;
+    persistUrl: (url: string | null) => void;
+    forceAuthClear?: boolean;
+}): Promise<void> {
+    if (options.forceAuthClear || options.currentUrl !== options.nextUrl) {
+        await options.clearAuth();
+    }
+    options.persistUrl(options.nextUrl);
 }
 
 export function getLynttyRelayHealthUrl(url: string): string {

@@ -3,6 +3,7 @@ import {
     getLynttyRelayHealthUrl,
     isLynttyRelayHealthResponse,
     probeLynttyRelay,
+    replaceServerUrlWithAuthBoundary,
     requiresPreviewServerSetupForEnvironment,
     validateServerUrlForEnvironment,
 } from './serverConfigUtils';
@@ -38,6 +39,7 @@ describe('serverConfig URL validation', () => {
         ]) expect(validateServerUrlForEnvironment(url, 'preview'), url).toEqual({
             valid: false,
             error: 'Preview HTTP requires a localhost or private LAN relay address',
+            errorCode: 'preview-http-requires-local-network',
         });
         expect(validateServerUrlForEnvironment('https://relay.example.com', 'preview')).toEqual({ valid: true });
     });
@@ -46,8 +48,30 @@ describe('serverConfig URL validation', () => {
         expect(requiresPreviewServerSetupForEnvironment('preview', null)).toBe(true);
         expect(requiresPreviewServerSetupForEnvironment('preview', '')).toBe(true);
         expect(requiresPreviewServerSetupForEnvironment('preview', 'http://192.168.1.2:3005')).toBe(false);
+        expect(requiresPreviewServerSetupForEnvironment('preview', 'http://8.8.8.8:3005')).toBe(true);
+        expect(requiresPreviewServerSetupForEnvironment('preview', 'not-a-url')).toBe(true);
         expect(requiresPreviewServerSetupForEnvironment('development', null)).toBe(false);
         expect(requiresPreviewServerSetupForEnvironment('production', null)).toBe(false);
+    });
+
+    it('clears old auth before persisting a Relay switch and leaves the old URL on failure', async () => {
+        const events: string[] = [];
+        await replaceServerUrlWithAuthBoundary({
+            currentUrl: 'http://192.168.1.2:3005',
+            nextUrl: 'http://192.168.1.3:3005',
+            clearAuth: async () => { events.push('clear-auth'); },
+            persistUrl: (url) => { events.push(`persist:${url}`); },
+        });
+        expect(events).toEqual(['clear-auth', 'persist:http://192.168.1.3:3005']);
+
+        events.length = 0;
+        await expect(replaceServerUrlWithAuthBoundary({
+            currentUrl: 'http://192.168.1.2:3005',
+            nextUrl: null,
+            clearAuth: async () => { events.push('clear-auth'); throw new Error('credential deletion failed'); },
+            persistUrl: (url) => { events.push(`persist:${url}`); },
+        })).rejects.toThrow('credential deletion failed');
+        expect(events).toEqual(['clear-auth']);
     });
 
     it('targets and recognizes only the canonical healthy Lyntty Relay endpoint', async () => {

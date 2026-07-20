@@ -272,6 +272,8 @@ export const en = {
         previewSetupFooter: 'On your computer, run `bun preview:test`, then enter the local Relay URL shown in the terminal.',
         clearRelay: 'Clear Relay',
         clearRelayConfirm: 'Clear the saved Relay and require setup again?',
+        previewHttpRequiresLocalNetwork: 'Preview HTTP must use localhost or a private LAN address.',
+        failedToClearOldAccount: 'Could not clear the old account. The Relay was not changed.',
         enterServerUrl: 'Please enter a server URL',
         notValidLynttyServer: 'Not a valid Lyntty relay',
         changeServer: 'Change Server',

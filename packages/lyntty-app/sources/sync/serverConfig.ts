@@ -100,6 +100,6 @@ export function getServerInfo(): { hostname: string; port?: number; isCustom: bo
     }
 }
 
-export function validateServerUrl(url: string): { valid: boolean; error?: string } {
+export function validateServerUrl(url: string) {
     return validateServerUrlForEnvironment(url, appEnvironment());
 }

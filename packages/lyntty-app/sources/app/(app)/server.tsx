@@ -16,8 +16,9 @@ import {
     setServerUrl,
     validateServerUrl,
 } from '@/sync/serverConfig';
-import { probeLynttyRelay } from '@/sync/serverConfigUtils';
+import { probeLynttyRelay, replaceServerUrlWithAuthBoundary } from '@/sync/serverConfigUtils';
 import { getCurrentAuth } from '@/auth/AuthContext';
+import { clearStoredAuthState } from '@/auth/bootstrapAuth';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -132,12 +133,15 @@ export default function ServerConfigScreen() {
 
         const validation = validateServerUrl(inputUrl);
         if (!validation.valid) {
-            setError(validation.error || t('errors.invalidFormat'));
+            setError(validation.errorCode === 'preview-http-requires-local-network'
+                ? t('server.previewHttpRequiresLocalNetwork')
+                : validation.error || t('errors.invalidFormat'));
             return;
         }
 
+        const normalizedUrl = inputUrl.trim();
         // Validate the server
-        const isValid = await validateServer(inputUrl);
+        const isValid = await validateServer(normalizedUrl);
         if (!isValid) {
             return;
         }
@@ -149,12 +153,22 @@ export default function ServerConfigScreen() {
         );
 
         if (confirmed) {
-            setServerUrl(inputUrl);
-            const auth = getCurrentAuth();
-            if (auth) {
-                await auth.logout({ skipPushUnregister: true });
+            try {
+                await replaceServerUrlWithAuthBoundary({
+                    currentUrl: configuredServerUrl,
+                    nextUrl: normalizedUrl,
+                    clearAuth: async () => {
+                        const auth = getCurrentAuth();
+                        if (auth) await auth.logout({ skipPushUnregister: true });
+                        else await clearStoredAuthState();
+                    },
+                    persistUrl: setServerUrl,
+                });
+                router.replace('/');
+            } catch (saveError) {
+                console.error('Failed to switch Relay safely:', saveError);
+                setError(t('server.failedToClearOldAccount'));
             }
-            router.replace('/');
         }
     };
 
@@ -166,13 +180,24 @@ export default function ServerConfigScreen() {
         );
 
         if (confirmed) {
-            setServerUrl(null);
-            setInputUrl('');
-            const auth = getCurrentAuth();
-            if (auth) {
-                await auth.logout({ skipPushUnregister: true });
+            try {
+                await replaceServerUrlWithAuthBoundary({
+                    currentUrl: configuredServerUrl,
+                    nextUrl: null,
+                    clearAuth: async () => {
+                        const auth = getCurrentAuth();
+                        if (auth) await auth.logout({ skipPushUnregister: true });
+                        else await clearStoredAuthState();
+                    },
+                    persistUrl: setServerUrl,
+                    forceAuthClear: true,
+                });
+                setInputUrl('');
+                router.replace('/server');
+            } catch (resetError) {
+                console.error('Failed to clear Relay safely:', resetError);
+                setError(t('server.failedToClearOldAccount'));
             }
-            router.replace('/server');
         }
     };
 
@@ -229,7 +254,7 @@ export default function ServerConfigScreen() {
                                 </Text>
                             )}
                             <View style={styles.buttonRow}>
-                                {!setupRequired && configuredServerUrl && (
+                                {!setupRequired && (configuredServerUrl || !previewEnvironment) && (
                                     <View style={styles.buttonWrapper}>
                                         <RoundButton
                                             testID="lyntty-server-reset"
