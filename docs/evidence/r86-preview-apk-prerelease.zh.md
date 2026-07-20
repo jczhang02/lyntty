@@ -2,7 +2,7 @@
 
 日期：2026-07-20
 
-状态：实现已准备进入受保护 PR；尚未构建或发布 Candidate
+状态：PR #16 已合入；首次 Candidate 在生成 artifact 前停止；bundle 修复等待受保护 PR
 
 ## 范围
 
@@ -46,11 +46,21 @@ Candidate SHA-256 经 `scripts/preview-apk-allowlist.json` 审阅后，必须用
 - GitHub admin API 已确认 immutable releases 启用；active、无 bypass 的 tag ruleset `19203462` 禁止更新和删除 `refs/tags/android-preview-v*`，对应仓库门禁变量已设置；
 - 当前 App TypeScript 和 i18n 门禁通过。
 
-最终评审加固 head 的本地 `bun run ci:fast` 已通过：repo hardening 19、Wire 33、CLI 585、Relay 119 / 332 assertions、App 809 / 3,268 assertions（89 个隔离文件）、dev/Preview lifecycle 35 / 194 assertions。两个 workflow 还通过 YAML parse、提取 Bash ShellCheck 和 `git diff --check`。受保护 PR CI 仍待执行。
+最终评审加固 head 的本地 `bun run ci:fast` 已通过：repo hardening 19、Wire 33、CLI 585、Relay 119 / 332 assertions、App 809 / 3,268 assertions（89 个隔离文件）、dev/Preview lifecycle 35 / 194 assertions。两个 workflow 还通过 YAML parse、提取 Bash ShellCheck 和 `git diff --check`。PR [#16](https://github.com/jczhang02/lyntty/pull/16) 随后通过全部受保护检查，并以 `5b45d37989cc13a8eb2db1d46a8876a0c3227036` 合入。
+
+## 首次 Candidate 中断
+
+Candidate run [`29739227276`](https://github.com/jczhang02/lyntty/actions/runs/29739227276) 在 `:app:createBundleReleaseJsAndAssets` 中停止，尚未进入 APK audit、attestation 或 artifact 上传。该 run 的 artifact 数量为 0，也没有创建 Preview tag 或 Release。
+
+本地使用相同 Expo `export:embed` 路径稳定复现了 `ResolveMessage is not constructable`。聚焦诊断还原出的原始错误是：`babel.config.js` 直接加载 `babel-preset-expo`，但 App 没有直接声明该依赖；因此 Bun 的 isolated workspace linker 正确阻止 Babel Core 访问 Expo 的传递依赖。该问题并非 `EMFILE` 或 GitHub runner 故障。
+
+修复补充匹配的 `babel-preset-expo ~55.0.23` 直接构建依赖，并将真实 Preview Android bundle smoke 纳入 `ci:app`。修复前，`bun run --filter lyntty-app test:bundle` 可复现 exit 7 和 Candidate 错误；修复后，同一命令完成 3,182 个模块的 bundle，验证非空 13,068,103-byte 输出后删除隔离产物。
+
+干净 staged snapshot 随后通过 `bun run ci:fast`：repo hardening 19、Wire 33、CLI 585、Relay 119 / 332 assertions、App 809 / 3,268 assertions（89 个隔离文件）及 Preview bundle smoke、dev/Preview lifecycle 35 / 194 assertions，以及 `git diff --check`。
 
 ## 尚未执行
 
-- GitHub Candidate workflow；
+- 修复后的 GitHub Candidate workflow；
 - `920001` Candidate APK audit；
 - 实体手机 `910003 → 920001` 原位升级；
 - 清除数据后的强制 Relay 设置、Android 返回键、Clear Relay 重新门禁、配对、Pi 消息往返和重开；
