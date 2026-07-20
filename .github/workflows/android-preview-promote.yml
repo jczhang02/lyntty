@@ -105,6 +105,9 @@ jobs:
           grep -Fx 'signer_sha256=ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c' "$apk_audit"
           grep -Fx 'signature_scheme_v2=true' "$apk_audit"
           grep -Fx 'standalone_bundle=assets/index.android.bundle' "$apk_audit"
+          grep -Fx 'native_abis=arm64-v8a,x86_64' "$apk_audit"
+          grep -Fx "source_commit=$source_sha" "$apk_audit"
+          grep -Fx "sha256=$actual_sha" "$apk_audit"
           gh attestation verify "$apk" --repo "$GITHUB_REPOSITORY" --source-digest "$source_sha" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/android-preview-candidate.yml" \
             --signer-digest "$source_sha" --format json > "$RUNNER_TEMP/android-preview-attestation.json"

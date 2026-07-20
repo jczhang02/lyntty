@@ -123,6 +123,7 @@ jobs:
           VERSION_NAME: ${{ steps.release.outputs.version_name }}
           VERSION_CODE: ${{ steps.release.outputs.version_code }}
           PREVIEW_SIGNER_SHA256: ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c
+          EXPECTED_ABIS: arm64-v8a,x86_64
         run: |
           set -euo pipefail
           candidate="$RUNNER_TEMP/android-preview-candidate"
@@ -130,10 +131,14 @@ jobs:
           apk="$candidate/$APK_NAME"
           cp packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk "$apk"
           cp "$RUNNER_TEMP/android-preview-runtime-audit.txt" "$candidate/android-preview-runtime-audit.txt"
-          packages/lyntty-app/scripts/apk-audit.sh \
-            "$apk" dev.jczhang.lyntty.preview "$VERSION_NAME" "$VERSION_CODE" "$PREVIEW_SIGNER_SHA256" \
-            > "$candidate/${APK_NAME%.apk}.audit.txt"
           sha256="$(sha256sum "$apk" | awk '{print $1}')"
+          embedded_commit="$(unzip -p "$apk" assets/app.config | jq -er '.extra.app.buildCommitSha')"
+          [[ "$embedded_commit" == "$GITHUB_SHA" ]]
+          audit="$candidate/${APK_NAME%.apk}.audit.txt"
+          packages/lyntty-app/scripts/apk-audit.sh \
+            "$apk" dev.jczhang.lyntty.preview "$VERSION_NAME" "$VERSION_CODE" "$PREVIEW_SIGNER_SHA256" "$EXPECTED_ABIS" \
+            > "$audit"
+          printf 'source_commit=%s\nsha256=%s\n' "$embedded_commit" "$sha256" >> "$audit"
           printf '%s  %s\n' "$sha256" "$APK_NAME" > "$candidate/$APK_NAME.sha256"
           export APK_NAME RELEASE_TAG RELEASE_TITLE VERSION_NAME VERSION_CODE PREVIEW_SIGNER_SHA256
           export SHA256="$sha256" SOURCE_TREE="$(git rev-parse 'HEAD^{tree}')"

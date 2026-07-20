@@ -98,6 +98,9 @@ test('Preview APK candidate builds audited dual-ABI bytes without publishing', (
   assert.match(androidPreviewCandidate, /EXPO_PUBLIC_\*/);
   assert.match(androidPreviewCandidate, /gradle-runtime-audit\.sh/);
   assert.match(androidPreviewCandidate, /apk-audit\.sh/);
+  assert.match(androidPreviewCandidate, /arm64-v8a,x86_64/);
+  assert.match(androidPreviewCandidate, /source_commit=%s/);
+  assert.match(androidPreviewCandidate, /sha256=%s/);
   assert.match(androidPreviewCandidate, /actions\/attest@/);
   assert.match(androidPreviewCandidate, /actions\/upload-artifact@/);
   assert.doesNotMatch(androidPreviewCandidate, /contents: write/);
@@ -113,6 +116,7 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /android-preview-candidate\.yml/);
   assert.match(androidPreviewPromote, /gh run download/);
   assert.match(androidPreviewPromote, /gh attestation verify/);
+  assert.match(androidPreviewPromote, /native_abis=arm64-v8a,x86_64/);
   assert.match(androidPreviewPromote, /git diff --quiet[^\n]*packages\/lyntty-app/);
   assert.match(androidPreviewPromote, /gh release create[^\n]*--draft[^\n]*--prerelease/);
   assert.match(androidPreviewPromote, /gh release edit[^\n]*--draft=false[^\n]*--prerelease/);
