@@ -8,7 +8,7 @@ async function removeStoredCredentials(): Promise<void> {
     }
 }
 
-async function clearStoredCredentialsAndPersistence(): Promise<void> {
+export async function clearStoredCredentialsForServerSetup(): Promise<void> {
     await removeStoredCredentials();
     const { clearPersistence } = await import('@/sync/persistence');
     clearPersistence();
@@ -41,7 +41,7 @@ export async function bootstrapAuth(options: {
     devCredentials: AuthCredentials | null;
 }): Promise<AuthCredentials | null> {
     if (options.requiresServerSetup) {
-        await clearStoredCredentialsAndPersistence();
+        await clearStoredCredentialsForServerSetup();
         return null;
     }
 

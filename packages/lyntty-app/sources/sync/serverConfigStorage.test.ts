@@ -44,6 +44,14 @@ describe('Preview server configuration storage', () => {
         expect(() => getServerUrl()).toThrow('Preview Relay URL must be configured before use');
     });
 
+    it('fails closed for a persisted Preview Relay that violates the HTTP policy', () => {
+        setServerUrl('http://8.8.8.8:3005');
+
+        expect(getConfiguredServerUrl()).toBe('http://8.8.8.8:3005');
+        expect(isPreviewServerSetupRequired()).toBe(true);
+        expect(() => getServerUrl()).toThrow('Preview Relay URL must be configured before use');
+    });
+
     it('persists an explicit Preview Relay and notifies the bootstrap gate', () => {
         let notifications = 0;
         const unsubscribe = subscribeServerConfig(() => { notifications += 1; });

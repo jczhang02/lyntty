@@ -4,14 +4,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Fonts from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { FontAwesome } from '@expo/vector-icons';
-import { usePathname, useRouter } from 'expo-router';
+import { Slot, usePathname, useRouter } from 'expo-router';
 import type { AuthCredentials } from '@/auth/tokenStorage';
-import { AuthProvider } from '@/auth/AuthContext';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { initialWindowMetrics, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SidebarNavigator } from '@/components/SidebarNavigator';
 import sodium from '@/encryption/libsodium.lib';
 import { View, Platform, AppState } from 'react-native';
 import { ModalProvider } from '@/modal';
@@ -19,8 +17,7 @@ import { bootstrapAuth, getBootstrapRouteGate } from '@/auth/bootstrapAuth';
 import { isPreviewServerSetupRequired, subscribeServerConfig } from '@/sync/serverConfig';
 import { StatusBarProvider } from '@/components/StatusBarProvider';
 // import * as SystemUI from 'expo-system-ui';
-import { initConsoleLogging, setConsoleOutputEnabled } from '@/utils/consoleLogging';
-import { useLocalSetting } from '@/sync/storage';
+import { initConsoleLogging } from '@/utils/consoleLogging';
 import { useUnistyles } from 'react-native-unistyles';
 import { AsyncLock } from '@/utils/lock';
 import { getSessionRouteFromNotificationResponse } from '@/utils/notificationRouting';
@@ -87,6 +84,8 @@ function HorizontalSafeAreaWrapper({ children }: { children: React.ReactNode }) 
         </View>
     );
 }
+
+const BootstrappedNavigator = React.lazy(() => import('@/components/BootstrappedNavigator'));
 
 let lock = new AsyncLock();
 let loaded = false;
@@ -285,12 +284,6 @@ export default function RootLayout() {
     }, [handleNotificationResponse, initState, serverSetupRequired]);
 
 
-    // Sync console output toggle from local debug settings.
-    const consoleLoggingEnabled = useLocalSetting('consoleLoggingEnabled');
-    React.useEffect(() => {
-        setConsoleOutputEnabled(consoleLoggingEnabled);
-    }, [consoleLoggingEnabled]);
-
     //
     // Not inited
     //
@@ -304,20 +297,25 @@ export default function RootLayout() {
     // Boot
     //
 
-    let providers = (
+    const content = serverSetupRequired
+        ? <Slot />
+        : (
+            <React.Suspense fallback={null}>
+                <BootstrappedNavigator initialCredentials={initState.credentials} />
+            </React.Suspense>
+        );
+    const providers = (
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
             <KeyboardProvider preload={true}>
                 <GestureHandlerRootView style={{ flex: 1 }}>
-                    <AuthProvider initialCredentials={initState.credentials}>
-                        <ThemeProvider value={navigationTheme}>
-                            <StatusBarProvider />
-                            <ModalProvider>
-                                <HorizontalSafeAreaWrapper>
-                                    <SidebarNavigator />
-                                </HorizontalSafeAreaWrapper>
-                            </ModalProvider>
-                        </ThemeProvider>
-                    </AuthProvider>
+                    <ThemeProvider value={navigationTheme}>
+                        <StatusBarProvider />
+                        <ModalProvider>
+                            <HorizontalSafeAreaWrapper>
+                                {content}
+                            </HorizontalSafeAreaWrapper>
+                        </ModalProvider>
+                    </ThemeProvider>
                 </GestureHandlerRootView>
             </KeyboardProvider>
         </SafeAreaProvider>

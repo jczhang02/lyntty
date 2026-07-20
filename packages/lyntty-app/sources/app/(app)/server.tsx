@@ -18,7 +18,7 @@ import {
 } from '@/sync/serverConfig';
 import { probeLynttyRelay, replaceServerUrlWithAuthBoundary } from '@/sync/serverConfigUtils';
 import { getCurrentAuth } from '@/auth/AuthContext';
-import { clearStoredAuthState } from '@/auth/bootstrapAuth';
+import { clearStoredAuthState, clearStoredCredentialsForServerSetup } from '@/auth/bootstrapAuth';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -160,6 +160,7 @@ export default function ServerConfigScreen() {
                     clearAuth: async () => {
                         const auth = getCurrentAuth();
                         if (auth) await auth.logout({ skipPushUnregister: true });
+                        else if (setupRequired) await clearStoredCredentialsForServerSetup();
                         else await clearStoredAuthState();
                     },
                     persistUrl: setServerUrl,
@@ -187,6 +188,7 @@ export default function ServerConfigScreen() {
                     clearAuth: async () => {
                         const auth = getCurrentAuth();
                         if (auth) await auth.logout({ skipPushUnregister: true });
+                        else if (setupRequired) await clearStoredCredentialsForServerSetup();
                         else await clearStoredAuthState();
                     },
                     persistUrl: setServerUrl,

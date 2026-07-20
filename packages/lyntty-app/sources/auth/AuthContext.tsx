@@ -27,6 +27,10 @@ export function AuthProvider({ children, initialCredentials }: { children: React
         setCurrentAuth(credentials ? { isAuthenticated, credentials, login, logout } : null);
     }, [isAuthenticated, credentials]);
 
+    useEffect(() => () => {
+        setCurrentAuth(null);
+    }, []);
+
     useEffect(() => {
         return subscribeAuthInvalidation(async () => {
             await clearLocalAuth();

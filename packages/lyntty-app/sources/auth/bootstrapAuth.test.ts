@@ -74,6 +74,14 @@ describe('bootstrapAuth', () => {
         expect(mocks.syncReset).not.toHaveBeenCalled();
     });
 
+    it('keeps the root bootstrap module free of eager sync and navigator imports', async () => {
+        const source = await Bun.file(new URL('../app/_layout.tsx', import.meta.url)).text();
+        expect(source).not.toContain("from '@/sync/storage'");
+        expect(source).not.toContain("from '@/components/SidebarNavigator'");
+        expect(source).not.toContain("from '@/auth/AuthContext'");
+        expect(source).toContain('React.lazy');
+    });
+
     it('blocks deep-linked routes until Preview Relay setup is complete', () => {
         expect(getBootstrapRouteGate(false, true, '/restore')).toBe('wait');
         expect(getBootstrapRouteGate(true, true, '/restore')).toBe('redirect-to-server');

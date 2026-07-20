@@ -40,10 +40,10 @@ export function subscribeServerConfig(listener: () => void): () => void {
 
 export function getServerUrl(): string {
     const configured = getConfiguredServerUrl();
-    if (configured) return configured;
-    if (isPreviewServerSetupRequired()) {
+    if (requiresPreviewServerSetupForEnvironment(appEnvironment(), configured)) {
         throw new Error('Preview Relay URL must be configured before use');
     }
+    if (configured) return configured;
     return (globalThis as any).__LYNTTY_CONFIG__?.serverUrl
         || process.env.EXPO_PUBLIC_LYNTTY_SERVER_URL
         || DEFAULT_SERVER_URL;
