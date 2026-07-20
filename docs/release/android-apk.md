@@ -35,6 +35,35 @@ Rules:
 - No automatic cross-package data migration.
 - If an old `dev.jczhang.lyntty` exists with different signing key, uninstall it once and reinstall the new production APK.
 
+## APK-only Preview prerelease
+
+The developer Preview APK is distributed independently from the signed Compatibility release system:
+
+- package `dev.jczhang.lyntty.preview` and the checked-in Preview-only signer;
+- public GitHub prerelease, never `latest`;
+- no hosted Preview Relay, Relay OCI, CLI archive, Compatibility BOM, or Play publication;
+- manual GitHub download and Android Package Installer update;
+- local testing through `bun preview:test` and its isolated Relay;
+- first-run Preview UI requires an explicit local Relay before credentials or sync can load;
+- Stable behavior and the production signing path remain unchanged.
+
+Candidate and publication remain separate:
+
+1. `.github/workflows/android-preview-candidate.yml` builds one `arm64-v8a + x86_64` APK from protected `main`, audits it, attests it, and uploads a 30-day workflow artifact without publishing.
+2. A CODEOWNERS-reviewed allowlist PR binds the candidate SHA-256 and source inputs.
+3. The operator upgrades and fresh-start tests the exact candidate on physical Android.
+4. Only after a separate release confirmation, `.github/workflows/android-preview-promote.yml` verifies the run, attestation, SHA-256, APK identity, unchanged App inputs, and final protected `main`, then publishes those exact bytes as a prerelease.
+
+Release identity for this cycle:
+
+```text
+Tag: android-preview-v1.2.0-920001
+Title: V1.2.0 Local First 📡
+APK: lyntty-preview-v1.2.0-920001.apk
+```
+
+Release notes are generated from `docs/release/preview-apk-release-notes.md`. Promotion publishes the APK, checksum, APK audit, runtime audit, and provenance only.
+
 ## Signing key
 
 Create one permanent release keystore:

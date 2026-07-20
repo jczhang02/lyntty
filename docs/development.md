@@ -49,7 +49,7 @@ On the first run the command:
 1. reuses a content-matched cached APK, imports an audited current-source `lyntty-preview-*.apk` from `~/Downloads`, or builds one when at least 12 GiB of memory is available;
 2. starts the current source Relay on a stable worktree-local LAN port;
 3. prints the APK path and Relay URL;
-4. asks you to confirm that **Lyntty (preview)** uses that Relay URL, create the local test account, and scan the terminal QR code;
+4. requires **Lyntty (preview)** 1.2 or newer to validate and save that Relay URL before account creation, then asks you to create the local test account and scan the terminal QR code;
 5. starts the current source daemon directly, without installing the global Pi extension;
 6. launches a new managed Pi session using the existing Pi model configuration.
 
@@ -59,7 +59,7 @@ The phone and computer must be on the same trusted LAN. If the default route is 
 LYNTTY_PREVIEW_LAN_IP=192.168.1.20 bun preview:test
 ```
 
-An imported APK may initially retain `relay.jczhang.cc` as its normal public default. The harness pauses before pairing: set or confirm the displayed local URL in **Settings → Server** and create the test account only after that URL is active. Opening an older imported APK may briefly initialize its configured default before you switch it; the manual test itself begins only after local-URL confirmation. The override persists, so later runs reuse the account, node pairing, Relay database, APK, and port.
+Preview 1.2 and newer fail closed on first launch: credentials and sync remain disabled until **Connect to Relay** validates and saves the local URL through canonical `/health`. Older imported APKs may retain `relay.jczhang.cc` as their public default, so the harness still pauses before pairing and requires local-URL confirmation. The saved local override persists across Preview upgrades, so later runs reuse the account, node pairing, Relay database, APK, and port.
 
 The manual check is intentionally short:
 
@@ -77,7 +77,7 @@ bun preview:stop     # stop only the proven owned process group; preserve pairin
 bun preview:reset    # safely stop, then remove only this worktree's manual profile
 ```
 
-State is private and ignored under `dist/manual-preview/<worktree-hash>/`. `preview:stop` never deletes it. `preview:reset` removes the local Relay account and computer pairing, but cannot clear Android App data; clear or change the App server manually if needed.
+State is private and ignored under `dist/manual-preview/<worktree-hash>/`. `preview:stop` never deletes it. `preview:reset` removes the local Relay account and computer pairing, but cannot clear Android App data. **Clear Relay** in Preview settings removes the saved URL, clears old authentication state, and returns the App to mandatory setup.
 
 APK reuse is fail-closed. An imported APK needs an exact SHA-256 entry in the reviewed `scripts/preview-apk-allowlist.json`, a matching `.audit.txt` sidecar and embedded build commit, exact current App/Wire inputs, Preview package/signature, and standalone bundle. Override discovery with `LYNTTY_PREVIEW_APK=/path/to/lyntty-preview.apk`; an unallowlisted APK is rejected. A native build removes inherited `EXPO_PUBLIC_*` values, uses one worker and `arm64-v8a`, and refuses before Gradle when memory is below the safety threshold.
 
