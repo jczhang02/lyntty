@@ -1,0 +1,177 @@
+name: Publish Android Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run_id:
+        description: Successful Android Preview candidate workflow run id
+        required: true
+        type: string
+      expected_sha256:
+        description: Exact APK SHA-256 confirmed during physical-phone testing
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  attestations: read
+  contents: write
+
+concurrency:
+  group: android-preview-promotion
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout final protected main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Resolve and validate immutable candidate
+        id: candidate
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          run_json="$(gh run view "$CANDIDATE_RUN_ID" --json headSha,headBranch,event,conclusion,workflowName,url)"
+          [[ "$(jq -r .workflowName <<< "$run_json")" == "Android Preview candidate" ]]
+          [[ "$(jq -r .headBranch <<< "$run_json")" == "main" ]]
+          [[ "$(jq -r .event <<< "$run_json")" == "workflow_dispatch" ]]
+          [[ "$(jq -r .conclusion <<< "$run_json")" == "success" ]]
+          source_sha="$(jq -r .headSha <<< "$run_json")"
+          [[ "$source_sha" =~ ^[a-f0-9]{40}$ ]]
+          git fetch --no-tags origin "$source_sha"
+          git merge-base --is-ancestor "$source_sha" HEAD
+          git diff --quiet "$source_sha" HEAD -- .bun-version bun.lock patches scripts/postinstall.cjs packages/lyntty-app packages/lyntty-wire
+          artifact_name="android-preview-candidate-${CANDIDATE_RUN_ID}"
+          download="$RUNNER_TEMP/android-preview-candidate"
+          mkdir -p "$download"
+          gh run download "$CANDIDATE_RUN_ID" --name "$artifact_name" --dir "$download"
+          mapfile -t apks < <(find "$download" -type f -name 'lyntty-preview-v*.apk')
+          [[ "${#apks[@]}" -eq 1 ]]
+          apk="${apks[0]}"
+          apk_name="$(basename "$apk")"
+          sha_file="$download/$apk_name.sha256"
+          [[ -f "$sha_file" ]]
+          (cd "$download" && sha256sum -c "$(basename "$sha_file")")
+          actual_sha="$(sha256sum "$apk" | awk '{print $1}')"
+          [[ "$actual_sha" == "$EXPECTED_SHA256" ]]
+          provenance="$download/android-preview-provenance.json"
+          notes="$download/release-notes.md"
+          title_file="$download/release-title.txt"
+          apk_audit="$download/${apk_name%.apk}.audit.txt"
+          runtime_audit="$download/android-preview-runtime-audit.txt"
+          for path in "$provenance" "$notes" "$title_file" "$apk_audit" "$runtime_audit"; do [[ -f "$path" ]]; done
+          export PROVENANCE="$provenance" SOURCE_SHA="$source_sha" EXPECTED_SHA256 APK_NAME="$apk_name" CANDIDATE_RUN_ID
+          bun - <<'BUN'
+          const value = await Bun.file(process.env.PROVENANCE).json();
+          const expected = {
+            schemaVersion: 1,
+            artifact: process.env.APK_NAME,
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: '.github/workflows/android-preview-candidate.yml',
+            candidateRunId: Number(process.env.CANDIDATE_RUN_ID),
+            sourceCommit: process.env.SOURCE_SHA,
+            applicationId: 'dev.jczhang.lyntty.preview',
+            versionName: '1.2.0',
+            versionCode: 920001,
+            signerSha256: 'ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c',
+            sha256: process.env.EXPECTED_SHA256,
+          };
+          for (const [key, expectedValue] of Object.entries(expected)) {
+            if (value[key] !== expectedValue) throw new Error(`candidate provenance mismatch: ${key}`);
+          }
+          if (JSON.stringify(value.abis) !== JSON.stringify(['arm64-v8a', 'x86_64'])) throw new Error('candidate ABI mismatch');
+          BUN
+          grep -Fx 'application_id=dev.jczhang.lyntty.preview' "$apk_audit"
+          grep -Fx 'version_name=1.2.0' "$apk_audit"
+          grep -Fx 'version_code=920001' "$apk_audit"
+          grep -Fx 'signer_sha256=ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c' "$apk_audit"
+          grep -Fx 'signature_scheme_v2=true' "$apk_audit"
+          grep -Fx 'standalone_bundle=assets/index.android.bundle' "$apk_audit"
+          gh attestation verify "$apk" --repo "$GITHUB_REPOSITORY" --source-digest "$source_sha" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/android-preview-candidate.yml" \
+            --signer-digest "$source_sha" --format json > "$RUNNER_TEMP/android-preview-attestation.json"
+          tag="$(jq -r .releaseTag "$provenance")"
+          title="$(cat "$title_file")"
+          [[ "$tag" == android-preview-v1.2.0-920001 ]]
+          [[ "$title" == 'V1.2.0 Local First 📡' ]]
+          {
+            echo "source_sha=$source_sha"
+            echo "download=$download"
+            echo "apk=$apk"
+            echo "apk_name=$apk_name"
+            echo "tag=$tag"
+            echo "title=$title"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or resume exact draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOWNLOAD: ${{ steps.candidate.outputs.download }}
+          APK: ${{ steps.candidate.outputs.apk }}
+          APK_NAME: ${{ steps.candidate.outputs.apk_name }}
+          RELEASE_TAG: ${{ steps.candidate.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.candidate.outputs.title }}
+        run: |
+          set -euo pipefail
+          notes="$DOWNLOAD/release-notes.md"
+          assets=(
+            "$APK"
+            "$DOWNLOAD/$APK_NAME.sha256"
+            "$DOWNLOAD/${APK_NAME%.apk}.audit.txt"
+            "$DOWNLOAD/android-preview-runtime-audit.txt"
+            "$DOWNLOAD/android-preview-provenance.json"
+          )
+          if release_json="$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,targetCommitish,title,body 2>/dev/null)"; then
+            [[ "$(jq -r .isDraft <<< "$release_json")" == true ]]
+            [[ "$(jq -r .isPrerelease <<< "$release_json")" == true ]]
+            [[ "$(jq -r .targetCommitish <<< "$release_json")" == "$GITHUB_SHA" ]]
+            [[ "$(jq -r .title <<< "$release_json")" == "$RELEASE_TITLE" ]]
+            jq -r .body <<< "$release_json" > "$RUNNER_TEMP/existing-release-notes.md"
+            cmp -s "$notes" "$RUNNER_TEMP/existing-release-notes.md"
+          else
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TITLE" --notes-file "$notes" --draft --prerelease
+          fi
+          for asset in "${assets[@]}"; do
+            name="$(basename "$asset")"
+            if gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
+              verify_dir="$RUNNER_TEMP/existing-assets/$name"
+              mkdir -p "$verify_dir"
+              gh release download "$RELEASE_TAG" --pattern "$name" --dir "$verify_dir"
+              cmp -s "$asset" "$verify_dir/$name"
+            else
+              gh release upload "$RELEASE_TAG" "$asset"
+            fi
+          done
+          desired_names="$(printf '%s\n' "${assets[@]##*/}" | sort)"
+          published_names="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)"
+          [[ "$published_names" == "$desired_names" ]]
+
+      - name: Publish only after final protected-main recheck
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.candidate.outputs.tag }}
+          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          git diff --quiet "$SOURCE_SHA" HEAD -- .bun-version bun.lock patches scripts/postinstall.cjs packages/lyntty-app packages/lyntty-wire
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease

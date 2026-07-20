@@ -5,6 +5,8 @@ import { test } from 'bun:test';
 const relayDeployPath = new URL('../.github/workflows/relay-deploy.yml', import.meta.url);
 const relayImagePath = new URL('../.github/workflows/relay-image.yml', import.meta.url);
 const androidReleasePath = new URL('../.github/workflows/android-release.yml', import.meta.url);
+const androidPreviewCandidatePath = new URL('../.github/workflows/android-preview-candidate.yml', import.meta.url);
+const androidPreviewPromotePath = new URL('../.github/workflows/android-preview-promote.yml', import.meta.url);
 const releaseCandidatePath = new URL('../.github/workflows/release-candidate.yml', import.meta.url);
 const releasePromotePath = new URL('../.github/workflows/release-promote.yml', import.meta.url);
 const releaseRollbackPath = new URL('../.github/workflows/release-rollback.yml', import.meta.url);
@@ -16,10 +18,12 @@ const typecheckWorkflowPath = new URL('../.github/workflows/typecheck.yml', impo
 const cliSmokeWorkflowPath = new URL('../.github/workflows/cli-smoke-test.yml', import.meta.url);
 const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-artifact.ts', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
+  readFile(androidPreviewCandidatePath, 'utf8'),
+  readFile(androidPreviewPromotePath, 'utf8'),
   readFile(releaseCandidatePath, 'utf8'),
   readFile(releasePromotePath, 'utf8'),
   readFile(releaseRollbackPath, 'utf8'),
@@ -81,6 +85,39 @@ test('Android component workflow verifies a candidate but cannot publish', () =>
   assert.doesNotMatch(androidRelease, /contents: write/);
   assert.doesNotMatch(androidRelease, /gh release create/);
   assert.doesNotMatch(androidRelease, /LYNTTY_EAS_PROJECT_ID/);
+});
+
+test('Preview APK candidate builds audited dual-ABI bytes without publishing', () => {
+  assert.match(androidPreviewCandidate, /workflow_dispatch/);
+  assert.match(androidPreviewCandidate, /GITHUB_REF[^\n]*refs\/heads\/main/);
+  assert.match(androidPreviewCandidate, /APP_ENV: preview/);
+  assert.match(androidPreviewCandidate, /reactNativeArchitectures=x86_64,arm64-v8a/);
+  assert.match(androidPreviewCandidate, /dev\.jczhang\.lyntty\.preview/);
+  assert.match(androidPreviewCandidate, /ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c/);
+  assert.match(androidPreviewCandidate, /Refusing unreviewed Preview build input/);
+  assert.match(androidPreviewCandidate, /EXPO_PUBLIC_\*/);
+  assert.match(androidPreviewCandidate, /gradle-runtime-audit\.sh/);
+  assert.match(androidPreviewCandidate, /apk-audit\.sh/);
+  assert.match(androidPreviewCandidate, /actions\/attest@/);
+  assert.match(androidPreviewCandidate, /actions\/upload-artifact@/);
+  assert.doesNotMatch(androidPreviewCandidate, /contents: write/);
+  assert.doesNotMatch(androidPreviewCandidate, /gh release create/);
+});
+
+test('Preview APK promotion publishes only exact tested candidate bytes', () => {
+  assert.match(androidPreviewPromote, /workflow_dispatch/);
+  assert.match(androidPreviewPromote, /candidate_run_id/);
+  assert.match(androidPreviewPromote, /expected_sha256/);
+  assert.match(androidPreviewPromote, /contents: write/);
+  assert.match(androidPreviewPromote, /actions: read/);
+  assert.match(androidPreviewPromote, /android-preview-candidate\.yml/);
+  assert.match(androidPreviewPromote, /gh run download/);
+  assert.match(androidPreviewPromote, /gh attestation verify/);
+  assert.match(androidPreviewPromote, /git diff --quiet[^\n]*packages\/lyntty-app/);
+  assert.match(androidPreviewPromote, /gh release create[^\n]*--draft[^\n]*--prerelease/);
+  assert.match(androidPreviewPromote, /gh release edit[^\n]*--draft=false[^\n]*--prerelease/);
+  assert.match(androidPreviewPromote, /android-preview-v/);
+  assert.doesNotMatch(androidPreviewPromote, /gradlew|assembleRelease/);
 });
 
 test('candidate builds once under channel isolation and never publishes', () => {
