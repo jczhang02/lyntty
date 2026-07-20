@@ -743,8 +743,8 @@ async function importAuditedPreviewApk(
 async function assertBuildMemoryAvailable(): Promise<void> {
   if (testHook('LYNTTY_PREVIEW_TEST_FAKE_APK')) return;
   if (testHooksEnabled() && process.env.LYNTTY_PREVIEW_ALLOW_LOW_MEMORY_BUILD === '1') return;
-  if (process.platform !== 'linux') return;
   const testAvailable = testHooksEnabled() ? process.env.LYNTTY_PREVIEW_TEST_MEM_AVAILABLE_KIB : undefined;
+  if (process.platform !== 'linux' && !testAvailable) return;
   const meminfo = testAvailable ? '' : await readFile('/proc/meminfo', 'utf8');
   const availableKiB = testAvailable
     ? Number(testAvailable)
