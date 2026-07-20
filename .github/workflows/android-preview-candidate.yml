@@ -151,8 +151,14 @@ jobs:
           cp packages/lyntty-app/android/app/build/outputs/apk/release/app-release.apk "$apk"
           cp "$RUNNER_TEMP/android-preview-runtime-audit.txt" "$candidate/android-preview-runtime-audit.txt"
           sha256="$(sha256sum "$apk" | awk '{print $1}')"
-          embedded_commit="$(unzip -p "$apk" assets/app.config | jq -er '.extra.app.buildCommitSha')"
-          [[ "$embedded_commit" == "$GITHUB_SHA" ]]
+          if ! embedded_commit="$(unzip -p "$apk" assets/app.config | jq -er '.extra.app.buildCommitSha')"; then
+            echo 'Candidate APK is missing a valid embedded source commit.' >&2
+            exit 1
+          fi
+          [[ "$embedded_commit" == "$GITHUB_SHA" ]] || {
+            echo "Candidate source commit mismatch: expected <$GITHUB_SHA>, got <$embedded_commit>" >&2
+            exit 1
+          }
           audit="$candidate/${APK_NAME%.apk}.audit.txt"
           packages/lyntty-app/scripts/apk-audit.sh \
             "$apk" dev.jczhang.lyntty.preview "$VERSION_NAME" "$VERSION_CODE" "$PREVIEW_SIGNER_SHA256" "$EXPECTED_ABIS" \
