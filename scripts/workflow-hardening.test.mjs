@@ -18,11 +18,12 @@ const typecheckWorkflowPath = new URL('../.github/workflows/typecheck.yml', impo
 const cliSmokeWorkflowPath = new URL('../.github/workflows/cli-smoke-test.yml', import.meta.url);
 const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-artifact.ts', import.meta.url);
 const rootPackagePath = new URL('../package.json', import.meta.url);
+const bunLockPath = new URL('../bun.lock', import.meta.url);
 const previewRelayGatePath = new URL('../e2e/maestro/standalone/preview_first_run.yml', import.meta.url);
 const previewReleaseNotesPath = new URL('../docs/release/preview-apk-release-notes.md', import.meta.url);
 const previewBundleSmokePath = new URL('../packages/lyntty-app/scripts/bundle-smoke.ts', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, previewRelayGate, previewBundleSmoke] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, bunLockText, previewRelayGate, previewBundleSmoke] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
@@ -39,6 +40,7 @@ const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, android
   readFile(cliSmokeWorkflowPath, 'utf8'),
   readFile(cliArtifactBuilderPath, 'utf8'),
   readFile(rootPackagePath, 'utf8'),
+  readFile(bunLockPath, 'utf8'),
   readFile(previewRelayGatePath, 'utf8'),
   readFile(previewBundleSmokePath, 'utf8'),
 ]);
@@ -287,6 +289,12 @@ test('native signature verification pins platform identities and attests exact a
   assert.doesNotMatch(nativeSigning, /^\s*! printf '%s\\n'/m);
   assert.match(nativeSigning, /actions\/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35/);
   assert.match(nativeSigning, /bun install --frozen-lockfile/);
+});
+
+test('dependency audit pins the patched shell-quote release', () => {
+  assert.equal(rootPackage.overrides['shell-quote'], '1.9.0');
+  assert.match(bunLockText, /"shell-quote": \["shell-quote@1\.9\.0"/);
+  assert.doesNotMatch(bunLockText, /shell-quote@1\.8\.4/);
 });
 
 test('required PR hygiene verifies lifecycle trust and release contracts', () => {
