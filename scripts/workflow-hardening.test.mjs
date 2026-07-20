@@ -98,6 +98,8 @@ test('Preview APK candidate builds audited dual-ABI bytes without publishing', (
   assert.match(androidPreviewCandidate, /EXPO_PUBLIC_\*/);
   assert.match(androidPreviewCandidate, /gradle-runtime-audit\.sh/);
   assert.match(androidPreviewCandidate, /apk-audit\.sh/);
+  assert.match(androidPreviewCandidate, /\[\[ "\$VERSION_CODE" == 920001 \]\]/);
+  assert.match(androidPreviewCandidate, /\[\[ "\$version_name" == 1\.2\.0 \]\]/);
   assert.match(androidPreviewCandidate, /arm64-v8a,x86_64/);
   assert.match(androidPreviewCandidate, /source_commit=%s/);
   assert.match(androidPreviewCandidate, /sha256=%s/);
