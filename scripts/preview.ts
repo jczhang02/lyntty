@@ -828,21 +828,46 @@ async function inspectBuildGroups(canonicalRoot: string, buildId: string): Promi
   return ownedGroups;
 }
 
+function parseDarwinBuildMarkerPids(value: string, buildId: string): number[] {
+  const token = `LYNTTY_PREVIEW_BUILD_ID=${buildId}`;
+  const pids: number[] = [];
+  for (const line of value.split('\n')) {
+    const match = line.match(/^\s*(\d+)\s+(.+)$/);
+    if (!match) continue;
+    const command = match[2]!;
+    if (command === token || command.startsWith(`${token} `) || command.endsWith(` ${token}`) || command.includes(` ${token} `)) {
+      pids.push(Number(match[1]));
+    }
+  }
+  return pids;
+}
+
+async function buildMarkerPids(buildId: string): Promise<number[]> {
+  if (process.platform === 'darwin') {
+    const result = await runCaptured(['/bin/ps', 'eww', '-axo', 'pid=,command='], process.cwd());
+    return parseDarwinBuildMarkerPids(result, buildId);
+  }
+  const pids: number[] = [];
+  for (const member of (await listProcessGroups()).filter(member => !isZombie(member))) {
+    if (await processHasBuildMarker(member.pid, buildId)) pids.push(member.pid);
+  }
+  return pids;
+}
+
 async function inspectBuildPids(canonicalRoot: string, buildId: string): Promise<number[]> {
   const ownedPids: number[] = [];
-  for (const member of (await listProcessGroups()).filter(member => !isZombie(member))) {
-    if (!(await processHasBuildMarker(member.pid, buildId))) continue;
-    const identity = await readProcessIdentity({ canonicalRoot }, member.pid);
+  for (const pid of await buildMarkerPids(buildId)) {
+    const identity = await readProcessIdentity({ canonicalRoot }, pid);
     if (!identity) {
-      if (!processIsAlive(member.pid)) continue;
-      throw new Error(`Refusing to stop Preview build PID ${member.pid}: identity unavailable`);
+      if (!processIsAlive(pid)) continue;
+      throw new Error(`Refusing to stop Preview build PID ${pid}: identity unavailable`);
     }
     if (
       !hasExactEnvironment(identity.environment, 'LYNTTY_PREVIEW_BUILD_ID', buildId)
       || !hasExactEnvironment(identity.environment, 'LYNTTY_PREVIEW_BUILD_ROOT', canonicalRoot)
       || !pathIsInside(canonicalRoot, identity.cwd)
-    ) throw new Error(`Refusing to stop Preview build PID ${member.pid}: ownership not proven`);
-    ownedPids.push(member.pid);
+    ) throw new Error(`Refusing to stop Preview build PID ${pid}: ownership not proven`);
+    ownedPids.push(pid);
   }
   return ownedPids;
 }
@@ -1691,6 +1716,7 @@ export {
   cleanupBuildProcesses,
   isUsableLanIpv4,
   parseArgs,
+  parseDarwinBuildMarkerPids,
   parseLinuxDefaultRoute,
   parseState,
   relayPortForHash,

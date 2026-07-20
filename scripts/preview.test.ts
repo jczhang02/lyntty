@@ -6,6 +6,7 @@ import { processStartToken } from './dev';
 import {
   cleanupBuildProcesses,
   isUsableLanIpv4,
+  parseDarwinBuildMarkerPids,
   parseLinuxDefaultRoute,
   relayPortForHash,
   sanitizePreviewBuildEnvironment,
@@ -54,6 +55,15 @@ describe('Preview LAN selection', () => {
 });
 
 describe('Preview build cleanup', () => {
+  it('prefilters Darwin build PIDs without inspecting every process identity', () => {
+    expect(parseDarwinBuildMarkerPids([
+      '  41 bun test scripts/preview.test.ts PATH=/usr/bin',
+      '  52 bun -e timer LYNTTY_PREVIEW_BUILD_ID=build-1 LYNTTY_PREVIEW_BUILD_ROOT=/repo',
+      '  63 bun -e timer LYNTTY_PREVIEW_BUILD_ID=build-10 LYNTTY_PREVIEW_BUILD_ROOT=/repo',
+      '  74 env LYNTTY_PREVIEW_BUILD_ID=build-1',
+    ].join('\n'), 'build-1')).toEqual([52, 74]);
+  });
+
   it('removes every inherited EXPO_PUBLIC value before a release-style build', () => {
     expect(sanitizePreviewBuildEnvironment({
       PATH: '/usr/bin',
