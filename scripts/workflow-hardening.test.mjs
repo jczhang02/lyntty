@@ -123,7 +123,7 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /git\/refs/);
   assert.match(androidPreviewPromote, /refs\/tags\/\$RELEASE_TAG/);
   assert.match(androidPreviewPromote, /gh release create[^\n]*--draft[^\n]*--prerelease/);
-  assert.match(androidPreviewPromote, /gh release edit[^\n]*--draft=false[^\n]*--prerelease/);
+  assert.match(androidPreviewPromote, /gh release edit[^\n]*--draft=false[^\n]*--prerelease[^\n]*--latest=false/);
   assert.match(androidPreviewPromote, /android-preview-v/);
   assert.doesNotMatch(androidPreviewPromote, /gradlew|assembleRelease/);
 });

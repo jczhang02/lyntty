@@ -150,7 +150,7 @@ jobs:
             jq -r .body <<< "$release_json" > "$RUNNER_TEMP/existing-release-notes.md"
             cmp -s "$notes" "$RUNNER_TEMP/existing-release-notes.md"
           else
-            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TITLE" --notes-file "$notes" --draft --prerelease
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TITLE" --notes-file "$notes" --draft --prerelease --latest=false
           fi
           for asset in "${assets[@]}"; do
             name="$(basename "$asset")"
@@ -187,4 +187,4 @@ jobs:
             [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
             [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
           fi
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
