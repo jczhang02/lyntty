@@ -8,6 +8,8 @@
 /packages/*/package.json @jczhang02
 /scripts/release.ts @jczhang02
 /scripts/dev.ts @jczhang02
+/scripts/preview.ts @jczhang02
+/scripts/preview-apk-allowlist.json @jczhang02
 /scripts/workflow-hardening.test.mjs @jczhang02
 /packages/lyntty-app/android/app/build.gradle @jczhang02
 /packages/lyntty-app/scripts/apk-audit.sh @jczhang02

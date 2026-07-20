@@ -14,6 +14,18 @@ describe('resolveLynttySpawnTarget', () => {
     });
   });
 
+  it('accepts an explicit current-source entry without requiring a stale dist build', () => {
+    expect(resolveLynttySpawnTarget({
+      bunMain: '/repo/packages/lyntty-cli/src/index.ts',
+      execPath: '/opt/bun/bin/bun',
+      projectDir: '/repo/packages/lyntty-cli',
+      configuredSourceEntry: '/repo/packages/lyntty-cli/src/index.ts',
+    })).toEqual({
+      command: 'bun',
+      prefixArgs: ['/repo/packages/lyntty-cli/src/index.ts'],
+    });
+  });
+
   it('lets a compiled CLI respawn itself without Bun', () => {
     expect(resolveLynttySpawnTarget({
       bunMain: '/$bunfs/root/lyntty',

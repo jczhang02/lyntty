@@ -45,6 +45,7 @@ const managedKeys = [
     'USERPROFILE',
     'LYNTTY_HOME_DIR',
     'LYNTTY_INSTALL_ROOT',
+    'LYNTTY_CLI_SOURCE_ENTRY',
     'LYNTTY_PI_EXTENSION_PATH',
     'PI_CODING_AGENT_DIR',
     'XDG_CONFIG_HOME',
@@ -74,6 +75,7 @@ process.env.XDG_STATE_HOME = join(testRoot, 'xdg', 'state')
 process.env.TMPDIR = tempDir
 process.env.TEMP = tempDir
 process.env.TMP = tempDir
+delete process.env.LYNTTY_CLI_SOURCE_ENTRY
 delete process.env.LYNTTY_PI_EXTENSION_PATH
 
 afterAll(() => {

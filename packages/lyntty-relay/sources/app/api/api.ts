@@ -46,7 +46,8 @@ export async function startApi(opts: StartApiOptions = {}) {
     );
 
     app.get('/', function (_request, reply) {
-        reply.send('Lyntty Relay API');
+        // Installed Preview clients before the health-probe migration require this marker.
+        reply.send('Welcome to Lyntty Relay!\nLyntty Relay API');
     });
 
     // Create typed provider

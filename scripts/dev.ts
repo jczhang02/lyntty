@@ -135,7 +135,7 @@ interface LockOwner {
   processStartToken: string;
 }
 
-interface CoordinationLock {
+export interface CoordinationLock {
   release(): Promise<void>;
 }
 
@@ -153,14 +153,14 @@ interface OwnershipResult {
   reason?: string;
 }
 
-interface ProcessIdentity {
+export interface ProcessIdentity {
   cwd: string;
   command: string;
   argv: string[];
   environment: string[];
 }
 
-interface ProcessGroupMember {
+export interface ProcessGroupMember {
   pid: number;
   ppid: number;
   pgid: number;
@@ -1470,7 +1470,7 @@ async function readDarwinProcargs(pid: number): Promise<{ argv: string[]; enviro
   return null;
 }
 
-async function readProcessIdentity(layout: DevLayout, pid: number): Promise<ProcessIdentity | null> {
+async function readProcessIdentity(layout: { canonicalRoot: string }, pid: number): Promise<ProcessIdentity | null> {
   let argv: string[];
   let environment: string[];
   if (process.platform === 'linux') {
@@ -2670,4 +2670,10 @@ export {
   parseKernProcargs2,
   pathIsInside,
   supervisorOwnership,
+  acquireAtomicLock,
+  isZombie,
+  listProcessGroups,
+  processIsAlive,
+  processStartToken,
+  readProcessIdentity,
 };
