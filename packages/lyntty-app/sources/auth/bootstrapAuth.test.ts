@@ -80,14 +80,26 @@ describe('bootstrapAuth', () => {
         expect(source).not.toContain("from '@/components/SidebarNavigator'");
         expect(source).not.toContain("from '@/auth/AuthContext'");
         expect(source).toContain('React.lazy');
-        expect(source).toContain('<Redirect href="/server" />');
+        expect(source).toContain('<Redirect href={PREVIEW_SETUP_SERVER_PATH} />');
         expect(source).not.toContain("router.replace('/server')");
+    });
+
+    it('keeps mandatory setup in an independent route group with no business index', async () => {
+        const setupLayout = await Bun.file(new URL('../app/(setup)/_layout.tsx', import.meta.url)).text();
+        const setupServer = Bun.file(new URL('../app/(setup)/setup/server.tsx', import.meta.url));
+        expect(await setupServer.exists()).toBe(true);
+        expect(setupLayout).toContain('name="setup/server"');
+        expect(setupLayout).not.toContain('(app)');
+        expect(setupLayout).not.toContain('index');
+        expect(setupLayout).not.toContain('@/sync/');
+        expect(setupLayout).not.toContain('SidebarNavigator');
     });
 
     it('blocks deep-linked routes until Preview Relay setup is complete', () => {
         expect(getBootstrapRouteGate(false, true, '/restore')).toBe('wait');
         expect(getBootstrapRouteGate(true, true, '/restore')).toBe('redirect-to-server');
-        expect(getBootstrapRouteGate(true, true, '/server')).toBe('render');
+        expect(getBootstrapRouteGate(true, true, '/server')).toBe('redirect-to-server');
+        expect(getBootstrapRouteGate(true, true, '/setup/server')).toBe('render');
         expect(getBootstrapRouteGate(true, false, '/restore')).toBe('render');
     });
 

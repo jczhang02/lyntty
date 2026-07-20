@@ -24,6 +24,8 @@ export async function clearStoredAuthState(): Promise<void> {
     clearPersistence();
 }
 
+export const PREVIEW_SETUP_SERVER_PATH = '/setup/server';
+
 export type BootstrapRouteGate = 'wait' | 'redirect-to-server' | 'render';
 
 export function getBootstrapRouteGate(
@@ -32,7 +34,7 @@ export function getBootstrapRouteGate(
     pathname: string,
 ): BootstrapRouteGate {
     if (!initialized) return 'wait';
-    if (requiresServerSetup && pathname !== '/server') return 'redirect-to-server';
+    if (requiresServerSetup && pathname !== PREVIEW_SETUP_SERVER_PATH) return 'redirect-to-server';
     return 'render';
 }
 

@@ -13,7 +13,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import sodium from '@/encryption/libsodium.lib';
 import { View, Platform, AppState } from 'react-native';
 import { ModalProvider } from '@/modal';
-import { bootstrapAuth, getBootstrapRouteGate } from '@/auth/bootstrapAuth';
+import { bootstrapAuth, getBootstrapRouteGate, PREVIEW_SETUP_SERVER_PATH } from '@/auth/bootstrapAuth';
 import { isPreviewServerSetupRequired, subscribeServerConfig } from '@/sync/serverConfig';
 import { StatusBarProvider } from '@/components/StatusBarProvider';
 // import * as SystemUI from 'expo-system-ui';
@@ -190,7 +190,7 @@ export default function RootLayout() {
     }, []);
 
     React.useEffect(() => {
-        if (initState && (!serverSetupRequired || pathname === '/server')) {
+        if (initState && (!serverSetupRequired || pathname === PREVIEW_SETUP_SERVER_PATH)) {
             setTimeout(() => {
                 SplashScreen.hideAsync();
             }, 100);
@@ -287,7 +287,7 @@ export default function RootLayout() {
         return null;
     }
     if (routeGate === 'redirect-to-server') {
-        return <Redirect href="/server" />;
+        return <Redirect href={PREVIEW_SETUP_SERVER_PATH} />;
     }
 
     //
