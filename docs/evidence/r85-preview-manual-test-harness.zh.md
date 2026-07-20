@@ -67,7 +67,7 @@ App         -> This does not look like a Lyntty relay.
 
 本次手测版本选择服务端兼容修复：当前 Relay 在保留规范 `GET /health` 的同时恢复旧首页标记。诊断期间验证过 App `/health` 探测方案，但没有保留，因为这会改变 App 输入；在新的 APK 尚未产生前，已审计的 `910003` 将无法继续满足精确复用要求。
 
-真实源码 Relay lifecycle 测试先在缺少兼容标记时失败，修正路由后通过。当前 App/Wire 输入与 APK source commit `4043171d3b6e89ef32a5a7a3c56d5c7b7ab9b40c` 的精确比较为 clean，普通 APK 选择路径也在修正后直接复用 `910003`，没有进入 Gradle。手机复测仍属于下方待执行步骤。
+真实源码 Relay lifecycle 测试先在缺少兼容标记时失败，修正路由后通过。当前 App/Wire 输入与 APK source commit `4043171d3b6e89ef32a5a7a3c56d5c7b7ab9b40c` 的精确比较为 clean，普通 APK 选择路径也在修正后直接复用 `910003`，没有进入 Gradle。源码 Relay 重启后，用户于 `2026-07-20T08:43:28Z` 完成实体 Android 交互路径并反馈无问题；随后已停止 backend 并保留测试状态。
 
 ## 内存问题与修正
 
@@ -99,7 +99,7 @@ git diff --check
 
 ## 尚未执行
 
-- 尚未由用户完成该分支的实体手机交互：确认本地 Server URL、V2 扫码、节点/Session 出现、消息往返、重开 App。
+- 实体手机完成情况来自操作者确认；未保留配对 URL、账号数据、截图或其他敏感交互产物。
 - 自动验证没有启动真实 managed Pi TUI，因为这会创建 live Pi session 并依赖 provider 凭据；仅验证了隔离启动环境。
 - 本机未完成原生 fallback build；当前 App/Wire 复用精确审阅的 `910003` APK。
 - 导入的旧 APK 可能短暂初始化 `relay.jczhang.cc` 默认配置。框架会在配对前暂停，要求先切换到显示的本地 URL；CLI/daemon 始终只连接本地 Relay。

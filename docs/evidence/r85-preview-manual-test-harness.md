@@ -82,7 +82,7 @@ App result  -> This does not look like a Lyntty relay.
 
 The fix is deliberately server-side for this manual-test release: current Relay keeps the old root marker alongside its API identity, while its canonical `GET /health` response remains available for a future App migration. A `/health` App probe was tested during diagnosis but not retained because it would change the App inputs and make the audited `910003` APK ineligible for exact reuse before a replacement APK existed.
 
-The real source Relay lifecycle test went red on the missing compatibility marker, then passed after the route correction. Exact App/Wire input comparison against APK source commit `4043171d3b6e89ef32a5a7a3c56d5c7b7ab9b40c` is clean, and the normal APK-selection path reused `910003` after the correction instead of entering Gradle. A post-fix phone retry remains part of the physical-phone check below.
+The real source Relay lifecycle test went red on the missing compatibility marker, then passed after the route correction. Exact App/Wire input comparison against APK source commit `4043171d3b6e89ef32a5a7a3c56d5c7b7ab9b40c` is clean, and the normal APK-selection path reused `910003` after the correction instead of entering Gradle. After the source Relay restart, the user completed the physical Android interactive path and reported no issues at `2026-07-20T08:43:28Z`; the backend was then stopped with state preserved.
 
 ## Resource correction
 
@@ -114,7 +114,7 @@ Observed results: Wire 33; CLI 585; Relay 119; App 791 tests / 3,183 assertions;
 
 ## Not run and residual risk
 
-- The user has not yet run the final interactive physical-phone steps against this branch: install/open, local Server URL confirmation, V2 QR approval, node/session visibility, message round trip, and App reopen.
+- Physical-phone completion is an operator attestation. No pairing URL, account data, screenshots, or other sensitive interaction artifact was retained.
 - The real managed Pi TUI was not launched by automation because that would create a live Pi session and require provider credentials; only its isolated launch environment was exercised.
 - The native-build fallback did not complete on this memory-constrained host. The current App/Wire source instead uses the exact reviewed `910003` APK.
 - An imported APK may initially contain `relay.jczhang.cc` as its normal default. The harness now pauses before pairing and requires the operator to activate the displayed local URL before creating or using the test account. Test CLI/daemon traffic is always forced to the local Relay.
