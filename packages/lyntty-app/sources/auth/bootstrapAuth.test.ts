@@ -80,6 +80,8 @@ describe('bootstrapAuth', () => {
         expect(source).not.toContain("from '@/components/SidebarNavigator'");
         expect(source).not.toContain("from '@/auth/AuthContext'");
         expect(source).toContain('React.lazy');
+        expect(source).toContain('<Redirect href="/server" />');
+        expect(source).not.toContain("router.replace('/server')");
     });
 
     it('blocks deep-linked routes until Preview Relay setup is complete', () => {

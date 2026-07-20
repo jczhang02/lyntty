@@ -4,7 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Fonts from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { FontAwesome } from '@expo/vector-icons';
-import { Slot, usePathname, useRouter } from 'expo-router';
+import { Redirect, Slot, usePathname, useRouter } from 'expo-router';
 import type { AuthCredentials } from '@/auth/tokenStorage';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -190,12 +190,6 @@ export default function RootLayout() {
     }, []);
 
     React.useEffect(() => {
-        if (initState && serverSetupRequired && pathname !== '/server') {
-            router.replace('/server');
-        }
-    }, [initState, pathname, router, serverSetupRequired]);
-
-    React.useEffect(() => {
         if (initState && (!serverSetupRequired || pathname === '/server')) {
             setTimeout(() => {
                 SplashScreen.hideAsync();
@@ -289,8 +283,11 @@ export default function RootLayout() {
     //
 
     const routeGate = getBootstrapRouteGate(Boolean(initState), serverSetupRequired, pathname);
-    if (routeGate !== 'render' || !initState) {
+    if (routeGate === 'wait' || !initState) {
         return null;
+    }
+    if (routeGate === 'redirect-to-server') {
+        return <Redirect href="/server" />;
     }
 
     //
