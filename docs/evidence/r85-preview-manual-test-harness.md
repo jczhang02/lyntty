@@ -80,12 +80,9 @@ GET /health -> 200 {"status":"ok",...,"service":"lyntty-relay"}
 App result  -> This does not look like a Lyntty relay.
 ```
 
-The compatibility fix is bidirectional:
+The fix is deliberately server-side for this manual-test release: current Relay keeps the old root marker alongside its API identity, while its canonical `GET /health` response remains available for a future App migration. A `/health` App probe was tested during diagnosis but not retained because it would change the App inputs and make the audited `910003` APK ineligible for exact reuse before a replacement APK existed.
 
-- current/future App builds probe `GET /health` and accept only exact `status: ok` plus `service: lyntty-relay` JSON;
-- current Relay keeps the old root marker alongside its API identity so the already audited `910003` APK can complete server setup without a native rebuild.
-
-The focused App regression went red on the missing probe, then passed 6 tests / 16 assertions. The real source Relay lifecycle test went red on the missing compatibility marker, then passed after the route correction. Full App passed 795 tests / 3,197 assertions; full Relay passed 119 tests / 332 assertions; Preview lifecycle passed 19 tests / 94 assertions. A post-fix phone retry requires restarting the source Relay and remains part of the physical-phone check below.
+The real source Relay lifecycle test went red on the missing compatibility marker, then passed after the route correction. Exact App/Wire input comparison against APK source commit `4043171d3b6e89ef32a5a7a3c56d5c7b7ab9b40c` is clean, and the normal APK-selection path reused `910003` after the correction instead of entering Gradle. A post-fix phone retry remains part of the physical-phone check below.
 
 ## Resource correction
 
@@ -99,7 +96,7 @@ The final implementation therefore optimizes the actual manual-test need:
 4. refuse before Gradle when Linux `MemAvailable` is below 12 GiB;
 5. stream logs directly to disk, use one worker/one arm64 ABI, and clean marked build groups on interruption.
 
-The failed Gradle caches were removed after proving no matching processes remained. A later isolated rebuild attempt for the Relay-discovery correction passed the memory preflight but stopped during Kotlin dependency resolution when Maven Central terminated the TLS handshake. One retry reached JavaScript bundling before Bun exited with `EMFILE: too many open files, watch`; neither attempt left a Gradle/native process or produced a claimed APK. `preview:reset` now also removes an incomplete pre-state build profile under the external lifecycle lock; the 3.3 GiB failed profile was removed through that path. The backward-compatible Relay marker makes the rebuild unnecessary for the installed `910003` test path. The retained manual profile contains only the reviewed APK, local Relay state, logs, and private metadata.
+The failed Gradle caches were removed after proving no matching processes remained. A later isolated rebuild attempt for the Relay-discovery correction passed the memory preflight but stopped during Kotlin dependency resolution when Maven Central terminated the TLS handshake. One retry reached JavaScript bundling before Bun exited with `EMFILE: too many open files, watch`; neither attempt left a Gradle/native process or produced a claimed APK. `preview:reset` now reloads state only after acquiring the external lifecycle lock, serializes APK preparation through initial backend state publication, stops marker-owned build groups, and removes incomplete pre-state profiles; the 3.3 GiB failed profile was removed through that path. The backward-compatible Relay marker makes the rebuild unnecessary for the installed `910003` test path. The retained manual profile contains only the reviewed APK, local Relay state, logs, and private metadata.
 
 ## Verification commands
 
@@ -113,7 +110,7 @@ bun pm untrusted
 git diff --check
 ```
 
-Observed results: Wire 33; CLI 585; Relay 119; App 795 tests / 3,197 assertions; combined dev/Preview lifecycle 32 tests / 182 assertions. Independent requirements verification and post-fix code review both returned `APPROVE` with no P0/P1/P2 blocker.
+Observed results: Wire 33; CLI 585; Relay 119; App 791 tests / 3,183 assertions; combined dev/Preview lifecycle 34 tests / 193 assertions. Earlier requirements verification approved the base harness; the Relay-discovery correction is not called approved until its post-remediation review completes.
 
 ## Not run and residual risk
 

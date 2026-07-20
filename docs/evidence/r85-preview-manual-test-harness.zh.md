@@ -65,12 +65,9 @@ GET /health -> 200 {"status":"ok",...,"service":"lyntty-relay"}
 App         -> This does not look like a Lyntty relay.
 ```
 
-修复同时覆盖两端：
+本次手测版本选择服务端兼容修复：当前 Relay 在保留规范 `GET /health` 的同时恢复旧首页标记。诊断期间验证过 App `/health` 探测方案，但没有保留，因为这会改变 App 输入；在新的 APK 尚未产生前，已审计的 `910003` 将无法继续满足精确复用要求。
 
-- 新 App 改为探测 `GET /health`，只接受精确的 `status: ok` 和 `service: lyntty-relay`；
-- 当前 Relay 保留旧首页标记，因此已审计的 `910003` APK 无需原生重建即可继续设置。
-
-App 聚焦回归先红后绿，最终 6 tests / 16 assertions；真实源码 Relay lifecycle 测试也先红后绿。完整 App 为 795 tests / 3,197 assertions，Relay 为 119 tests / 332 assertions，Preview lifecycle 为 19 tests / 94 assertions。修复后的手机复测需要重启源码 Relay，仍属于下方待执行实体手机步骤。
+真实源码 Relay lifecycle 测试先在缺少兼容标记时失败，修正路由后通过。当前 App/Wire 输入与 APK source commit `4043171d3b6e89ef32a5a7a3c56d5c7b7ab9b40c` 的精确比较为 clean，普通 APK 选择路径也在修正后直接复用 `910003`，没有进入 Gradle。手机复测仍属于下方待执行步骤。
 
 ## 内存问题与修正
 
@@ -84,7 +81,7 @@ App 聚焦回归先红后绿，最终 6 tests / 16 assertions；真实源码 Rel
 4. Linux 可用内存低于 12 GiB 时，在启动 Gradle 前拒绝；
 5. 构建日志直接落盘，单 worker、仅 arm64，并在中断后清理带精确 marker 的进程组。
 
-失败构建缓存已在证明无相关进程后清理。Relay 识别修正后又尝试过一次隔离重建：内存预检查通过，但 Maven Central 在 Kotlin 依赖解析时终止 TLS handshake；单次重试到达 JavaScript bundling 后，Bun 因 `EMFILE: too many open files, watch` 退出。两次均无残留 Gradle/native 进程，也没有声明 APK 产物。`preview:reset` 现在会在外置 lifecycle lock 下删除尚未发布 state 的不完整构建 profile；本次 3.3 GiB 失败目录已通过该路径移除。由于 Relay 已保留向后兼容标记，已安装的 `910003` 手测路径不再需要此次重建。
+失败构建缓存已在证明无相关进程后清理。Relay 识别修正后又尝试过一次隔离重建：内存预检查通过，但 Maven Central 在 Kotlin 依赖解析时终止 TLS handshake；单次重试到达 JavaScript bundling 后，Bun 因 `EMFILE: too many open files, watch` 退出。两次均无残留 Gradle/native 进程，也没有声明 APK 产物。`preview:reset` 现在只在取得外置 lifecycle lock 后重新读取 state，并把 APK 准备到首次 backend state 发布放在同一个锁区间；它还会停止带精确 marker 的构建进程组并删除不完整 profile。本次 3.3 GiB 失败目录已通过该路径移除。由于 Relay 已保留向后兼容标记，已安装的 `910003` 手测路径不再需要此次重建。
 
 ## 门禁
 
@@ -98,7 +95,7 @@ bun pm untrusted
 git diff --check
 ```
 
-已观察到 Wire 33、CLI 585、Relay 119、App 795 tests / 3,197 assertions，以及 dev/Preview lifecycle 32 tests / 182 assertions 全部通过。独立 requirements verifier 和修复后 code reviewer 均为 `APPROVE`，无 P0/P1/P2。
+已观察到 Wire 33、CLI 585、Relay 119、App 791 tests / 3,183 assertions，以及 dev/Preview lifecycle 34 tests / 193 assertions。早期 requirements verifier 已批准基础框架；Relay 识别修正只有在并发补救复审通过后才会声明 `APPROVE`。
 
 ## 尚未执行
 
