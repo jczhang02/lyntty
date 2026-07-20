@@ -10,7 +10,7 @@
     },
     "packages/lyntty-app": {
       "name": "lyntty-app",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "dependencies": {
         "@expo/ui": "~55.0.5",
         "@expo/vector-icons": "^15.0.2",
@@ -90,6 +90,7 @@
         "@types/react": "~19.1.10",
         "@typescript-eslint/parser": "^8.63.0",
         "babel-plugin-transform-remove-console": "^6.9.4",
+        "babel-preset-expo": "~55.0.23",
         "cross-env": "^10.1.0",
         "eslint": "^9.39.2",
         "react-test-renderer": "19.0.0",

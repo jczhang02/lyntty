@@ -20,8 +20,9 @@ const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-art
 const rootPackagePath = new URL('../package.json', import.meta.url);
 const previewRelayGatePath = new URL('../e2e/maestro/standalone/preview_first_run.yml', import.meta.url);
 const previewReleaseNotesPath = new URL('../docs/release/preview-apk-release-notes.md', import.meta.url);
+const previewBundleSmokePath = new URL('../packages/lyntty-app/scripts/bundle-smoke.ts', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, previewRelayGate] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, previewRelayGate, previewBundleSmoke] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
@@ -39,6 +40,7 @@ const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, android
   readFile(cliArtifactBuilderPath, 'utf8'),
   readFile(rootPackagePath, 'utf8'),
   readFile(previewRelayGatePath, 'utf8'),
+  readFile(previewBundleSmokePath, 'utf8'),
 ]);
 const rootPackage = JSON.parse(rootPackageText);
 const previewReleaseNotes = await readFile(previewReleaseNotesPath, 'utf8');
@@ -120,6 +122,10 @@ test('Preview APK candidate builds audited dual-ABI bytes without publishing', (
   assert.match(androidPreviewCandidate, /actions\/upload-artifact@/);
   assert.doesNotMatch(androidPreviewCandidate, /contents: write/);
   assert.doesNotMatch(androidPreviewCandidate, /gh release create/);
+  assert.match(rootPackage.scripts['ci:app'], /bun run --filter lyntty-app test:bundle/);
+  assert.match(previewBundleSmoke, /EXPO_NO_DOTENV: '1'/);
+  assert.match(previewBundleSmoke, /startsWith\('EXPO_PUBLIC_'\)/);
+  assert.match(previewBundleSmoke, /finally \{\s+await rm\(outputRoot/);
 });
 
 test('Preview APK promotion publishes only exact tested candidate bytes', () => {
