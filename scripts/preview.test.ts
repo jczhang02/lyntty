@@ -119,6 +119,22 @@ describe('public Preview manual-test commands', () => {
     expect(reset.stdout).toContain('nothing to reset');
   });
 
+  it('reset removes an incomplete build profile even before state publication', async () => {
+    const environment = { LYNTTY_PREVIEW_TEST_NAMESPACE: `partial-reset-${process.pid}` };
+    const status = await runPreview(['status'], environment);
+    const stateDir = status.stdout.match(/^.*State: (.+)$/m)?.[1];
+    expect(stateDir).toBeTruthy();
+    const partialFile = join(stateDir!, 'android', 'gradle', 'partial.bin');
+    await mkdir(join(stateDir!, 'android', 'gradle'), { recursive: true });
+    await writeFile(partialFile, 'partial build');
+
+    const reset = await runPreview(['reset'], environment);
+
+    expect(reset.exitCode).toBe(0);
+    expect(reset.stdout).toContain('incomplete profile removed');
+    expect(await Bun.file(partialFile).exists()).toBe(false);
+  });
+
   it('recognizes the V2 data-key credentials written by real mobile pairing', async () => {
     const namespace = `v2-auth-${process.pid}`;
     const environment = {

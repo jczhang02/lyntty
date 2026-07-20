@@ -29,6 +29,7 @@ interface PreviewLayout {
   logsDir: string;
   supervisorLog: string;
   runtimeLog: string;
+  buildMarkerFile: string;
   relayDataDir: string;
   pgliteDir: string;
   masterSecretFile: string;
@@ -202,6 +203,7 @@ async function resolveLayout(): Promise<PreviewLayout> {
     logsDir,
     supervisorLog: join(logsDir, 'supervisor.log'),
     runtimeLog: join(logsDir, 'runtime.log'),
+    buildMarkerFile: join(stateDir, 'apk-build-owner.json'),
     relayDataDir: join(stateDir, 'relay'),
     pgliteDir: join(stateDir, 'relay', 'pglite'),
     masterSecretFile: join(stateDir, 'secrets', 'relay-master-secret'),
@@ -938,9 +940,10 @@ async function buildPreviewApk(
       'LYNTTY_ANDROID_KEY_ALIAS',
       'LYNTTY_ANDROID_KEY_PASSWORD',
     ]) delete environment[key];
+    const buildId = randomUUID();
     Object.assign(environment, {
       APP_ENV: 'preview',
-      LYNTTY_PREVIEW_BUILD_ID: randomUUID(),
+      LYNTTY_PREVIEW_BUILD_ID: buildId,
       LYNTTY_PREVIEW_BUILD_ROOT: layout.canonicalRoot,
       BUN_EXECUTABLE: process.execPath,
       HOME: layout.androidHomeDir,
@@ -957,6 +960,11 @@ async function buildPreviewApk(
     const androidDir = join(layout.canonicalRoot, 'packages', 'lyntty-app', 'android');
     const buildLog = join(layout.logsDir, 'apk-build.log');
     console.log(`Building standalone Preview APK. Log: ${buildLog}`);
+    await writeJsonAtomically(layout.buildMarkerFile, {
+      schemaVersion: 1,
+      buildId,
+      canonicalRoot: layout.canonicalRoot,
+    });
     await runLogged([
       './gradlew',
       'assembleRelease',
@@ -975,6 +983,7 @@ async function buildPreviewApk(
       `-PlynttyVersionName=${versionName}`,
       `-PlynttyVersionCode=${versionCode}`,
     ], androidDir, environment, buildLog);
+    await rm(layout.buildMarkerFile, { force: true });
     const builtApk = join(androidDir, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
     await copyFile(builtApk, apkPath);
     const audit = await runCaptured([
@@ -1391,7 +1400,29 @@ async function commandStop(layout: PreviewLayout): Promise<void> {
 async function commandReset(layout: PreviewLayout): Promise<void> {
   const state = await loadState(layout);
   if (!state) {
-    console.log('Preview test profile is not initialized; nothing to reset.');
+    const profileExists = await stat(layout.stateDir).then(() => true).catch(error => {
+      if (isErrno(error, 'ENOENT')) return false;
+      throw error;
+    });
+    if (!profileExists) {
+      console.log('Preview test profile is not initialized; nothing to reset.');
+      return;
+    }
+    await withLifecycleLock(layout, async () => {
+      const marker = await readJson(layout.buildMarkerFile);
+      if (marker) {
+        if (
+          typeof marker !== 'object'
+          || Array.isArray(marker)
+          || marker.schemaVersion !== 1
+          || typeof marker.buildId !== 'string'
+          || marker.canonicalRoot !== layout.canonicalRoot
+        ) throw new Error('Invalid Preview APK build ownership marker');
+        await cleanupBuildProcesses(layout.canonicalRoot, marker.buildId);
+      }
+      await rm(layout.stateDir, { recursive: true, force: true });
+    });
+    console.log('Preview test incomplete profile removed.');
     return;
   }
   await withLifecycleLock(layout, async () => {
@@ -1490,7 +1521,7 @@ async function commandTest(layout: PreviewLayout): Promise<void> {
   const target = await desiredRelay(layout);
   let apk: ApkArtifact | undefined;
   if (!testHook('LYNTTY_PREVIEW_TEST_SKIP_APK')) {
-    const result = await ensurePreviewApk(layout);
+    const result = await withLifecycleLock(layout, async () => ensurePreviewApk(layout));
     apk = result.artifact;
     console.log(`Preview APK ${result.mode}: ${apk.path}`);
     console.log(`SHA-256: ${apk.sha256}`);
