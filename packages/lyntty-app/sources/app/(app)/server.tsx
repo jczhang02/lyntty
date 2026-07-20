@@ -9,7 +9,14 @@ import { RoundButton } from '@/components/RoundButton';
 import { Modal } from '@/modal';
 import { layout } from '@/components/layout';
 import { t } from '@/text';
-import { getServerUrl, setServerUrl, validateServerUrl, getServerInfo } from '@/sync/serverConfig';
+import {
+    getConfiguredServerUrl,
+    isPreviewAppEnvironment,
+    isPreviewServerSetupRequired,
+    setServerUrl,
+    validateServerUrl,
+} from '@/sync/serverConfig';
+import { probeLynttyRelay } from '@/sync/serverConfigUtils';
 import { getCurrentAuth } from '@/auth/AuthContext';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -74,14 +81,23 @@ const stylesheet = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
         textAlign: 'center',
     },
+    setupText: {
+        ...Typography.default(),
+        fontSize: 14,
+        lineHeight: 20,
+        color: theme.colors.textSecondary,
+        marginBottom: 16,
+    },
 }));
 
 export default function ServerConfigScreen() {
     const { theme } = useUnistyles();
     const styles = stylesheet;
     const router = useRouter();
-    const serverInfo = getServerInfo();
-    const [inputUrl, setInputUrl] = useState(serverInfo.isCustom ? getServerUrl() : '');
+    const configuredServerUrl = getConfiguredServerUrl();
+    const previewEnvironment = isPreviewAppEnvironment();
+    const setupRequired = isPreviewServerSetupRequired();
+    const [inputUrl, setInputUrl] = useState(configuredServerUrl ?? '');
     const [error, setError] = useState<string | null>(null);
     const [isValidating, setIsValidating] = useState(false);
 
@@ -90,24 +106,15 @@ export default function ServerConfigScreen() {
             setIsValidating(true);
             setError(null);
 
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'text/plain'
-                }
-            });
-
-            if (!response.ok) {
+            const result = await probeLynttyRelay(url);
+            if (result === 'server-error') {
                 setError(t('server.serverReturnedError'));
                 return false;
             }
-
-            const text = await response.text();
-            if (!text.includes('Welcome to Lyntty Relay!')) {
-                setError('This does not look like a Lyntty relay.');
+            if (result === 'not-relay') {
+                setError(t('server.notValidLynttyServer'));
                 return false;
             }
-
             return true;
         } catch (err) {
             setError(t('server.failedToConnectToServer'));
@@ -135,10 +142,10 @@ export default function ServerConfigScreen() {
             return;
         }
 
-        const confirmed = await Modal.confirm(
+        const confirmed = setupRequired || await Modal.confirm(
             t('server.changeServer'),
             t('server.continueWithServer'),
-            { confirmText: t('common.continue'), destructive: true }
+            { confirmText: t('common.continue'), destructive: true },
         );
 
         if (confirmed) {
@@ -146,16 +153,15 @@ export default function ServerConfigScreen() {
             const auth = getCurrentAuth();
             if (auth) {
                 await auth.logout({ skipPushUnregister: true });
-            } else {
-                router.back();
             }
+            router.replace('/');
         }
     };
 
     const handleReset = async () => {
         const confirmed = await Modal.confirm(
-            t('server.resetToDefault'),
-            t('server.resetServerDefault'),
+            previewEnvironment ? t('server.clearRelay') : t('server.resetToDefault'),
+            previewEnvironment ? t('server.clearRelayConfirm') : t('server.resetServerDefault'),
             { confirmText: t('common.reset'), destructive: true }
         );
 
@@ -165,9 +171,8 @@ export default function ServerConfigScreen() {
             const auth = getCurrentAuth();
             if (auth) {
                 await auth.logout({ skipPushUnregister: true });
-            } else {
-                router.back();
             }
+            router.replace('/server');
         }
     };
 
@@ -176,8 +181,10 @@ export default function ServerConfigScreen() {
             <Stack.Screen
                 options={{
                     headerShown: true,
-                    headerTitle: t('server.serverConfiguration'),
+                    headerTitle: setupRequired ? t('server.previewSetupTitle') : t('server.serverConfiguration'),
                     headerBackTitle: t('common.back'),
+                    headerBackVisible: !setupRequired,
+                    gestureEnabled: !setupRequired,
                 }}
             />
 
@@ -186,8 +193,11 @@ export default function ServerConfigScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
                 <ItemList style={styles.itemListContainer}>
-                    <ItemGroup footer={t('server.advancedFeatureFooter')}>
+                    <ItemGroup footer={previewEnvironment ? t('server.previewSetupFooter') : t('server.advancedFeatureFooter')}>
                         <View style={styles.contentContainer}>
+                            {setupRequired && (
+                                <Text style={styles.setupText}>{t('server.previewSetupDescription')}</Text>
+                            )}
                             <Text style={styles.labelText}>{t('server.customServerUrlLabel').toUpperCase()}</Text>
                             <TextInput
                                 testID="lyntty-server-url-input"
@@ -219,15 +229,17 @@ export default function ServerConfigScreen() {
                                 </Text>
                             )}
                             <View style={styles.buttonRow}>
-                                <View style={styles.buttonWrapper}>
-                                    <RoundButton
-                                        testID="lyntty-server-reset"
-                                        title={t('server.resetToDefault')}
-                                        size="normal"
-                                        display="inverted"
-                                        onPress={handleReset}
-                                    />
-                                </View>
+                                {!setupRequired && configuredServerUrl && (
+                                    <View style={styles.buttonWrapper}>
+                                        <RoundButton
+                                            testID="lyntty-server-reset"
+                                            title={previewEnvironment ? t('server.clearRelay') : t('server.resetToDefault')}
+                                            size="normal"
+                                            display="inverted"
+                                            onPress={handleReset}
+                                        />
+                                    </View>
+                                )}
                                 <View style={styles.buttonWrapper}>
                                     <RoundButton
                                         testID="lyntty-server-save"
@@ -238,7 +250,7 @@ export default function ServerConfigScreen() {
                                     />
                                 </View>
                             </View>
-                            {serverInfo.isCustom && (
+                            {configuredServerUrl && (
                                 <Text style={styles.statusText}>
                                     {t('server.currentlyUsingCustomServer')}
                                 </Text>

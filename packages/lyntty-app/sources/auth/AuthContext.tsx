@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { TokenStorage, AuthCredentials } from '@/auth/tokenStorage';
-import { syncCreate, syncReset } from '@/sync/sync';
-import { clearPersistence, loadRegisteredPushToken } from '@/sync/persistence';
+import { syncCreate } from '@/sync/sync';
+import { loadRegisteredPushToken } from '@/sync/persistence';
 import { unregisterPushToken } from '@/sync/apiPush';
 import { subscribeAuthInvalidation } from '@/auth/authInvalidation';
+import { clearStoredAuthState } from './bootstrapAuth';
 
 interface AuthContextType {
     isAuthenticated: boolean;
@@ -19,9 +20,7 @@ export function AuthProvider({ children, initialCredentials }: { children: React
     const [credentials, setCredentials] = useState<AuthCredentials | null>(initialCredentials);
 
     const clearLocalAuth = async () => {
-        syncReset();
-        clearPersistence();
-        await TokenStorage.removeCredentials();
+        await clearStoredAuthState();
         setCredentials(null);
         setIsAuthenticated(false);
     };

@@ -1,6 +1,9 @@
 import { MMKV } from 'react-native-mmkv';
 import { loadAppConfig } from './appConfig';
-import { validateServerUrlForEnvironment } from './serverConfigUtils';
+import {
+    requiresPreviewServerSetupForEnvironment,
+    validateServerUrlForEnvironment,
+} from './serverConfigUtils';
 
 // Separate MMKV instance for server config that persists across logouts
 const serverConfigStorage = new MMKV({ id: 'server-config' });
@@ -8,26 +11,56 @@ const serverConfigStorage = new MMKV({ id: 'server-config' });
 const SERVER_KEY = 'custom-server-url';
 const LOG_SERVER_KEY = 'log-server-url';
 const DEFAULT_SERVER_URL = 'https://relay.jczhang.cc';
+const serverConfigListeners = new Set<() => void>();
+
+function appEnvironment(): string | undefined {
+    return loadAppConfig().appEnv || process.env.APP_ENV;
+}
+
+function notifyServerConfigListeners(): void {
+    for (const listener of serverConfigListeners) listener();
+}
+
+export function getConfiguredServerUrl(): string | null {
+    return serverConfigStorage.getString(SERVER_KEY) || null;
+}
+
+export function isPreviewAppEnvironment(): boolean {
+    return appEnvironment() === 'preview';
+}
+
+export function isPreviewServerSetupRequired(): boolean {
+    return requiresPreviewServerSetupForEnvironment(appEnvironment(), getConfiguredServerUrl());
+}
+
+export function subscribeServerConfig(listener: () => void): () => void {
+    serverConfigListeners.add(listener);
+    return () => serverConfigListeners.delete(listener);
+}
 
 export function getServerUrl(): string {
-    return serverConfigStorage.getString(SERVER_KEY) ||
-           (globalThis as any).__LYNTTY_CONFIG__?.serverUrl ||
-           process.env.EXPO_PUBLIC_LYNTTY_SERVER_URL ||
-           DEFAULT_SERVER_URL;
+    const configured = getConfiguredServerUrl();
+    if (configured) return configured;
+    if (isPreviewServerSetupRequired()) {
+        throw new Error('Preview Relay URL must be configured before use');
+    }
+    return (globalThis as any).__LYNTTY_CONFIG__?.serverUrl
+        || process.env.EXPO_PUBLIC_LYNTTY_SERVER_URL
+        || DEFAULT_SERVER_URL;
 }
 
 export function setServerUrl(url: string | null): void {
-    if (url && url.trim()) {
-        serverConfigStorage.set(SERVER_KEY, url.trim());
-    } else {
-        serverConfigStorage.delete(SERVER_KEY);
-    }
+    const previous = getConfiguredServerUrl();
+    const next = url?.trim() || null;
+    if (next) serverConfigStorage.set(SERVER_KEY, next);
+    else serverConfigStorage.delete(SERVER_KEY);
+    if (previous !== next) notifyServerConfigListeners();
 }
 
 export function getLogServerUrl(): string | null {
-    return serverConfigStorage.getString(LOG_SERVER_KEY) ||
-           process.env.EXPO_PUBLIC_LOG_SERVER_URL ||
-           null;
+    return serverConfigStorage.getString(LOG_SERVER_KEY)
+        || process.env.EXPO_PUBLIC_LOG_SERVER_URL
+        || null;
 }
 
 export function setLogServerUrl(url: string | null): void {
@@ -39,11 +72,15 @@ export function setLogServerUrl(url: string | null): void {
 }
 
 export function isUsingCustomServer(): boolean {
+    const configured = getConfiguredServerUrl();
+    if (configured) return true;
+    if (isPreviewServerSetupRequired()) return false;
     return getServerUrl() !== DEFAULT_SERVER_URL;
 }
 
 export function getServerInfo(): { hostname: string; port?: number; isCustom: boolean } {
-    const url = getServerUrl();
+    const configured = getConfiguredServerUrl();
+    const url = configured || (isPreviewServerSetupRequired() ? '' : getServerUrl());
     const isCustom = isUsingCustomServer();
 
     try {
@@ -52,18 +89,17 @@ export function getServerInfo(): { hostname: string; port?: number; isCustom: bo
         return {
             hostname: parsed.hostname,
             port,
-            isCustom
+            isCustom,
         };
     } catch {
-        // Fallback if URL parsing fails
         return {
             hostname: url,
             port: undefined,
-            isCustom
+            isCustom,
         };
     }
 }
 
 export function validateServerUrl(url: string): { valid: boolean; error?: string } {
-    return validateServerUrlForEnvironment(url, loadAppConfig().appEnv || process.env.APP_ENV);
+    return validateServerUrlForEnvironment(url, appEnvironment());
 }

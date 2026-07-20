@@ -22,6 +22,15 @@ tags:
     commands:
       - tapOn:
           point: "90%,46%"
+- runFlow:
+    when:
+      visible: "Connect to Relay"
+    commands:
+      - tapOn:
+          id: "lyntty-server-url-input"
+      - inputText: "${SERVER_URL}"
+      - tapOn:
+          id: "lyntty-server-save"
 - extendedWaitUntil:
     visible: "Create account"
     timeout: 60000

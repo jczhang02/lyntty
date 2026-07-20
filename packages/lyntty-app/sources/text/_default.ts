@@ -267,6 +267,11 @@ export const en = {
     server: {
         // Used by Server Configuration screen (app/(app)/server.tsx)
         serverConfiguration: 'Server Configuration',
+        previewSetupTitle: 'Connect to Relay',
+        previewSetupDescription: 'Lyntty (preview) needs your local Relay before you can create or restore an account.',
+        previewSetupFooter: 'On your computer, run `bun preview:test`, then enter the local Relay URL shown in the terminal.',
+        clearRelay: 'Clear Relay',
+        clearRelayConfirm: 'Clear the saved Relay and require setup again?',
         enterServerUrl: 'Please enter a server URL',
         notValidLynttyServer: 'Not a valid Lyntty relay',
         changeServer: 'Change Server',

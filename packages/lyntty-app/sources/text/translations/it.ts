@@ -251,6 +251,11 @@ export const it: TranslationStructure = {
     server: {
         // Used by Server Configuration screen (app/(app)/server.tsx)
         serverConfiguration: 'Configurazione server',
+        previewSetupTitle: 'Connetti al Relay',
+        previewSetupDescription: 'Lyntty (preview) richiede il Relay locale prima di creare o ripristinare un account.',
+        previewSetupFooter: 'Esegui `bun preview:test` sul computer, quindi inserisci l’URL del Relay locale mostrato nel terminale.',
+        clearRelay: 'Cancella Relay',
+        clearRelayConfirm: 'Cancellare il Relay salvato e richiedere una nuova configurazione?',
         enterServerUrl: 'Inserisci un URL del server',
         notValidLynttyServer: 'Non è un Lyntty Relay valido',
         changeServer: 'Cambia server',

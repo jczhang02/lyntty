@@ -252,6 +252,11 @@ export const zhHant: TranslationStructure = {
     server: {
         // Used by Server Configuration screen (app/(app)/server.tsx)
         serverConfiguration: '伺服器設定',
+        previewSetupTitle: '連線到 Relay',
+        previewSetupDescription: '建立或還原帳號前，Lyntty（preview）必須先連線到你的本機 Relay。',
+        previewSetupFooter: '請先在電腦上執行 `bun preview:test`，然後輸入終端機顯示的本機 Relay URL。',
+        clearRelay: '清除 Relay',
+        clearRelayConfirm: '清除已儲存的 Relay 並重新進行設定？',
         enterServerUrl: '請輸入伺服器 URL',
         notValidLynttyServer: '不是有效的 Lyntty 伺服器',
         changeServer: '更改伺服器',

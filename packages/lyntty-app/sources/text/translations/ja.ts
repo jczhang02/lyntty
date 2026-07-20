@@ -253,6 +253,11 @@ export const ja: TranslationStructure = {
     server: {
         // Used by Server Configuration screen (app/(app)/server.tsx)
         serverConfiguration: 'サーバー設定',
+        previewSetupTitle: 'Relay に接続',
+        previewSetupDescription: 'アカウントを作成または復元する前に、Lyntty（preview）をローカル Relay に接続してください。',
+        previewSetupFooter: 'パソコンで `bun preview:test` を実行し、ターミナルに表示されたローカル Relay URL を入力してください。',
+        clearRelay: 'Relay を消去',
+        clearRelayConfirm: '保存済みの Relay を消去して、もう一度設定しますか？',
         enterServerUrl: 'サーバーURLを入力してください',
         notValidLynttyServer: '有効なLyntty Relayではありません',
         changeServer: 'サーバーを変更',
