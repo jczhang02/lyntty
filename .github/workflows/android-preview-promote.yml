@@ -66,6 +66,12 @@ jobs:
           [[ "$IMMUTABLE_RELEASES_ENABLED" == true ]]
           [[ "$REPOSITORY_IMMUTABILITY_GATE" == true ]]
           [[ "$PREVIEW_TAG_RULESET_ID" =~ ^[1-9][0-9]*$ ]]
+          ruleset_json="$(gh api "repos/$GITHUB_REPOSITORY/rulesets/$PREVIEW_TAG_RULESET_ID")"
+          [[ "$(jq -r .target <<< "$ruleset_json")" == tag ]]
+          [[ "$(jq -r .enforcement <<< "$ruleset_json")" == active ]]
+          [[ "$(jq -r '.bypass_actors | length' <<< "$ruleset_json")" == 0 ]]
+          jq -e '.conditions.ref_name == {exclude: [], include: ["refs/tags/android-preview-v*"]}' <<< "$ruleset_json" > /dev/null
+          jq -e '[.rules[].type] | sort == ["deletion", "update"]' <<< "$ruleset_json" > /dev/null
           git fetch --no-tags origin main
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
 
@@ -80,18 +86,29 @@ jobs:
           git merge-base --is-ancestor "$source_sha" HEAD
 
           expected_changes="$(cat <<'PATHS'
-          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt
-          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256
-          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json
-          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-runtime-audit.txt
-          docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json
-          docs/evidence/r86-preview-apk-candidate.md
-          docs/evidence/r86-preview-apk-candidate.zh.md
-          scripts/preview-apk-allowlist.json
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-runtime-audit.txt
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json
+          A	docs/evidence/r86-preview-apk-candidate.md
+          A	docs/evidence/r86-preview-apk-candidate.zh.md
+          M	scripts/preview-apk-allowlist.json
           PATHS
           )"
-          actual_changes="$(git diff --name-only "$source_sha" HEAD | sort)"
+          actual_changes="$(git diff --no-renames --name-status "$source_sha" HEAD | LC_ALL=C sort -k2)"
           [[ "$actual_changes" == "$expected_changes" ]]
+          release_list_json="$(gh release list --limit 1000 --json tagName)"
+          existing_tags="$(jq -r '.[].tagName' <<< "$release_list_json")"
+          while IFS= read -r existing_tag; do
+            [[ "$existing_tag" == android-preview-v1.2.0-920001 ]] && continue
+            if [[ "$existing_tag" =~ ^android-preview-v[0-9]+\.[0-9]+\.[0-9]+-([0-9]+)$ ]]; then
+              (( 920001 > BASH_REMATCH[1] )) || {
+                echo "versionCode would not advance every published Preview APK" >&2
+                exit 1
+              }
+            fi
+          done <<< "$existing_tags"
 
           artifact_name="android-preview-candidate-${CANDIDATE_RUN_ID}"
           download="$RUNNER_TEMP/android-preview-candidate"
@@ -279,7 +296,7 @@ jobs:
             [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
             [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
             [[ "$(jq -r .name <<< "$release_json")" == "$RELEASE_TITLE" ]]
-            jq -r '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/existing-release-notes.md"
+            jq -j '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/existing-release-notes.md"
             cmp -s "$notes" "$RUNNER_TEMP/existing-release-notes.md"
             if [[ "$(jq -r .draft <<< "$release_json")" == false ]]; then
               [[ "$(jq -r .immutable <<< "$release_json")" == true ]]
@@ -327,18 +344,29 @@ jobs:
           git fetch --no-tags origin main
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
           expected_changes="$(cat <<'PATHS'
-          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt
-          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256
-          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json
-          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-runtime-audit.txt
-          docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json
-          docs/evidence/r86-preview-apk-candidate.md
-          docs/evidence/r86-preview-apk-candidate.zh.md
-          scripts/preview-apk-allowlist.json
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-runtime-audit.txt
+          A	docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json
+          A	docs/evidence/r86-preview-apk-candidate.md
+          A	docs/evidence/r86-preview-apk-candidate.zh.md
+          M	scripts/preview-apk-allowlist.json
           PATHS
           )"
-          actual_changes="$(git diff --name-only "$SOURCE_SHA" HEAD | sort)"
+          actual_changes="$(git diff --no-renames --name-status "$SOURCE_SHA" HEAD | LC_ALL=C sort -k2)"
           [[ "$actual_changes" == "$expected_changes" ]]
+          release_list_json="$(gh release list --limit 1000 --json tagName)"
+          existing_tags="$(jq -r '.[].tagName' <<< "$release_list_json")"
+          while IFS= read -r existing_tag; do
+            [[ "$existing_tag" == "$RELEASE_TAG" ]] && continue
+            if [[ "$existing_tag" =~ ^android-preview-v[0-9]+\.[0-9]+\.[0-9]+-([0-9]+)$ ]]; then
+              (( 920001 > BASH_REMATCH[1] )) || {
+                echo "versionCode would not advance every published Preview APK" >&2
+                exit 1
+              }
+            fi
+          done <<< "$existing_tags"
 
           assets=(
             "$APK"
@@ -369,7 +397,7 @@ jobs:
           [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
           [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
           [[ "$(jq -r .name <<< "$release_json")" == "$RELEASE_TITLE" ]]
-          jq -r '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/pre-publish-notes.md"
+          jq -j '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/pre-publish-notes.md"
           cmp -s "$DOWNLOAD/release-notes.md" "$RUNNER_TEMP/pre-publish-notes.md"
           verify_release_assets pre-publish-assets
 
@@ -396,7 +424,7 @@ jobs:
           [[ "$(jq -r .isImmutable <<< "$published")" == true ]]
           [[ "$(jq -r .name <<< "$published")" == "$RELEASE_TITLE" ]]
           [[ "$(jq -r .targetCommitish <<< "$published")" == "$GITHUB_SHA" ]]
-          jq -r '.body // ""' <<< "$published" > "$RUNNER_TEMP/post-publish-notes.md"
+          jq -j '.body // ""' <<< "$published" > "$RUNNER_TEMP/post-publish-notes.md"
           cmp -s "$DOWNLOAD/release-notes.md" "$RUNNER_TEMP/post-publish-notes.md"
           [[ "$(gh release list --limit 1000 --json tagName,isLatest --jq ".[] | select(.tagName == \"$RELEASE_TAG\") | .isLatest")" == false ]]
           tag_json="$(gh api "$tag_api")"

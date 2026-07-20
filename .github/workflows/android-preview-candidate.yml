@@ -50,10 +50,26 @@ jobs:
           [[ "$version_name" == 1.2.0 ]]
           tag="android-preview-v${version_name}-${VERSION_CODE}"
           apk_name="lyntty-preview-v${version_name}-${VERSION_CODE}.apk"
-          ! gh release view "$tag" >/dev/null 2>&1
-          ! git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null
+          release_error="$RUNNER_TEMP/preview-release-lookup.err"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > /dev/null 2>"$release_error"; then
+            echo "Preview release already exists: $tag" >&2
+            exit 1
+          elif ! grep -Fq '(HTTP 404)' "$release_error"; then
+            cat "$release_error" >&2
+            exit 1
+          fi
+          tag_error="$RUNNER_TEMP/preview-tag-lookup.err"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" > /dev/null 2>"$tag_error"; then
+            echo "Preview tag already exists: $tag" >&2
+            exit 1
+          elif ! grep -Fq '(HTTP 404)' "$tag_error"; then
+            cat "$tag_error" >&2
+            exit 1
+          fi
           max_allowlisted="$(bun -e 'const x=await Bun.file("scripts/preview-apk-allowlist.json").json();process.stdout.write(String(Math.max(0,...x.artifacts.map(a=>a.versionCode))))')"
           (( VERSION_CODE > max_allowlisted ))
+          release_list_json="$(gh release list --limit 1000 --json tagName)"
+          existing_tags="$(jq -r '.[].tagName' <<< "$release_list_json")"
           while IFS= read -r existing_tag; do
             if [[ "$existing_tag" =~ ^android-preview-v[0-9]+\.[0-9]+\.[0-9]+-([0-9]+)$ ]]; then
               (( VERSION_CODE > BASH_REMATCH[1] )) || {
@@ -61,7 +77,7 @@ jobs:
                 exit 1
               }
             fi
-          done < <(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+          done <<< "$existing_tags"
           {
             echo "version_name=$version_name"
             echo "version_code=$VERSION_CODE"

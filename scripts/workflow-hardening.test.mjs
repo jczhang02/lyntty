@@ -19,6 +19,7 @@ const cliSmokeWorkflowPath = new URL('../.github/workflows/cli-smoke-test.yml', 
 const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-artifact.ts', import.meta.url);
 const rootPackagePath = new URL('../package.json', import.meta.url);
 const previewRelayGatePath = new URL('../e2e/maestro/standalone/preview_first_run.yml', import.meta.url);
+const previewReleaseNotesPath = new URL('../docs/release/preview-apk-release-notes.md', import.meta.url);
 
 const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, previewRelayGate] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
@@ -40,6 +41,7 @@ const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, android
   readFile(previewRelayGatePath, 'utf8'),
 ]);
 const rootPackage = JSON.parse(rootPackageText);
+const previewReleaseNotes = await readFile(previewReleaseNotesPath, 'utf8');
 
 test('relay deploy resolves only a signed stable BOM to an immutable image', () => {
   assert.match(relayDeploy, /environment: production-relay/);
@@ -110,6 +112,9 @@ test('Preview APK candidate builds audited dual-ABI bytes without publishing', (
   assert.match(androidPreviewCandidate, /source_commit=%s/);
   assert.match(androidPreviewCandidate, /sha256=%s/);
   assert.match(androidPreviewCandidate, /candidate-manifest\.json/);
+  assert.match(androidPreviewCandidate, /\(HTTP 404\)/);
+  assert.match(androidPreviewCandidate, /release_list_json="\$\(gh release list/);
+  assert.doesNotMatch(androidPreviewCandidate, /done < <\(gh release list/);
   assert.match(androidPreviewCandidate, /subject-path:[^\n]*candidate-manifest\.json/);
   assert.match(androidPreviewCandidate, /actions\/attest@/);
   assert.match(androidPreviewCandidate, /actions\/upload-artifact@/);
@@ -137,9 +142,16 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /candidate-manifest\.json/);
   assert.match(androidPreviewPromote, /scripts\/preview-apk-allowlist\.json/);
   assert.match(androidPreviewPromote, /docs\/evidence\/r86-preview-apk-candidate\.md/);
-  assert.match(androidPreviewPromote, /git diff --name-only/);
+  assert.match(androidPreviewPromote, /git diff --no-renames --name-status/);
+  assert.match(androidPreviewPromote, /A\s+docs\/evidence\/r86-preview-apk-candidate\.md/);
+  assert.match(androidPreviewPromote, /M\s+scripts\/preview-apk-allowlist\.json/);
   assert.match(androidPreviewPromote, /sourceTree/);
   assert.match(androidPreviewPromote, /isImmutable/);
+  assert.match(androidPreviewPromote, /bypass_actors/);
+  assert.match(androidPreviewPromote, /\["deletion", "update"\]/);
+  assert.match(androidPreviewPromote, /release_list_json="\$\(gh release list/g);
+  assert.match(androidPreviewPromote, /jq -j '\.body \/\/ ""'/);
+  assert.doesNotMatch(androidPreviewPromote, /jq -r '\.body \/\/ ""'/);
   assert.match(androidPreviewPromote, /\(HTTP 404\)/);
   assert.match(androidPreviewPromote, /\.name/);
   assert.match(androidPreviewPromote, /already_published/);
@@ -152,6 +164,12 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /gh release edit[^\n]*--draft=false[^\n]*--prerelease[^\n]*--latest=false/);
   assert.match(androidPreviewPromote, /android-preview-v/);
   assert.doesNotMatch(androidPreviewPromote, /gradlew|assembleRelease/);
+});
+
+test('Preview release body extraction preserves exact trailing bytes', () => {
+  assert.match(previewReleaseNotes, /\n$/);
+  const apiPayload = JSON.stringify({ body: previewReleaseNotes });
+  assert.equal(JSON.parse(apiPayload).body, previewReleaseNotes);
 });
 
 test('candidate builds once under channel isolation and never publishes', () => {
