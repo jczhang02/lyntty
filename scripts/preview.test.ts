@@ -389,6 +389,11 @@ describe('public Preview manual-test commands', () => {
       const started = await runPreview(['test'], environment);
       expect(started.exitCode).toBe(0);
       expect(started.stdout).toContain('Preview test backend is running');
+      const relayUrl = started.stdout.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0];
+      expect(relayUrl).toBeTruthy();
+      const rootResponse = await fetch(relayUrl!);
+      expect(rootResponse.status).toBe(200);
+      expect(await rootResponse.text()).toContain('Welcome to Lyntty Relay!');
 
       const status = await runPreview(['status'], environment);
       expect(status.exitCode).toBe(0);
