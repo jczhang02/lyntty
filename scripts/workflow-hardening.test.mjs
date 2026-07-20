@@ -17,8 +17,10 @@ const codeownersPath = new URL('../.github/CODEOWNERS', import.meta.url);
 const typecheckWorkflowPath = new URL('../.github/workflows/typecheck.yml', import.meta.url);
 const cliSmokeWorkflowPath = new URL('../.github/workflows/cli-smoke-test.yml', import.meta.url);
 const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-artifact.ts', import.meta.url);
+const rootPackagePath = new URL('../package.json', import.meta.url);
+const previewRelayGatePath = new URL('../e2e/maestro/standalone/preview_first_run.yml', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, previewRelayGate] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
@@ -34,7 +36,10 @@ const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, android
   readFile(typecheckWorkflowPath, 'utf8'),
   readFile(cliSmokeWorkflowPath, 'utf8'),
   readFile(cliArtifactBuilderPath, 'utf8'),
+  readFile(rootPackagePath, 'utf8'),
+  readFile(previewRelayGatePath, 'utf8'),
 ]);
+const rootPackage = JSON.parse(rootPackageText);
 
 test('relay deploy resolves only a signed stable BOM to an immutable image', () => {
   assert.match(relayDeploy, /environment: production-relay/);
@@ -285,6 +290,13 @@ test('Android Gradle binds stable, preview, and development to distinct identiti
 });
 
 test('Maestro reliability flows cannot bypass guarded orchestration', () => {
+  assert.equal(
+    rootPackage.scripts['e2e:maestro:preview-first-run'],
+    'LYNTTY_MAESTRO_APP_ID=dev.jczhang.lyntty.preview scripts/e2e/run-maestro.sh e2e/maestro/standalone/preview_first_run.yml',
+  );
+  assert.match(previewRelayGate, /visible: "Connect to Relay"/);
+  assert.match(previewRelayGate, /assertNotVisible: "Create account"/);
+  assert.doesNotMatch(previewRelayGate, /optional: true/);
   assert.match(maestroRunner, /maestro-daemon-restart\.sh/);
   assert.match(maestroRunner, /maestro-reload-ownership\.sh/);
   assert.match(maestroRunner, /Run scripts\/e2e\/maestro-daemon-restart\.sh/);

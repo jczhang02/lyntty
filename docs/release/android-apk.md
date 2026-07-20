@@ -64,7 +64,7 @@ APK: lyntty-preview-v1.2.0-920001.apk
 
 Release notes are generated from `docs/release/preview-apk-release-notes.md`. Promotion publishes the APK, checksum, APK audit, runtime audit, and provenance only.
 
-Physical-phone acceptance must cover the `910003 → 920001` in-place update, preservation of an existing valid Relay, fresh-data Relay gating before account actions, Android Back exiting the mandatory setup screen, Clear Relay returning to that gate, local pairing and managed Pi round-trip, and recovery after reopening the App. The dedicated automation seam is `e2e/maestro/01_preview_relay_gate.yml`; it does not replace physical acceptance.
+Physical-phone acceptance must cover the `910003 → 920001` in-place update, preservation of an existing valid Relay, fresh-data Relay gating before account actions, Android Back exiting the mandatory setup screen, Clear Relay returning to that gate, local pairing and managed Pi round-trip, and recovery after reopening the App. The dedicated automation seam is `bun run e2e:maestro:preview-first-run` (`e2e/maestro/standalone/preview_first_run.yml`); it is standalone and does not replace physical acceptance.
 
 ## Signing key
 
