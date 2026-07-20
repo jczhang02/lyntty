@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "artifact": "lyntty-preview-v1.2.0-920001.apk",
+  "repository": "jczhang02/lyntty",
+  "workflow": ".github/workflows/android-preview-candidate.yml",
+  "candidateRunId": 29762476280,
+  "sourceCommit": "33d7a99c57cce0783d069e95ba6d4abc59a53c1d",
+  "sourceTree": "6c6ba760d68d0f68e85d1af839efb90a0ab9c252",
+  "applicationId": "dev.jczhang.lyntty.preview",
+  "versionName": "1.2.0",
+  "versionCode": 920001,
+  "releaseTag": "android-preview-v1.2.0-920001",
+  "releaseTitle": "V1.2.0 Local First 📡",
+  "signerSha256": "ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c",
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "sha256": "9025d83a142ded5a618ef15c56c9bdd5486fed8336a53f1b9f0c7336b325aae9",
+  "size": 126797863
+}
