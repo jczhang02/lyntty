@@ -56,7 +56,7 @@
     "node-forge": "1.4.0",
     "path-to-regexp": "8.4.0",
     "prismjs": "1.30.0",
-    "shell-quote": "1.8.4",
+    "shell-quote": "1.9.0",
     "socket.io-parser": "4.2.6",
     "react-devtools-core>ws": "7.5.11",
     "engine.io>ws": "8.21.0",
