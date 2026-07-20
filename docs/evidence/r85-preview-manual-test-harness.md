@@ -68,6 +68,25 @@ The imported APK was accepted only after all of the following matched:
 
 Before and after the default profile lifecycle, file metadata for live `~/.lyntty/settings.json`, live `~/.lyntty/access.key`, and `~/.pi/agent/extensions/lyntty/index.ts` was unchanged. No Preview supervisor, Relay, daemon, Gradle, or native-build process remained after shutdown.
 
+## Relay discovery compatibility correction
+
+The first physical-phone setup exposed a real contract drift. The running current-source Relay was healthy at `GET /health`, but its root returned `Lyntty Relay API`; the installed `910003` Preview App still required the removed `Welcome to Lyntty Relay!` root marker and displayed `This does not look like a Lyntty relay.`
+
+The minimized live repro was:
+
+```text
+GET /       -> 200 Lyntty Relay API
+GET /health -> 200 {"status":"ok",...,"service":"lyntty-relay"}
+App result  -> This does not look like a Lyntty relay.
+```
+
+The compatibility fix is bidirectional:
+
+- current/future App builds probe `GET /health` and accept only exact `status: ok` plus `service: lyntty-relay` JSON;
+- current Relay keeps the old root marker alongside its API identity so the already audited `910003` APK can complete server setup without a native rebuild.
+
+The focused App regression went red on the missing probe, then passed 6 tests / 16 assertions. The real source Relay lifecycle test went red on the missing compatibility marker, then passed after the route correction. Full App passed 795 tests / 3,197 assertions; full Relay passed 119 tests / 332 assertions; Preview lifecycle passed 19 tests / 94 assertions. A post-fix phone retry requires restarting the source Relay and remains part of the physical-phone check below.
+
 ## Resource correction
 
 An initial native build was stopped after excessive host memory use. A second run inside a 4 GiB memory cgroup reached the arm64 Skia/native stage and was killed by the cgroup OOM guard; systemd recorded a 5.3 GiB memory peak plus 2 GiB swap. No APK from either attempt is claimed.
@@ -80,7 +99,7 @@ The final implementation therefore optimizes the actual manual-test need:
 4. refuse before Gradle when Linux `MemAvailable` is below 12 GiB;
 5. stream logs directly to disk, use one worker/one arm64 ABI, and clean marked build groups on interruption.
 
-The failed Gradle caches were removed after proving no matching processes remained. The retained manual profile contains only the reviewed APK, local Relay state, logs, and private metadata.
+The failed Gradle caches were removed after proving no matching processes remained. A later isolated rebuild attempt for the Relay-discovery correction passed the memory preflight but stopped during Kotlin dependency resolution when Maven Central terminated the TLS handshake. One retry reached JavaScript bundling before Bun exited with `EMFILE: too many open files, watch`; neither attempt left a Gradle/native process or produced a claimed APK. `preview:reset` now also removes an incomplete pre-state build profile under the external lifecycle lock; the 3.3 GiB failed profile was removed through that path. The backward-compatible Relay marker makes the rebuild unnecessary for the installed `910003` test path. The retained manual profile contains only the reviewed APK, local Relay state, logs, and private metadata.
 
 ## Verification commands
 
@@ -94,7 +113,7 @@ bun pm untrusted
 git diff --check
 ```
 
-Observed results: Wire 33; CLI 585; Relay 119; App 791 tests / 3,183 assertions; combined dev/Preview lifecycle 31 tests / 175 assertions. Independent requirements verification and post-fix code review both returned `APPROVE` with no P0/P1/P2 blocker.
+Observed results: Wire 33; CLI 585; Relay 119; App 795 tests / 3,197 assertions; combined dev/Preview lifecycle 32 tests / 182 assertions. Independent requirements verification and post-fix code review both returned `APPROVE` with no P0/P1/P2 blocker.
 
 ## Not run and residual risk
 

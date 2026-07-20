@@ -53,6 +53,25 @@ signer: ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c
 
 默认 profile 的本地 Relay 实际启动并通过 health；`status` 证明 supervisor owned，`stop` 后无 Relay/daemon/Gradle 残留。运行前后，live `~/.lyntty/settings.json`、`~/.lyntty/access.key` 和 `~/.pi/agent/extensions/lyntty/index.ts` 的文件元数据没有变化。
 
+## Relay 识别兼容性修正
+
+首次实体手机设置暴露了真实契约漂移：当前源码 Relay 的 `GET /health` 正常，但首页返回 `Lyntty Relay API`；已安装的 `910003` Preview App 仍要求旧标记 `Welcome to Lyntty Relay!`，因此显示 `This does not look like a Lyntty relay.`。
+
+最小真实复现：
+
+```text
+GET /       -> 200 Lyntty Relay API
+GET /health -> 200 {"status":"ok",...,"service":"lyntty-relay"}
+App         -> This does not look like a Lyntty relay.
+```
+
+修复同时覆盖两端：
+
+- 新 App 改为探测 `GET /health`，只接受精确的 `status: ok` 和 `service: lyntty-relay`；
+- 当前 Relay 保留旧首页标记，因此已审计的 `910003` APK 无需原生重建即可继续设置。
+
+App 聚焦回归先红后绿，最终 6 tests / 16 assertions；真实源码 Relay lifecycle 测试也先红后绿。完整 App 为 795 tests / 3,197 assertions，Relay 为 119 tests / 332 assertions，Preview lifecycle 为 19 tests / 94 assertions。修复后的手机复测需要重启源码 Relay，仍属于下方待执行实体手机步骤。
+
 ## 内存问题与修正
 
 首次原生构建因整机内存压力被停止。第二次在 4 GiB cgroup 中运行，到 arm64 Skia/native 阶段触发 cgroup OOM；systemd 记录峰值约 5.3 GiB 内存加 2 GiB swap。两次均不声明产生有效 APK。
@@ -65,7 +84,7 @@ signer: ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c
 4. Linux 可用内存低于 12 GiB 时，在启动 Gradle 前拒绝；
 5. 构建日志直接落盘，单 worker、仅 arm64，并在中断后清理带精确 marker 的进程组。
 
-失败构建缓存已在证明无相关进程后清理。
+失败构建缓存已在证明无相关进程后清理。Relay 识别修正后又尝试过一次隔离重建：内存预检查通过，但 Maven Central 在 Kotlin 依赖解析时终止 TLS handshake；单次重试到达 JavaScript bundling 后，Bun 因 `EMFILE: too many open files, watch` 退出。两次均无残留 Gradle/native 进程，也没有声明 APK 产物。`preview:reset` 现在会在外置 lifecycle lock 下删除尚未发布 state 的不完整构建 profile；本次 3.3 GiB 失败目录已通过该路径移除。由于 Relay 已保留向后兼容标记，已安装的 `910003` 手测路径不再需要此次重建。
 
 ## 门禁
 
@@ -79,7 +98,7 @@ bun pm untrusted
 git diff --check
 ```
 
-已观察到 Wire 33、CLI 585、Relay 119、App 791 tests / 3,183 assertions，以及 dev/Preview lifecycle 31 tests / 175 assertions 全部通过。独立 requirements verifier 和修复后 code reviewer 均为 `APPROVE`，无 P0/P1/P2。
+已观察到 Wire 33、CLI 585、Relay 119、App 795 tests / 3,197 assertions，以及 dev/Preview lifecycle 32 tests / 182 assertions 全部通过。独立 requirements verifier 和修复后 code reviewer 均为 `APPROVE`，无 P0/P1/P2。
 
 ## 尚未执行
 
