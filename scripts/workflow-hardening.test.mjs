@@ -118,6 +118,8 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /gh attestation verify/);
   assert.match(androidPreviewPromote, /native_abis=arm64-v8a,x86_64/);
   assert.match(androidPreviewPromote, /git diff --quiet[^\n]*packages\/lyntty-app/);
+  assert.match(androidPreviewPromote, /git\/refs/);
+  assert.match(androidPreviewPromote, /refs\/tags\/\$RELEASE_TAG/);
   assert.match(androidPreviewPromote, /gh release create[^\n]*--draft[^\n]*--prerelease/);
   assert.match(androidPreviewPromote, /gh release edit[^\n]*--draft=false[^\n]*--prerelease/);
   assert.match(androidPreviewPromote, /android-preview-v/);

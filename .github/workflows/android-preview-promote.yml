@@ -177,4 +177,14 @@ jobs:
           git fetch --no-tags origin main
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
           git diff --quiet "$SOURCE_SHA" HEAD -- .bun-version bun.lock patches scripts/postinstall.cjs packages/lyntty-app packages/lyntty-wire
+          tag_api="repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG"
+          if tag_json="$(gh api "$tag_api" 2>/dev/null)"; then
+            [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
+            [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
+          else
+            tag_json="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$RELEASE_TAG" -f sha="$GITHUB_SHA")"
+            [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
+            [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
+          fi
           gh release edit "$RELEASE_TAG" --draft=false --prerelease
