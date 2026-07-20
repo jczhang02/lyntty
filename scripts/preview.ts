@@ -828,12 +828,39 @@ async function inspectBuildGroups(canonicalRoot: string, buildId: string): Promi
   return ownedGroups;
 }
 
+async function inspectBuildPids(canonicalRoot: string, buildId: string): Promise<number[]> {
+  const ownedPids: number[] = [];
+  for (const member of (await listProcessGroups()).filter(member => !isZombie(member))) {
+    if (!(await processHasBuildMarker(member.pid, buildId))) continue;
+    const identity = await readProcessIdentity({ canonicalRoot }, member.pid);
+    if (!identity) {
+      if (!processIsAlive(member.pid)) continue;
+      throw new Error(`Refusing to stop Preview build PID ${member.pid}: identity unavailable`);
+    }
+    if (
+      !hasExactEnvironment(identity.environment, 'LYNTTY_PREVIEW_BUILD_ID', buildId)
+      || !hasExactEnvironment(identity.environment, 'LYNTTY_PREVIEW_BUILD_ROOT', canonicalRoot)
+      || !pathIsInside(canonicalRoot, identity.cwd)
+    ) throw new Error(`Refusing to stop Preview build PID ${member.pid}: ownership not proven`);
+    ownedPids.push(member.pid);
+  }
+  return ownedPids;
+}
+
+async function inspectBuildTargets(canonicalRoot: string, buildId: string): Promise<number[]> {
+  if (process.platform === 'linux') {
+    return (await inspectBuildGroups(canonicalRoot, buildId)).map(pgid => -pgid);
+  }
+  // Bun's detached subprocesses do not reliably form a distinct process group on Darwin.
+  // Every Gradle/native descendant inherits the exact build marker, so sweep only those PIDs.
+  return inspectBuildPids(canonicalRoot, buildId);
+}
+
 async function cleanupBuildProcesses(canonicalRoot: string, buildId: string): Promise<void> {
   const signal = async (name: 'SIGTERM' | 'SIGKILL'): Promise<void> => {
-    const groups = await inspectBuildGroups(canonicalRoot, buildId);
-    for (const pgid of groups) {
+    for (const target of await inspectBuildTargets(canonicalRoot, buildId)) {
       try {
-        process.kill(-pgid, name);
+        process.kill(target, name);
       } catch (error) {
         if (!isErrno(error, 'ESRCH')) throw error;
       }
@@ -841,12 +868,12 @@ async function cleanupBuildProcesses(canonicalRoot: string, buildId: string): Pr
   };
   await signal('SIGTERM');
   const stopped = await waitFor('Preview APK build process shutdown', async () => (
-    (await inspectBuildGroups(canonicalRoot, buildId)).length === 0 ? true : false
+    (await inspectBuildTargets(canonicalRoot, buildId)).length === 0 ? true : false
   ), STOP_TIMEOUT_MS).then(() => true).catch(() => false);
   if (stopped) return;
   await signal('SIGKILL');
   await waitFor('Preview APK build forced shutdown', async () => (
-    (await inspectBuildGroups(canonicalRoot, buildId)).length === 0 ? true : false
+    (await inspectBuildTargets(canonicalRoot, buildId)).length === 0 ? true : false
   ), STOP_TIMEOUT_MS);
 }
 
@@ -862,7 +889,8 @@ async function runLogged(command: string[], cwd: string, environment: Record<str
     interruptedBy = signal;
     if (!child) return;
     try {
-      process.kill(-child.pid, 'SIGTERM');
+      if (process.platform === 'linux') process.kill(-child.pid, 'SIGTERM');
+      else child.kill('SIGTERM');
     } catch {
       // The child may already have exited; the ownership sweep below is authoritative.
     }
