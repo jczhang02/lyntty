@@ -14,7 +14,7 @@ Production APK 必须使用永久密钥并 fail closed；本地 throwaway/Previe
 - 测试者在电脑运行 `bun preview:test` 启动隔离本地 Relay；
 - Preview App 必须先设置并验证本地 Relay，之后才能读取凭据或启动同步；Stable 行为不变。
 
-`.github/workflows/android-preview-candidate.yml` 只构建、审计、attest 并上传候选产物，不发布。候选 SHA-256 经 allowlist PR 审阅并完成实体 Android 原位升级与全新启动测试后，用户另行明确授权，`.github/workflows/android-preview-promote.yml` 才会发布完全相同的 APK 字节及 SHA-256、APK/runtime audit、provenance。
+`.github/workflows/android-preview-candidate.yml` 只构建、审计、attest APK 与严格 Candidate manifest，并上传候选产物，不发布。Candidate 到 Promotion 的 protected `main` 只允许改动 allowlist、`docs/evidence/r86-preview-apk-candidate*.md` 和对应五个审阅 sidecar；出现其他路径必须重建 Candidate。候选 SHA-256 经 allowlist PR 审阅并完成实体 Android 原位升级与全新启动测试后，还必须启用仓库 immutable releases，并用无 bypass 的 active tag ruleset 禁止更新/删除 `android-preview-v*`；通过 admin API 核实后设置仓库变量 `LYNTTY_IMMUTABLE_RELEASES_ENABLED=true` 和 `LYNTTY_PREVIEW_TAG_RULESET_ID=<数字 id>`。用户另行明确授权后，`.github/workflows/android-preview-promote.yml` 才会复核受保护 ref、物理机确认、allowlist、双 attestation、完整 provenance/audit、发布前后精确资产和 `isImmutable=true`，再把完全相同的 APK 字节及 SHA-256、APK/runtime audit、provenance 发布为非 Latest prerelease。
 
 ```text
 Tag: android-preview-v1.2.0-920001

@@ -34,9 +34,9 @@ Preview 必须先持久化并验证 Relay，之后才能初始化认证或同步
 
 ## Candidate 与 Promotion 边界
 
-`.github/workflows/android-preview-candidate.yml` 只从精确受保护 `main` 构建一次，审计 APK 与 Bun-only 执行边界，生成 SHA-256、provenance 和 Mole 风格中英文说明，对 APK 做 attestation，并上传保留 30 天的 Candidate artifact。它没有 contents-write 权限，不能创建 Release。
+`.github/workflows/android-preview-candidate.yml` 只从精确受保护 `main` 构建一次，审计 APK、唯一 signer 与 Bun-only 执行边界，生成 SHA-256、provenance、Mole 风格中英文说明和严格内容 manifest，对 APK 与 manifest 分别做 attestation，并上传保留 30 天的 Candidate artifact。它没有 contents-write 权限，不能创建 Release。
 
-Candidate SHA-256 经 `scripts/preview-apk-allowlist.json` 审阅后，必须用同一 APK完成实体 Android 原位升级和全新数据测试。`.github/workflows/android-preview-promote.yml` 只接受该 run id 和已测试 SHA-256；它重新验证 Candidate workflow、源码祖先关系、未变化的 App/Wire 输入、attestation、APK 身份与最终受保护 `main`，随后创建或恢复精确 draft 并发布为 prerelease。Promotion 不执行构建。
+Candidate SHA-256 经 `scripts/preview-apk-allowlist.json` 审阅后，必须用同一 APK 完成实体 Android 原位升级和全新数据测试。Candidate 到 Promotion 只允许出现精确 allowlist 与 R86 Candidate evidence 文件。仓库 immutable releases 和禁止更新/删除 `android-preview-v*` 的 tag ruleset 是外部 Promotion 门禁，经 admin API 核实后以独立仓库变量持久化。`.github/workflows/android-preview-promote.yml` 只接受该 run id 和已测试 SHA-256，要求显式物理机验收，并复核 protected ref、精确审阅 delta、双 attestation、全部 manifest/provenance/audit 字段、发布前后五个精确资产、不可变 tag、`isImmutable=true` 与最终受保护 `main`。Promotion 不构建；若已存在完全一致的 immutable prerelease，可幂等成功。
 
 ## Candidate 前已完成
 

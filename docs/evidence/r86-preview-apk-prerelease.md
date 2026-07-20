@@ -34,9 +34,9 @@ Preview now requires a persisted, validated Relay before authentication or sync 
 
 ## Candidate and promotion boundary
 
-`.github/workflows/android-preview-candidate.yml` builds once from exact protected `main`, audits the APK and Bun-only execution boundary, generates SHA-256/provenance/Mole-style bilingual notes, attests the APK, and uploads a 30-day candidate artifact. It has no contents-write permission and cannot create a Release.
+`.github/workflows/android-preview-candidate.yml` builds once from exact protected `main`, audits the APK, sole signer, and Bun-only execution boundary, generates SHA-256/provenance/Mole-style bilingual notes plus a strict content manifest, attests both APK and manifest, and uploads a 30-day candidate artifact. It has no contents-write permission and cannot create a Release.
 
-After the candidate SHA-256 is reviewed into `scripts/preview-apk-allowlist.json`, the exact candidate must pass physical Android update and fresh-start testing. `.github/workflows/android-preview-promote.yml` accepts only that run id and tested SHA-256, verifies the successful candidate workflow, source ancestry, unchanged App/Wire inputs, attestation, APK identity, and final protected `main`, then creates or resumes an exact draft and publishes it as a prerelease. Promotion does not build.
+After the candidate SHA-256 is reviewed into `scripts/preview-apk-allowlist.json`, the exact candidate must pass physical Android update and fresh-start testing. Candidate-to-Promotion source changes are restricted to the exact allowlist and R86 Candidate evidence files. Repository immutable releases and an update/deletion-blocking `android-preview-v*` tag ruleset are external Promotion gates, persisted as separately reviewed repository variables after admin-API verification. `.github/workflows/android-preview-promote.yml` accepts only that run id and tested SHA-256, requires explicit physical acceptance, verifies protected refs, the exact reviewed delta, both attestations, all manifest/provenance/audit fields, the five release assets immediately before and after publication, immutable tag identity, `isImmutable=true`, and final protected `main`. Promotion does not build and remains idempotent for an already exact immutable prerelease.
 
 ## Verification completed before candidate
 

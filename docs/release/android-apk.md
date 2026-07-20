@@ -50,9 +50,10 @@ The developer Preview APK is distributed independently from the signed Compatibi
 Candidate and publication remain separate:
 
 1. `.github/workflows/android-preview-candidate.yml` builds one `arm64-v8a + x86_64` APK from protected `main`, audits it, attests it, and uploads a 30-day workflow artifact without publishing.
-2. A CODEOWNERS-reviewed allowlist PR binds the candidate SHA-256 and source inputs.
+2. A CODEOWNERS-reviewed allowlist PR binds the candidate SHA-256 and source inputs. From Candidate to Promotion, protected `main` must change by exactly the allowlist plus `docs/evidence/r86-preview-apk-candidate*.md` and the five reviewed text/JSON sidecars under `docs/evidence/artifacts/r86-preview-apk-candidate/`; any other path requires a new Candidate.
 3. The operator upgrades and fresh-start tests the exact candidate on physical Android.
-4. Only after a separate release confirmation, `.github/workflows/android-preview-promote.yml` verifies the run, attestation, SHA-256, APK identity, unchanged App inputs, and final protected `main`, then publishes those exact bytes as a prerelease.
+4. Before Promotion, repository release immutability must be enabled and an active no-bypass tag ruleset must block updates/deletion for `android-preview-v*`. After verifying both through the admin API, set repository variables `LYNTTY_IMMUTABLE_RELEASES_ENABLED=true` and `LYNTTY_PREVIEW_TAG_RULESET_ID=<numeric id>`; Promotion also requires an explicit dispatch confirmation and post-publication `isImmutable=true`.
+5. Only after a separate release confirmation, `.github/workflows/android-preview-promote.yml` verifies the run, protected ref, reviewed allowlist delta, physical-test confirmation, APK and manifest attestations, SHA-256, complete provenance/audits, immutable tag, exact assets, and final protected `main`, then publishes those exact bytes as a non-Latest prerelease. It re-downloads every release asset immediately before and after publication and requires `isImmutable=true`.
 
 Release identity for this cycle:
 
