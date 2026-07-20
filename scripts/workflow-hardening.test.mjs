@@ -122,6 +122,8 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /candidate_run_id/);
   assert.match(androidPreviewPromote, /expected_sha256/);
   assert.match(androidPreviewPromote, /physical_phone_accepted/);
+  assert.match(androidPreviewPromote, /LYNTTY_IMMUTABLE_RELEASES_ENABLED/);
+  assert.match(androidPreviewPromote, /LYNTTY_PREVIEW_TAG_RULESET_ID/);
   assert.match(androidPreviewPromote, /GITHUB_REF_PROTECTED/g);
   assert.match(androidPreviewPromote, /contents: write/);
   assert.match(androidPreviewPromote, /actions: read/);

@@ -53,6 +53,8 @@ jobs:
           EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
           PHYSICAL_PHONE_ACCEPTED: ${{ inputs.physical_phone_accepted }}
           IMMUTABLE_RELEASES_ENABLED: ${{ inputs.immutable_releases_enabled }}
+          REPOSITORY_IMMUTABILITY_GATE: ${{ vars.LYNTTY_IMMUTABLE_RELEASES_ENABLED }}
+          PREVIEW_TAG_RULESET_ID: ${{ vars.LYNTTY_PREVIEW_TAG_RULESET_ID }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -62,6 +64,8 @@ jobs:
           [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]]
           [[ "$PHYSICAL_PHONE_ACCEPTED" == true ]]
           [[ "$IMMUTABLE_RELEASES_ENABLED" == true ]]
+          [[ "$REPOSITORY_IMMUTABILITY_GATE" == true ]]
+          [[ "$PREVIEW_TAG_RULESET_ID" =~ ^[1-9][0-9]*$ ]]
           git fetch --no-tags origin main
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
 
