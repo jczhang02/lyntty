@@ -25,7 +25,7 @@ Preview now requires a persisted, validated Relay before authentication or sync 
 
 - no configured or policy-invalid Relay means stored credentials are cleared without being read or restored;
 - credential deletion failures stop bootstrap or Relay replacement before the new URL can be persisted;
-- deep links cannot mount account routes, and the sync/navigation graph is lazy-loaded only after setup, while **Connect to Relay** uses a setup-only route shell;
+- deep links cannot mount account routes, and the sync/navigation graph is lazy-loaded only after setup, while **Connect to Relay** uses an independent route group with no business index;
 - validation probes canonical `GET /health` and requires `status: ok` plus `service: lyntty-relay`;
 - Preview HTTP accepts only localhost, loopback, private RFC1918/CGNAT IPv4, or local IPv6; HTTPS remains available;
 - existing valid custom Relay settings survive an in-place Preview update;
@@ -43,9 +43,10 @@ After the candidate SHA-256 is reviewed into `scripts/preview-apk-allowlist.json
 - focused URL/health policy tests went red before implementation and pass afterward;
 - focused bootstrap policy tests went red before implementation and pass afterward, including deletion failure and deep-link route blocking;
 - workflow hardening tests went red while the two workflows were absent and pass afterward;
+- GitHub admin API confirms immutable releases are enabled; active no-bypass tag ruleset `19203462` blocks `update` and `deletion` for `refs/tags/android-preview-v*`; matching repository gate variables are set;
 - TypeScript and i18n gates pass for the implemented App surface.
 
-Final local `bun run ci:fast` passed at the review-hardened head: repo hardening 18; Wire 33; CLI 585; Relay 119 / 332 assertions; App 808 / 3,259 assertions across 89 isolated files; dev/Preview lifecycle 35 / 194 assertions. Both workflows also passed YAML parsing, extracted Bash ShellCheck, and `git diff --check`. Protected PR CI is still pending.
+Final local `bun run ci:fast` passed at the review-hardened head: repo hardening 19; Wire 33; CLI 585; Relay 119 / 332 assertions; App 809 / 3,268 assertions across 89 isolated files; dev/Preview lifecycle 35 / 194 assertions. Both workflows also passed YAML parsing, extracted Bash ShellCheck, and `git diff --check`. Protected PR CI is still pending.
 
 ## Not run yet
 

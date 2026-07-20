@@ -25,7 +25,7 @@ Preview 必须先持久化并验证 Relay，之后才能初始化认证或同步
 
 - 未配置或不符合策略的 Relay 时，直接清理旧凭据，不读取、不恢复同步；
 - 凭据删除失败会在写入新 URL 前阻止启动或 Relay 更换；
-- 深链页面不会在门禁期间挂载；同步与主导航依赖仅在设置完成后惰性加载，**连接到 Relay** 使用独立设置路由壳；
+- 深链页面不会在门禁期间挂载；同步与主导航依赖仅在设置完成后惰性加载，**连接到 Relay** 使用不含业务首页的独立 route group；
 - 通过规范 `GET /health` 验证精确 `status: ok` 与 `service: lyntty-relay`；
 - Preview HTTP 仅允许 localhost、loopback、RFC1918/CGNAT 私有 IPv4 或本地 IPv6；HTTPS 仍可使用；
 - 已有有效自定义 Relay 的 Preview 原位升级会保留设置；
@@ -43,9 +43,10 @@ Candidate SHA-256 经 `scripts/preview-apk-allowlist.json` 审阅后，必须用
 - URL/health policy 聚焦测试先红后绿；
 - bootstrap policy 聚焦测试先红后绿，覆盖凭据删除失败和深链路由阻断；
 - 两个 workflow 缺失时 hardening 测试为红，实现后转绿；
+- GitHub admin API 已确认 immutable releases 启用；active、无 bypass 的 tag ruleset `19203462` 禁止更新和删除 `refs/tags/android-preview-v*`，对应仓库门禁变量已设置；
 - 当前 App TypeScript 和 i18n 门禁通过。
 
-最终评审加固 head 的本地 `bun run ci:fast` 已通过：repo hardening 18、Wire 33、CLI 585、Relay 119 / 332 assertions、App 808 / 3,259 assertions（89 个隔离文件）、dev/Preview lifecycle 35 / 194 assertions。两个 workflow 还通过 YAML parse、提取 Bash ShellCheck 和 `git diff --check`。受保护 PR CI 仍待执行。
+最终评审加固 head 的本地 `bun run ci:fast` 已通过：repo hardening 19、Wire 33、CLI 585、Relay 119 / 332 assertions、App 809 / 3,268 assertions（89 个隔离文件）、dev/Preview lifecycle 35 / 194 assertions。两个 workflow 还通过 YAML parse、提取 Bash ShellCheck 和 `git diff --check`。受保护 PR CI 仍待执行。
 
 ## 尚未执行
 
