@@ -2,7 +2,7 @@
 
 Date: 2026-07-20
 
-Status: PR #16 merged; first candidate stopped before artifact creation; bundle remediation pending protected PR
+Status: PR #17 merged; second candidate built the APK but stopped at audit; signer-parser remediation pending protected PR
 
 ## Scope
 
@@ -56,12 +56,22 @@ The same `ResolveMessage is not constructable` failure was reproduced locally wi
 
 The remediation adds the matching `babel-preset-expo ~55.0.23` direct build dependency and a real Preview Android bundle smoke to `ci:app`. Before the dependency fix, `bun run --filter lyntty-app test:bundle` reproduced exit 7 and the Candidate error. Afterward, the same command bundled 3,182 modules and produced a non-empty 13,068,103-byte bundle before deleting its isolated output.
 
-A clean staged snapshot then passed `bun run ci:fast`: repo hardening 19; Wire 33; CLI 585; Relay 119 / 332 assertions; App 809 / 3,268 assertions across 89 isolated files plus the Preview bundle smoke; dev/Preview lifecycle 35 / 194 assertions; and `git diff --check`.
+A clean staged snapshot then passed `bun run ci:fast`: repo hardening 19; Wire 33; CLI 585; Relay 119 / 332 assertions; App 809 / 3,268 assertions across 89 isolated files plus the Preview bundle smoke; dev/Preview lifecycle 35 / 194 assertions; and `git diff --check`. PR [#17](https://github.com/jczhang02/lyntty/pull/17) passed all protected checks and merged as GitHub-verified commit `61bdcc9700c234baf029957f2754f076ac2b722e` with the exact reviewed tree.
+
+## Second candidate interruption
+
+Candidate run [`29744698996`](https://github.com/jczhang02/lyntty/actions/runs/29744698996) completed `Build dual-ABI Preview APK`, proving the Expo bundle remediation on the release path. It then stopped in `Audit and stage candidate`; both attestations and artifact upload were skipped, leaving zero artifacts and no Preview tag or Release.
+
+The failure was reproduced with the runner's Android build-tools 37 against a locally built source-matched `1.2.0` / `920001` APK. Build-tools 37 changed the certificate line from `Signer #1 certificate SHA-256 digest` to the scheme-specific `V2 Signer: certificate SHA-256 digest`. The audit parser accepted only the build-tools 36 prefix, found no certificate digest, and failed its single-signer assertion. The local reproduction's package, version, debuggable, standalone bundle, ABI, signer certificate, and embedded source values all matched the release contract; the failed GitHub run retained no APK, so its bytes are not claimed as inspected.
+
+The remediation binds the explicit `Number of signers: 1` field to one unique certificate SHA-256 digest collected across signature schemes, supporting both build-tools 36 and 37 without weakening the sole-signer gate. Focused tests cover both formats, cross-scheme digest deduplication, and fail-closed rejection of two signers with a precise diagnostic. The real source-matched APK passes the updated audit with build-tools 37, and the previously accepted `910003` APK continues to pass with build-tools 36. Candidate source-commit failures now also emit an explicit diagnostic.
+
+A clean synthetic commit of the exact staged tree passed `bun run ci:fast`: repo hardening 19; Wire 33; CLI 585 / 1,272 assertions; Relay 119 / 332 assertions; App 812 / 3,276 assertions across 90 isolated files plus the 13,068,103-byte Preview bundle smoke; dev/Preview lifecycle 35 / 194 assertions. Focused build-tools 36/37 audit tests, real APK audits, ShellCheck, workflow YAML parsing, and `git diff --check` also passed.
 
 ## Not run yet
 
-- remediated GitHub candidate workflow;
-- APK audit on the `920001` candidate;
+- protected review and merge of the build-tools 37 audit remediation;
+- remediated GitHub Candidate audit, attestations, and artifact upload;
 - in-place physical update from `910003` to `920001`;
 - fresh-data mandatory Relay setup, Android Back behavior, Clear Relay re-gating, pairing, Pi message round trip, and reopen;
 - public Promotion workflow.

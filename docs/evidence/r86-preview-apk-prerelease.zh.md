@@ -2,7 +2,7 @@
 
 日期：2026-07-20
 
-状态：PR #16 已合入；首次 Candidate 在生成 artifact 前停止；bundle 修复等待受保护 PR
+状态：PR #17 已合入；第二次 Candidate 已构建 APK，但在审计阶段停止；signer parser 修复等待受保护 PR
 
 ## 范围
 
@@ -56,12 +56,22 @@ Candidate run [`29739227276`](https://github.com/jczhang02/lyntty/actions/runs/2
 
 修复补充匹配的 `babel-preset-expo ~55.0.23` 直接构建依赖，并将真实 Preview Android bundle smoke 纳入 `ci:app`。修复前，`bun run --filter lyntty-app test:bundle` 可复现 exit 7 和 Candidate 错误；修复后，同一命令完成 3,182 个模块的 bundle，验证非空 13,068,103-byte 输出后删除隔离产物。
 
-干净 staged snapshot 随后通过 `bun run ci:fast`：repo hardening 19、Wire 33、CLI 585、Relay 119 / 332 assertions、App 809 / 3,268 assertions（89 个隔离文件）及 Preview bundle smoke、dev/Preview lifecycle 35 / 194 assertions，以及 `git diff --check`。
+干净 staged snapshot 随后通过 `bun run ci:fast`：repo hardening 19、Wire 33、CLI 585、Relay 119 / 332 assertions、App 809 / 3,268 assertions（89 个隔离文件）及 Preview bundle smoke、dev/Preview lifecycle 35 / 194 assertions，以及 `git diff --check`。PR [#17](https://github.com/jczhang02/lyntty/pull/17) 通过全部受保护检查，并以 GitHub 已验证提交 `61bdcc9700c234baf029957f2754f076ac2b722e` 合入，merge tree 与评审 tree 完全一致。
+
+## 第二次 Candidate 中断
+
+Candidate run [`29744698996`](https://github.com/jczhang02/lyntty/actions/runs/29744698996) 已通过 `Build dual-ABI Preview APK`，证明 Expo bundle 修复在正式发布路径中有效。随后 `Audit and stage candidate` 停止，双 attestation 与 artifact 上传均被跳过；最终 artifact 仍为 0，也没有 Preview tag 或 Release。
+
+使用 runner 同版 Android build-tools 37 和本地按同一源码构建的 `1.2.0` / `920001` APK 已复现根因。build-tools 37 将证书行从 `Signer #1 certificate SHA-256 digest` 改为按签名方案输出的 `V2 Signer: certificate SHA-256 digest`。旧审计 parser 只接受 build-tools 36 前缀，因此没有读到证书 digest，并在唯一 signer 断言处失败。本地复现 APK 的 package、版本、debuggable、standalone bundle、ABI、signer 证书和嵌入源码值均符合发行契约；失败的 GitHub run 没有保留 APK，因此不声称已检查其具体字节。
+
+修复将显式 `Number of signers: 1` 与跨签名方案去重后的唯一证书 SHA-256 digest 绑定，同时支持 build-tools 36 和 37，且不放宽唯一 signer 门禁。聚焦测试覆盖两种格式、跨 scheme digest 去重，以及两个 signer 的 fail-closed 拒绝和明确诊断。真实源码匹配 APK 已在 build-tools 37 下通过新审计，既有 `910003` APK 也继续在 build-tools 36 下通过。Candidate 嵌入源码不匹配时现在同样会输出明确诊断。
+
+精确 staged tree 的干净 synthetic commit 已通过 `bun run ci:fast`：repo hardening 19、Wire 33、CLI 585 / 1,272 assertions、Relay 119 / 332 assertions、App 812 / 3,276 assertions（90 个隔离文件）及 13,068,103-byte Preview bundle smoke、dev/Preview lifecycle 35 / 194 assertions。build-tools 36/37 聚焦审计测试、真实 APK 审计、ShellCheck、workflow YAML parse 和 `git diff --check` 也全部通过。
 
 ## 尚未执行
 
-- 修复后的 GitHub Candidate workflow；
-- `920001` Candidate APK audit；
+- build-tools 37 审计修复的受保护评审与合入；
+- 修复后的 GitHub Candidate audit、attestations 与 artifact 上传；
 - 实体手机 `910003 → 920001` 原位升级；
 - 清除数据后的强制 Relay 设置、Android 返回键、Clear Relay 重新门禁、配对、Pi 消息往返和重开；
 - 公开 Promotion workflow。
