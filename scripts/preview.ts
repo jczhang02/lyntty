@@ -1388,95 +1388,100 @@ async function commandLogs(layout: PreviewLayout): Promise<void> {
 }
 
 async function commandStop(layout: PreviewLayout): Promise<void> {
-  const state = await loadState(layout);
-  if (!state) {
+  const stopped = await withLifecycleLock(layout, async () => {
+    const state = await loadState(layout);
+    if (!state) return false;
+    await stopLocked(layout, state);
+    return true;
+  });
+  if (!stopped) {
     console.log('Preview test profile is not initialized; nothing to stop.');
     return;
   }
-  await withLifecycleLock(layout, async () => stopLocked(layout, state));
   console.log(`Preview test backend stopped. State preserved at ${layout.stateDir}`);
 }
 
 async function commandReset(layout: PreviewLayout): Promise<void> {
-  const state = await loadState(layout);
-  if (!state) {
+  const outcome = await withLifecycleLock(layout, async (): Promise<'missing' | 'incomplete' | 'complete'> => {
+    const state = await loadState(layout);
+    if (state) {
+      await stopLocked(layout, state);
+      await rm(layout.stateDir, { recursive: true, force: true });
+      return 'complete';
+    }
     const profileExists = await stat(layout.stateDir).then(() => true).catch(error => {
       if (isErrno(error, 'ENOENT')) return false;
       throw error;
     });
-    if (!profileExists) {
-      console.log('Preview test profile is not initialized; nothing to reset.');
-      return;
+    if (!profileExists) return 'missing';
+    const marker = await readJson(layout.buildMarkerFile);
+    if (marker) {
+      if (
+        typeof marker !== 'object'
+        || Array.isArray(marker)
+        || marker.schemaVersion !== 1
+        || typeof marker.buildId !== 'string'
+        || marker.canonicalRoot !== layout.canonicalRoot
+      ) throw new Error('Invalid Preview APK build ownership marker');
+      await cleanupBuildProcesses(layout.canonicalRoot, marker.buildId);
     }
-    await withLifecycleLock(layout, async () => {
-      const marker = await readJson(layout.buildMarkerFile);
-      if (marker) {
-        if (
-          typeof marker !== 'object'
-          || Array.isArray(marker)
-          || marker.schemaVersion !== 1
-          || typeof marker.buildId !== 'string'
-          || marker.canonicalRoot !== layout.canonicalRoot
-        ) throw new Error('Invalid Preview APK build ownership marker');
-        await cleanupBuildProcesses(layout.canonicalRoot, marker.buildId);
-      }
-      await rm(layout.stateDir, { recursive: true, force: true });
-    });
+    await rm(layout.stateDir, { recursive: true, force: true });
+    return 'incomplete';
+  });
+  if (outcome === 'missing') {
+    console.log('Preview test profile is not initialized; nothing to reset.');
+    return;
+  }
+  if (outcome === 'incomplete') {
     console.log('Preview test incomplete profile removed.');
     return;
   }
-  await withLifecycleLock(layout, async () => {
-    await stopLocked(layout, state);
-    await rm(layout.stateDir, { recursive: true, force: true });
-  });
   console.log('Preview test profile reset. Local Relay data, account, and pairing were removed.');
 }
 
-async function ensureBackend(
+async function ensureBackendLocked(
   layout: PreviewLayout,
   target: RelayTarget,
   daemonRequested: boolean,
   apk?: ApkArtifact,
 ): Promise<PreviewState> {
-  return withLifecycleLock(layout, async () => {
-    let previous = await loadState(layout);
-    if (previous) {
-      previous = await reconcileReceipt(layout, previous);
-      const inspection = await inspectGroup(layout, previous);
-      if (inspection.alive) {
-        if (!inspection.owned) throw new Error(`Existing Preview process group is not owned: ${inspection.reason ?? 'unknown'}`);
-        if (previous.daemonRequested === daemonRequested && previous.relayUrl === target.relayUrl) {
-          previous.status = 'running';
-          if (apk) previous.apk = apk;
-          await writeState(layout, previous);
-          return previous;
-        }
-        await stopLocked(layout, previous);
+  let previous = await loadState(layout);
+  if (previous) {
+    previous = await reconcileReceipt(layout, previous);
+    const inspection = await inspectGroup(layout, previous);
+    if (inspection.alive) {
+      if (!inspection.owned) throw new Error(`Existing Preview process group is not owned: ${inspection.reason ?? 'unknown'}`);
+      if (previous.daemonRequested === daemonRequested && previous.relayUrl === target.relayUrl) {
+        previous.status = 'running';
+        if (apk) previous.apk = apk;
+        await writeState(layout, previous);
+        return previous;
       }
+      await stopLocked(layout, previous);
     }
+  }
 
-    assertRelayPortAvailable(target.lanIp, target.relayPort);
-    const state: PreviewState = {
-      schemaVersion: 1,
-      status: 'starting',
-      canonicalRoot: layout.canonicalRoot,
-      worktreeHash: layout.worktreeHash,
-      instanceId: randomUUID(),
-      lanIp: target.lanIp,
-      relayPort: target.relayPort,
-      relayUrl: target.relayUrl,
-      daemonRequested,
-      startedAt: new Date().toISOString(),
-      ...(apk ? { apk } : {}),
-    };
-    await ensureDirectory(layout.stateDir);
-    await writeState(layout, state);
-    await startSupervisor(layout, state);
-    if (!testHook('LYNTTY_PREVIEW_TEST_FAKE_RUNTIME')) {
-      await waitFor('local Preview Relay health', async () => await relayIsHealthy(state) || false, 30_000);
-    }
-    return state;
-  });
+  assertRelayPortAvailable(target.lanIp, target.relayPort);
+  const state: PreviewState = {
+    schemaVersion: 1,
+    status: 'starting',
+    canonicalRoot: layout.canonicalRoot,
+    worktreeHash: layout.worktreeHash,
+    instanceId: randomUUID(),
+    lanIp: target.lanIp,
+    relayPort: target.relayPort,
+    relayUrl: target.relayUrl,
+    daemonRequested,
+    startedAt: new Date().toISOString(),
+    ...(apk ? { apk } : {}),
+  };
+  await ensureDirectory(layout.stateDir);
+  await writeState(layout, state);
+  await startSupervisor(layout, state);
+  if (!testHook('LYNTTY_PREVIEW_TEST_FAKE_RUNTIME')) {
+    await waitFor('local Preview Relay health', async () => await relayIsHealthy(state) || false, 30_000);
+  }
+  return state;
 }
 
 async function runManagedPi(layout: PreviewLayout, state: PreviewState): Promise<void> {
@@ -1519,22 +1524,29 @@ async function runManagedPi(layout: PreviewLayout, state: PreviewState): Promise
 
 async function commandTest(layout: PreviewLayout): Promise<void> {
   const target = await desiredRelay(layout);
-  let apk: ApkArtifact | undefined;
-  if (!testHook('LYNTTY_PREVIEW_TEST_SKIP_APK')) {
-    const result = await withLifecycleLock(layout, async () => ensurePreviewApk(layout));
-    apk = result.artifact;
-    console.log(`Preview APK ${result.mode}: ${apk.path}`);
+  const prepared = await withLifecycleLock(layout, async () => {
+    const apkResult = testHook('LYNTTY_PREVIEW_TEST_SKIP_APK') ? undefined : await ensurePreviewApk(layout);
+    if (testHook('LYNTTY_PREVIEW_TEST_PAUSE_BEFORE_BACKEND')) {
+      await writeFile(join(layout.stateDir, '.test-before-backend'), 'ready\n', { mode: 0o600 });
+      await Bun.sleep(1_000);
+    }
+    const authenticated = await credentialsExist(layout);
+    const state = await ensureBackendLocked(layout, target, authenticated, apkResult?.artifact);
+    return { apkResult, authenticated, state };
+  });
+  const apk = prepared.apkResult?.artifact;
+  if (prepared.apkResult && apk) {
+    console.log(`Preview APK ${prepared.apkResult.mode}: ${apk.path}`);
     console.log(`SHA-256: ${apk.sha256}`);
   }
-  let authenticated = await credentialsExist(layout);
-  let state = await ensureBackend(layout, target, authenticated, apk);
+  let { authenticated, state } = prepared;
 
   if (!authenticated && !testHook('LYNTTY_PREVIEW_TEST_SKIP_AUTH')) {
     if (testHook('LYNTTY_PREVIEW_TEST_SEED_AUTH')) await seedCredentialsForTest(layout, state.relayUrl);
     else await runInteractiveAuth(layout, state);
     authenticated = await credentialsExist(layout);
     if (!authenticated) throw new Error('Preview pairing did not produce usable credentials');
-    state = await ensureBackend(layout, target, true, apk);
+    state = await withLifecycleLock(layout, async () => ensureBackendLocked(layout, target, true, apk));
   }
 
   if (state.daemonRequested && !testHook('LYNTTY_PREVIEW_TEST_FAKE_RUNTIME')) {

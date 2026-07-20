@@ -135,6 +135,86 @@ describe('public Preview manual-test commands', () => {
     expect(await Bun.file(partialFile).exists()).toBe(false);
   });
 
+  it('reset stops a marker-owned build group before removing an incomplete profile', async () => {
+    const namespace = `partial-build-reset-${process.pid}`;
+    const environment = { LYNTTY_PREVIEW_TEST_NAMESPACE: namespace };
+    const status = await runPreview(['status'], environment);
+    const stateDir = status.stdout.match(/^.*State: (.+)$/m)?.[1];
+    expect(stateDir).toBeTruthy();
+    await mkdir(stateDir!, { recursive: true });
+    const buildId = `reset-build-${process.pid}-${Date.now()}`;
+    await writeFile(join(stateDir!, 'apk-build-owner.json'), JSON.stringify({
+      schemaVersion: 1,
+      buildId,
+      canonicalRoot: repositoryRoot,
+    }));
+    const child = Bun.spawn({
+      cmd: [process.execPath, '-e', 'setInterval(() => {}, 1_000)'],
+      cwd: repositoryRoot,
+      env: {
+        ...Bun.env,
+        LYNTTY_PREVIEW_BUILD_ID: buildId,
+        LYNTTY_PREVIEW_BUILD_ROOT: repositoryRoot,
+      },
+      stdin: 'ignore',
+      stdout: 'ignore',
+      stderr: 'ignore',
+      detached: true,
+    });
+    child.unref?.();
+    expect(await processStartToken(child.pid)).toBeTruthy();
+
+    try {
+      const reset = await runPreview(['reset'], environment);
+      expect(reset.exitCode).toBe(0);
+      expect(reset.stdout).toContain('incomplete profile removed');
+      expect(() => process.kill(child.pid, 0)).toThrow();
+      expect(await Bun.file(stateDir!).exists()).toBe(false);
+    } finally {
+      try {
+        process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        // The expected reset path already removed the owned group.
+      }
+    }
+  });
+
+  it('serializes reset after APK preparation and initial backend state publication', async () => {
+    const namespace = `prepare-reset-${process.pid}`;
+    const environment = {
+      LYNTTY_PREVIEW_TEST_NAMESPACE: namespace,
+      LYNTTY_PREVIEW_TEST_FAKE_APK: '1',
+      LYNTTY_PREVIEW_TEST_FAKE_RUNTIME: '1',
+      LYNTTY_PREVIEW_TEST_SKIP_AUTH: '1',
+      LYNTTY_PREVIEW_TEST_SKIP_PI: '1',
+      LYNTTY_PREVIEW_TEST_PAUSE_BEFORE_BACKEND: '1',
+      LYNTTY_PREVIEW_LAN_IP: '127.0.0.1',
+    };
+    const status = await runPreview(['status'], environment);
+    const stateDir = status.stdout.match(/^.*State: (.+)$/m)?.[1];
+    expect(stateDir).toBeTruthy();
+    const beforeBackend = join(stateDir!, '.test-before-backend');
+
+    try {
+      const starting = runPreview(['test'], environment);
+      const deadline = Date.now() + 5_000;
+      while (!(await Bun.file(beforeBackend).exists())) {
+        if (Date.now() >= deadline) throw new Error('Preview test did not reach the pre-backend checkpoint');
+        await Bun.sleep(10);
+      }
+      const reset = runPreview(['reset'], environment);
+      const [startResult, resetResult] = await Promise.all([starting, reset]);
+
+      expect(startResult.exitCode).toBe(0);
+      expect(resetResult.exitCode).toBe(0);
+      expect(resetResult.stdout).toContain('profile reset');
+      expect(await Bun.file(stateDir!).exists()).toBe(false);
+    } finally {
+      await runPreview(['stop'], environment);
+      await runPreview(['reset'], environment);
+    }
+  }, 15_000);
+
   it('recognizes the V2 data-key credentials written by real mobile pairing', async () => {
     const namespace = `v2-auth-${process.pid}`;
     const environment = {
