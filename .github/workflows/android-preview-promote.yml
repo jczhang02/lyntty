@@ -11,6 +11,16 @@ on:
         description: Exact APK SHA-256 confirmed during physical-phone testing
         required: true
         type: string
+      physical_phone_accepted:
+        description: Confirm the exact candidate passed the documented physical Android matrix
+        required: true
+        default: false
+        type: boolean
+      immutable_releases_enabled:
+        description: Confirm repository release immutability and Preview tag protection are active
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -41,14 +51,20 @@ jobs:
         env:
           CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
           EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+          PHYSICAL_PHONE_ACCEPTED: ${{ inputs.physical_phone_accepted }}
+          IMMUTABLE_RELEASES_ENABLED: ${{ inputs.immutable_releases_enabled }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
           [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$PHYSICAL_PHONE_ACCEPTED" == true ]]
+          [[ "$IMMUTABLE_RELEASES_ENABLED" == true ]]
           git fetch --no-tags origin main
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+
           run_json="$(gh run view "$CANDIDATE_RUN_ID" --json headSha,headBranch,event,conclusion,workflowName,url)"
           [[ "$(jq -r .workflowName <<< "$run_json")" == "Android Preview candidate" ]]
           [[ "$(jq -r .headBranch <<< "$run_json")" == "main" ]]
@@ -58,28 +74,97 @@ jobs:
           [[ "$source_sha" =~ ^[a-f0-9]{40}$ ]]
           git fetch --no-tags origin "$source_sha"
           git merge-base --is-ancestor "$source_sha" HEAD
-          git diff --quiet "$source_sha" HEAD -- .bun-version bun.lock patches scripts/postinstall.cjs packages/lyntty-app packages/lyntty-wire
+
+          expected_changes="$(cat <<'PATHS'
+          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt
+          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256
+          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json
+          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-runtime-audit.txt
+          docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json
+          docs/evidence/r86-preview-apk-candidate.md
+          docs/evidence/r86-preview-apk-candidate.zh.md
+          scripts/preview-apk-allowlist.json
+          PATHS
+          )"
+          actual_changes="$(git diff --name-only "$source_sha" HEAD | sort)"
+          [[ "$actual_changes" == "$expected_changes" ]]
+
           artifact_name="android-preview-candidate-${CANDIDATE_RUN_ID}"
           download="$RUNNER_TEMP/android-preview-candidate"
           mkdir -p "$download"
           gh run download "$CANDIDATE_RUN_ID" --name "$artifact_name" --dir "$download"
-          mapfile -t apks < <(find "$download" -type f -name 'lyntty-preview-v*.apk')
-          [[ "${#apks[@]}" -eq 1 ]]
-          apk="${apks[0]}"
-          apk_name="$(basename "$apk")"
+
+          apk_name="lyntty-preview-v1.2.0-920001.apk"
+          apk="$download/$apk_name"
           sha_file="$download/$apk_name.sha256"
-          [[ -f "$sha_file" ]]
-          (cd "$download" && sha256sum -c "$(basename "$sha_file")")
-          actual_sha="$(sha256sum "$apk" | awk '{print $1}')"
-          [[ "$actual_sha" == "$EXPECTED_SHA256" ]]
+          apk_audit="$download/${apk_name%.apk}.audit.txt"
+          runtime_audit="$download/android-preview-runtime-audit.txt"
           provenance="$download/android-preview-provenance.json"
           notes="$download/release-notes.md"
           title_file="$download/release-title.txt"
-          apk_audit="$download/${apk_name%.apk}.audit.txt"
-          runtime_audit="$download/android-preview-runtime-audit.txt"
-          for path in "$provenance" "$notes" "$title_file" "$apk_audit" "$runtime_audit"; do [[ -f "$path" ]]; done
-          export PROVENANCE="$provenance" SOURCE_SHA="$source_sha" EXPECTED_SHA256 APK_NAME="$apk_name" CANDIDATE_RUN_ID
+          manifest="$download/candidate-manifest.json"
+          expected_candidate_files="$(printf '%s\n' \
+            "$apk_name" \
+            "$apk_name.sha256" \
+            "${apk_name%.apk}.audit.txt" \
+            android-preview-provenance.json \
+            android-preview-runtime-audit.txt \
+            candidate-manifest.json \
+            release-notes.md \
+            release-title.txt | sort)"
+          actual_candidate_files="$(find "$download" -maxdepth 1 -type f -printf '%f\n' | sort)"
+          [[ "$actual_candidate_files" == "$expected_candidate_files" ]]
+          (cd "$download" && sha256sum -c "$(basename "$sha_file")")
+          actual_sha="$(sha256sum "$apk" | awk '{print $1}')"
+          actual_size="$(stat -c '%s' "$apk")"
+          [[ "$actual_sha" == "$EXPECTED_SHA256" ]]
+          source_tree="$(git rev-parse "$source_sha^{tree}")"
+
+          export DOWNLOAD="$download" MANIFEST="$manifest" PROVENANCE="$provenance"
+          export SOURCE_SHA="$source_sha" SOURCE_TREE="$source_tree" EXPECTED_SHA256 APK_NAME="$apk_name"
+          export APK_SIZE="$actual_size" CANDIDATE_RUN_ID
           bun - <<'BUN'
+          const exactKeys = (value, expected, label) => {
+            const actual = Object.keys(value).sort();
+            if (JSON.stringify(actual) !== JSON.stringify([...expected].sort())) {
+              throw new Error(`${label} keys mismatch`);
+            }
+          };
+          const digest = async (path) => {
+            const file = Bun.file(path);
+            const hasher = new Bun.CryptoHasher('sha256');
+            for await (const chunk of file.stream()) hasher.update(chunk);
+            return { size: file.size, sha256: hasher.digest('hex') };
+          };
+
+          const manifest = await Bun.file(process.env.MANIFEST).json();
+          exactKeys(manifest, ['schemaVersion', 'sourceCommit', 'files'], 'candidate manifest');
+          if (manifest.schemaVersion !== 1 || manifest.sourceCommit !== process.env.SOURCE_SHA || !Array.isArray(manifest.files)) {
+            throw new Error('candidate manifest identity mismatch');
+          }
+          const expectedNames = [
+            process.env.APK_NAME,
+            `${process.env.APK_NAME}.sha256`,
+            `${process.env.APK_NAME.replace(/\.apk$/, '')}.audit.txt`,
+            'android-preview-provenance.json',
+            'android-preview-runtime-audit.txt',
+            'release-notes.md',
+            'release-title.txt',
+          ].sort();
+          if (JSON.stringify(manifest.files.map((entry) => entry.name).sort()) !== JSON.stringify(expectedNames)) {
+            throw new Error('candidate manifest inventory mismatch');
+          }
+          for (const entry of manifest.files) {
+            exactKeys(entry, ['name', 'size', 'sha256'], `candidate manifest entry ${entry.name}`);
+            if (!Number.isSafeInteger(entry.size) || entry.size < 1 || !/^[a-f0-9]{64}$/.test(entry.sha256)) {
+              throw new Error(`candidate manifest metadata mismatch: ${entry.name}`);
+            }
+            const actual = await digest(`${process.env.DOWNLOAD}/${entry.name}`);
+            if (actual.size !== entry.size || actual.sha256 !== entry.sha256) {
+              throw new Error(`candidate manifest content mismatch: ${entry.name}`);
+            }
+          }
+
           const value = await Bun.file(process.env.PROVENANCE).json();
           const expected = {
             schemaVersion: 1,
@@ -88,29 +173,70 @@ jobs:
             workflow: '.github/workflows/android-preview-candidate.yml',
             candidateRunId: Number(process.env.CANDIDATE_RUN_ID),
             sourceCommit: process.env.SOURCE_SHA,
+            sourceTree: process.env.SOURCE_TREE,
             applicationId: 'dev.jczhang.lyntty.preview',
             versionName: '1.2.0',
             versionCode: 920001,
+            releaseTag: 'android-preview-v1.2.0-920001',
+            releaseTitle: 'V1.2.0 Local First 📡',
             signerSha256: 'ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c',
             sha256: process.env.EXPECTED_SHA256,
+            size: Number(process.env.APK_SIZE),
           };
+          exactKeys(value, [...Object.keys(expected), 'abis'], 'candidate provenance');
           for (const [key, expectedValue] of Object.entries(expected)) {
             if (value[key] !== expectedValue) throw new Error(`candidate provenance mismatch: ${key}`);
           }
-          if (JSON.stringify(value.abis) !== JSON.stringify(['arm64-v8a', 'x86_64'])) throw new Error('candidate ABI mismatch');
+          if (JSON.stringify(value.abis) !== JSON.stringify(['arm64-v8a', 'x86_64'])) {
+            throw new Error('candidate ABI mismatch');
+          }
+
+          const allowlist = await Bun.file('scripts/preview-apk-allowlist.json').json();
+          if (allowlist.schemaVersion !== 1 || !Array.isArray(allowlist.artifacts)) throw new Error('invalid Preview APK allowlist');
+          const allowed = allowlist.artifacts.filter((entry) => (
+            entry.sourceCommit === process.env.SOURCE_SHA
+            && entry.applicationId === 'dev.jczhang.lyntty.preview'
+            && entry.versionName === '1.2.0'
+            && entry.versionCode === 920001
+            && entry.sha256 === process.env.EXPECTED_SHA256
+            && entry.signerSha256 === 'ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c'
+          ));
+          if (allowed.length !== 1) throw new Error('candidate is not uniquely bound by the reviewed Preview APK allowlist');
           BUN
+
+          cmp -s "$sha_file" docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256
+          cmp -s "$apk_audit" docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt
+          cmp -s "$runtime_audit" docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-runtime-audit.txt
+          cmp -s "$provenance" docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json
+          cmp -s "$manifest" docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json
+          for evidence in docs/evidence/r86-preview-apk-candidate.md docs/evidence/r86-preview-apk-candidate.zh.md; do
+            grep -Fq "$source_sha" "$evidence"
+            grep -Fq "$EXPECTED_SHA256" "$evidence"
+            grep -Fq "$CANDIDATE_RUN_ID" "$evidence"
+          done
+
           grep -Fx 'application_id=dev.jczhang.lyntty.preview' "$apk_audit"
           grep -Fx 'version_name=1.2.0' "$apk_audit"
           grep -Fx 'version_code=920001' "$apk_audit"
+          grep -Fx 'debuggable=false' "$apk_audit"
+          grep -Fx 'signer_count=1' "$apk_audit"
           grep -Fx 'signer_sha256=ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c' "$apk_audit"
           grep -Fx 'signature_scheme_v2=true' "$apk_audit"
           grep -Fx 'standalone_bundle=assets/index.android.bundle' "$apk_audit"
           grep -Fx 'native_abis=arm64-v8a,x86_64' "$apk_audit"
           grep -Fx "source_commit=$source_sha" "$apk_audit"
           grep -Fx "sha256=$actual_sha" "$apk_audit"
+          grep -Fx 'Node-family execve matches: 0' "$runtime_audit"
+          grep -Fx 'Sentinel invocations: 0' "$runtime_audit"
+          grep -Fx 'Trace source: strace -f -e execve' "$runtime_audit"
+
           gh attestation verify "$apk" --repo "$GITHUB_REPOSITORY" --source-digest "$source_sha" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/android-preview-candidate.yml" \
-            --signer-digest "$source_sha" --format json > "$RUNNER_TEMP/android-preview-attestation.json"
+            --signer-digest "$source_sha" --format json > "$RUNNER_TEMP/android-preview-apk-attestation.json"
+          gh attestation verify "$manifest" --repo "$GITHUB_REPOSITORY" --source-digest "$source_sha" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/android-preview-candidate.yml" \
+            --signer-digest "$source_sha" --format json > "$RUNNER_TEMP/android-preview-manifest-attestation.json"
+
           tag="$(jq -r .releaseTag "$provenance")"
           title="$(cat "$title_file")"
           [[ "$tag" == android-preview-v1.2.0-920001 ]]
@@ -125,6 +251,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create or resume exact draft release
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
           DOWNLOAD: ${{ steps.candidate.outputs.download }}
@@ -142,16 +269,26 @@ jobs:
             "$DOWNLOAD/android-preview-runtime-audit.txt"
             "$DOWNLOAD/android-preview-provenance.json"
           )
-          if release_json="$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,targetCommitish,title,body 2>/dev/null)"; then
-            [[ "$(jq -r .isDraft <<< "$release_json")" == true ]]
-            [[ "$(jq -r .isPrerelease <<< "$release_json")" == true ]]
-            [[ "$(jq -r .targetCommitish <<< "$release_json")" == "$GITHUB_SHA" ]]
-            [[ "$(jq -r .title <<< "$release_json")" == "$RELEASE_TITLE" ]]
-            jq -r .body <<< "$release_json" > "$RUNNER_TEMP/existing-release-notes.md"
+          release_error="$RUNNER_TEMP/release-lookup.err"
+          already_published=false
+          if release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" 2>"$release_error")"; then
+            [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
+            [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
+            [[ "$(jq -r .name <<< "$release_json")" == "$RELEASE_TITLE" ]]
+            jq -r '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/existing-release-notes.md"
             cmp -s "$notes" "$RUNNER_TEMP/existing-release-notes.md"
+            if [[ "$(jq -r .draft <<< "$release_json")" == false ]]; then
+              [[ "$(jq -r .immutable <<< "$release_json")" == true ]]
+              already_published=true
+            fi
+          elif grep -Fq '(HTTP 404)' "$release_error"; then
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TITLE" \
+              --notes-file "$notes" --draft --prerelease --latest=false
           else
-            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TITLE" --notes-file "$notes" --draft --prerelease --latest=false
+            cat "$release_error" >&2
+            exit 1
           fi
+
           for asset in "${assets[@]}"; do
             name="$(basename "$asset")"
             if gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
@@ -160,23 +297,78 @@ jobs:
               gh release download "$RELEASE_TAG" --pattern "$name" --dir "$verify_dir"
               cmp -s "$asset" "$verify_dir/$name"
             else
+              [[ "$already_published" == false ]]
               gh release upload "$RELEASE_TAG" "$asset"
             fi
           done
           desired_names="$(printf '%s\n' "${assets[@]##*/}" | sort)"
-          published_names="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)"
-          [[ "$published_names" == "$desired_names" ]]
+          release_names="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)"
+          [[ "$release_names" == "$desired_names" ]]
+          echo "already_published=$already_published" >> "$GITHUB_OUTPUT"
 
-      - name: Publish only after final protected-main recheck
+      - name: Publish only after final protected-main and byte recheck
         env:
           GH_TOKEN: ${{ github.token }}
+          DOWNLOAD: ${{ steps.candidate.outputs.download }}
+          APK: ${{ steps.candidate.outputs.apk }}
+          APK_NAME: ${{ steps.candidate.outputs.apk_name }}
           RELEASE_TAG: ${{ steps.candidate.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.candidate.outputs.title }}
           SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+          ALREADY_PUBLISHED: ${{ steps.release.outputs.already_published }}
         run: |
           set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
           git fetch --no-tags origin main
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
-          git diff --quiet "$SOURCE_SHA" HEAD -- .bun-version bun.lock patches scripts/postinstall.cjs packages/lyntty-app packages/lyntty-wire
+          expected_changes="$(cat <<'PATHS'
+          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt
+          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256
+          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json
+          docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-runtime-audit.txt
+          docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json
+          docs/evidence/r86-preview-apk-candidate.md
+          docs/evidence/r86-preview-apk-candidate.zh.md
+          scripts/preview-apk-allowlist.json
+          PATHS
+          )"
+          actual_changes="$(git diff --name-only "$SOURCE_SHA" HEAD | sort)"
+          [[ "$actual_changes" == "$expected_changes" ]]
+
+          assets=(
+            "$APK"
+            "$DOWNLOAD/$APK_NAME.sha256"
+            "$DOWNLOAD/${APK_NAME%.apk}.audit.txt"
+            "$DOWNLOAD/android-preview-runtime-audit.txt"
+            "$DOWNLOAD/android-preview-provenance.json"
+          )
+          verify_release_assets() {
+            local phase="$1"
+            local verify_root="$RUNNER_TEMP/$phase"
+            rm -rf "$verify_root"
+            mkdir -p "$verify_root"
+            local desired_names release_names asset name target_dir
+            desired_names="$(printf '%s\n' "${assets[@]##*/}" | sort)"
+            release_names="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)"
+            [[ "$release_names" == "$desired_names" ]]
+            for asset in "${assets[@]}"; do
+              name="$(basename "$asset")"
+              target_dir="$verify_root/$name"
+              mkdir -p "$target_dir"
+              gh release download "$RELEASE_TAG" --pattern "$name" --dir "$target_dir"
+              cmp -s "$asset" "$target_dir/$name"
+            done
+          }
+
+          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
+          [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
+          [[ "$(jq -r .name <<< "$release_json")" == "$RELEASE_TITLE" ]]
+          jq -r '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/pre-publish-notes.md"
+          cmp -s "$DOWNLOAD/release-notes.md" "$RUNNER_TEMP/pre-publish-notes.md"
+          verify_release_assets pre-publish-assets
+
           tag_api="repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG"
           if tag_json="$(gh api "$tag_api" 2>/dev/null)"; then
             [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
@@ -187,4 +379,23 @@ jobs:
             [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
             [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
           fi
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          if [[ "$ALREADY_PUBLISHED" == false ]]; then
+            [[ "$(jq -r .draft <<< "$release_json")" == true ]]
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            [[ "$(jq -r .draft <<< "$release_json")" == false ]]
+          fi
+
+          published="$(gh release view "$RELEASE_TAG" --json isDraft,isImmutable,isPrerelease,name,targetCommitish,body)"
+          [[ "$(jq -r .isDraft <<< "$published")" == false ]]
+          [[ "$(jq -r .isPrerelease <<< "$published")" == true ]]
+          [[ "$(jq -r .isImmutable <<< "$published")" == true ]]
+          [[ "$(jq -r .name <<< "$published")" == "$RELEASE_TITLE" ]]
+          [[ "$(jq -r .targetCommitish <<< "$published")" == "$GITHUB_SHA" ]]
+          jq -r '.body // ""' <<< "$published" > "$RUNNER_TEMP/post-publish-notes.md"
+          cmp -s "$DOWNLOAD/release-notes.md" "$RUNNER_TEMP/post-publish-notes.md"
+          [[ "$(gh release list --limit 1000 --json tagName,isLatest --jq ".[] | select(.tagName == \"$RELEASE_TAG\") | .isLatest")" == false ]]
+          tag_json="$(gh api "$tag_api")"
+          [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
+          [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
+          verify_release_assets post-publish-assets

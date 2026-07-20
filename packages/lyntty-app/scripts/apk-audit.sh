@@ -25,8 +25,11 @@ application_id="$("$apkanalyzer" manifest application-id "$apk")"
 version_name="$("$apkanalyzer" manifest version-name "$apk")"
 version_code="$("$apkanalyzer" manifest version-code "$apk")"
 debuggable="$("$apkanalyzer" manifest debuggable "$apk")"
-signer_sha256="$(awk -F': ' '/Signer #1 certificate SHA-256 digest:/ { print $2; exit }' <<<"$signature_report" \
-  | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+signer_sha256s="$(awk -F': ' '/Signer #[0-9]+ certificate SHA-256 digest:/ { print $2 }' <<<"$signature_report" \
+  | sed 's/[[:space:]:]//g' | tr '[:upper:]' '[:lower:]')"
+signer_count="$(awk 'NF { count++ } END { print count + 0 }' <<<"$signer_sha256s")"
+test "$signer_count" -eq 1
+signer_sha256="$(awk 'NF { print; exit }' <<<"$signer_sha256s")"
 apk_entries="$(unzip -Z1 "$apk")"
 test "$(grep -Fxc 'assets/index.android.bundle' <<<"$apk_entries")" -eq 1
 native_abis="$(awk -F/ '$1 == "lib" && NF >= 3 { print $2 }' <<<"$apk_entries" | sort -u | paste -sd, -)"
@@ -42,6 +45,6 @@ if [[ -n "$expected_signer_sha256" ]]; then
 fi
 if [[ -n "$expected_native_abis" ]]; then test "$native_abis" = "$expected_native_abis"; fi
 
-printf 'application_id=%s\nversion_name=%s\nversion_code=%s\ndebuggable=%s\nsigner_sha256=%s\n' \
+printf 'application_id=%s\nversion_name=%s\nversion_code=%s\ndebuggable=%s\nsigner_count=1\nsigner_sha256=%s\n' \
   "$application_id" "$version_name" "$version_code" "$debuggable" "$signer_sha256"
 printf 'signature_scheme_v2=true\nstandalone_bundle=assets/index.android.bundle\nnative_abis=%s\n' "$native_abis"
