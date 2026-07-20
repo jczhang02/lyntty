@@ -10,6 +10,7 @@ import { Modal } from '@/modal';
 import { layout } from '@/components/layout';
 import { t } from '@/text';
 import { getServerUrl, setServerUrl, validateServerUrl, getServerInfo } from '@/sync/serverConfig';
+import { probeLynttyRelay } from '@/sync/serverConfigUtils';
 import { getCurrentAuth } from '@/auth/AuthContext';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -90,24 +91,15 @@ export default function ServerConfigScreen() {
             setIsValidating(true);
             setError(null);
 
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'text/plain'
-                }
-            });
-
-            if (!response.ok) {
+            const result = await probeLynttyRelay(url);
+            if (result === 'server-error') {
                 setError(t('server.serverReturnedError'));
                 return false;
             }
-
-            const text = await response.text();
-            if (!text.includes('Welcome to Lyntty Relay!')) {
+            if (result === 'not-relay') {
                 setError('This does not look like a Lyntty relay.');
                 return false;
             }
-
             return true;
         } catch (err) {
             setError(t('server.failedToConnectToServer'));
