@@ -2,7 +2,7 @@
 
 Date: 2026-07-20
 
-Status: implementation ready for protected PR; candidate not yet built or published
+Status: PR #16 merged; first candidate stopped before artifact creation; bundle remediation pending protected PR
 
 ## Scope
 
@@ -46,11 +46,21 @@ After the candidate SHA-256 is reviewed into `scripts/preview-apk-allowlist.json
 - GitHub admin API confirms immutable releases are enabled; active no-bypass tag ruleset `19203462` blocks `update` and `deletion` for `refs/tags/android-preview-v*`; matching repository gate variables are set;
 - TypeScript and i18n gates pass for the implemented App surface.
 
-Final local `bun run ci:fast` passed at the review-hardened head: repo hardening 19; Wire 33; CLI 585; Relay 119 / 332 assertions; App 809 / 3,268 assertions across 89 isolated files; dev/Preview lifecycle 35 / 194 assertions. Both workflows also passed YAML parsing, extracted Bash ShellCheck, and `git diff --check`. Protected PR CI is still pending.
+Final local `bun run ci:fast` passed at the review-hardened head: repo hardening 19; Wire 33; CLI 585; Relay 119 / 332 assertions; App 809 / 3,268 assertions across 89 isolated files; dev/Preview lifecycle 35 / 194 assertions. Both workflows also passed YAML parsing, extracted Bash ShellCheck, and `git diff --check`. PR [#16](https://github.com/jczhang02/lyntty/pull/16) then passed all protected checks and merged as `5b45d37989cc13a8eb2db1d46a8876a0c3227036`.
+
+## First candidate interruption
+
+Candidate run [`29739227276`](https://github.com/jczhang02/lyntty/actions/runs/29739227276) stopped in `:app:createBundleReleaseJsAndAssets` before APK audit, attestation, or artifact upload. The run produced zero artifacts, and no Preview tag or Release was created.
+
+The same `ResolveMessage is not constructable` failure was reproduced locally with the exact Expo `export:embed` path. A scoped diagnostic exposed the hidden original error: `babel.config.js` directly loads `babel-preset-expo`, but the App did not declare it directly, so Bun's isolated workspace linker correctly kept Expo's transitive copy out of Babel Core's resolution path. This was not an `EMFILE` or GitHub runner failure.
+
+The remediation adds the matching `babel-preset-expo ~55.0.23` direct build dependency and a real Preview Android bundle smoke to `ci:app`. Before the dependency fix, `bun run --filter lyntty-app test:bundle` reproduced exit 7 and the Candidate error. Afterward, the same command bundled 3,182 modules and produced a non-empty 13,068,103-byte bundle before deleting its isolated output.
+
+A clean staged snapshot then passed `bun run ci:fast`: repo hardening 19; Wire 33; CLI 585; Relay 119 / 332 assertions; App 809 / 3,268 assertions across 89 isolated files plus the Preview bundle smoke; dev/Preview lifecycle 35 / 194 assertions; and `git diff --check`.
 
 ## Not run yet
 
-- GitHub candidate workflow;
+- remediated GitHub candidate workflow;
 - APK audit on the `920001` candidate;
 - in-place physical update from `910003` to `920001`;
 - fresh-data mandatory Relay setup, Android Back behavior, Clear Relay re-gating, pairing, Pi message round trip, and reopen;
