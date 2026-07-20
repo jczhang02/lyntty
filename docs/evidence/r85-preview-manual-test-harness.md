@@ -110,7 +110,7 @@ bun pm untrusted
 git diff --check
 ```
 
-Observed results: Wire 33; CLI 585; Relay 119; App 791 tests / 3,183 assertions; combined dev/Preview lifecycle 34 tests / 193 assertions. Earlier requirements verification approved the base harness; the Relay-discovery correction is not called approved until its post-remediation review completes.
+Observed results: Wire 33; CLI 585; Relay 119; App 791 tests / 3,183 assertions; combined dev/Preview lifecycle 34 tests / 193 assertions. Earlier requirements verification approved the base harness; the final post-remediation review also returned `APPROVE` with no P0/P1/P2 or new regression.
 
 ## Not run and residual risk
 

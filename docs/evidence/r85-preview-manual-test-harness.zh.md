@@ -95,7 +95,7 @@ bun pm untrusted
 git diff --check
 ```
 
-已观察到 Wire 33、CLI 585、Relay 119、App 791 tests / 3,183 assertions，以及 dev/Preview lifecycle 34 tests / 193 assertions。早期 requirements verifier 已批准基础框架；Relay 识别修正只有在并发补救复审通过后才会声明 `APPROVE`。
+已观察到 Wire 33、CLI 585、Relay 119、App 791 tests / 3,183 assertions，以及 dev/Preview lifecycle 34 tests / 193 assertions。早期 requirements verifier 已批准基础框架；最终并发补救复审也返回 `APPROVE`，未发现 P0/P1/P2 或新回归。
 
 ## 尚未执行
 
