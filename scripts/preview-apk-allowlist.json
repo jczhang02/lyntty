@@ -8,14 +8,6 @@
       "versionCode": 910003,
       "sha256": "d0e0a335fa0db34b882fa2c71a89a65e416ecdd1ed21995719aba6a2be99da06",
       "signerSha256": "ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c"
-    },
-    {
-      "sourceCommit": "33d7a99c57cce0783d069e95ba6d4abc59a53c1d",
-      "applicationId": "dev.jczhang.lyntty.preview",
-      "versionName": "1.2.0",
-      "versionCode": 920001,
-      "sha256": "9025d83a142ded5a618ef15c56c9bdd5486fed8336a53f1b9f0c7336b325aae9",
-      "signerSha256": "ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c"
     }
   ]
 }

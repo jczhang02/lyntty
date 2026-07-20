@@ -2,7 +2,7 @@
 
 日期：2026-07-21
 
-状态：Candidate 字节已完成审阅，可进入实体 Android 测试；尚未执行公开 Promotion。
+状态：Candidate run `29762476280` 已在发布前被 R87 依赖安全升级取代。其历史证据继续保留，但 allowlist 授权已撤销，等待新的替代 Candidate。
 
 ## Candidate 身份
 
@@ -24,6 +24,14 @@ ABIs: arm64-v8a, x86_64
 Signer SHA-256: ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c
 ```
 
+## 发布前被取代
+
+受保护 PR #20 为 GHSA-395f-4hp3-45gv 将审计依赖图升级到 `shell-quote@1.9.0`，并以 `08b56175a8f22bc6f4b7d014de4767232fc930e7` 合入。根 `package.json` 与 `bun.lock` 均是 Android Candidate 构建输入，因此即使上述字节、sidecar 和 attestation 仍是有效历史证据，该 source identity 也不能再用于 Promotion。
+
+公共 tag 与 Release 从未存在。本准备变更只从 `scripts/preview-apk-allowlist.json` 删除旧 `920001` 条目，不删除或改写历史证据。保留的 `910003` 条目继续支持手动升级 fixture，同时 Candidate 策略可对新的 protected-main 构建继续强制 `920001 > maxAllowlistedVersionCode`。
+
+Focused JSON 验证确认只保留一个 artifact、allowlist 最大 `versionCode` 为 `910003`，且 `920001` replacement 重新满足门禁。`bun audit` 报告零漏洞；`bun run ci:fast` 通过 hardening/redaction 20、Wire 33/76、CLI 585/1272、Relay 119/332、App 90 个文件 812/3276 加 bundle smoke，以及 lifecycle 35/194。tag 与 Release 不存在检查也通过。
+
 ## Candidate 验证
 
 workflow 从受保护 `main` 运行，全部步骤成功：精确源码验证、依赖安装、未审阅配置拒绝检查、Bun-only 双 ABI 构建审计、APK staging/audit、APK attestation、manifest attestation 和 Candidate 上传。最终只保留一个 artifact，没有创建 tag 或 Release。
@@ -39,11 +47,11 @@ workflow 从受保护 `main` 运行，全部步骤成功：精确源码验证、
 - Release 标题与 Notes 已完整解析，不含模板占位符；
 - 公共 tag `android-preview-v1.2.0-920001` 和 GitHub Release 仍不存在。
 
-`docs/evidence/artifacts/r86-preview-apk-candidate/` 下五个文件是 Candidate 对应 sidecar 的逐字节副本。APK 本身按设计不提交。`scripts/preview-apk-allowlist.json` 只新增一条对此 Candidate 字节的绑定。
+`docs/evidence/artifacts/r86-preview-apk-candidate/` 下五个文件继续作为 Candidate 对应 sidecar 的逐字节历史副本保留。APK 本身按设计不提交。原 evidence PR 曾为这些字节新增一条 allowlist 绑定；本撤销变更删除该绑定，但不改写历史 sidecar。
 
-## 仍需实体 Android 验收
+## 未执行实体 Android 验收
 
-Promotion 必须使用同一 APK 和 hash。实体机矩阵如下：
+这份历史 Candidate 原计划的实体机矩阵如下：
 
 1. 将已安装的 `1.1.0` / `910003` Preview APK 原位升级至 `1.2.0` / `920001`，确认既有有效 Relay 配置仍可使用；
 2. 清除 App 数据或全新安装，确认 Relay 设置完成前不能启动认证或同步；
@@ -51,8 +59,8 @@ Promotion 必须使用同一 APK 和 hash。实体机矩阵如下：
 4. 配对节点，打开 managed Pi session，从手机发送独特消息，收到独特 assistant 回复，并在重开 App 后确认连续性；
 5. 清除 Relay，确认 App 回到设置门禁，且不复用旧身份。
 
-实体机测试的精确 SHA-256 必须保持 `9025d83a142ded5a618ef15c56c9bdd5486fed8336a53f1b9f0c7336b325aae9`。实体机验收将由 Promotion workflow 输入和不可变 workflow 日志记录；本份测试前证据不声称其已完成。
+该矩阵没有针对这份已取代 APK 执行。后续任何 Promotion 必须使用替代 Candidate 及其新审阅 hash，而不能使用上方记录的 APK identity。所有者随后授权如实标注“设备未验证”后发布，但单独的受保护 waiver 策略必须应用于替代 Candidate，并保持 `physical_phone_accepted=false`；本证据不声称任一 Candidate 已完成实体机验收。
 
 ## 发布边界
 
-本审阅 PR 不创建公开 Release、Stable APK、CLI archive、Relay image、Compatibility BOM、托管 Preview Relay、Google Play artifact 或 OTA update。只有本 PR 通过受保护检查并合入，且同一 Candidate 字节完成实体机矩阵后，Promotion 才能继续。
+本撤销 PR 不创建公开 Release、Stable APK、CLI archive、Relay image、Compatibility BOM、托管 Preview Relay、Google Play artifact 或 OTA update。只有新的 protected-main Candidate 完成构建、审计、attest 并绑定新审阅的精确 SHA-256 后，Promotion 才能继续；truthful waiver 策略与公开警告还必须通过独立受保护检查。

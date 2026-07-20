@@ -2,7 +2,7 @@
 
 Date: 2026-07-21
 
-Status: Candidate bytes reviewed and approved for physical Android testing; public Promotion has not run.
+Status: Candidate run `29762476280` was superseded before publication by the R87 dependency security update. Its historical evidence remains, but its allowlist authorization is revoked and a replacement Candidate is pending.
 
 ## Candidate identity
 
@@ -24,6 +24,14 @@ ABIs: arm64-v8a, x86_64
 Signer SHA-256: ebd23c222b690e2be635fe3e52bd70b6fb86c5570ab279bc4e8c1f22ed90ef9c
 ```
 
+## Superseded before publication
+
+Protected PR #20 upgraded the audited dependency graph to `shell-quote@1.9.0` for GHSA-395f-4hp3-45gv and merged as `08b56175a8f22bc6f4b7d014de4767232fc930e7`. Because root `package.json` and `bun.lock` are Android Candidate build inputs, the exact source identity above is no longer eligible for Promotion even though its bytes, sidecars, and attestations remain valid historical evidence.
+
+The public tag and Release never existed. This preparation change removes only the old `920001` entry from `scripts/preview-apk-allowlist.json`; it does not delete or rewrite historical evidence. The retained `910003` entry keeps the manual upgrade fixture available, while Candidate policy can again require `920001 > maxAllowlistedVersionCode` for a fresh protected-main build.
+
+Focused JSON verification confirms exactly one retained artifact, maximum allowlisted `versionCode` `910003`, and replacement eligibility for `920001`. `bun audit` reports zero vulnerabilities, and `bun run ci:fast` passes hardening/redaction 20, Wire 33/76, CLI 585/1272, Relay 119/332, App 812/3276 across 90 files plus bundle smoke, and lifecycle 35/194. The tag and Release absence checks also pass.
+
 ## Candidate verification
 
 The workflow ran from protected `main` and every step succeeded: exact-source validation, dependency installation, configuration rejection checks, Bun-only audited dual-ABI build, APK staging/audit, APK attestation, manifest attestation, and candidate upload. It retained one artifact and did not create a tag or Release.
@@ -39,11 +47,11 @@ The downloaded candidate contained exactly the APK, SHA-256 sidecar, APK audit, 
 - release title and notes resolve exactly with no template placeholders;
 - the public tag `android-preview-v1.2.0-920001` and GitHub Release remain absent.
 
-The five files under `docs/evidence/artifacts/r86-preview-apk-candidate/` are byte-for-byte copies of the corresponding Candidate sidecars. The APK itself is intentionally not committed. `scripts/preview-apk-allowlist.json` adds exactly one binding for these Candidate bytes.
+The five files under `docs/evidence/artifacts/r86-preview-apk-candidate/` remain byte-for-byte historical copies of the corresponding Candidate sidecars. The APK itself is intentionally not committed. The original evidence PR added one allowlist binding for these bytes; this revocation removes that binding without rewriting the historical sidecars.
 
-## Physical Android acceptance still required
+## Physical Android acceptance was not run
 
-Promotion must use this exact APK and hash. The physical-device matrix is:
+The planned physical-device matrix for this historical Candidate was:
 
 1. update the installed `1.1.0` / `910003` Preview APK to `1.2.0` / `920001` and confirm the existing valid Relay configuration remains usable;
 2. clear App data or perform a fresh install and confirm authentication/sync cannot start before Relay setup;
@@ -51,8 +59,8 @@ Promotion must use this exact APK and hash. The physical-device matrix is:
 4. pair the node, open the managed Pi session, send a distinct phone message, receive its distinct assistant reply, and verify continuity after reopening the App;
 5. clear Relay and confirm the App returns to the setup gate without reusing the prior identity.
 
-The exact tested SHA-256 must remain `9025d83a142ded5a618ef15c56c9bdd5486fed8336a53f1b9f0c7336b325aae9`. Physical acceptance will be recorded by the Promotion workflow input and immutable workflow log; it is not claimed in this pre-test evidence.
+That matrix was not executed for this superseded APK. Any later Promotion must use the replacement Candidate and its newly reviewed hash, not the APK identity recorded above. The owner later authorized a truthful unverified-device release, but that separate protected waiver policy must apply to the replacement Candidate with `physical_phone_accepted=false`; this evidence does not claim physical acceptance for either Candidate.
 
 ## Publication boundary
 
-No public Release, Stable APK, CLI archive, Relay image, Compatibility BOM, hosted Preview Relay, Google Play artifact, or OTA update is created by this review PR. Promotion remains blocked until this PR merges through protected checks and the physical-device matrix passes on the exact Candidate bytes.
+No public Release, Stable APK, CLI archive, Relay image, Compatibility BOM, hosted Preview Relay, Google Play artifact, or OTA update is created by this revocation PR. Promotion remains blocked until a fresh protected-main Candidate is built, audited, attested, and bound to a newly reviewed exact SHA-256; the truthful waiver policy and public warning must then pass their own protected checks.
