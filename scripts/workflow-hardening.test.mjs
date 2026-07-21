@@ -501,6 +501,8 @@ test('candidate builds once under channel isolation and never publishes', () => 
   assert.match(releaseCandidate, /outputs: type=oci/);
   assert.match(releaseCandidate, /gradle-runtime-audit\.sh/);
   assert.match(releaseCandidate, /scripts\/release\.ts sign/);
+  assert.match(releaseCandidate, /CANDIDATE="\$RUNNER_TEMP\/candidate"\n\s+export CANDIDATE\n\s+bun - <<'BUN'/);
+  assert.doesNotMatch(releaseCandidate, /CANDIDATE="\$RUNNER_TEMP\/candidate" bun - <<'BUN'/);
   assert.equal((releaseCandidate.match(/secrets\.LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64/g) ?? []).length, 1);
   assert.equal((releaseCandidate.match(/^  attestations: write$/gm) ?? []).length, 1);
   assert.match(releaseCandidate, /actions\/attest@/);

@@ -468,7 +468,9 @@ jobs:
         run: |
           set -euo pipefail
           : "${LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64:?protected channel BOM key is required}"
-          CANDIDATE="$RUNNER_TEMP/candidate" bun - <<'BUN'
+          CANDIDATE="$RUNNER_TEMP/candidate"
+          export CANDIDATE
+          bun - <<'BUN'
           import { readdir } from 'node:fs/promises';
           import { basename, join, relative } from 'node:path';
           import { CURRENT_WIRE_OFFER } from 'lyntty-wire';
