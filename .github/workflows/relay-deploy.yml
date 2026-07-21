@@ -376,6 +376,23 @@ jobs:
             local repo_digests repo_tags previous_reference previous_image_id env_value
             local -a legacy_containers=()
             local env_backup compose_backup env_stage compose_stage source_projection stage_projection staged_json image_indent original_image_line
+            report_legacy_tag_classification() {
+              local assignment category=other
+              assignment="$(grep "^${legacy_tag_key}=" .env)"
+              if LC_ALL=C grep -Eq "^${legacy_tag_key}=[[:space:]]*(sha-9752c689c927|'sha-9752c689c927'|\"sha-9752c689c927\")[[:space:]]+#[[:print:][:space:]]*$" <<< "$assignment"; then
+                category=expected-value-inline-comment
+              elif LC_ALL=C grep -Eq "^${legacy_tag_key}=[[:space:]]*['\"]?sha-[a-f0-9]{7,64}['\"]?[[:space:]]*(#[[:print:][:space:]]*)?$" <<< "$assignment"; then
+                category=alternate-sha-tag
+              elif LC_ALL=C grep -Eq "^${legacy_tag_key}=[[:space:]]*['\"]?ghcr\.io/jczhang02/lyntty-relay:sha-[a-f0-9]{7,64}['\"]?[[:space:]]*(#[[:print:][:space:]]*)?$" <<< "$assignment"; then
+                category=repository-qualified-tag
+              elif grep -Fq '$' <<< "$assignment"; then
+                category=interpolation
+              elif LC_ALL=C grep -q '[^[:print:][:space:]]' <<< "$assignment"; then
+                category=non-printing-bytes
+              fi
+              printf 'legacy Relay source image-tag syntax category=%s\n' "$category" >&2
+              unset assignment
+            }
             assignment_count="$(grep -Ec "^[[:space:]]*(export[[:space:]]+)?${target_key}([[:space:]]*=|[[:space:]]+)" .env || true)"
             canonical_count="$(grep -c "^${target_key}=" .env || true)"
             legacy_tag_assignment_count="$(grep -Ec "^[[:space:]]*(export[[:space:]]+)?${legacy_tag_key}([[:space:]]*=|[[:space:]]+)" .env || true)"
@@ -439,6 +456,7 @@ jobs:
               }
               if [[ "$legacy_tag_assignment_count" == 1 ]]; then
                 LC_ALL=C grep -Eq "$legacy_tag_value_pattern" .env || {
+                  report_legacy_tag_classification
                   echo 'canonical retry state has an unsupported legacy image-tag syntax' >&2
                   return 1
                 }
@@ -458,6 +476,7 @@ jobs:
                 return 1
               }
               LC_ALL=C grep -Eq "$legacy_tag_value_pattern" .env || {
+                report_legacy_tag_classification
                 echo 'legacy Relay source image tag is not a supported syntax for the documented R65 value' >&2
                 return 1
               }
@@ -469,6 +488,7 @@ jobs:
               }
               if [[ "$legacy_tag_assignment_count" == 1 ]]; then
                 LC_ALL=C grep -Eq "$legacy_tag_value_pattern" .env || {
+                  report_legacy_tag_classification
                   echo 'hardcoded legacy Relay source has an unsupported image-tag retry syntax' >&2
                   return 1
                 }
