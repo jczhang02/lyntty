@@ -275,7 +275,7 @@ jobs:
           set -euo pipefail
           read -r repository digest < <(bun -e '
             const b=await Bun.file(process.argv[1]).json();
-            process.stdout.write(`${b.components.relay.image.repository} ${b.components.relay.image.digest}`);
+            console.log(`${b.components.relay.image.repository} ${b.components.relay.image.digest}`);
           ' "$CANDIDATE/compatibility-bom.json")
           expected_repository="ghcr.io/jczhang02/lyntty-relay-preview"
           [[ "$CHANNEL" == stable ]] && expected_repository="ghcr.io/jczhang02/lyntty-relay"
