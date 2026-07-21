@@ -1,10 +1,10 @@
-# Native CLI signing and staging
+# Optional native CLI signing and staging
 
-Stable ships five standalone CLI/`lynttyd` archives. Linux archives come from the Compatibility Candidate. The two macOS archives and Windows archive must first pass a protected native production and independent verification chain.
+Stable ships five standalone CLI/`lynttyd` archives. The first owner-operated self-use Stable line intentionally publishes macOS and Windows archives without Apple notarization or Authenticode; signed BOM, hash, provenance, and GitHub attestation checks remain mandatory. The workflows below are retained as optional future tooling and are not invoked or consumed by the current Candidate contract. Reconnecting them to Stable requires a protected PR and exact-byte review.
 
-## Protected environment
+## Optional protected environment
 
-Create `release-native-signing`, restrict it to `main`, require an independent reviewer, and disable self-review.
+Only create `release-native-signing` when platform code signing is deliberately enabled. Restrict it to `main` and require an explicit owner approval.
 
 Secrets:
 
@@ -48,16 +48,16 @@ Expected staging assets include three archives, manifest/archive sidecars, per-t
 
 ## Independently verify
 
-Do not configure Stable Candidate URLs immediately. First dispatch `.github/workflows/native-signing.yml` with:
+For an optional future platform-signed release, first dispatch `.github/workflows/native-signing.yml` with:
 
 - exact `source_sha`, CLI version, and staging `release_tag`;
 - exact metadata URL/SHA-256;
 - exact archive URL/SHA-256 for all three targets;
 - the two notarization UUIDs from metadata.
 
-The verifier runs x64 and arm64 on matching macOS runners and Windows on a native runner. It requires the immutable staging Release/tag to target the source commit, verifies metadata and every archive byte, reruns platform signature/runtime checks, and emits one GitHub attestation per archive. Stable Candidate accepts only attestations signed by this verifier at the same source commit.
+The verifier runs x64 and arm64 on matching macOS runners and Windows on a native runner. It requires the immutable staging Release/tag to target the source commit, verifies metadata and every archive byte, reruns platform signature/runtime checks, and emits one GitHub attestation per archive.
 
-After all three attestations pass, copy only the exact archive URL/hash pairs into `release-stable-candidate` variables. A failed verifier leaves an immutable but untrusted prerelease; never reuse it for Stable. Transient verifier failures may rerun against the same bytes. Bad bytes require a new producer run and tag.
+The current self-use Candidate does not accept external native archive URL/hash inputs, so optional staging output cannot silently replace Candidate bytes. A future policy change must reconnect those exact inputs and verifier attestations through a protected PR. A failed verifier leaves an immutable but untrusted prerelease; transient verification failures may rerun against the same bytes, while bad bytes require a new producer run and tag.
 
 ## Platform caveats
 

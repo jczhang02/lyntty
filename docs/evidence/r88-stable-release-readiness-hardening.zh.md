@@ -2,6 +2,8 @@
 
 日期：2026-07-21
 
+> 政策更新：R89 只覆盖 R88 中首次 Stable 的审批和原生平台签名要求。R88 仍证明可选签名链及精确发布/部署 seam 已完成加固；owner-operated 自用发布不调用 Apple notarization 或 Windows Authenticode。
+
 分支：`fix/stable-release-hardening`
 
 Bead：`lyntty-24v`

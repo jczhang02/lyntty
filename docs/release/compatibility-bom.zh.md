@@ -14,8 +14,10 @@ BOM、签名与 predecessor digest 都绑定带末尾 LF 的精确 canonical 文
 
 公开 Stable root 位于 `config/release-trust-roots/stable.json`。Candidate 与 Promotion 要求受保护 environment 的 `LYNTTY_RELEASE_TRUST_ROOTS` 与它逐字段一致；私钥只存在于受保护 secret 和仓库外加密备份。
 
-Stable 原生 CLI 先由 `native-signing-producer.yml` 在对应 macOS/Windows runner 上签名、重建 manifest、notarize/timestamp，并发布不可变 `native-signing-*` staging prerelease；再由独立 `native-signing.yml` 验证并 attest。缺少任一生产证书或验证结果都必须停止。
+本次 owner-operated 自用 Stable 仍发布五个平台 CLI/`lynttyd` archive，但 macOS/Windows executable 明确不做 Apple notarization 或 Windows Authenticode。Candidate 直接从同一 protected source 构建五个平台，并在 provenance 中记录 `platformCodeSigning.policy=not-required-self-use`。archive SHA-256、内部 manifest SHA-256、source commit、runtime-free self-check、签名 BOM 与 GitHub attestations 仍是强制门禁。
 
 Promotion 与 rollback 统一调用 `scripts/github-release.ts`：绑定单一 Release ID 和 asset ID，逐项验证 API digest 与下载字节，不删除、不替换资产；发布边界再次检查 GitHub `main`，用 non-force Git push 原子创建精确 direct tag（中断重试只接受同一 tag/commit），再通过一个完整 Release-ID `PATCH` 发布。Stable 还必须提供精确 Candidate APK 的实体 Android 验收及其 SHA-256；没有 waiver。
+
+Stable 由 owner 显式审批；无需独立 reviewer，也不要求 Apple/Windows 生产证书。Release body 必须披露 macOS/Windows archive 未做平台代码签名，不能把 BOM 签名或 GitHub attestation 描述成平台签名。
 
 生产 Relay 部署必须安装精确 Stable trust roots 和 minimum sequence，要求旧镜像已按 digest 固定，核验备份与 sidecar、运行容器镜像，并通过本地和公网 `/v1/version` 证明 BOM、sequence、APK URL/hash 全部一致；仅 `/health` 成功不算验收。
