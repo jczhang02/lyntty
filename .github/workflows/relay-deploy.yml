@@ -74,7 +74,7 @@ jobs:
             const b=await Bun.file(process.argv[1]).json();
             if (b.releaseId!==process.env.BOM_TAG || b.components.relay.image.repository!=="ghcr.io/jczhang02/lyntty-relay") throw new Error("BOM release identity is invalid");
             const apk=b.components.app.android.apk;
-            process.stdout.write(`${b.source.commit} ${b.components.relay.sourceCommit} ${b.components.relay.version} ${b.components.relay.image.reference} ${b.sequence} ${apk.url} ${apk.sha256} ${b.components.app.android.versionCode}`);
+            console.log(`${b.source.commit} ${b.components.relay.sourceCommit} ${b.components.relay.version} ${b.components.relay.image.reference} ${b.sequence} ${apk.url} ${apk.sha256} ${b.components.app.android.versionCode}`);
           ' "$dir/compatibility-bom.json")
           [[ "$source" =~ ^[a-f0-9]{40}$ ]]
           [[ "$relay_source" =~ ^[a-f0-9]{40}$ ]]

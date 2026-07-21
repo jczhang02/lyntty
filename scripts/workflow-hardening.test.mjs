@@ -97,6 +97,8 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /bom_sequence/);
   assert.match(relayDeploy, /bun install --frozen-lockfile/);
   assert.match(relayDeploy, /bun --no-install scripts\/release\.ts/);
+  assert.match(relayDeploy, /read -r source relay_source[\s\S]*?console\.log\(`/);
+  assert.doesNotMatch(relayDeploy, /read -r source relay_source[\s\S]*?process\.stdout\.write/);
   assert.match(relayDeploy, / backup /);
   assert.match(relayDeploy, / migrate/);
   assert.match(relayDeploy, / doctor/);
@@ -551,6 +553,8 @@ test('promotion publishes exact candidate bytes with protected stable/preview se
   assert.match(releasePromote, /release_rows=.*gh api[\s\S]*--paginate/);
   assert.match(releasePromote, /info\.relaySchema!==bom\.components\.relay\.schema\.current/);
   assert.match(releasePromote, /existing candidate image tag has a different digest/);
+  assert.match(releasePromote, /read -r repository digest[\s\S]*?console\.log\(`/);
+  assert.doesNotMatch(releasePromote, /read -r repository digest[\s\S]*?process\.stdout\.write/);
   assert.match(releasePromote, /android-validation\.json/);
   assert.match(releasePromote, /Physical Android validation: not performed; explicit owner self-use waiver/);
   const auditIndex = releasePromote.indexOf('stable-release-validation.ts audit');
