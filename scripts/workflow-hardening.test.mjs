@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'bun:test';
@@ -91,6 +91,8 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /remains fail-stopped after migration began/);
   assert.match(relayDeploy, /LYNTTY_RELEASE_TRUST_ROOTS/);
   assert.match(relayDeploy, /LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE/);
+  assert.match(relayDeploy, /\[\[ ! -L \.env \]\]/);
+  assert.match(relayDeploy, /\.env-canonicalization\.log/);
   assert.match(relayDeploy, /\.Config\.Image/);
   assert.match(relayDeploy, /\/v1\/version/);
   assert.match(relayDeploy, /bom_release_id/);
@@ -102,6 +104,179 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, / backup /);
   assert.match(relayDeploy, / migrate/);
   assert.match(relayDeploy, / doctor/);
+});
+
+test('Relay env normalization preserves one exported secret and rejects ambiguity', async () => {
+  const block = relayDeploy.match(
+    /(          restore_env_backup\(\) \{[\s\S]*?\n          canonicalize_required_assignment LYNTTY_RELAY_IMAGE)/,
+  )?.[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  assert.ok(block);
+  const root = await mkdtemp(join(tmpdir(), 'lyntty-relay-env-normalize-'));
+  try {
+    const execute = (dir, mockDockerFail = false) => {
+      const result = Bun.spawnSync({
+        cmd: ['bash', '-c', `set -euo pipefail\ncd "$ROOT"\n${block}`],
+        env: {
+          ...process.env,
+          ROOT: dir,
+          PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
+          MOCK_DOCKER_FAIL: String(mockDockerFail),
+          LYNTTY_MASTER_SECRET: 'ambient-master-must-not-win',
+          HANDY_MASTER_SECRET: 'ambient-legacy-must-not-win',
+          LYNTTY_RELAY_IMAGE: 'ambient-image-must-not-win',
+        },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      return {
+        exitCode: result.exitCode,
+        stdout: new TextDecoder().decode(result.stdout),
+        stderr: new TextDecoder().decode(result.stderr),
+      };
+    };
+    const run = async (name, content, mockDockerFail = false) => {
+      const dir = join(root, name);
+      await mkdir(join(dir, 'bin'), { recursive: true });
+      const mockDocker = join(dir, 'bin', 'docker');
+      await writeFile(mockDocker, `#!/usr/bin/env bun
+if (process.env.MOCK_DOCKER_FAIL === 'true') process.exit(1);
+if (process.argv.slice(2).join(' ') !== 'compose --env-file .env config --format json') process.exit(2);
+const text = await Bun.file('.env').text();
+const values = {};
+for (const line of text.split('\\n')) {
+  const match = line.match(/^(LYNTTY_MASTER_SECRET|LYNTTY_RELAY_IMAGE)=(.*)$/);
+  if (!match) continue;
+  let value = match[2].trim();
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+  else value = value.replace(/\\s+#.*$/, '').trim();
+  values[match[1]] = value;
+}
+const master = process.env.LYNTTY_MASTER_SECRET ?? values.LYNTTY_MASTER_SECRET;
+const image = process.env.LYNTTY_RELAY_IMAGE ?? values.LYNTTY_RELAY_IMAGE;
+console.log(JSON.stringify({ services: { 'lyntty-relay': { image, environment: { LYNTTY_MASTER_SECRET: master } } } }));
+`);
+      await chmod(mockDocker, 0o755);
+      const mockJq = join(dir, 'bin', 'jq');
+      await writeFile(mockJq, `#!/usr/bin/env bun
+const args = process.argv.slice(2);
+const keyIndex = args.indexOf('--arg');
+if (keyIndex < 0 || args[keyIndex + 1] !== 'key' || !args[keyIndex + 2]) process.exit(2);
+const key = args[keyIndex + 2];
+const value = await Bun.stdin.json();
+const result = key === 'LYNTTY_MASTER_SECRET'
+  ? value.services?.['lyntty-relay']?.environment?.[key]
+  : key === 'LYNTTY_RELAY_IMAGE'
+    ? value.services?.['lyntty-relay']?.image
+    : undefined;
+if (result === undefined || result === null) process.exit(4);
+console.log(result);
+`);
+      await chmod(mockJq, 0o755);
+      await writeFile(join(dir, '.env'), content, { mode: 0o600 });
+      await chmod(join(dir, '.env'), 0o600);
+      return { dir, ...execute(dir, mockDockerFail) };
+    };
+
+    const original = [
+      ' export   LYNTTY_MASTER_SECRET =secret=value',
+      'export LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + 'a'.repeat(64),
+      '',
+    ].join('\n');
+    const normalized = await run('normalized', original);
+    assert.equal(normalized.exitCode, 0, normalized.stderr);
+    assert.doesNotMatch(`${normalized.stdout}\n${normalized.stderr}`, /secret=value/);
+    const normalizedEnv = await readFile(join(normalized.dir, '.env'), 'utf8');
+    assert.match(normalizedEnv, /^LYNTTY_MASTER_SECRET=secret=value$/m);
+    assert.match(normalizedEnv, /^LYNTTY_RELAY_IMAGE=ghcr\.io\/example\/relay@sha256:[a-f0-9]{64}$/m);
+    assert.doesNotMatch(normalizedEnv, /export[\s]+LYNTTY_MASTER_SECRET/);
+    assert.equal((await stat(join(normalized.dir, '.env'))).mode & 0o777, 0o600);
+    const normalizedNames = await readdir(normalized.dir);
+    assert.equal(normalizedNames.filter(name => name.startsWith('.env-precanonical-LYNTTY_MASTER_SECRET-')).length, 1);
+    assert.equal(normalizedNames.filter(name => name.startsWith('.env-precanonical-LYNTTY_RELAY_IMAGE-')).length, 1);
+    for (const name of normalizedNames.filter(name => name.startsWith('.env-precanonical-'))) {
+      assert.equal((await stat(join(normalized.dir, name))).mode & 0o777, 0o600);
+    }
+    const masterBackup = normalizedNames.find(name => name.startsWith('.env-precanonical-LYNTTY_MASTER_SECRET-'));
+    assert.equal(await readFile(join(normalized.dir, masterBackup), 'utf8'), original);
+    const receipt = await readFile(join(normalized.dir, '.env-canonicalization.log'), 'utf8');
+    assert.match(receipt, /key=LYNTTY_MASTER_SECRET source=export target=canonical/);
+    assert.match(receipt, /key=LYNTTY_RELAY_IMAGE source=export target=canonical/);
+    assert.doesNotMatch(receipt, /secret=value/);
+    const namesBeforeRetry = (await readdir(normalized.dir)).sort();
+    const receiptBeforeRetry = receipt;
+    assert.equal(execute(normalized.dir).exitCode, 0);
+    assert.deepEqual((await readdir(normalized.dir)).sort(), namesBeforeRetry);
+    assert.equal(await readFile(join(normalized.dir, '.env-canonicalization.log'), 'utf8'), receiptBeforeRetry);
+
+    const duplicateContent = [
+      'export LYNTTY_MASTER_SECRET=first',
+      'LYNTTY_MASTER_SECRET=second',
+      'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + 'b'.repeat(64),
+      '',
+    ].join('\n');
+    const duplicate = await run('duplicate', duplicateContent);
+    assert.notEqual(duplicate.exitCode, 0);
+    assert.equal(await readFile(join(duplicate.dir, '.env'), 'utf8'), duplicateContent);
+    assert.deepEqual((await readdir(duplicate.dir)).filter(name => name.startsWith('.env-precanonical-')), []);
+
+    const canonical = await run('canonical', [
+      'LYNTTY_MASTER_SECRET=already-canonical',
+      'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + 'c'.repeat(64),
+      '',
+    ].join('\n'));
+    assert.equal(canonical.exitCode, 0);
+    assert.deepEqual((await readdir(canonical.dir)).filter(name => name.startsWith('.env-precanonical-')), []);
+
+    const missing = await run('missing', 'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + 'd'.repeat(64) + '\n');
+    assert.notEqual(missing.exitCode, 0);
+    assert.deepEqual((await readdir(missing.dir)).filter(name => name.startsWith('.env-precanonical-')), []);
+
+    const empty = await run('empty', [
+      'export LYNTTY_MASTER_SECRET=',
+      'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + 'e'.repeat(64),
+      '',
+    ].join('\n'));
+    assert.notEqual(empty.exitCode, 0);
+    assert.deepEqual((await readdir(empty.dir)).filter(name => name.startsWith('.env-precanonical-')), []);
+
+    for (const [name, rawValue] of [['double-quoted-empty', '""'], ['single-quoted-empty', "''"], ['whitespace-empty', '   '], ['comment-empty', ' # comment']]) {
+      const content = [
+        `export LYNTTY_MASTER_SECRET=${rawValue}`,
+        'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + 'f'.repeat(64),
+        '',
+      ].join('\n');
+      const semanticEmpty = await run(name, content);
+      assert.notEqual(semanticEmpty.exitCode, 0, name);
+      assert.equal(await readFile(join(semanticEmpty.dir, '.env'), 'utf8'), content, name);
+      assert.doesNotMatch(`${semanticEmpty.stdout}\n${semanticEmpty.stderr}`, /comment|LYNTTY_MASTER_SECRET=.*["']/);
+      const backupName = (await readdir(semanticEmpty.dir)).find(entry => entry.startsWith('.env-precanonical-LYNTTY_MASTER_SECRET-'));
+      assert.ok(backupName);
+      assert.equal(await readFile(join(semanticEmpty.dir, backupName), 'utf8'), content);
+    }
+
+    const restoreContent = [
+      'export LYNTTY_MASTER_SECRET=restore-without-leak',
+      'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + '1'.repeat(64),
+      '',
+    ].join('\n');
+    const restored = await run('restore-on-parser-failure', restoreContent, true);
+    assert.notEqual(restored.exitCode, 0);
+    assert.equal(await readFile(join(restored.dir, '.env'), 'utf8'), restoreContent);
+    assert.equal((await stat(join(restored.dir, '.env'))).mode & 0o777, 0o600);
+    assert.doesNotMatch(`${restored.stdout}\n${restored.stderr}`, /restore-without-leak/);
+
+    const guard = relayDeploy.match(/          \[\[ ! -L \.env-canonicalization\.log[^\n]+/)?.[0].trim();
+    assert.ok(guard);
+    const danglingDir = join(root, 'dangling-log');
+    await mkdir(danglingDir);
+    const danglingTarget = join(danglingDir, 'created-through-link');
+    await symlink(danglingTarget, join(danglingDir, '.env-canonicalization.log'));
+    const dangling = Bun.spawnSync({ cmd: ['bash', '-c', `cd "$ROOT"\n${guard}`], env: { ...process.env, ROOT: danglingDir } });
+    assert.notEqual(dangling.exitCode, 0);
+    assert.equal(await Bun.file(danglingTarget).exists(), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('relay image verification never publishes from an ordinary main push', () => {

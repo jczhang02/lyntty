@@ -196,21 +196,108 @@ jobs:
           cd /opt/lyntty
           test -f .env
           test -f docker-compose.yml
+          [[ ! -L .env ]]
+          [[ ! -L .env-canonicalization.log && ( ! -e .env-canonicalization.log || -f .env-canonicalization.log ) ]]
           [[ "$(stat -c '%U:%a' .env)" == root:600 ]]
-          for key in LYNTTY_MASTER_SECRET LYNTTY_RELAY_IMAGE LYNTTY_RELEASE_TRUST_ROOTS LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE; do
+          restore_env_backup() {
+            local backup="$1" restore_path
+            restore_path="$(mktemp -p . .env-restore-XXXXXXXX)"
+            if ! cp --preserve=mode,ownership,timestamps "$backup" "$restore_path"; then
+              rm -f "$restore_path"
+              echo 'could not stage the original Relay .env for restoration' >&2
+              return 1
+            fi
+            if ! chmod 600 "$restore_path" || ! mv -f -- "$restore_path" .env; then
+              rm -f "$restore_path"
+              echo 'could not atomically restore the original Relay .env' >&2
+              return 1
+            fi
+            cmp -s "$backup" .env
+            [[ "$(stat -c '%U:%a' .env)" == root:600 ]]
+          }
+          canonicalize_required_assignment() {
+            local key="$1" assignment_count canonical_count exported_count before_value after_value backup="" normalized=false
+            local normalized_path parsed_value semantic_value
             assignment_count="$(grep -Ec "^[[:space:]]*(export[[:space:]]+)?${key}([[:space:]]*=|[[:space:]]+)" .env || true)"
             canonical_count="$(grep -c "^${key}=" .env || true)"
-            if [[ "$key" == LYNTTY_MASTER_SECRET || "$key" == LYNTTY_RELAY_IMAGE ]]; then
-              [[ "$assignment_count" == 1 && "$canonical_count" == 1 ]] || {
-                echo "$key must have exactly one canonical, unprefixed assignment" >&2
-                exit 1
+            if [[ "$assignment_count" != 1 || "$canonical_count" != 1 ]]; then
+              exported_count="$(grep -Ec "^[[:space:]]*export[[:space:]]+${key}[[:space:]]*=" .env || true)"
+              [[ "$assignment_count" == 1 && "$canonical_count" == 0 && "$exported_count" == 1 ]] || {
+                echo "$key must have exactly one canonical or safely normalizable exported assignment (assignments=$assignment_count canonical=$canonical_count exported=$exported_count)" >&2
+                return 1
               }
-            else
-              [[ "$assignment_count" == "$canonical_count" && "$canonical_count" -le 1 ]] || {
-                echo "$key has a duplicate or noncanonical assignment" >&2
-                exit 1
-              }
+              before_value="$(sed -n -E "s/^[[:space:]]*export[[:space:]]+${key}[[:space:]]*=//p" .env)"
+              [[ -n "$before_value" ]] || { echo "$key may not be empty" >&2; return 1; }
+              backup="$(mktemp -p . ".env-precanonical-${key}-XXXXXXXX")"
+              cp --preserve=mode,ownership,timestamps .env "$backup"
+              chmod 600 "$backup"
+              normalized_path="$(mktemp -p . ".env-normalized-${key}-XXXXXXXX")"
+              chmod 600 "$normalized_path"
+              if ! sed -E "s/^[[:space:]]*export[[:space:]]+${key}[[:space:]]*=/${key}=/" .env > "$normalized_path"; then
+                rm -f "$normalized_path"
+                echo "$key canonicalization transform failed; original .env was not changed" >&2
+                return 1
+              fi
+              if ! after_value="$(sed -n "s/^${key}=//p" "$normalized_path")"; then
+                rm -f "$normalized_path"
+                echo "$key canonicalization inspection failed; original .env was not changed" >&2
+                return 1
+              fi
+              if [[ -z "$after_value" || "$after_value" != "$before_value" || "$(grep -c "^${key}=" "$normalized_path" || true)" != 1 ]]; then
+                rm -f "$normalized_path"
+                echo "$key canonicalization verification failed; original .env was not changed" >&2
+                return 1
+              fi
+              if ! mv -f -- "$normalized_path" .env; then
+                rm -f "$normalized_path"
+                echo "$key canonicalization could not be installed; original .env was not changed" >&2
+                return 1
+              fi
+              normalized=true
             fi
+            unset before_value after_value
+            if ! parsed_value="$(env \
+              -u LYNTTY_MASTER_SECRET -u HANDY_MASTER_SECRET -u LYNTTY_RELAY_IMAGE \
+              -u LYNTTY_RELEASE_TRUST_ROOTS -u LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE \
+              docker compose --env-file .env config --format json 2>/dev/null \
+              | jq -er --arg key "$key" '
+                  if $key == "LYNTTY_MASTER_SECRET" then .services["lyntty-relay"].environment[$key]
+                  elif $key == "LYNTTY_RELAY_IMAGE" then .services["lyntty-relay"].image
+                  else empty
+                  end
+                ')"; then
+              if [[ "$normalized" == true ]]; then
+                restore_env_backup "$backup"
+              fi
+              echo "Docker Compose could not resolve the deployed $key value from .env" >&2
+              return 1
+            fi
+            semantic_value="$(sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//' <<< "$parsed_value")"
+            unset parsed_value
+            if [[ -z "$semantic_value" || "$semantic_value" == \#* ]]; then
+              if [[ "$normalized" == true ]]; then
+                restore_env_backup "$backup"
+              fi
+              echo "$key resolves to an empty or comment-only deployed value" >&2
+              return 1
+            fi
+            unset semantic_value
+            if [[ "$normalized" == true ]]; then
+              printf '%s key=%s source=export target=canonical backup=%s\n' \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$key" "$(basename "$backup")" >> .env-canonicalization.log
+              chmod 600 .env-canonicalization.log
+            fi
+          }
+          canonicalize_required_assignment LYNTTY_MASTER_SECRET
+          canonicalize_required_assignment LYNTTY_RELAY_IMAGE
+          [[ "$(stat -c '%U:%a' .env)" == root:600 ]]
+          for key in LYNTTY_RELEASE_TRUST_ROOTS LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE; do
+            assignment_count="$(grep -Ec "^[[:space:]]*(export[[:space:]]+)?${key}([[:space:]]*=|[[:space:]]+)" .env || true)"
+            canonical_count="$(grep -c "^${key}=" .env || true)"
+            [[ "$assignment_count" == "$canonical_count" && "$canonical_count" -le 1 ]] || {
+              echo "$key has a duplicate or noncanonical assignment" >&2
+              exit 1
+            }
           done
           master_secret="$(sed -n 's/^LYNTTY_MASTER_SECRET=//p' .env)"
           [[ -n "$master_secret" ]] || { echo 'canonical LYNTTY_MASTER_SECRET may not be empty' >&2; exit 1; }
