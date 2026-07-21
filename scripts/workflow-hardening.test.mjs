@@ -99,6 +99,15 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /grep -vE '[^']*LYNTTY_RELAY_IMAGE_TAG/);
   assert.match(relayDeploy, /HANDY_MASTER_SECRET: \$\{LYNTTY_MASTER_SECRET\}/);
   assert.match(relayDeploy, /Relay deployment preflight failed during phase=%s/);
+  for (const diagnostic of [
+    'rendered legacy Relay Compose must contain only the lyntty-relay service',
+    'rendered legacy Relay Compose has no scalar image reference',
+    'rendered legacy Relay Compose has an unexpected persistent-volume model',
+    'legacy Relay image tag must have one canonical source assignment',
+    'legacy Relay source image tag is not the documented R65 value',
+  ]) {
+    assert.match(relayDeploy, new RegExp(diagnostic));
+  }
   assert.match(relayDeploy, /preflight_phase=legacy-image-layout/);
   for (const phase of ['source-model', 'rendered-model', 'running-container', 'repository-digest', 'staging', 'install']) {
     assert.match(relayDeploy, new RegExp(`preflight_phase=legacy-image-${phase}`));

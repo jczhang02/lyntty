@@ -413,14 +413,23 @@ jobs:
               echo 'legacy Relay Compose could not be rendered' >&2
               return 1
             fi
-            jq -e '.services | type == "object" and keys == ["lyntty-relay"]' <<< "$rendered_json" >/dev/null
-            configured_reference="$(jq -er '.services["lyntty-relay"].image' <<< "$rendered_json")"
+            jq -e '.services | type == "object" and keys == ["lyntty-relay"]' <<< "$rendered_json" >/dev/null || {
+              echo 'rendered legacy Relay Compose must contain only the lyntty-relay service' >&2
+              return 1
+            }
+            configured_reference="$(jq -er '.services["lyntty-relay"].image' <<< "$rendered_json")" || {
+              echo 'rendered legacy Relay Compose has no scalar image reference' >&2
+              return 1
+            }
             jq -e --argjson backups "$backup_mount_count" '
                 .services["lyntty-relay"].volumes as $volumes
                 | ([ $volumes[] | select(.type == "bind" and .source == "/opt/lyntty/data" and .target == "/data") ] | length) == 1
                   and ([ $volumes[] | select(.target == "/backups") ] | length) == $backups
                   and ([ $volumes[] | select(.target == "/backups" and .type == "bind" and .source == "/opt/lyntty/backups") ] | length) == $backups
-              ' <<< "$rendered_json" >/dev/null
+              ' <<< "$rendered_json" >/dev/null || {
+              echo 'rendered legacy Relay Compose has an unexpected persistent-volume model' >&2
+              return 1
+            }
             if [[ "$raw_reference" == '${LYNTTY_RELAY_IMAGE}' ]]; then
               [[ "$assignment_count" == 1 ]] || { echo 'canonical Relay Compose requires exactly one image assignment' >&2; return 1; }
               [[ "$legacy_tag_assignment_count" == 0 || "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]] || {
@@ -428,7 +437,10 @@ jobs:
                 return 1
               }
               if [[ "$legacy_tag_assignment_count" == 1 ]]; then
-                [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]]
+                [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]] || {
+                  echo 'canonical retry state has an unexpected legacy image-tag value' >&2
+                  return 1
+                }
               fi
               [[ "$backup_mount_count" == 1 ]] || { echo 'canonical Relay Compose requires the persistent backup mount' >&2; return 1; }
               [[ "$configured_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]] || {
@@ -440,13 +452,25 @@ jobs:
             fi
             if [[ "$raw_reference" == 'ghcr.io/jczhang02/lyntty-relay:${LYNTTY_RELAY_IMAGE_TAG}' ]]; then
               source_form=legacy-compose-tag-variable
-              [[ "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]]
-              [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]]
+              [[ "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]] || {
+                echo 'legacy Relay image tag must have one canonical source assignment' >&2
+                return 1
+              }
+              [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]] || {
+                echo 'legacy Relay source image tag is not the documented R65 value' >&2
+                return 1
+              }
             elif [[ "$raw_reference" == "$expected_tag" ]]; then
               source_form=legacy-compose-hardcoded-tag
-              [[ "$legacy_tag_assignment_count" == 0 || "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]] || return 1
+              [[ "$legacy_tag_assignment_count" == 0 || "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]] || {
+                echo 'hardcoded legacy Relay source has an invalid image-tag retry assignment' >&2
+                return 1
+              }
               if [[ "$legacy_tag_assignment_count" == 1 ]]; then
-                [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]]
+                [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]] || {
+                  echo 'hardcoded legacy Relay source has an unexpected image-tag retry value' >&2
+                  return 1
+                }
               fi
             else
               echo 'legacy Relay Compose image is not the documented R65 source tag' >&2
