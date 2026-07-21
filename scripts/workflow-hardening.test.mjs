@@ -1310,14 +1310,15 @@ test('native signature verification pins platform identities and attests exact a
 
 test('dependency audit pins patched transitive releases', () => {
   const patchedVersions = {
-    '@hono/node-server': '2.0.5',
-    'fast-uri': '3.1.3',
+    '@hono/node-server': '2.0.11',
+    'fast-uri': '3.1.4',
+    'fast-xml-parser': '5.10.1',
     'hono': '4.12.27',
     'shell-quote': '1.9.0',
   };
   for (const [name, version] of Object.entries(patchedVersions)) {
     assert.equal(rootPackage.overrides[name], version);
-    assert.match(bunLockText, new RegExp(`"${name.replace('/', '\\/')}": \\["${name.replace('/', '\\/')}@${version.replaceAll('.', '\\.')}`));
+    assert.match(bunLockText, new RegExp(`"${name.replace('/', '\\/')}": \\["${name.replace('/', '\\/')}@${version.replaceAll('.', '\\.')}"`));
   }
   assert.doesNotMatch(bunLockText, /shell-quote@1\.8\.4/);
 });
