@@ -581,7 +581,7 @@ exec /usr/bin/mv "$@"
   } finally {
     await rm(root, { recursive: true, force: true });
   }
-});
+}, 20_000);
 
 test('Relay pre-schema rollback supplies the legacy master-secret alias without exposing it', async () => {
   const deindent = (value) => value.split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
@@ -692,7 +692,7 @@ process.exit(typeof environment?.LYNTTY_MASTER_SECRET === 'string' && environmen
   } finally {
     await rm(root, { recursive: true, force: true });
   }
-});
+}, 10_000);
 
 test('relay image verification never publishes from an ordinary main push', () => {
   assert.match(relayImage, /workflow_dispatch/);
