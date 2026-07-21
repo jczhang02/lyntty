@@ -6,6 +6,8 @@ Branch: `fix/relay-env-canonicalization`
 
 Bead: `lyntty-24v`
 
+> Follow-up: production retry `29864206703` proved `LYNTTY_MASTER_SECRET` is absent; tracked R65 evidence identifies the schema-1 key as `HANDY_MASTER_SECRET`. R95 remains evidence for the safe canonicalization primitive; R97 adds the narrowly bounded legacy-key rename.
+
 ## Failure
 
 Production deployment run `29858379372` verified the immutable Stable Release, signed BOM, exact Relay OCI digest, attestations, protected main, and pinned SSH host key. It authenticated to the VPS, then stopped before service shutdown, `.env` mutation, backup, migration, or container replacement because the existing `LYNTTY_MASTER_SECRET` was not exactly one canonical unprefixed assignment.
