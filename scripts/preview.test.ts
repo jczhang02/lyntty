@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join, resolve } from 'node:path';
 import { processStartToken } from './dev';
 import {
   cleanupBuildProcesses,
@@ -24,6 +25,62 @@ const testEnvironment = {
   LYNTTY_PREVIEW_ALLOW_TEST_HOOKS: '1',
   LYNTTY_PREVIEW_TEST_NAMESPACE: `suite-${process.pid}`,
 };
+
+const previewApkSourcePaths = [
+  '.bun-version',
+  'bun.lock',
+  'package.json',
+  'patches',
+  'scripts/postinstall.cjs',
+  'packages/lyntty-app',
+  'packages/lyntty-wire',
+];
+
+async function createEphemeralPreviewSourceCommit(): Promise<{ commit: string; environment: Record<string, string>; cleanup: () => Promise<void> }> {
+  const root = await mkdtemp(join(tmpdir(), 'lyntty-preview-source-'));
+  const objectDirectory = join(root, 'objects');
+  const indexFile = join(root, 'index');
+  await mkdir(objectDirectory, { recursive: true });
+  const gitPath = await Bun.$`git rev-parse --git-path objects`.cwd(repositoryRoot).text().then(value => value.trim());
+  const alternateObjects = isAbsolute(gitPath) ? gitPath : resolve(repositoryRoot, gitPath);
+  const environment = {
+    ...Bun.env,
+    GIT_OBJECT_DIRECTORY: objectDirectory,
+    GIT_ALTERNATE_OBJECT_DIRECTORIES: alternateObjects,
+    GIT_INDEX_FILE: indexFile,
+    GIT_AUTHOR_NAME: 'Lyntty Preview Test',
+    GIT_AUTHOR_EMAIL: 'preview-test@invalid',
+    GIT_COMMITTER_NAME: 'Lyntty Preview Test',
+    GIT_COMMITTER_EMAIL: 'preview-test@invalid',
+    GIT_AUTHOR_DATE: '2000-01-01T00:00:00Z',
+    GIT_COMMITTER_DATE: '2000-01-01T00:00:00Z',
+  };
+  const run = async (args: string[]): Promise<string> => {
+    const child = Bun.spawn(['git', ...args], { cwd: repositoryRoot, env: environment, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+    const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+    if (exitCode !== 0) throw new Error(stderr || stdout);
+    return stdout.trim();
+  };
+  try {
+    await run(['read-tree', 'HEAD']);
+    await run(['add', '-A', '--', ...previewApkSourcePaths]);
+    const tree = await run(['write-tree']);
+    const commit = await run(['commit-tree', tree, '-p', 'HEAD', '-m', 'ephemeral Preview APK source fixture']);
+    if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error('ephemeral Preview source commit is invalid');
+    return {
+      commit,
+      environment: {
+        GIT_OBJECT_DIRECTORY: objectDirectory,
+        GIT_ALTERNATE_OBJECT_DIRECTORIES: alternateObjects,
+        GIT_INDEX_FILE: indexFile,
+      },
+      cleanup: () => rm(root, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    await rm(root, { recursive: true, force: true });
+    throw error;
+  }
+}
 
 async function runPreview(args: string[], environment: Record<string, string> = {}): Promise<RunResult> {
   const child = Bun.spawn({
@@ -379,7 +436,8 @@ describe('public Preview manual-test commands', () => {
     const apkContent = 'audited Preview APK fixture';
     await writeFile(apkPath, apkContent);
     const sha256 = createHash('sha256').update(apkContent).digest('hex');
-    const sourceCommit = await Bun.$`git rev-parse HEAD`.cwd(repositoryRoot).text().then(value => value.trim());
+    const sourceFixture = await createEphemeralPreviewSourceCommit();
+    const sourceCommit = sourceFixture.commit;
     const allowlistPath = join(fixtureDir, 'allowlist.json');
     await writeFile(allowlistPath, `${JSON.stringify({
       schemaVersion: 1,
@@ -405,6 +463,7 @@ describe('public Preview manual-test commands', () => {
       'standalone_bundle=assets/index.android.bundle',
     ].join('\n'));
     const environment = {
+      ...sourceFixture.environment,
       LYNTTY_PREVIEW_TEST_NAMESPACE: `import-${process.pid}`,
       LYNTTY_PREVIEW_TEST_FAKE_RUNTIME: '1',
       LYNTTY_PREVIEW_TEST_SKIP_APK_AUDIT: '1',
@@ -430,6 +489,7 @@ describe('public Preview manual-test commands', () => {
     } finally {
       await runPreview(['stop'], approvedEnvironment);
       await runPreview(['reset'], approvedEnvironment);
+      await sourceFixture.cleanup();
       await rm(fixtureDir, { recursive: true, force: true });
     }
   }, 20_000);
