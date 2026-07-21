@@ -66,6 +66,7 @@ jobs:
           set -euo pipefail
           [[ "$GITHUB_REF" == refs/heads/main ]]
           [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
           [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]]
           waiver_phrase='I accept publishing this exact Candidate without physical Android validation'
@@ -324,7 +325,7 @@ jobs:
             echo "release_notes_sha256=$release_notes_sha256"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Create or resume exact draft release
+      - name: Resume exact private draft release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -348,42 +349,71 @@ jobs:
             "$DOWNLOAD/android-preview-runtime-audit.txt"
             "$DOWNLOAD/android-preview-provenance.json"
           )
-          release_error="$RUNNER_TEMP/release-lookup.err"
-          already_published=false
-          if release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" 2>"$release_error")"; then
+          recovery_draft_id=357064582
+          recovery_target_sha=47351659bd8e6862abde1521854a8965919c4691
+          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/$recovery_draft_id")"
+          verify_release_identity() {
+            [[ "$(jq -r .id <<< "$release_json")" == "$recovery_draft_id" ]]
+            [[ "$(jq -r .tag_name <<< "$release_json")" == "$RELEASE_TAG" ]]
             [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
-            [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
             [[ "$(jq -r .name <<< "$release_json")" == "$RELEASE_TITLE" ]]
             jq -j '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/existing-release-notes.md"
             cmp -s "$notes" "$RUNNER_TEMP/existing-release-notes.md"
-            if [[ "$(jq -r .draft <<< "$release_json")" == false ]]; then
-              [[ "$(jq -r .immutable <<< "$release_json")" == true ]]
-              already_published=true
-            fi
-          elif grep -Fq '(HTTP 404)' "$release_error"; then
-            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TITLE" \
-              --notes-file "$notes" --draft --prerelease --latest=false
+          }
+          verify_release_identity
+
+          already_published=false
+          if [[ "$(jq -r .draft <<< "$release_json")" == true ]]; then
+            [[ "$(jq -r .immutable <<< "$release_json")" == false ]]
+            release_target="$(jq -r .target_commitish <<< "$release_json")"
+            [[ "$release_target" == "$recovery_target_sha" || "$release_target" == "$GITHUB_SHA" ]]
           else
-            cat "$release_error" >&2
-            exit 1
+            [[ "$(jq -r .draft <<< "$release_json")" == false ]]
+            [[ "$(jq -r .immutable <<< "$release_json")" == true ]]
+            [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
+            already_published=true
           fi
 
-          for asset in "${assets[@]}"; do
-            name="$(basename "$asset")"
-            if gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
-              verify_dir="$RUNNER_TEMP/existing-assets/$name"
-              mkdir -p "$verify_dir"
-              gh release download "$RELEASE_TAG" --pattern "$name" --dir "$verify_dir"
-              cmp -s "$asset" "$verify_dir/$name"
-            else
-              [[ "$already_published" == false ]]
-              gh release upload "$RELEASE_TAG" "$asset"
-            fi
-          done
-          desired_names="$(printf '%s\n' "${assets[@]##*/}" | sort)"
-          release_names="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)"
-          [[ "$release_names" == "$desired_names" ]]
+          verify_release_assets() {
+            local phase="$1"
+            local verify_root="$RUNNER_TEMP/$phase"
+            rm -rf "$verify_root"
+            mkdir -p "$verify_root"
+            local release_snapshot desired_names release_names asset name expected_id matches actual_id
+            local expected_size expected_digest target
+            release_snapshot="$(gh api "repos/$GITHUB_REPOSITORY/releases/$recovery_draft_id")"
+            [[ "$(jq -r .id <<< "$release_snapshot")" == "$recovery_draft_id" ]]
+            desired_names="$(printf '%s\n' "${assets[@]##*/}" | sort)"
+            release_names="$(jq -r '.assets[].name' <<< "$release_snapshot" | sort)"
+            [[ "$release_names" == "$desired_names" ]]
+            for asset in "${assets[@]}"; do
+              name="$(basename "$asset")"
+              case "$name" in
+                android-preview-provenance.json) expected_id=484098553 ;;
+                android-preview-runtime-audit.txt) expected_id=484098498 ;;
+                lyntty-preview-v1.2.0-920001.apk) expected_id=484098319 ;;
+                lyntty-preview-v1.2.0-920001.apk.sha256) expected_id=484098422 ;;
+                lyntty-preview-v1.2.0-920001.audit.txt) expected_id=484098446 ;;
+                *) echo "unexpected Release asset: $name" >&2; exit 1 ;;
+              esac
+              matches="$(jq -c --arg name "$name" '[.assets[] | select(.name == $name)]' <<< "$release_snapshot")"
+              [[ "$(jq -r 'length' <<< "$matches")" == 1 ]]
+              actual_id="$(jq -r '.[0].id' <<< "$matches")"
+              [[ "$actual_id" == "$expected_id" ]]
+              [[ "$(jq -r '.[0].state' <<< "$matches")" == uploaded ]]
+              expected_size="$(stat -c '%s' "$asset")"
+              expected_digest="sha256:$(sha256sum "$asset" | awk '{print $1}')"
+              [[ "$(jq -r '.[0].size' <<< "$matches")" == "$expected_size" ]]
+              [[ "$(jq -r '.[0].digest' <<< "$matches")" == "$expected_digest" ]]
+              target="$verify_root/$name"
+              gh api -H 'Accept: application/octet-stream' \
+                "repos/$GITHUB_REPOSITORY/releases/assets/$actual_id" > "$target"
+              cmp -s "$asset" "$target"
+            done
+          }
+          verify_release_assets existing-release-assets
           echo "already_published=$already_published" >> "$GITHUB_OUTPUT"
+          echo "release_id=$recovery_draft_id" >> "$GITHUB_OUTPUT"
 
       - name: Publish only after final protected-main and byte recheck
         env:
@@ -398,6 +428,7 @@ jobs:
           RELEASE_NOTES: ${{ steps.candidate.outputs.release_notes }}
           RELEASE_NOTES_SHA256: ${{ steps.candidate.outputs.release_notes_sha256 }}
           ALREADY_PUBLISHED: ${{ steps.release.outputs.already_published }}
+          RELEASE_ID: ${{ steps.release.outputs.release_id }}
         run: |
           set -euo pipefail
           [[ "$RELEASE_MODE" == physical-phone || "$RELEASE_MODE" == owner-waiver-unverified ]]
@@ -449,53 +480,123 @@ jobs:
           )
           verify_release_assets() {
             local phase="$1"
+            local download_bytes="${2:-true}"
             local verify_root="$RUNNER_TEMP/$phase"
             rm -rf "$verify_root"
             mkdir -p "$verify_root"
-            local desired_names release_names asset name target_dir
+            local release_snapshot desired_names release_names asset name expected_id matches actual_id
+            local expected_size expected_digest target
+            release_snapshot="$(gh api "$release_api")"
+            [[ "$(jq -r .id <<< "$release_snapshot")" == "$RELEASE_ID" ]]
             desired_names="$(printf '%s\n' "${assets[@]##*/}" | sort)"
-            release_names="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)"
+            release_names="$(jq -r '.assets[].name' <<< "$release_snapshot" | sort)"
             [[ "$release_names" == "$desired_names" ]]
             for asset in "${assets[@]}"; do
               name="$(basename "$asset")"
-              target_dir="$verify_root/$name"
-              mkdir -p "$target_dir"
-              gh release download "$RELEASE_TAG" --pattern "$name" --dir "$target_dir"
-              cmp -s "$asset" "$target_dir/$name"
+              case "$name" in
+                android-preview-provenance.json) expected_id=484098553 ;;
+                android-preview-runtime-audit.txt) expected_id=484098498 ;;
+                lyntty-preview-v1.2.0-920001.apk) expected_id=484098319 ;;
+                lyntty-preview-v1.2.0-920001.apk.sha256) expected_id=484098422 ;;
+                lyntty-preview-v1.2.0-920001.audit.txt) expected_id=484098446 ;;
+                *) echo "unexpected Release asset: $name" >&2; exit 1 ;;
+              esac
+              matches="$(jq -c --arg name "$name" '[.assets[] | select(.name == $name)]' <<< "$release_snapshot")"
+              [[ "$(jq -r 'length' <<< "$matches")" == 1 ]]
+              actual_id="$(jq -r '.[0].id' <<< "$matches")"
+              [[ "$actual_id" == "$expected_id" ]]
+              [[ "$(jq -r '.[0].state' <<< "$matches")" == uploaded ]]
+              expected_size="$(stat -c '%s' "$asset")"
+              expected_digest="sha256:$(sha256sum "$asset" | awk '{print $1}')"
+              [[ "$(jq -r '.[0].size' <<< "$matches")" == "$expected_size" ]]
+              [[ "$(jq -r '.[0].digest' <<< "$matches")" == "$expected_digest" ]]
+              if [[ "$download_bytes" == true ]]; then
+                target="$verify_root/$name"
+                gh api -H 'Accept: application/octet-stream' \
+                  "repos/$GITHUB_REPOSITORY/releases/assets/$actual_id" > "$target"
+                cmp -s "$asset" "$target"
+              else
+                [[ "$download_bytes" == false ]]
+              fi
             done
           }
 
-          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          [[ "$RELEASE_ID" == 357064582 ]]
+          recovery_target_sha=47351659bd8e6862abde1521854a8965919c4691
+          release_api="repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"
+          release_json="$(gh api "$release_api")"
+          [[ "$(jq -r .id <<< "$release_json")" == "$RELEASE_ID" ]]
+          [[ "$(jq -r .tag_name <<< "$release_json")" == "$RELEASE_TAG" ]]
           [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
-          [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
           [[ "$(jq -r .name <<< "$release_json")" == "$RELEASE_TITLE" ]]
+          if [[ "$(jq -r .draft <<< "$release_json")" == true ]]; then
+            [[ "$ALREADY_PUBLISHED" == false ]]
+            [[ "$(jq -r .immutable <<< "$release_json")" == false ]]
+            release_target="$(jq -r .target_commitish <<< "$release_json")"
+            [[ "$release_target" == "$recovery_target_sha" || "$release_target" == "$GITHUB_SHA" ]]
+          else
+            [[ "$ALREADY_PUBLISHED" == true ]]
+            [[ "$(jq -r .immutable <<< "$release_json")" == true ]]
+            [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
+          fi
           jq -j '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/pre-publish-notes.md"
           cmp -s "$RELEASE_NOTES" "$RUNNER_TEMP/pre-publish-notes.md"
           verify_release_assets pre-publish-assets
 
-          tag_api="repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG"
-          if tag_json="$(gh api "$tag_api" 2>/dev/null)"; then
-            [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
-            [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
-          else
-            tag_json="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
-              -f ref="refs/tags/$RELEASE_TAG" -f sha="$GITHUB_SHA")"
-            [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
-            [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
-          fi
           if [[ "$ALREADY_PUBLISHED" == false ]]; then
+            git merge-base --is-ancestor "$recovery_target_sha" "$GITHUB_SHA"
+            release_json="$(gh api "$release_api")"
+            [[ "$(jq -r .id <<< "$release_json")" == "$RELEASE_ID" ]]
+            [[ "$(jq -r .tag_name <<< "$release_json")" == "$RELEASE_TAG" ]]
             [[ "$(jq -r .draft <<< "$release_json")" == true ]]
-            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
-          else
-            [[ "$(jq -r .draft <<< "$release_json")" == false ]]
+            [[ "$(jq -r .immutable <<< "$release_json")" == false ]]
+            [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
+            release_target="$(jq -r .target_commitish <<< "$release_json")"
+            [[ "$release_target" == "$recovery_target_sha" || "$release_target" == "$GITHUB_SHA" ]]
+            [[ "$(jq -r .name <<< "$release_json")" == "$RELEASE_TITLE" ]]
+            jq -j '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/final-draft-notes.md"
+            cmp -s "$RELEASE_NOTES" "$RUNNER_TEMP/final-draft-notes.md"
+            verify_release_assets final-draft-assets false
+
+            git fetch --no-tags origin main
+            [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
           fi
 
-          published="$(gh release view "$RELEASE_TAG" --json isDraft,isImmutable,isPrerelease,name,targetCommitish,body)"
-          [[ "$(jq -r .isDraft <<< "$published")" == false ]]
-          [[ "$(jq -r .isPrerelease <<< "$published")" == true ]]
-          [[ "$(jq -r .isImmutable <<< "$published")" == true ]]
+          tag_api="repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG"
+          tag_error="$RUNNER_TEMP/tag-lookup.err"
+          if tag_json="$(gh api "$tag_api" 2>"$tag_error")"; then
+            [[ "$ALREADY_PUBLISHED" == true ]]
+            [[ "$(jq -r .draft <<< "$release_json")" == false ]]
+            [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
+            [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
+          elif grep -Fq '(HTTP 404)' "$tag_error"; then
+            [[ "$ALREADY_PUBLISHED" == false ]]
+            [[ "$(jq -r .draft <<< "$release_json")" == true ]]
+          else
+            cat "$tag_error" >&2
+            exit 1
+          fi
+          if [[ "$ALREADY_PUBLISHED" == false ]]; then
+            publication_payload="$RUNNER_TEMP/release-publication.json"
+            jq -n --arg tag_name "$RELEASE_TAG" --arg target_commitish "$GITHUB_SHA" \
+              --arg name "$RELEASE_TITLE" --rawfile body "$RELEASE_NOTES" \
+              '{tag_name: $tag_name, target_commitish: $target_commitish, name: $name,
+                body: $body, draft: false, prerelease: true, make_latest: "false"}' \
+              > "$publication_payload"
+            # This one Release-ID update retargets, publishes, and creates the missing tag.
+            published="$(gh api --method PATCH "$release_api" --input "$publication_payload")"
+          else
+            [[ "$(jq -r .draft <<< "$release_json")" == false ]]
+            published="$release_json"
+          fi
+
+          [[ "$(jq -r .id <<< "$published")" == "$RELEASE_ID" ]]
+          [[ "$(jq -r .tag_name <<< "$published")" == "$RELEASE_TAG" ]]
+          [[ "$(jq -r .draft <<< "$published")" == false ]]
+          [[ "$(jq -r .prerelease <<< "$published")" == true ]]
+          [[ "$(jq -r .immutable <<< "$published")" == true ]]
           [[ "$(jq -r .name <<< "$published")" == "$RELEASE_TITLE" ]]
-          [[ "$(jq -r .targetCommitish <<< "$published")" == "$GITHUB_SHA" ]]
+          [[ "$(jq -r .target_commitish <<< "$published")" == "$GITHUB_SHA" ]]
           jq -j '.body // ""' <<< "$published" > "$RUNNER_TEMP/post-publish-notes.md"
           cmp -s "$RELEASE_NOTES" "$RUNNER_TEMP/post-publish-notes.md"
           [[ "$(gh release list --limit 1000 --json tagName,isLatest --jq ".[] | select(.tagName == \"$RELEASE_TAG\") | .isLatest")" == false ]]
