@@ -18,6 +18,8 @@ Bead：`lyntty-24v.3`
 
 ## 根因机制与修复
 
+> 后续：受保护重试 `29877679639` 证明生产形式不属于 bare/quoted/whitespace/CR。没有继续放宽门禁；下一版只输出一个固定分类：expected value with inline comment、alternate SHA tag、repository-qualified tag、interpolation、non-printing bytes 或 other。
+
 迁移逻辑在进入更强的 rendered/runtime identity chain 之前先比较 raw dotenv bytes。因此，只要固定 R65 tag 带有 dotenv 引号、周围空白或 CR，虽然 Docker Compose 可以把它解析为文档中的 tag，也会被提前拒绝。
 
 Source gate 现在只接受固定值 `sha-9752c689c927` 的以下语法：
@@ -39,4 +41,4 @@ Interpolation、inline comment、错误 tag、重复或非 canonical assignment 
 
 ## 残余风险
 
-生产上的具体装饰形式被刻意禁止输出。下一次 protected retry 必须证明它属于受限接受集合，并在任何 service mutation 前完成全部 image/runtime identity chain。
+生产上的具体装饰形式被刻意禁止输出。下一次 protected retry 必须在不暴露原值的情况下识别固定语法分类。任何接受范围变更都必须基于对应分类说明，并在 service mutation 前完成全部 image/runtime identity chain。
