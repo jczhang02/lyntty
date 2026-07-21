@@ -6,7 +6,7 @@ Branch: `fix/relay-preflight-phase`
 
 Bead: `lyntty-24v.3`
 
-> Follow-up: protected retry `29873580305` proved the diagnostic works and isolated the rejection to `legacy-image-layout`. The next revision subdivides that fixed label without exposing state values.
+> Follow-up: protected retry `29873580305` proved the diagnostic works and isolated the rejection to `legacy-image-layout`. Protected retry `29875585755` then narrowed it to `legacy-image-rendered-model`. The remaining rendered-service, image, volume, and R65 tag-binding assertions now emit fixed reason text without state values.
 
 ## Trigger
 

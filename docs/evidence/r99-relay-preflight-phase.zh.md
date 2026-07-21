@@ -6,7 +6,7 @@
 
 Bead：`lyntty-24v.3`
 
-> 后续：受保护重试 `29873580305` 已证明诊断有效，并将拒绝定位到 `legacy-image-layout`。下一版会继续细分固定标签，但不输出任何状态值。
+> 后续：受保护重试 `29873580305` 已证明诊断有效，并将拒绝定位到 `legacy-image-layout`；受保护重试 `29875585755` 又将其缩小到 `legacy-image-rendered-model`。剩余 rendered-service、image、volume 与 R65 tag-binding 断言现在只输出固定原因文本，不输出状态值。
 
 ## 触发
 
