@@ -58,8 +58,8 @@ Run `29786815855` 的一个 job 共 17 个步骤全部成功：protected-source 
 - 八文件 artifact 清单、manifest 绑定的七项输入、五个 tracked sidecar、唯一两行 allowlist、精确 source tree、APK SHA/size、解析后的标题/正文及两项严格 GitHub attestation 均重新验证；
 - Promotion 两处序列化 delta block 完全一致，并精确匹配 replacement source `ef0853524fb78ecf31697103ff5597a0b20b1ed6` 到当前变更的 11 个修改路径；
 - Promotion YAML 解析通过，三个 shell block 全部通过 `bash -n` 与 error-level ShellCheck；
-- hardening/redaction 通过 22 项测试，包含可执行授权 XOR 及 physical/waiver 正文逐字节生成；waiver 正文 SHA-256 为 `9cdc3d6fade06530de3440cfe3e6df1f4f35ae9ae7a86dda2b312b899094f08a`；
-- `bun run ci:fast` 通过：hardening/redaction 22、Wire 33/76、CLI 585/1272、Relay 119/332、App 90 个文件 812/3276 加真实 Preview bundle smoke、lifecycle 35/194；
+- hardening/redaction 通过 24 项测试，包含可执行授权 XOR、physical/waiver 正文逐字节生成、精确 Draft 发布恢复及仅允许 reviewed target 的 retarget；waiver 正文 SHA-256 为 `9cdc3d6fade06530de3440cfe3e6df1f4f35ae9ae7a86dda2b312b899094f08a`；
+- `bun run ci:fast` 通过：hardening/redaction 24、Wire 33/76、CLI 585/1272、Relay 119/332、App 90 个文件 812/3276 加真实 Preview bundle smoke、lifecycle 35/194；
 - `git diff --check` 通过。
 
 ## 未执行实体 Android 验收
@@ -75,6 +75,16 @@ Run `29786815855` 的一个 job 共 17 个步骤全部成功：protected-source 
 上述矩阵**没有针对 SHA-256 `7139219f0051ab0ad705932f15175ea1e5d8903f91e0491b19f800aa97d4038b` 的 APK 执行**。此前 `910003` 实体机测试、CI、静态检查、APK/runtime audit、attestation 与隔离 Relay 预检，都不能替代对这些精确字节的实体测试。
 
 所有者已明确接受该残余风险并授权直接 Release。因此 Promotion 必须保持 `physical_phone_accepted=false`，并要求精确短语 `I accept publishing this exact Candidate without physical Android validation`。不可变公开正文必须确定性前置中英文警告；Actions workflow summary 与 run audit trail 必须记录 actor/mode/source/APK hash；任何位置都不得把本 Release 描述为实体机通过。
+
+## Draft Promotion 恢复
+
+Promotion run `29792580712` 已重新验证 replacement Candidate 并创建精确私有 Draft，随后因单独执行 `POST /git/refs` 创建 tag 返回 HTTP 404，在公开发布前停止。该失败没有留下 tag，也没有产生公开 Release。只读恢复核验确认 Draft `357064582` 仍具备精确标题、目标 commit、3334-byte waiver 正文和五项 Candidate 资产；下载后的每项资产都与 escrow Candidate 逐字节一致。
+
+受保护恢复会硬绑定 Release ID `357064582` 及其五个既有 GitHub asset ID，且绝不调用 Release create、资产 upload、Release delete 或单独的 ref 创建端点。资产清单、状态、大小、服务端 digest、下载字节与 Candidate 字节都通过该精确 Release ID 核验，而不是通过待创建 tag 查询。由于合入恢复 PR 会推进 protected `main`，私有 Draft target 只能是已审阅 prior main `47351659bd8e6862abde1521854a8965919c4691` 或 workflow 的 final protected `GITHUB_SHA`；其他 target 都 fail closed。唯一写请求前，workflow 会再次核验精确 Draft 元数据、asset ID/digest、正文、protected-main 新鲜度和 tag 状态。一个完整 Release-ID 发布 payload 会钉死 tag、final target、标题、精确正文、draft/prerelease 状态及 non-Latest 状态，使 retarget 与发布在同一请求完成。Release API 从该 target 创建 tag。未发布 Draft 要求 tag 明确以 HTTP 404 证明不存在；只有已发布 immutable retry 才可接受既有 tag，且该 tag 必须直接指向 final commit。其他 tag 查询结果都会停止发布。可执行回归测试证明 reviewed-target-only 授权、精确/错误/既有 tag 处理、already-published retry、无 ref POST 的 404 发布及 HTTP 500 拒绝。既有 Draft 与资产不删除、不重建、不重新上传。
+
+只读恢复核验通过 Release asset API 下载 asset ID `484098553`、`484098498`、`484098319`、`484098422`、`484098446`，并逐项与 escrow Candidate 做字节比较；五项全部一致，其中 APK SHA-256 为 `7139219f0051ab0ad705932f15175ea1e5d8903f91e0491b19f800aa97d4038b`。
+
+GitHub 不支持对 Release `PATCH` 这类 unsafe 方法做条件请求。因此，本 workflow 将获授权的仓库写入者视为可信发布参与者，只允许 owner `jczhang02` dispatch，串行化全部 Preview Promotion run，并以完整字段请求缩短最终核验到发布之间的窗口。管理员蓄意并发修改不属于本 workflow 的威胁边界；不存在这种可信参与者竞态时，所有已观测不一致都会 fail closed。
 
 ## 发布边界
 

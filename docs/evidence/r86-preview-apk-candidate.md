@@ -58,8 +58,8 @@ The protected review change was verified without creating a tag, draft, or Relea
 - the eight-file artifact inventory, seven manifest-bound inputs, five tracked sidecars, unique two-row allowlist, exact source tree, APK SHA/size, resolved title/notes, and two strict GitHub attestations were revalidated;
 - both serialized Promotion delta blocks are identical and exactly match the 11 modified paths from replacement source `ef0853524fb78ecf31697103ff5597a0b20b1ed6`;
 - the Promotion YAML parses, and all three shell blocks pass `bash -n` plus error-level ShellCheck;
-- hardening/redaction passes 22 tests, including executable authorization XOR and byte-exact physical/waiver body generation; the waiver body SHA-256 is `9cdc3d6fade06530de3440cfe3e6df1f4f35ae9ae7a86dda2b312b899094f08a`;
-- `bun run ci:fast` passes: hardening/redaction 22, Wire 33/76, CLI 585/1272, Relay 119/332, App 812/3276 across 90 files plus the real Preview bundle smoke, and lifecycle 35/194;
+- hardening/redaction passes 24 tests, including executable authorization XOR, byte-exact physical/waiver body generation, exact-Draft publication recovery, and reviewed-target-only retargeting; the waiver body SHA-256 is `9cdc3d6fade06530de3440cfe3e6df1f4f35ae9ae7a86dda2b312b899094f08a`;
+- `bun run ci:fast` passes: hardening/redaction 24, Wire 33/76, CLI 585/1272, Relay 119/332, App 812/3276 across 90 files plus the real Preview bundle smoke, and lifecycle 35/194;
 - `git diff --check` passes.
 
 ## Physical Android acceptance was not run
@@ -75,6 +75,16 @@ The unexecuted physical-device matrix remains:
 This matrix was **not executed for APK SHA-256 `7139219f0051ab0ad705932f15175ea1e5d8903f91e0491b19f800aa97d4038b`**. Earlier `910003` physical testing, CI, static checks, APK/runtime audits, attestations, and isolated Relay preflight do not substitute for testing these exact bytes.
 
 The owner explicitly authorized direct Release despite this residual risk. Promotion must therefore keep `physical_phone_accepted=false` and require the exact phrase `I accept publishing this exact Candidate without physical Android validation`. It must prepend a deterministic bilingual warning to the immutable public body, record actor/mode/source/APK hash in the Actions workflow summary and run audit trail, and never describe this release as physically accepted.
+
+## Draft Promotion recovery
+
+Promotion run `29792580712` revalidated the replacement Candidate and created the exact private Draft, then stopped before publication when the separate `POST /git/refs` tag creation returned HTTP 404. The failure left no tag and no public Release. Read-only recovery verification confirms Draft `357064582` still has the exact title, target commit, 3334-byte waiver body, and five Candidate assets; every downloaded asset matches the escrowed Candidate byte-for-byte.
+
+The protected recovery hard-binds Release ID `357064582` plus its five existing GitHub asset IDs and never calls Release create, asset upload, Release delete, or a separate ref-creation endpoint. Asset inventory, state, size, server digest, downloaded bytes, and Candidate bytes are all checked through this exact Release ID rather than a pending tag lookup. Because merging the recovery PR advances protected `main`, the private Draft target may be only the reviewed prior main `47351659bd8e6862abde1521854a8965919c4691` or the workflow's final protected `GITHUB_SHA`; any other target fails closed. Immediately before the only mutating request, the workflow revalidates the exact Draft metadata, asset IDs/digests, body, protected-main freshness, and tag state. One full Release-ID publication payload pins tag, final target, title, exact body, draft/prerelease state, and non-Latest status, so retargeting and publication occur in the same request. The Release API creates the tag from that target. An unpublished Draft requires the tag to be absent with an explicit HTTP 404; only an already-published immutable retry may accept an existing tag, which must point directly to the final commit. Any other tag lookup result stops publication. Executable regression tests prove reviewed-target-only authorization, exact/wrong/existing tag handling, already-published retry, 404 publication without a ref POST, and HTTP 500 refusal. The existing Draft and assets are not deleted, recreated, or re-uploaded.
+
+A read-only recovery check downloaded asset IDs `484098553`, `484098498`, `484098319`, `484098422`, and `484098446` through the Release asset API and byte-compared each with the escrowed Candidate; all five matched, including APK SHA-256 `7139219f0051ab0ad705932f15175ea1e5d8903f91e0491b19f800aa97d4038b`.
+
+GitHub does not support conditional requests for unsafe Release `PATCH` operations. This workflow therefore treats authorized repository writers as trusted release actors, restricts dispatch to owner `jczhang02`, serializes all Preview Promotion runs, and minimizes the final check-to-publish interval with a full-field request. A deliberate concurrent mutation by an administrator remains outside the workflow threat boundary; absent such a trusted-actor race, every observed mismatch fails closed.
 
 ## Publication boundary
 

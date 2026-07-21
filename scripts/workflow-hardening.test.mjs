@@ -156,8 +156,8 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /此精确 Candidate 未完成实体 Android 验证。/);
   assert.match(androidPreviewPromote, /notes="\$RELEASE_NOTES"/);
   assert.match(androidPreviewPromote, /release_notes_sha256/);
-  assert.match(androidPreviewPromote, /GITHUB_ACTOR/);
-  assert.equal((androidPreviewPromote.match(/cmp -s "\$RELEASE_NOTES"/g) ?? []).length, 2);
+  assert.match(androidPreviewPromote, /\[\[ "\$GITHUB_ACTOR" == jczhang02 \]\]/);
+  assert.equal((androidPreviewPromote.match(/cmp -s "\$RELEASE_NOTES"/g) ?? []).length, 3);
   assert.match(androidPreviewPromote, /LYNTTY_IMMUTABLE_RELEASES_ENABLED/);
   assert.match(androidPreviewPromote, /LYNTTY_PREVIEW_TAG_RULESET_ID/);
   assert.match(androidPreviewPromote, /GITHUB_REF_PROTECTED/g);
@@ -193,7 +193,7 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   }
   assert.doesNotMatch(androidPreviewPromote, /M\s+docs\/evidence\/artifacts\/r86-preview-apk-candidate\/android-preview-runtime-audit\.txt/);
   assert.match(androidPreviewPromote, /sourceTree/);
-  assert.match(androidPreviewPromote, /isImmutable/);
+  assert.match(androidPreviewPromote, /jq -r \.immutable <<< "\$published"/);
   assert.match(androidPreviewPromote, /bypass_actors/);
   assert.match(androidPreviewPromote, /\["deletion", "update"\]/);
   assert.match(androidPreviewPromote, /release_list_json="\$\(gh release list/g);
@@ -203,12 +203,28 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /\.name/);
   assert.match(androidPreviewPromote, /already_published/);
   assert.doesNotMatch(androidPreviewPromote, /--json[^\n]*\btitle\b/);
-  assert.match(androidPreviewPromote, /git\/refs/);
-  assert.match(androidPreviewPromote, /refs\/tags\/\$RELEASE_TAG/);
-  assert.match(androidPreviewPromote, /gh release create[\s\S]{0,240}--draft[^\n]*--prerelease/);
+  assert.match(androidPreviewPromote, /tag_error="\$RUNNER_TEMP\/tag-lookup\.err"/);
+  assert.match(androidPreviewPromote, /elif grep -Fq '\(HTTP 404\)' "\$tag_error"/);
+  assert.doesNotMatch(androidPreviewPromote, /gh api --method POST[^\n]*git\/refs/);
+  assert.match(androidPreviewPromote, /This one Release-ID update retargets, publishes, and creates the missing tag/);
+  assert.equal(androidPreviewPromote.split('recovery_draft_id=357064582').length - 1, 1);
+  assert.equal(androidPreviewPromote.split('recovery_target_sha=47351659bd8e6862abde1521854a8965919c4691').length - 1, 2);
+  assert.doesNotMatch(androidPreviewPromote, /gh release (?:create|upload|download|delete|view)/);
   assert.match(androidPreviewPromote, /pre-publish-assets/);
+  assert.match(androidPreviewPromote, /final-draft-assets false/);
   assert.match(androidPreviewPromote, /post-publish-assets/);
-  assert.match(androidPreviewPromote, /gh release edit[^\n]*--draft=false[^\n]*--prerelease[^\n]*--latest=false/);
+  for (const assetId of ['484098553', '484098498', '484098319', '484098422', '484098446']) {
+    assert.equal(androidPreviewPromote.split(`expected_id=${assetId}`).length - 1, 2);
+  }
+  assert.match(androidPreviewPromote, /gh api -H 'Accept: application\/octet-stream'/);
+  assert.match(androidPreviewPromote, /\{tag_name: \$tag_name, target_commitish: \$target_commitish, name: \$name,[\s\S]{0,120}draft: false, prerelease: true, make_latest: "false"\}/);
+  assert.match(androidPreviewPromote, /gh api --method PATCH "\$release_api" --input "\$publication_payload"/);
+  const finalNotesIndex = androidPreviewPromote.indexOf('final-draft-notes.md');
+  const finalAssetsIndex = androidPreviewPromote.indexOf('verify_release_assets final-draft-assets false');
+  const finalMainIndex = androidPreviewPromote.indexOf('git fetch --no-tags origin main', finalAssetsIndex);
+  const finalTagIndex = androidPreviewPromote.indexOf('tag_error="$RUNNER_TEMP/tag-lookup.err"', finalMainIndex);
+  const publicationIndex = androidPreviewPromote.indexOf('gh api --method PATCH "$release_api" --input "$publication_payload"');
+  assert.ok(finalNotesIndex < finalAssetsIndex && finalAssetsIndex < finalMainIndex && finalMainIndex < finalTagIndex && finalTagIndex < publicationIndex);
   assert.match(androidPreviewPromote, /android-preview-v/);
   assert.doesNotMatch(androidPreviewPromote, /gradlew|assembleRelease/);
 });
@@ -247,6 +263,132 @@ test('Preview waiver authorization is explicit and mutually exclusive', () => {
     0,
   );
   assert.notEqual(authorize('unknown', '').exitCode, 0);
+});
+
+test('Preview draft recovery delegates tag creation to exact Release publication', async () => {
+  const recoveryBlock = androidPreviewPromote.match(
+    /(          tag_api="repos\/\$GITHUB_REPOSITORY\/git\/ref\/tags\/\$RELEASE_TAG"[\s\S]*?\n          fi)\n\n          \[\[ "\$\(jq -r \.id <<< "\$published"\)/,
+  )?.[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  assert.ok(recoveryBlock);
+  const root = await mkdtemp(join(tmpdir(), 'lyntty-preview-draft-recovery-'));
+  try {
+    const recover = async (name, tagMode, alreadyPublished = false) => {
+      const runnerTemp = join(root, name);
+      await mkdir(runnerTemp);
+      const child = Bun.spawn({
+        cmd: ['bash', '-c', `set -euo pipefail
+gh() {
+  printf '%s\\n' "$*" >> "$RUNNER_TEMP/gh-calls"
+  if [[ "$1 $2 \${3:-}" == 'api --method PATCH' ]]; then : > "$RUNNER_TEMP/release-published"; return 0; fi
+  if [[ "$1" == api ]]; then
+    case "$TAG_MODE" in
+      exact|wrong) printf '{}\\n'; return 0 ;;
+      missing) printf '%s\\n' 'gh: Not Found (HTTP 404)' >&2; return 1 ;;
+      error) printf '%s\\n' 'gh: internal server error (HTTP 500)' >&2; return 1 ;;
+      *) return 1 ;;
+    esac
+  fi
+  return 1
+}
+jq() {
+  if [[ "$1" == -n ]]; then printf '{}\\n'; return 0; fi
+  if [[ "$*" == *'.object.type'* ]]; then printf 'commit\\n'; return 0; fi
+  if [[ "$*" == *'.object.sha'* ]]; then
+    if [[ "$TAG_MODE" == wrong ]]; then printf 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n'; else printf '%s\\n' "$GITHUB_SHA"; fi
+    return 0
+  fi
+  if [[ "$*" == *'.draft'* ]]; then
+    if [[ "$ALREADY_PUBLISHED" == true ]]; then printf 'false\\n'; else printf 'true\\n'; fi
+    return 0
+  fi
+  return 1
+}
+${recoveryBlock}`],
+        env: {
+          ...process.env,
+          RUNNER_TEMP: runnerTemp,
+          TAG_MODE: tagMode,
+          ALREADY_PUBLISHED: String(alreadyPublished),
+          RELEASE_TAG: 'android-preview-v1.2.0-920001',
+          RELEASE_TITLE: 'V1.2.0 Local First 📡',
+          RELEASE_NOTES: join(runnerTemp, 'release-notes.md'),
+          GITHUB_REPOSITORY: 'jczhang02/lyntty',
+          GITHUB_SHA: '47351659bd8e6862abde1521854a8965919c4691',
+          RELEASE_ID: '357064582',
+          release_api: 'repos/jczhang02/lyntty/releases/357064582',
+          release_json: '{}',
+        },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      const [stderr, exitCode] = await Promise.all([
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+      const calls = await readFile(join(runnerTemp, 'gh-calls'), 'utf8');
+      return { exitCode, stderr, calls, published: await Bun.file(join(runnerTemp, 'release-published')).exists() };
+    };
+
+    const missingTag = await recover('missing-tag', 'missing');
+    assert.equal(missingTag.exitCode, 0, missingTag.stderr);
+    assert.equal(missingTag.published, true);
+    assert.match(missingTag.calls, /api --method PATCH repos\/jczhang02\/lyntty\/releases\/357064582 --input \/.*release-publication\.json/);
+    assert.doesNotMatch(missingTag.calls, /api --method POST/);
+
+    const exactTag = await recover('exact-tag', 'exact');
+    assert.notEqual(exactTag.exitCode, 0);
+    assert.equal(exactTag.published, false);
+
+    const wrongTag = await recover('wrong-tag', 'wrong');
+    assert.notEqual(wrongTag.exitCode, 0);
+    assert.equal(wrongTag.published, false);
+
+    const publishedWrongTag = await recover('published-wrong-tag', 'wrong', true);
+    assert.notEqual(publishedWrongTag.exitCode, 0);
+    assert.equal(publishedWrongTag.published, false);
+    assert.doesNotMatch(publishedWrongTag.calls, /api --method PATCH/);
+
+    const publishedRetry = await recover('published-retry', 'exact', true);
+    assert.equal(publishedRetry.exitCode, 0, publishedRetry.stderr);
+    assert.equal(publishedRetry.published, false);
+    assert.doesNotMatch(publishedRetry.calls, /api --method PATCH/);
+
+    const lookupFailure = await recover('lookup-failure', 'error');
+    assert.notEqual(lookupFailure.exitCode, 0);
+    assert.equal(lookupFailure.published, false);
+    assert.doesNotMatch(lookupFailure.calls, /api --method PATCH/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('Preview Draft target accepts only the reviewed prior or current protected main', () => {
+  const targetChecks = [...androidPreviewPromote.matchAll(
+    /(release_target="\$\(jq -r \.target_commitish <<< "\$release_json"\)"\n\s*\[\[ "\$release_target" == "\$recovery_target_sha" \|\| "\$release_target" == "\$GITHUB_SHA" \]\])/g,
+  )].map(match => match[1]);
+  assert.equal(targetChecks.length, 3);
+  assert.match(androidPreviewPromote, /git merge-base --is-ancestor "\$recovery_target_sha" "\$GITHUB_SHA"/);
+
+  const authorize = (block, target) => Bun.spawnSync({
+    cmd: ['bash', '-c', `set -euo pipefail
+jq() { printf '%s\\n' "$DRAFT_TARGET"; }
+${block}`],
+    env: {
+      ...process.env,
+      DRAFT_TARGET: target,
+      release_json: '{}',
+      recovery_target_sha: '47351659bd8e6862abde1521854a8965919c4691',
+      GITHUB_SHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  }).exitCode;
+
+  for (const block of targetChecks) {
+    assert.equal(authorize(block, '47351659bd8e6862abde1521854a8965919c4691'), 0);
+    assert.equal(authorize(block, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), 0);
+    assert.notEqual(authorize(block, 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'), 0);
+  }
 });
 
 test('Preview waiver release body is generated byte-for-byte with a leading warning', async () => {
