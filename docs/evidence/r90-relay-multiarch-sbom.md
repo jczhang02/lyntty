@@ -6,7 +6,7 @@ Branch: `fix/stable-relay-multiarch-sbom`
 
 Bead: `lyntty-24v`
 
-Implementation commit: `aa8130aa2104de545e3ac475b08e28530d9ceadf` (GPG signature verified locally).
+Implementation commits: `aa8130aa2104de545e3ac475b08e28530d9ceadf` and `aab7831fbac704f55c331be9e00dc6870caeb558` (both GPG signatures verified locally).
 
 ## Failure
 
@@ -36,8 +36,9 @@ The Buildx OCI archive has a top-level descriptor for a nested multiarchitecture
 2. requires exactly one `linux/amd64` and one `linux/arm64` image-manifest descriptor, validates both manifest blobs, permits only the matching BuildKit `unknown/unknown` attestation descriptors, and rejects every other platform or descriptor;
 3. rejects symlinked layout parents, writes a temporary one-platform OCI index view for each Syft scan, and byte-restores the original top-level `index.json` even on failure;
 4. creates separate `relay-linux-amd64.spdx.json` and `relay-linux-arm64.spdx.json` documents;
-5. creates `relay.spdx.json`, a deterministic SPDX 2.3 document that represents the multiarch index package, carries the exact OCI index digest, and hash-references both platform SPDX documents through `externalDocumentRefs` and `VARIANT_OF` relationships;
-6. requires the SPDX index digest to equal the digest captured from the built OCI layout.
+5. seals each Syft document with a dedicated SPDX 2.3 `CONTAINER` package and `DESCRIBES` relationship that bind its exact selected image-manifest digest and Stable/Preview repository identity;
+6. creates `relay.spdx.json`, a deterministic SPDX 2.3 document that represents the multiarch index package, carries the exact OCI index digest, and hash-references both platform SPDX documents through `externalDocumentRefs` and `VARIANT_OF` relationships;
+7. requires the SPDX index digest to equal the digest captured from the built OCI layout.
 
 Candidate checksums, the signed Compatibility BOM, and final Release checksums bind all three SPDX documents plus `relay-oci-platforms.json`. Promotion attaches the SPDX index to the immutable multiarch image digest and publishes the two exact referenced platform documents as release assets.
 
@@ -69,9 +70,9 @@ Results:
 - `25` changed workflow Bash blocks passed `bash -n` and error-level ShellCheck;
 - `git diff --check`: pass.
 
-The real Buildx/Syft regression path is not available in the local environment because Docker, Buildx, and Syft are absent. The protected pull-request `Relay image verification` job is the required real-path acceptance test before merge.
+The real Buildx/Syft regression path is not available in the local environment because Docker, Buildx, and Syft are absent. PR #27 run `29829918659` proved that Buildx produced the accepted two-platform/attestation layout and that both selected Syft scans completed. It then exposed a second fail-closed assumption: Syft's `oci-dir` SPDX does not itself put the selected image-manifest digest in its original described package checksum. Commit `aab7831...` now adds and validates an explicit manifest-identity package after each Syft scan. A new protected `Relay image verification` execution must pass before merge.
 
-An adversarial review found and drove fixes for extra-platform coverage, child-SBOM/manifest binding, symlinked layout parents, signed-BOM supplementary evidence, byte-exact index restoration, and adversarial test coverage. Final read-only re-review returned `PASS` with no remaining P0/P1/P2.
+Adversarial reviews found and drove fixes for extra-platform coverage, child-SBOM/manifest binding, symlinked layout parents, signed-BOM supplementary evidence, byte-exact index restoration, and adversarial test coverage. The final follow-up review also validated the resulting SPDX 2.3 documents and returned `PASS` with no remaining P0/P1/P2.
 
 ## Residual state
 

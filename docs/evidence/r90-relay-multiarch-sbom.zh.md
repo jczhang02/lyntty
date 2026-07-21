@@ -6,7 +6,7 @@
 
 Bead：`lyntty-24v`
 
-实现 commit：`aa8130aa2104de545e3ac475b08e28530d9ceadf`（本地 GPG signature 验证通过）。
+实现 commits：`aa8130aa2104de545e3ac475b08e28530d9ceadf`、`aab7831fbac704f55c331be9e00dc6870caeb558`（本地 GPG signature 均验证通过）。
 
 ## 失败
 
@@ -22,8 +22,9 @@ Syft 扫描 multiarch OCI archive 时遇到 nested `application/vnd.oci.image.in
 2. 强制且只接受一个 `linux/amd64` 和一个 `linux/arm64` image manifest，验证两个 blob；只允许与它们对应的 BuildKit `unknown/unknown` attestation descriptor，并拒绝其他平台或 descriptor；
 3. 拒绝 symlink layout parent，为每次 Syft scan 写入临时单平台 OCI index view，失败时也逐字节恢复原 top-level `index.json`；
 4. 分别生成 `relay-linux-amd64.spdx.json` 和 `relay-linux-arm64.spdx.json`；
-5. 生成确定性 `relay.spdx.json`，以 SPDX 2.3 `externalDocumentRefs` 和 `VARIANT_OF` 关系 hash-reference 两个平台 document，并绑定 multiarch OCI index digest；
-6. 要求 SPDX index digest 与实际构建 OCI layout 捕获的 digest 完全一致。
+5. 为每份 Syft document 加入专用 SPDX 2.3 `CONTAINER` package 和 `DESCRIBES` relationship，绑定精确 image-manifest digest 与 Stable/Preview repository identity；
+6. 生成确定性 `relay.spdx.json`，以 SPDX 2.3 `externalDocumentRefs` 和 `VARIANT_OF` 关系 hash-reference 两个平台 document，并绑定 multiarch OCI index digest；
+7. 要求 SPDX index digest 与实际构建 OCI layout 捕获的 digest 完全一致。
 
 Candidate checksums、签名 Compatibility BOM 和最终 Release checksums 会绑定三个 SPDX document 与 `relay-oci-platforms.json`。Promotion 把 SPDX index attach 到 multiarch image digest，并发布其引用的两个精确平台 document。
 
@@ -33,9 +34,9 @@ Candidate checksums、签名 Compatibility BOM 和最终 Release checksums 会�
 
 本地已通过：hardening/redaction/Relay-SBOM `30/0`、release/publication/Relay-SBOM/artifact `26/0`、Wire `36/0`、CLI `585/0`、Relay `119/0`、App `812/0`（3276 assertions）；全部 workflow YAML、25 个 Bash block 的 `bash -n`/error-level ShellCheck 及 `git diff --check` 通过。
 
-本机没有 Docker/Buildx/Syft，因此无法运行真实 OCI scan；protected PR 的 `Relay image verification` 是合并前必须通过的 real-path acceptance。
+本机没有 Docker/Buildx/Syft，因此无法运行真实 OCI scan。PR #27 run `29829918659` 已证明 Buildx 产出预期的双平台/attestation layout，且两个精确 Syft scan 均成功；随后又 fail-closed 暴露一个假设：Syft 的 `oci-dir` SPDX 不会在原 described package checksum 中直接给出所选 image-manifest digest。Commit `aab7831...` 现在会在 scan 后加入并验证显式 manifest-identity package。合并前新的 protected `Relay image verification` 必须通过。
 
-对抗式 review 推动修复了额外平台 coverage、child SBOM/manifest 绑定、symlink layout parent、signed-BOM supplementary evidence、逐字节 index 恢复和 adversarial tests。最终只读复核返回 `PASS`，无 P0/P1/P2。
+对抗式 review 推动修复了额外平台 coverage、child SBOM/manifest 绑定、symlink layout parent、signed-BOM supplementary evidence、逐字节 index 恢复和 adversarial tests。最终 follow-up review 也验证了产出的 SPDX 2.3 documents，并返回 `PASS`，无 P0/P1/P2。
 
 ## 残余状态
 
