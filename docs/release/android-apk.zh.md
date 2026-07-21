@@ -8,7 +8,7 @@ Production APK 必须使用永久密钥并 fail closed；本地 throwaway/Previe
 
 首次 Compatibility Stable 固定为 App `1.2.0`、`versionCode=6`、package `dev.jczhang.lyntty`，并沿用现有 production certificate SHA-256 `25e3928a7cc228254e8249e684c6ab661f5c87140e23db7406afc64af29f0cf5`。`6` 必须能从现有 production `5` 原位升级。
 
-Android-only workflow 只验证永久签名/build 路径并上传短期 artifact，不能发布。最终 Promotion 只允许发布 Compatibility Candidate 内的精确 APK。Stable 没有 Preview 式 waiver：必须在实体 Android 上测试同一 Candidate 字节，并在 dispatch 中同时提供 `physical_phone_accepted=true` 与精确 APK SHA-256；缺一项即停止。
+Android-only workflow 只验证永久签名/build 路径并上传短期 artifact，不能发布。最终 Promotion 只允许发布 Compatibility Candidate 内的精确 APK。Stable 有两条互斥 owner 审批路径：常规路径必须在实体 Android 上测试同一 Candidate 字节，并同时提供 `physical_phone_accepted=true` 与精确 APK SHA-256；owner-operated 自用 waiver 路径必须提供 `physical_phone_accepted=false`、空 accepted hash 和精确短语 `I accept publishing this exact Stable Candidate without physical Android validation`。waiver 绝不冒充实体机验收，会发布 `android-validation.json` 审计资产，并在 immutable Release body 顶部加入中英文未验收警告。
 
 ## 独立 Preview APK prerelease
 

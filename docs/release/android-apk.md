@@ -156,7 +156,7 @@ Version and release-note rules:
 - The Android-only workflow is retained as a protected signing/build verification job. It uploads a short-lived candidate and cannot create a GitHub Release.
 - The first formal Stable uses `versionCode=6`, which advances the existing production package at `5`, and must retain certificate SHA-256 `25e3928a7cc228254e8249e684c6ab661f5c87140e23db7406afc64af29f0cf5`.
 - Formal release notes and channel advancement belong to the signed Compatibility BOM promotion.
-- Stable Promotion has no unverified waiver: the exact Compatibility Candidate APK must pass physical Android validation, and the dispatch must provide both `physical_phone_accepted=true` and that APK's SHA-256.
+- Stable Promotion supports two mutually exclusive owner-approved paths. The normal path requires the exact Compatibility Candidate APK to pass physical Android validation and supplies `physical_phone_accepted=true` plus that APK's SHA-256. For an owner-operated self-use release, an explicit unverified path instead requires `physical_phone_accepted=false`, an empty accepted hash, and the exact phrase `I accept publishing this exact Stable Candidate without physical Android validation`. The waiver path never claims physical acceptance, publishes an `android-validation.json` audit asset, and places a leading bilingual warning in the immutable Release body.
 
 Build outline:
 
