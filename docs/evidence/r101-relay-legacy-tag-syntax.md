@@ -18,6 +18,8 @@ The final reason proves the production `.env` has one canonical `LYNTTY_RELAY_IM
 
 ## Root mechanism and fix
 
+> Follow-up: protected retry `29877679639` proved the production form is outside bare/quoted/whitespace/CR syntax. No gate was broadened. The next revision reports only one fixed category: expected value with inline comment, alternate SHA tag, repository-qualified tag, interpolation, non-printing bytes, or other.
+
 The migration compared raw dotenv bytes before reaching its stronger rendered/runtime identity chain. A semantically fixed R65 tag decorated by dotenv quoting or surrounding whitespace/CR was therefore rejected even though Docker Compose can resolve it to the documented tag.
 
 The source gate now accepts only these syntactic forms of the exact fixed `sha-9752c689c927` value:
@@ -39,4 +41,4 @@ Interpolation, inline comments, wrong tags, duplicate/non-canonical assignments,
 
 ## Residual risk
 
-The exact decoration present on production is deliberately not printed. The next protected retry must prove that it belongs to the bounded accepted set and then complete the full image/runtime identity chain before any service mutation.
+The exact decoration present on production is deliberately not printed. The next protected retry must identify the fixed syntax category without exposing the value. Any acceptance change requires category-specific reasoning and must still complete the full image/runtime identity chain before service mutation.

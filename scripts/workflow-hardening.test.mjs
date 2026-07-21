@@ -99,6 +99,7 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /grep -vE '[^']*LYNTTY_RELAY_IMAGE_TAG/);
   assert.match(relayDeploy, /HANDY_MASTER_SECRET: \$\{LYNTTY_MASTER_SECRET\}/);
   assert.match(relayDeploy, /Relay deployment preflight failed during phase=%s/);
+  assert.match(relayDeploy, /legacy Relay source image-tag syntax category=%s/);
   for (const diagnostic of [
     'rendered legacy Relay Compose must contain only the lyntty-relay service',
     'rendered legacy Relay Compose has no scalar image reference',
@@ -580,7 +581,8 @@ exec /usr/bin/mv "$@"
       ['spaced-extends', { composeContent: composeContent.replace('    restart: unless-stopped', '    extends : legacy-base') }, {}],
       ['interpolated-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=${UNTRUSTED_TAG}\n' }, { UNTRUSTED_TAG: 'sha-9752c689c927' }],
       ['commented-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927 # unrecorded syntax\n' }, {}],
-      ['wrong-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-not-the-r65-image\n' }, {}],
+      ['wrong-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-aaaaaaaaaaaa\n' }, {}],
+      ['repository-qualified-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927\n' }, {}],
       ['mismatched-target', { envContent: `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927\nLYNTTY_RELAY_IMAGE=ghcr.io/jczhang02/lyntty-relay@sha256:${'9'.repeat(64)}\n` }, {}],
       ['multiple-digests', {}, { MOCK_REPO_DIGESTS: JSON.stringify([priorDigest, `ghcr.io/jczhang02/lyntty-relay@sha256:${'3'.repeat(64)}`]) }],
       ['foreign-digest', {}, { MOCK_REPO_DIGESTS: JSON.stringify([`ghcr.io/other/relay@sha256:${'2'.repeat(64)}`]) }],
@@ -596,8 +598,15 @@ exec /usr/bin/mv "$@"
       assert.equal(await readFile(join(rejected.dir, '.env'), 'utf8'), beforeEnv, name);
       assert.equal(await readFile(join(rejected.dir, 'docker-compose.yml'), 'utf8'), beforeCompose, name);
       assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /fixture-secret-never-log/, name);
-      if (['interpolated-legacy-tag', 'commented-legacy-tag', 'wrong-legacy-tag'].includes(name)) {
+      const expectedTagCategory = {
+        'interpolated-legacy-tag': 'interpolation',
+        'commented-legacy-tag': 'expected-value-inline-comment',
+        'wrong-legacy-tag': 'alternate-sha-tag',
+        'repository-qualified-legacy-tag': 'repository-qualified-tag',
+      }[name];
+      if (expectedTagCategory) {
         assert.match(result.stderr, /not a supported syntax for the documented R65 value/, name);
+        assert.match(result.stderr, new RegExp(`syntax category=${expectedTagCategory}`), name);
       }
       const commands = await readFile(join(rejected.dir, '.commands.log'), 'utf8').catch(() => '');
       assert.doesNotMatch(commands, /\b(stop|run|migrate|backup|up)\b/, name);
