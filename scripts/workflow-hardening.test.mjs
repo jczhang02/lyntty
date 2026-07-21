@@ -716,9 +716,17 @@ test('native signature verification pins platform identities and attests exact a
   assert.match(nativeSigning, /bun install --frozen-lockfile/);
 });
 
-test('dependency audit pins the patched shell-quote release', () => {
-  assert.equal(rootPackage.overrides['shell-quote'], '1.9.0');
-  assert.match(bunLockText, /"shell-quote": \["shell-quote@1\.9\.0"/);
+test('dependency audit pins patched transitive releases', () => {
+  const patchedVersions = {
+    '@hono/node-server': '2.0.5',
+    'fast-uri': '3.1.3',
+    'hono': '4.12.27',
+    'shell-quote': '1.9.0',
+  };
+  for (const [name, version] of Object.entries(patchedVersions)) {
+    assert.equal(rootPackage.overrides[name], version);
+    assert.match(bunLockText, new RegExp(`"${name.replace('/', '\\/')}": \\["${name.replace('/', '\\/')}@${version.replaceAll('.', '\\.')}`));
+  }
   assert.doesNotMatch(bunLockText, /shell-quote@1\.8\.4/);
 });
 
