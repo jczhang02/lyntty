@@ -369,6 +369,7 @@ jobs:
             preflight_phase=legacy-image-source-model
             local expected_tag='ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927'
             local target_key=LYNTTY_RELAY_IMAGE legacy_tag_key=LYNTTY_RELAY_IMAGE_TAG source_form
+            local legacy_tag_value_pattern="^LYNTTY_RELAY_IMAGE_TAG=[[:space:]]*(sha-9752c689c927|'sha-9752c689c927'|\"sha-9752c689c927\")[[:space:]]*$"
             local assignment_count canonical_count legacy_tag_assignment_count legacy_tag_canonical_count
             local services_key_count service_key_count raw_image_count strict_image_count data_mount_count backup_target_count backup_mount_count
             local rendered_json configured_reference raw_reference container container_reference container_image_id configured_image_id
@@ -437,8 +438,8 @@ jobs:
                 return 1
               }
               if [[ "$legacy_tag_assignment_count" == 1 ]]; then
-                [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]] || {
-                  echo 'canonical retry state has an unexpected legacy image-tag value' >&2
+                LC_ALL=C grep -Eq "$legacy_tag_value_pattern" .env || {
+                  echo 'canonical retry state has an unsupported legacy image-tag syntax' >&2
                   return 1
                 }
               fi
@@ -456,8 +457,8 @@ jobs:
                 echo 'legacy Relay image tag must have one canonical source assignment' >&2
                 return 1
               }
-              [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]] || {
-                echo 'legacy Relay source image tag is not the documented R65 value' >&2
+              LC_ALL=C grep -Eq "$legacy_tag_value_pattern" .env || {
+                echo 'legacy Relay source image tag is not a supported syntax for the documented R65 value' >&2
                 return 1
               }
             elif [[ "$raw_reference" == "$expected_tag" ]]; then
@@ -467,8 +468,8 @@ jobs:
                 return 1
               }
               if [[ "$legacy_tag_assignment_count" == 1 ]]; then
-                [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]] || {
-                  echo 'hardcoded legacy Relay source has an unexpected image-tag retry value' >&2
+                LC_ALL=C grep -Eq "$legacy_tag_value_pattern" .env || {
+                  echo 'hardcoded legacy Relay source has an unsupported image-tag retry syntax' >&2
                   return 1
                 }
               fi

@@ -104,7 +104,7 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
     'rendered legacy Relay Compose has no scalar image reference',
     'rendered legacy Relay Compose has an unexpected persistent-volume model',
     'legacy Relay image tag must have one canonical source assignment',
-    'legacy Relay source image tag is not the documented R65 value',
+    'legacy Relay source image tag is not a supported syntax for the documented R65 value',
   ]) {
     assert.match(relayDeploy, new RegExp(diagnostic));
   }
@@ -433,8 +433,14 @@ if (args[0] === 'compose') {
   const compose = readFileSync(composePath, 'utf8');
   const env = readFileSync(envPath, 'utf8');
   const rawImage = compose.match(/^    image: (.+)$/m)?.[1];
-  const envImage = env.match(/^LYNTTY_RELAY_IMAGE=(.+)$/m)?.[1];
-  const legacyTagValue = env.match(/^LYNTTY_RELAY_IMAGE_TAG=(.+)$/m)?.[1];
+  const parseEnvValue = (raw) => {
+    let value = raw?.trim();
+    if (value?.length >= 2 && ((value[0] === "'" && value.at(-1) === "'") || (value[0] === '"' && value.at(-1) === '"'))) return value.slice(1, -1);
+    value = value?.replace(/\\s+#.*$/, '').trim();
+    return value?.replace(/\\$\\{([A-Z_][A-Z0-9_]*)\\}/g, (_, key) => process.env[key] ?? '');
+  };
+  const envImage = parseEnvValue(env.match(/^LYNTTY_RELAY_IMAGE=(.+)$/m)?.[1]);
+  const legacyTagValue = parseEnvValue(env.match(/^LYNTTY_RELAY_IMAGE_TAG=(.+)$/m)?.[1]);
   const targetVariable = '$' + '{LYNTTY_RELAY_IMAGE}';
   const legacyVariable = 'ghcr.io/jczhang02/lyntty-relay:' + '$' + '{LYNTTY_RELAY_IMAGE_TAG}';
   const image = rawImage === targetVariable ? envImage : rawImage === legacyVariable ? 'ghcr.io/jczhang02/lyntty-relay:' + legacyTagValue : rawImage;
@@ -540,6 +546,18 @@ exec /usr/bin/mv "$@"
     assert.equal(execute(fixture.dir).exitCode, 0);
     assert.deepEqual((await readdir(fixture.dir)).filter(name => name !== '.commands.log').sort(), namesBeforeRetry);
 
+    for (const [name, envContent] of [
+      ['single-quoted-tag', "LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG='sha-9752c689c927'\n"],
+      ['double-quoted-spaced-tag', 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=  "sha-9752c689c927"  \n'],
+      ['crlf-tag', 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\r\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927\r\n'],
+    ]) {
+      const ornamented = await createFixture(name, { envContent });
+      const result = execute(ornamented.dir);
+      assert.equal(result.exitCode, 0, `${name}: ${result.stderr}`);
+      assert.equal(await readFile(join(ornamented.dir, '.env'), 'utf8'), `${envContent}LYNTTY_RELAY_IMAGE=${priorDigest}\n`, name);
+      assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /fixture-secret-never-log/, name);
+    }
+
     const interruptedEnv = `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927\nLYNTTY_RELAY_IMAGE=${priorDigest}\n`;
     const interrupted = await createFixture('env-first-retry', { envContent: interruptedEnv });
     assert.equal(execute(interrupted.dir).exitCode, 0);
@@ -560,6 +578,9 @@ exec /usr/bin/mv "$@"
       ['tagged-include', { composeContent: `!unsafe include: extra.yml\n${composeContent}` }, {}],
       ['explicit-include', { composeContent: `? include\n: extra.yml\n${composeContent}` }, {}],
       ['spaced-extends', { composeContent: composeContent.replace('    restart: unless-stopped', '    extends : legacy-base') }, {}],
+      ['interpolated-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=${UNTRUSTED_TAG}\n' }, { UNTRUSTED_TAG: 'sha-9752c689c927' }],
+      ['commented-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927 # unrecorded syntax\n' }, {}],
+      ['wrong-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-not-the-r65-image\n' }, {}],
       ['mismatched-target', { envContent: `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927\nLYNTTY_RELAY_IMAGE=ghcr.io/jczhang02/lyntty-relay@sha256:${'9'.repeat(64)}\n` }, {}],
       ['multiple-digests', {}, { MOCK_REPO_DIGESTS: JSON.stringify([priorDigest, `ghcr.io/jczhang02/lyntty-relay@sha256:${'3'.repeat(64)}`]) }],
       ['foreign-digest', {}, { MOCK_REPO_DIGESTS: JSON.stringify([`ghcr.io/other/relay@sha256:${'2'.repeat(64)}`]) }],
@@ -575,6 +596,9 @@ exec /usr/bin/mv "$@"
       assert.equal(await readFile(join(rejected.dir, '.env'), 'utf8'), beforeEnv, name);
       assert.equal(await readFile(join(rejected.dir, 'docker-compose.yml'), 'utf8'), beforeCompose, name);
       assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /fixture-secret-never-log/, name);
+      if (['interpolated-legacy-tag', 'commented-legacy-tag', 'wrong-legacy-tag'].includes(name)) {
+        assert.match(result.stderr, /not a supported syntax for the documented R65 value/, name);
+      }
       const commands = await readFile(join(rejected.dir, '.commands.log'), 'utf8').catch(() => '');
       assert.doesNotMatch(commands, /\b(stop|run|migrate|backup|up)\b/, name);
     }
