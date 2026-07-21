@@ -383,11 +383,40 @@ jobs:
           ' "$RUNNER_TEMP/candidate/evidence/retained-runtime-verification.json"
 
       - name: Generate SPDX SBOMs and deterministic provenance subjects
+        env:
+          RELAY_VERSION: ${{ steps.release.outputs.relay }}
         run: |
           set -euo pipefail
           syft scan "dir:$RUNNER_TEMP/candidate/cli" -o spdx-json="$RUNNER_TEMP/candidate/evidence/cli.spdx.json"
           syft scan "file:$RUNNER_TEMP/candidate/app/lyntty-${CHANNEL}.apk" -o spdx-json="$RUNNER_TEMP/candidate/evidence/app.spdx.json"
-          syft scan "oci-archive:$RUNNER_TEMP/candidate/relay/lyntty-relay.oci.tar" -o spdx-json="$RUNNER_TEMP/candidate/evidence/relay.spdx.json"
+          relay_layout="$RUNNER_TEMP/relay-oci-layout"
+          selection="$RUNNER_TEMP/candidate/evidence/relay-oci-platforms.json"
+          mkdir "$relay_layout"
+          tar -xf "$RUNNER_TEMP/candidate/relay/lyntty-relay.oci.tar" -C "$relay_layout"
+          bun scripts/relay-oci-sbom.ts prepare --layout "$relay_layout" --output "$selection"
+          restore_relay_index() {
+            bun scripts/relay-oci-sbom.ts restore --layout "$relay_layout" --selection "$selection"
+          }
+          trap restore_relay_index EXIT
+          bun scripts/relay-oci-sbom.ts select --layout "$relay_layout" --selection "$selection" --platform linux/amd64
+          syft scan --platform linux/amd64 "oci-dir:$relay_layout" -o spdx-json="$RUNNER_TEMP/candidate/evidence/relay-linux-amd64.spdx.json"
+          bun scripts/relay-oci-sbom.ts select --layout "$relay_layout" --selection "$selection" --platform linux/arm64
+          syft scan --platform linux/arm64 "oci-dir:$relay_layout" -o spdx-json="$RUNNER_TEMP/candidate/evidence/relay-linux-arm64.spdx.json"
+          restore_relay_index
+          trap - EXIT
+          relay_repository=ghcr.io/jczhang02/lyntty-relay
+          [[ "$CHANNEL" == preview ]] && relay_repository=ghcr.io/jczhang02/lyntty-relay-preview
+          bun scripts/relay-oci-sbom.ts assemble \
+            --selection "$selection" \
+            --amd64-sbom "$RUNNER_TEMP/candidate/evidence/relay-linux-amd64.spdx.json" \
+            --arm64-sbom "$RUNNER_TEMP/candidate/evidence/relay-linux-arm64.spdx.json" \
+            --output "$RUNNER_TEMP/candidate/evidence/relay.spdx.json" \
+            --source-commit "$GITHUB_SHA" \
+            --version "$RELAY_VERSION" \
+            --repository "$relay_repository" \
+            --created "$(git show -s --format=%cI "$GITHUB_SHA")" \
+            --expected-index-digest "$(cat "$RUNNER_TEMP/candidate/relay/digest.txt")"
+          rm -rf "$relay_layout"
           for component in app cli relay; do
             COMPONENT="$component" SOURCE_SHA="$GITHUB_SHA" bun - <<'BUN'
           import { createHash } from 'node:crypto';
@@ -459,6 +488,11 @@ jobs:
           const evidence = component => ({
             sbom: local(join(root, 'evidence', `${component}.spdx.json`)),
             provenance: local(join(root, 'evidence', `${component}.intoto.json`)),
+            ...(component === 'relay' ? { supplementary: [
+              local(join(root, 'evidence', 'relay-linux-amd64.spdx.json')),
+              local(join(root, 'evidence', 'relay-linux-arm64.spdx.json')),
+              local(join(root, 'evidence', 'relay-oci-platforms.json')),
+            ] } : {}),
           });
           const required = [...CURRENT_WIRE_OFFER.capabilities];
           const wire = CURRENT_WIRE_OFFER;

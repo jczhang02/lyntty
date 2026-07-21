@@ -15,6 +15,7 @@ const releaseRollbackPath = new URL('../.github/workflows/release-rollback.yml',
 const nativeSigningPath = new URL('../.github/workflows/native-signing.yml', import.meta.url);
 const nativeSigningProducerPath = new URL('../.github/workflows/native-signing-producer.yml', import.meta.url);
 const githubReleasePath = new URL('./github-release.ts', import.meta.url);
+const relayOciSbomPath = new URL('./relay-oci-sbom.ts', import.meta.url);
 const androidGradlePath = new URL('../packages/lyntty-app/android/app/build.gradle', import.meta.url);
 const maestroRunnerPath = new URL('./e2e/run-maestro.sh', import.meta.url);
 const codeownersPath = new URL('../.github/CODEOWNERS', import.meta.url);
@@ -27,7 +28,7 @@ const previewRelayGatePath = new URL('../e2e/maestro/standalone/preview_first_ru
 const previewReleaseNotesPath = new URL('../docs/release/preview-apk-release-notes.md', import.meta.url);
 const previewBundleSmokePath = new URL('../packages/lyntty-app/scripts/bundle-smoke.ts', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, nativeSigningProducer, githubRelease, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, bunLockText, previewRelayGate, previewBundleSmoke] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, nativeSigningProducer, githubRelease, relayOciSbom, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, bunLockText, previewRelayGate, previewBundleSmoke] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
@@ -39,6 +40,7 @@ const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, android
   readFile(nativeSigningPath, 'utf8'),
   readFile(nativeSigningProducerPath, 'utf8'),
   readFile(githubReleasePath, 'utf8'),
+  readFile(relayOciSbomPath, 'utf8'),
   readFile(androidGradlePath, 'utf8'),
   readFile(maestroRunnerPath, 'utf8'),
   readFile(codeownersPath, 'utf8'),
@@ -100,6 +102,12 @@ test('relay image verification never publishes from an ordinary main push', () =
   assert.match(relayImage, /pull_request/);
   assert.match(relayImage, /push: false/);
   assert.match(relayImage, /verify-\$\{\{ github\.sha \}\}/);
+  assert.match(relayImage, /type=oci,dest=/);
+  assert.match(relayImage, /--platform linux\/amd64/);
+  assert.match(relayImage, /--platform linux\/arm64/);
+  assert.match(relayImage, /relay-linux-amd64\.spdx\.json/);
+  assert.match(relayImage, /relay-linux-arm64\.spdx\.json/);
+  assert.doesNotMatch(relayImage, /syft scan "oci-archive:/);
   assert.doesNotMatch(relayImage, /packages: write/);
   assert.doesNotMatch(relayImage, /docker\/login-action/);
   assert.doesNotMatch(relayImage, /refs\/heads\/main/);
@@ -469,6 +477,14 @@ test('candidate builds once under channel isolation and never publishes', () => 
   assert.doesNotMatch(releaseCandidate, /LYNTTY_SIGNED_(?:DARWIN|WINDOWS)/);
   assert.doesNotMatch(releaseCandidate, /native-signing\.yml/);
   assert.match(releaseCandidate, /platformCodeSigning:[\s\S]*policy: 'not-required-self-use'[\s\S]*evidence: \[\]/);
+  assert.match(releaseCandidate, /--platform linux\/amd64/);
+  assert.match(releaseCandidate, /--platform linux\/arm64/);
+  assert.match(relayOciSbom, /externalDocumentRefs/);
+  assert.match(relayOciSbom, /VARIANT_OF/);
+  assert.match(releaseCandidate, /relay-linux-amd64\.spdx\.json/);
+  assert.match(releaseCandidate, /relay-linux-arm64\.spdx\.json/);
+  assert.match(releaseCandidate, /supplementary:[\s\S]*relay-oci-platforms\.json/);
+  assert.doesNotMatch(releaseCandidate, /syft scan "oci-archive:/);
   assert.match(cliArtifactBuilder, /git', 'status', '--porcelain=v1', '--untracked-files=all'/);
   assert.match(cliArtifactBuilder, /Refusing to attribute an artifact to a dirty source tree/);
   assert.match(releaseCandidate, /test fixture BOM roots are never publishable/);
@@ -611,7 +627,7 @@ test('dependency audit pins the patched shell-quote release', () => {
 test('required PR hygiene verifies lifecycle trust and release contracts', () => {
   assert.match(typecheckWorkflow, /bun pm untrusted/);
   assert.match(typecheckWorkflow, /Found 0 untrusted dependencies with scripts/);
-  assert.match(typecheckWorkflow, /bun test scripts\/release\.test\.ts scripts\/github-release\.test\.ts packages\/lyntty-cli\/scripts\/build-artifact\.test\.ts/);
+  assert.match(typecheckWorkflow, /bun test scripts\/release\.test\.ts scripts\/github-release\.test\.ts scripts\/relay-oci-sbom\.test\.ts packages\/lyntty-cli\/scripts\/build-artifact\.test\.ts/);
 });
 
 test('supported CLI artifacts run on every release architecture in PR CI', () => {
@@ -635,7 +651,7 @@ test('isolated development lifecycle runs on Linux and macOS CI', () => {
 test('CODEOWNERS covers release trust inputs and its own policy', () => {
   for (const path of [
     '/.github/CODEOWNERS', '/.dockerignore', '/Dockerfile', '/bun.lock',
-    '/config/native-signing/', '/config/release-trust-roots/', '/scripts/github-release.ts',
+    '/config/native-signing/', '/config/release-trust-roots/', '/scripts/github-release.ts', '/scripts/relay-oci-sbom.ts',
     '/packages/lyntty-app/android/app/build.gradle',
     '/packages/lyntty-cli/scripts/build-artifact.ts',
     '/packages/lyntty-cli/src/distribution/',

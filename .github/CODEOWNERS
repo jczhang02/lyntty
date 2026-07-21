@@ -9,6 +9,7 @@
 /config/release-trust-roots/ @jczhang02
 /packages/*/package.json @jczhang02
 /scripts/github-release.ts @jczhang02
+/scripts/relay-oci-sbom.ts @jczhang02
 /scripts/release.ts @jczhang02
 /scripts/dev.ts @jczhang02
 /scripts/preview.ts @jczhang02

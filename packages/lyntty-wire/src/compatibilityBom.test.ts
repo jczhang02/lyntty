@@ -216,6 +216,18 @@ describe('Compatibility BOM', () => {
       .toBe('optional-native-darwin-arm64-attestation.json');
   });
 
+  it('binds unique supplementary multiarch supply-chain evidence', () => {
+    const bom = buildBom({ sequence: 9 });
+    bom.components.relay.supplyChain.supplementary = [
+      immutableFile('relay-linux-amd64.spdx.json', 9),
+      immutableFile('relay-linux-arm64.spdx.json', 9),
+      immutableFile('relay-oci-platforms.json', 9),
+    ];
+    expect(CompatibilityBomV1Schema.parse(bom).components.relay.supplyChain.supplementary).toHaveLength(3);
+    bom.components.relay.supplyChain.supplementary[1] = bom.components.relay.supplyChain.supplementary[0]!;
+    expect(() => CompatibilityBomV1Schema.parse(bom)).toThrow('file names must be unique');
+  });
+
   it('rejects tampering, channel confusion, replay, and a mismatched signer policy', async () => {
     const bom = buildBom({ sequence: 4 });
     const signature = signCompatibilityBom({
