@@ -391,6 +391,8 @@ jobs:
           syft scan "file:$RUNNER_TEMP/candidate/app/lyntty-${CHANNEL}.apk" -o spdx-json="$RUNNER_TEMP/candidate/evidence/app.spdx.json"
           relay_layout="$RUNNER_TEMP/relay-oci-layout"
           selection="$RUNNER_TEMP/candidate/evidence/relay-oci-platforms.json"
+          relay_repository=ghcr.io/jczhang02/lyntty-relay
+          [[ "$CHANNEL" == preview ]] && relay_repository=ghcr.io/jczhang02/lyntty-relay-preview
           mkdir "$relay_layout"
           tar -xf "$RUNNER_TEMP/candidate/relay/lyntty-relay.oci.tar" -C "$relay_layout"
           bun scripts/relay-oci-sbom.ts prepare --layout "$relay_layout" --output "$selection"
@@ -400,12 +402,14 @@ jobs:
           trap restore_relay_index EXIT
           bun scripts/relay-oci-sbom.ts select --layout "$relay_layout" --selection "$selection" --platform linux/amd64
           syft scan --platform linux/amd64 "oci-dir:$relay_layout" -o spdx-json="$RUNNER_TEMP/candidate/evidence/relay-linux-amd64.spdx.json"
+          bun scripts/relay-oci-sbom.ts bind --selection "$selection" --platform linux/amd64 \
+            --sbom "$RUNNER_TEMP/candidate/evidence/relay-linux-amd64.spdx.json" --repository "$relay_repository"
           bun scripts/relay-oci-sbom.ts select --layout "$relay_layout" --selection "$selection" --platform linux/arm64
           syft scan --platform linux/arm64 "oci-dir:$relay_layout" -o spdx-json="$RUNNER_TEMP/candidate/evidence/relay-linux-arm64.spdx.json"
+          bun scripts/relay-oci-sbom.ts bind --selection "$selection" --platform linux/arm64 \
+            --sbom "$RUNNER_TEMP/candidate/evidence/relay-linux-arm64.spdx.json" --repository "$relay_repository"
           restore_relay_index
           trap - EXIT
-          relay_repository=ghcr.io/jczhang02/lyntty-relay
-          [[ "$CHANNEL" == preview ]] && relay_repository=ghcr.io/jczhang02/lyntty-relay-preview
           bun scripts/relay-oci-sbom.ts assemble \
             --selection "$selection" \
             --amd64-sbom "$RUNNER_TEMP/candidate/evidence/relay-linux-amd64.spdx.json" \

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import {
   assembleRelaySpdxIndex,
+  bindRelayPlatformSpdx,
   prepareRelayOciPlatformSelection,
   restoreRelayOciIndex,
   selectRelayOciPlatform,
@@ -89,7 +90,7 @@ async function fixture(): Promise<{
   return { root, layout, selection: join(root, 'selection.json'), rootIndex, rootIndexBytes, amd64, arm64 };
 }
 
-function spdx(namespace: string, packageId: string, manifestDigest: string) {
+function spdx(namespace: string, packageId: string) {
   return {
     SPDXID: 'SPDXRef-DOCUMENT',
     spdxVersion: 'SPDX-2.3',
@@ -103,7 +104,6 @@ function spdx(namespace: string, packageId: string, manifestDigest: string) {
       name: packageId,
       downloadLocation: 'NOASSERTION',
       filesAnalyzed: false,
-      checksums: [{ algorithm: 'SHA256', checksumValue: manifestDigest.slice('sha256:'.length) }],
     }],
   };
 }
@@ -137,10 +137,13 @@ describe('Relay multiarch OCI SBOM preparation', () => {
     const selection = await prepareRelayOciPlatformSelection(value.layout, value.selection);
     const amd64Path = join(value.root, 'relay-linux-amd64.spdx.json');
     const arm64Path = join(value.root, 'relay-linux-arm64.spdx.json');
-    const amd64Bytes = `${JSON.stringify(spdx('https://example.invalid/amd64', 'SPDXRef-Package-amd64', value.amd64.digest), null, 2)}\n`;
-    const arm64Bytes = `${JSON.stringify(spdx('https://example.invalid/arm64', 'SPDXRef-Package-arm64', value.arm64.digest), null, 2)}\n`;
-    await writeFile(amd64Path, amd64Bytes);
-    await writeFile(arm64Path, arm64Bytes);
+    await writeFile(amd64Path, `${JSON.stringify(spdx('https://example.invalid/amd64', 'SPDXRef-Package-amd64'), null, 2)}\n`);
+    await writeFile(arm64Path, `${JSON.stringify(spdx('https://example.invalid/arm64', 'SPDXRef-Package-arm64'), null, 2)}\n`);
+    const repository = 'ghcr.io/jczhang02/lyntty-relay';
+    await bindRelayPlatformSpdx({ selectionPath: value.selection, platform: 'linux/amd64', sbomPath: amd64Path, repository });
+    await bindRelayPlatformSpdx({ selectionPath: value.selection, platform: 'linux/arm64', sbomPath: arm64Path, repository });
+    const amd64Bytes = await readFile(amd64Path, 'utf8');
+    const arm64Bytes = await readFile(arm64Path, 'utf8');
     const output = join(value.root, 'relay.spdx.json');
     const options = {
       selectionPath: value.selection,
@@ -149,7 +152,7 @@ describe('Relay multiarch OCI SBOM preparation', () => {
       outputPath: output,
       sourceCommit: '1'.repeat(40),
       version: '1.2.0',
-      repository: 'ghcr.io/jczhang02/lyntty-relay',
+      repository,
       created: '2026-07-21T00:00:00Z',
       expectedIndexDigest: selection.indexDigest,
     };
@@ -168,6 +171,11 @@ describe('Relay multiarch OCI SBOM preparation', () => {
       .rejects.toThrow('does not describe its selected image manifest');
     await expect(assembleRelaySpdxIndex({ ...options, arm64SbomPath: amd64Path }))
       .rejects.toThrow(/does not describe|namespaces must be unique/);
+    const tampered = JSON.parse(amd64Bytes);
+    const manifestPackage = tampered.packages.find((entry: { SPDXID: string }) => entry.SPDXID.endsWith('manifest'));
+    manifestPackage.checksums[0].checksumValue = 'f'.repeat(64);
+    await writeFile(amd64Path, `${JSON.stringify(tampered, null, 2)}\n`);
+    await expect(assembleRelaySpdxIndex(options)).rejects.toThrow('does not describe its selected image manifest');
   });
 
   it('rejects nested-index and platform blobs that no longer match their descriptors', async () => {

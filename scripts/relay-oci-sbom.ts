@@ -46,7 +46,17 @@ interface SpdxDocument {
   documentDescribes?: string[];
   packages?: Array<{
     SPDXID?: string;
+    name?: string;
+    versionInfo?: string;
+    downloadLocation?: string;
+    filesAnalyzed?: boolean;
+    primaryPackagePurpose?: string;
     checksums?: Array<{ algorithm?: string; checksumValue?: string }>;
+  }>;
+  relationships?: Array<{
+    spdxElementId?: string;
+    relationshipType?: string;
+    relatedSpdxElement?: string;
   }>;
 }
 
@@ -279,6 +289,48 @@ function parseSpdxDocument(value: unknown, label: string): {
   };
 }
 
+function platformManifestPackageId(platform: ExpectedPlatform): string {
+  return `SPDXRef-Package-lyntty-relay-${platform.replace('/', '-')}-manifest`;
+}
+
+export async function bindRelayPlatformSpdx(options: {
+  selectionPath: string;
+  platform: ExpectedPlatform;
+  sbomPath: string;
+  repository: string;
+}): Promise<void> {
+  if (!EXPECTED_PLATFORMS.includes(options.platform)) throw new Error(`Unsupported Relay OCI platform: ${options.platform}`);
+  if (!/^ghcr\.io\/[a-z0-9][a-z0-9._/-]*$/.test(options.repository)) throw new Error('Relay SPDX repository is invalid');
+  const selection = await readSelection(options.selectionPath);
+  const value = await readJson(options.sbomPath, `${options.platform} SPDX document`);
+  const { document, describedPackage } = parseSpdxDocument(value, `${options.platform} SPDX document`);
+  const manifestPackageId = platformManifestPackageId(options.platform);
+  if (document.packages!.some(candidate => candidate.SPDXID === manifestPackageId)) {
+    throw new Error(`${options.platform} SPDX document already contains a manifest binding`);
+  }
+  const manifestDigest = selection.platforms[options.platform].digest;
+  const digestValue = manifestDigest.match(DIGEST_PATTERN)![1]!;
+  document.packages!.push({
+    SPDXID: manifestPackageId,
+    name: `${options.repository}@${manifestDigest}`,
+    versionInfo: manifestDigest,
+    downloadLocation: 'NOASSERTION',
+    filesAnalyzed: false,
+    primaryPackagePurpose: 'CONTAINER',
+    checksums: [{ algorithm: 'SHA256', checksumValue: digestValue }],
+  });
+  document.documentDescribes = [...new Set([...(document.documentDescribes ?? [describedPackage.SPDXID]), manifestPackageId])];
+  document.relationships = [
+    ...(document.relationships ?? []),
+    {
+      spdxElementId: 'SPDXRef-DOCUMENT',
+      relationshipType: 'DESCRIBES',
+      relatedSpdxElement: manifestPackageId,
+    },
+  ];
+  await writeJsonAtomic(options.sbomPath, document);
+}
+
 export async function assembleRelaySpdxIndex(options: {
   selectionPath: string;
   amd64SbomPath: string;
@@ -310,14 +362,25 @@ export async function assembleRelaySpdxIndex(options: {
   }];
   for (const input of inputs) {
     const bytes = await readRegularFile(input.path, `${input.platform} SPDX document`);
-    const { document, describedPackage } = parseSpdxDocument(
+    const { document } = parseSpdxDocument(
       JSON.parse(new TextDecoder().decode(bytes)),
       `${input.platform} SPDX document`,
     );
     if (documentNamespaces.has(document.documentNamespace)) throw new Error('Relay platform SPDX document namespaces must be unique');
     documentNamespaces.add(document.documentNamespace);
     const manifestDigest = selection.platforms[input.platform].digest.match(DIGEST_PATTERN)![1]!;
-    if (!describedPackage.checksums?.some(checksum => checksum.algorithm === 'SHA256' && checksum.checksumValue === manifestDigest)) {
+    const manifestPackageId = platformManifestPackageId(input.platform);
+    const manifestPackages = document.packages!.filter(candidate => candidate.SPDXID === manifestPackageId);
+    const manifestPackage = manifestPackages[0];
+    if (manifestPackages.length !== 1
+      || !manifestPackage
+      || !document.documentDescribes?.includes(manifestPackageId)
+      || manifestPackage.name !== `${options.repository}@sha256:${manifestDigest}`
+      || manifestPackage.versionInfo !== `sha256:${manifestDigest}`
+      || manifestPackage.downloadLocation !== 'NOASSERTION'
+      || manifestPackage.filesAnalyzed !== false
+      || manifestPackage.primaryPackagePurpose !== 'CONTAINER'
+      || !manifestPackage.checksums?.some(checksum => checksum.algorithm === 'SHA256' && checksum.checksumValue === manifestDigest)) {
       throw new Error(`${input.platform} SPDX document does not describe its selected image manifest`);
     }
     externalDocumentRefs.push({
@@ -326,7 +389,7 @@ export async function assembleRelaySpdxIndex(options: {
       checksum: { algorithm: 'SHA256', checksumValue: sha256(bytes) },
     });
     relationships.push({
-      spdxElementId: `${input.externalDocumentId}:${describedPackage.SPDXID}`,
+      spdxElementId: `${input.externalDocumentId}:${manifestPackageId}`,
       relationshipType: 'VARIANT_OF',
       relatedSpdxElement: 'SPDXRef-Package-lyntty-relay-multiarch',
     });
@@ -381,6 +444,15 @@ async function main(args: string[]): Promise<void> {
     await restoreRelayOciIndex(option(args, '--layout'), option(args, '--selection'));
     return;
   }
+  if (command === 'bind') {
+    await bindRelayPlatformSpdx({
+      selectionPath: option(args, '--selection'),
+      platform: option(args, '--platform') as ExpectedPlatform,
+      sbomPath: option(args, '--sbom'),
+      repository: option(args, '--repository'),
+    });
+    return;
+  }
   if (command === 'assemble') {
     await assembleRelaySpdxIndex({
       selectionPath: option(args, '--selection'),
@@ -395,7 +467,7 @@ async function main(args: string[]): Promise<void> {
     });
     return;
   }
-  throw new Error('Usage: relay-oci-sbom.ts <prepare|select|restore|assemble> [options]');
+  throw new Error('Usage: relay-oci-sbom.ts <prepare|select|restore|bind|assemble> [options]');
 }
 
 if (import.meta.main) await main(process.argv.slice(2));

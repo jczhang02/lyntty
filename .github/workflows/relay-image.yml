@@ -60,8 +60,12 @@ jobs:
           trap restore_relay_index EXIT
           bun scripts/relay-oci-sbom.ts select --layout "$layout" --selection "$selection" --platform linux/amd64
           syft scan --platform linux/amd64 "oci-dir:$layout" -o spdx-json="$evidence/relay-linux-amd64.spdx.json"
+          bun scripts/relay-oci-sbom.ts bind --selection "$selection" --platform linux/amd64 \
+            --sbom "$evidence/relay-linux-amd64.spdx.json" --repository ghcr.io/jczhang02/lyntty-relay
           bun scripts/relay-oci-sbom.ts select --layout "$layout" --selection "$selection" --platform linux/arm64
           syft scan --platform linux/arm64 "oci-dir:$layout" -o spdx-json="$evidence/relay-linux-arm64.spdx.json"
+          bun scripts/relay-oci-sbom.ts bind --selection "$selection" --platform linux/arm64 \
+            --sbom "$evidence/relay-linux-arm64.spdx.json" --repository ghcr.io/jczhang02/lyntty-relay
           restore_relay_index
           trap - EXIT
           bun scripts/relay-oci-sbom.ts assemble \
