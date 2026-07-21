@@ -6,6 +6,8 @@
 
 Bead：`lyntty-24v`
 
+> 后续：生产重试 `29864206703` 证明 `LYNTTY_MASTER_SECRET` 不存在；已有 R65 证据将 schema-1 键记录为 `HANDY_MASTER_SECRET`。R95 仍记录安全 canonicalization primitive；R97 补充严格受限的 legacy-key rename。
+
 ## 失败
 
 生产部署 run `29858379372` 已验证 immutable Stable Release、签名 BOM、精确 Relay OCI digest、attestations、protected main 与 pinned SSH host key，并成功登录 VPS；随后因现有 `LYNTTY_MASTER_SECRET` 不是唯一 canonical unprefixed assignment，在停服务、修改 `.env`、备份、迁移和替换容器之前安全停止。

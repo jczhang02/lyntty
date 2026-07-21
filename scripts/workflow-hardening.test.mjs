@@ -106,7 +106,7 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, / doctor/);
 });
 
-test('Relay env normalization preserves one exported secret and rejects ambiguity', async () => {
+test('Relay env normalization preserves one supported secret assignment and rejects ambiguity', async () => {
   const block = relayDeploy.match(
     /(          restore_env_backup\(\) \{[\s\S]*?\n          canonicalize_required_assignment LYNTTY_RELAY_IMAGE)/,
   )?.[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
@@ -144,7 +144,7 @@ if (process.argv.slice(2).join(' ') !== 'compose --env-file .env config --format
 const text = await Bun.file('.env').text();
 const values = {};
 for (const line of text.split('\\n')) {
-  const match = line.match(/^(LYNTTY_MASTER_SECRET|LYNTTY_RELAY_IMAGE)=(.*)$/);
+  const match = line.replace(/^\\uFEFF/, '').match(/^(LYNTTY_MASTER_SECRET|LYNTTY_RELAY_IMAGE)=(.*)$/);
   if (!match) continue;
   let value = match[2].trim();
   if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
@@ -163,6 +163,11 @@ const keyIndex = args.indexOf('--arg');
 if (keyIndex < 0 || args[keyIndex + 1] !== 'key' || !args[keyIndex + 2]) process.exit(2);
 const key = args[keyIndex + 2];
 const value = await Bun.stdin.json();
+if (args.at(-1).includes('has($key) | not')) {
+  const result = !Object.hasOwn(value.services?.['lyntty-relay']?.environment ?? {}, key);
+  console.log(result);
+  process.exit(result ? 0 : 1);
+}
 const result = key === 'LYNTTY_MASTER_SECRET'
   ? value.services?.['lyntty-relay']?.environment?.[key]
   : key === 'LYNTTY_RELAY_IMAGE'
@@ -199,8 +204,8 @@ console.log(result);
     const masterBackup = normalizedNames.find(name => name.startsWith('.env-precanonical-LYNTTY_MASTER_SECRET-'));
     assert.equal(await readFile(join(normalized.dir, masterBackup), 'utf8'), original);
     const receipt = await readFile(join(normalized.dir, '.env-canonicalization.log'), 'utf8');
-    assert.match(receipt, /key=LYNTTY_MASTER_SECRET source=export target=canonical/);
-    assert.match(receipt, /key=LYNTTY_RELAY_IMAGE source=export target=canonical/);
+    assert.match(receipt, /key=LYNTTY_MASTER_SECRET source_key=LYNTTY_MASTER_SECRET source_form=export target_form=canonical/);
+    assert.match(receipt, /key=LYNTTY_RELAY_IMAGE source_key=LYNTTY_RELAY_IMAGE source_form=export target_form=canonical/);
     assert.doesNotMatch(receipt, /secret=value/);
     const namesBeforeRetry = (await readdir(normalized.dir)).sort();
     const receiptBeforeRetry = receipt;
@@ -226,6 +231,61 @@ console.log(result);
     ].join('\n'));
     assert.equal(canonical.exitCode, 0);
     assert.deepEqual((await readdir(canonical.dir)).filter(name => name.startsWith('.env-precanonical-')), []);
+
+    const legacyContent = [
+      'HANDY_MASTER_SECRET=legacy-secret=value',
+      'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + '2'.repeat(64),
+      '',
+    ].join('\n');
+    const legacy = await run('legacy-master-secret', legacyContent);
+    assert.equal(legacy.exitCode, 0, legacy.stderr);
+    const legacyEnv = await readFile(join(legacy.dir, '.env'), 'utf8');
+    assert.match(legacyEnv, /^LYNTTY_MASTER_SECRET=legacy-secret=value$/m);
+    assert.doesNotMatch(legacyEnv, /HANDY_MASTER_SECRET/);
+    assert.doesNotMatch(`${legacy.stdout}\n${legacy.stderr}`, /legacy-secret=value/);
+    const legacyNames = await readdir(legacy.dir);
+    const legacyBackup = legacyNames.find(name => name.startsWith('.env-precanonical-LYNTTY_MASTER_SECRET-'));
+    assert.ok(legacyBackup);
+    assert.equal(await readFile(join(legacy.dir, legacyBackup), 'utf8'), legacyContent);
+    assert.equal((await stat(join(legacy.dir, legacyBackup))).mode & 0o777, 0o600);
+    assert.equal((await stat(join(legacy.dir, '.env'))).mode & 0o777, 0o600);
+    const legacyReceipt = await readFile(join(legacy.dir, '.env-canonicalization.log'), 'utf8');
+    assert.match(legacyReceipt, /key=LYNTTY_MASTER_SECRET source_key=HANDY_MASTER_SECRET source_form=legacy target_form=canonical/);
+    assert.doesNotMatch(legacyReceipt, /legacy-secret=value/);
+    const legacyNamesBeforeRetry = (await readdir(legacy.dir)).sort();
+    assert.equal(execute(legacy.dir).exitCode, 0);
+    assert.deepEqual((await readdir(legacy.dir)).sort(), legacyNamesBeforeRetry);
+
+    const legacyExport = await run('legacy-exported-master-secret', [
+      " export HANDY_MASTER_SECRET='quoted legacy value'",
+      'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + '3'.repeat(64),
+      '',
+    ].join('\n'));
+    assert.equal(legacyExport.exitCode, 0, legacyExport.stderr);
+    assert.match(await readFile(join(legacyExport.dir, '.env'), 'utf8'), /^LYNTTY_MASTER_SECRET='quoted legacy value'$/m);
+    assert.doesNotMatch(`${legacyExport.stdout}\n${legacyExport.stderr}`, /quoted legacy value/);
+
+    for (const [name, masterLines] of [
+      ['coexisting-master-aliases', ['LYNTTY_MASTER_SECRET=current', 'HANDY_MASTER_SECRET=legacy']],
+      ['duplicate-legacy-master', ['HANDY_MASTER_SECRET=first', 'export HANDY_MASTER_SECRET=second']],
+      ['bom-hidden-current-master', ['\uFEFFLYNTTY_MASTER_SECRET=current', 'HANDY_MASTER_SECRET=legacy']],
+    ]) {
+      const content = [...masterLines, 'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + '4'.repeat(64), ''].join('\n');
+      const ambiguous = await run(name, content);
+      assert.notEqual(ambiguous.exitCode, 0, name);
+      assert.equal(await readFile(join(ambiguous.dir, '.env'), 'utf8'), content, name);
+      assert.deepEqual((await readdir(ambiguous.dir)).filter(entry => entry.startsWith('.env-precanonical-')), [], name);
+    }
+
+    const legacySemanticEmptyContent = [
+      'HANDY_MASTER_SECRET=""',
+      'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + '5'.repeat(64),
+      '',
+    ].join('\n');
+    const legacySemanticEmpty = await run('legacy-semantic-empty', legacySemanticEmptyContent);
+    assert.notEqual(legacySemanticEmpty.exitCode, 0);
+    assert.equal(await readFile(join(legacySemanticEmpty.dir, '.env'), 'utf8'), legacySemanticEmptyContent);
+    assert.doesNotMatch(`${legacySemanticEmpty.stdout}\n${legacySemanticEmpty.stderr}`, /HANDY_MASTER_SECRET=/);
 
     const missing = await run('missing', 'LYNTTY_RELAY_IMAGE=ghcr.io/example/relay@sha256:' + 'd'.repeat(64) + '\n');
     assert.notEqual(missing.exitCode, 0);
