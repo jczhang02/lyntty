@@ -33,13 +33,14 @@ jobs:
       - name: Validate release source
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "Android releases must run from refs/heads/main"
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
+          if [[ "$GITHUB_REF" != "refs/heads/main" || "${GITHUB_REF_PROTECTED:-false}" != true ]]; then
+            echo "Android releases must run from protected refs/heads/main"
             exit 1
           fi
           git fetch --no-tags origin main
-          if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
-            echo "Android release HEAD must equal origin/main"
+          if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" || "$GITHUB_SHA" != "$(git rev-parse origin/main)" ]]; then
+            echo "Android release HEAD and origin/main must equal GITHUB_SHA"
             exit 1
           fi
 
@@ -80,6 +81,10 @@ jobs:
               exit 1
               ;;
           esac
+          (( version_code > 5 )) || {
+            echo 'Stable versionCode must advance the existing production package (5)' >&2
+            exit 1
+          }
           tag="android-v${VERSION_NAME}-${version_code}"
           apk_name="lyntty-android-v${VERSION_NAME}-${version_code}.apk"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"

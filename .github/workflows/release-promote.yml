@@ -16,6 +16,20 @@ on:
         description: Immutable candidate tag from that run
         required: true
         type: string
+      physical_phone_accepted:
+        description: Stable only — exact Candidate APK passed physical Android validation
+        required: true
+        type: boolean
+        default: false
+      accepted_android_apk_sha256:
+        description: Stable only — SHA-256 of the physically validated Candidate APK
+        required: false
+        type: string
+      immutable_releases_enabled:
+        description: Confirm repository immutable Releases are enabled
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -38,6 +52,11 @@ jobs:
       CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
       CANDIDATE_TAG: ${{ inputs.candidate_tag }}
       LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
+      PHYSICAL_PHONE_ACCEPTED: ${{ inputs.physical_phone_accepted }}
+      ACCEPTED_ANDROID_APK_SHA256: ${{ inputs.accepted_android_apk_sha256 }}
+      IMMUTABLE_RELEASES_ENABLED: ${{ inputs.immutable_releases_enabled }}
+      REPOSITORY_IMMUTABILITY_GATE: ${{ vars.LYNTTY_IMMUTABLE_RELEASES_ENABLED }}
+      TAG_RULESET_ID: ${{ inputs.channel == 'stable' && vars.LYNTTY_STABLE_TAG_RULESET_ID || vars.LYNTTY_COMPAT_PREVIEW_TAG_RULESET_ID }}
     steps:
       - name: Checkout protected main
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -49,19 +68,34 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
           [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse origin/main)" ]]
           [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$IMMUTABLE_RELEASES_ENABLED" == true ]]
+          [[ "$REPOSITORY_IMMUTABILITY_GATE" == true ]]
+          [[ "$TAG_RULESET_ID" =~ ^[1-9][0-9]*$ ]]
           if [[ "$CHANNEL" == stable ]]; then
             [[ "$CANDIDATE_TAG" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
+            [[ "$PHYSICAL_PHONE_ACCEPTED" == true ]]
+            [[ "$ACCEPTED_ANDROID_APK_SHA256" =~ ^[a-f0-9]{64}$ ]]
+            expected_tag_pattern='refs/tags/compat-v*'
           else
             [[ "$CANDIDATE_TAG" =~ ^compat-preview-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
+            [[ "$PHYSICAL_PHONE_ACCEPTED" == false ]]
+            [[ -z "$ACCEPTED_ANDROID_APK_SHA256" ]]
+            expected_tag_pattern='refs/tags/compat-preview-v*'
           fi
+          ruleset_json="$(gh api "repos/$GITHUB_REPOSITORY/rulesets/$TAG_RULESET_ID")"
+          [[ "$(jq -r .target <<< "$ruleset_json")" == tag ]]
+          [[ "$(jq -r .enforcement <<< "$ruleset_json")" == active ]]
+          [[ "$(jq -r '.bypass_actors | length' <<< "$ruleset_json")" == 0 ]]
+          jq -e --arg pattern "$expected_tag_pattern" '.conditions.ref_name == {exclude: [], include: [$pattern]}' <<< "$ruleset_json"
+          jq -e '[.rules[].type] | sort == ["deletion", "update"]' <<< "$ruleset_json"
           : "${LYNTTY_RELEASE_TRUST_ROOTS:?protected channel trust roots are required}"
-          if existing_request_release="$(gh release view "$CANDIDATE_TAG" --json isDraft 2>/dev/null)"; then
-            RELEASE_JSON="$existing_request_release" bun -e 'const x=JSON.parse(process.env.RELEASE_JSON);if(!x.isDraft)throw new Error("release tag is already published")'
-          else
-            test -z "$(git ls-remote --tags origin "refs/tags/$CANDIDATE_TAG")"
-          fi
           run="$(gh run view "$CANDIDATE_RUN_ID" --json conclusion,event,headSha,workflowName)"
           RUN_JSON="$run" bun -e '
             const run=JSON.parse(process.env.RUN_JSON);
@@ -69,6 +103,14 @@ jobs:
           '
           echo "$run" > "$RUNNER_TEMP/candidate-run.json"
           printf '%s\n' "$LYNTTY_RELEASE_TRUST_ROOTS" > "$RUNNER_TEMP/trust-roots.json"
+          jq -e --arg channel "$CHANNEL" '.schemaVersion == 1 and (.roots | length > 0) and all(.roots[]; .channel == $channel)' "$RUNNER_TEMP/trust-roots.json"
+          if [[ "$CHANNEL" == stable ]]; then
+            [[ "$(jq -S -c . "$RUNNER_TEMP/trust-roots.json")" == "$(jq -S -c . config/release-trust-roots/stable.json)" ]]
+          else
+            jq -e --slurpfile stable config/release-trust-roots/stable.json \
+              '([.roots[].publicKeyBase64] as $preview | [$stable[0].roots[].publicKeyBase64] as $stableKeys | all($preview[]; . as $key | ($stableKeys | index($key) | not)))' \
+              "$RUNNER_TEMP/trust-roots.json"
+          fi
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -122,11 +164,19 @@ jobs:
               gh attestation verify "$native_archive" --repo "$GITHUB_REPOSITORY" --source-digest "$source_sha" \
                 --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/native-signing.yml" --signer-digest "$source_sha" >/dev/null
             done
+            stable_apk="$CANDIDATE/app/lyntty-stable.apk"
+            [[ -f "$stable_apk" ]]
+            actual_android_apk_sha256="$(sha256sum "$stable_apk" | awk '{print $1}')"
+            [[ "$actual_android_apk_sha256" == "$ACCEPTED_ANDROID_APK_SHA256" ]] || {
+              echo 'physical Android acceptance does not bind this exact Stable Candidate APK' >&2
+              exit 1
+            }
           fi
           echo "candidate=$CANDIDATE" >> "$GITHUB_OUTPUT"
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
 
       - name: Revalidate monotonic channel head under promotion lock
+        id: head
         env:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE: ${{ steps.verify.outputs.candidate }}
@@ -175,6 +225,17 @@ jobs:
             if (candidate.components.app.android.versionCode<=head.components.app.android.versionCode) throw new Error('candidate Android versionCode does not advance current channel head');
           }
           BUN
+          latest_error="$RUNNER_TEMP/latest-release.err"
+          if latest_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" 2>"$latest_error")"; then
+            current_latest="$(jq -er .tag_name <<< "$latest_json")"
+          elif grep -Fq '(HTTP 404)' "$latest_error"; then
+            current_latest=none
+          else
+            cat "$latest_error" >&2
+            exit 1
+          fi
+          echo "current_latest=$current_latest" >> "$GITHUB_OUTPUT"
+          echo "channel_head=${expected_tags[0]:-none}" >> "$GITHUB_OUTPUT"
 
       - name: Install registry promotion tools
         run: |
@@ -260,6 +321,20 @@ jobs:
           if compgen -G "$CANDIDATE/evidence/native-*-attestation.json" >/dev/null; then
             cp "$CANDIDATE/evidence/"native-*-attestation.json "$assets/"
           fi
+          if [[ "$CHANNEL" == stable ]]; then
+            committed_roots=config/release-trust-roots/stable.json
+            [[ -f "$committed_roots" ]]
+            TRUST_ENV="$LYNTTY_RELEASE_TRUST_ROOTS" TRUST_FILE="$committed_roots" bun -e '
+              const configured=JSON.stringify(JSON.parse(process.env.TRUST_ENV));
+              const committed=JSON.stringify(await Bun.file(process.env.TRUST_FILE).json());
+              if(configured!==committed)throw new Error("Stable environment trust roots do not match protected source");
+            '
+            cp packages/lyntty-cli/install/install.sh "$assets/install.sh"
+            cp "$committed_roots" "$assets/stable-release-trust-roots.json"
+            cp "$CANDIDATE/evidence/android-production-guard.txt" "$assets/"
+            chmod 755 "$assets/install.sh"
+            (cd "$assets" && sha256sum install.sh > install.sh.sha256)
+          fi
           (cd "$assets" && sha256sum * | sort -k2 > release-checksums.txt)
           echo "path=$assets" >> "$GITHUB_OUTPUT"
 
@@ -280,52 +355,86 @@ jobs:
           subject-path: ${{ steps.assets.outputs.path }}/lyntty-cli-*
           sbom-path: ${{ steps.assets.outputs.path }}/cli.spdx.json
 
-      - name: Resume draft assets and publish atomically
+      - name: Publish exact immutable Release-ID transaction
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
           ASSETS: ${{ steps.assets.outputs.path }}
           SOURCE_SHA: ${{ steps.verify.outputs.source_sha }}
+          CURRENT_LATEST: ${{ steps.head.outputs.current_latest }}
+          EXPECTED_CHANNEL_HEAD: ${{ steps.head.outputs.channel_head }}
         run: |
           set -euo pipefail
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
+          if [[ "$CHANNEL" == stable ]]; then
+            filter='select(.prerelease == false and .draft == false and (.tag_name | startswith("compat-v")))'
+            prerelease=false
+            latest=true
+          else
+            filter='select(.prerelease == true and .draft == false and (.tag_name | startswith("compat-preview-v")))'
+            prerelease=true
+            latest=false
+          fi
+          release_rows="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --jq ".[] | $filter | [.published_at, .id, .tag_name] | @tsv")"
+          current_channel_head=none
+          if [[ -n "$release_rows" ]]; then
+            current_channel_head="$(printf '%s\n' "$release_rows" | sort -t$'\t' -k1,1r -k2,2nr | awk -F '\t' 'NR == 1 { print $3 }')"
+          fi
+          [[ "$current_channel_head" == "$EXPECTED_CHANNEL_HEAD" ]]
           mapfile -t files < <(find "$ASSETS" -maxdepth 1 -type f -print | sort)
+          [[ "${#files[@]}" -gt 0 ]]
           notes="$RUNNER_TEMP/release-notes.md"
           {
             echo "# Lyntty Compatibility release $CANDIDATE_TAG"
             echo
             echo "Channel: \`$CHANNEL\`"
+            echo "Sequence: \`$(jq -r .sequence "$ASSETS/compatibility-bom.json")\`"
             echo "Source: \`$SOURCE_SHA\`"
+            echo "Candidate run: \`$CANDIDATE_RUN_ID\`"
             echo "Relay: \`${{ steps.image.outputs.repository }}@${{ steps.image.outputs.digest }}\`"
+            if [[ "$CHANNEL" == stable ]]; then
+              echo "Physical Android validation: accepted for APK SHA-256 \`$ACCEPTED_ANDROID_APK_SHA256\`"
+            fi
             echo
-            echo 'Verify with `gh attestation verify <asset> --repo jczhang02/lyntty` and the detached Compatibility BOM signature.'
+            if [[ "$CHANNEL" == stable ]]; then
+              echo 'Verify assets with `gh attestation verify <asset> --repo jczhang02/lyntty` and verify the detached Compatibility BOM signature against `stable-release-trust-roots.json`.'
+            else
+              echo 'Verify assets with `gh attestation verify <asset> --repo jczhang02/lyntty` and verify the detached Compatibility BOM signature against the separately configured Preview trust roots.'
+            fi
           } > "$notes"
-          if release_json="$(gh release view "$CANDIDATE_TAG" --json isDraft,targetCommitish,title 2>/dev/null)"; then
-            RELEASE_JSON="$release_json" SOURCE_SHA="$SOURCE_SHA" bun -e '
-              const release=JSON.parse(process.env.RELEASE_JSON);
-              if (!release.isDraft || release.targetCommitish!==process.env.SOURCE_SHA) throw new Error("existing release is not the exact resumable draft");
-            '
-          else
-            gh release create "$CANDIDATE_TAG" --draft --target "$SOURCE_SHA" \
-              --title "Lyntty $CHANNEL $CANDIDATE_TAG" --notes-file "$notes"
-          fi
-          existing_dir="$RUNNER_TEMP/existing-draft-assets"; mkdir "$existing_dir"
-          mapfile -t existing < <(gh release view "$CANDIDATE_TAG" --json assets --jq '.assets[].name' | sort)
-          for name in "${existing[@]}"; do
-            [[ -f "$ASSETS/$name" ]] || { echo "unexpected draft asset: $name" >&2; exit 1; }
-            gh release download "$CANDIDATE_TAG" -p "$name" -D "$existing_dir" --clobber
-            cmp "$existing_dir/$name" "$ASSETS/$name"
-          done
-          for file in "${files[@]}"; do
-            name="$(basename "$file")"
-            printf '%s\n' "${existing[@]}" | grep -Fqx "$name" || gh release upload "$CANDIDATE_TAG" "$file"
-          done
-          desired_names="$(printf '%s\n' "${files[@]##*/}" | sort)"
-          published_names="$(gh release view "$CANDIDATE_TAG" --json assets --jq '.assets[].name' | sort)"
-          [[ "$published_names" == "$desired_names" ]]
-          if [[ "$CHANNEL" == stable ]]; then
-            gh release edit "$CANDIDATE_TAG" --draft=false --latest
-          else
-            gh release edit "$CANDIDATE_TAG" --draft=false --prerelease
-          fi
+          audit="$RUNNER_TEMP/release-publication-audit.json"
+          result="$(bun scripts/github-release.ts publish \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$CANDIDATE_TAG" \
+            --title "Lyntty $CHANNEL $CANDIDATE_TAG" \
+            --target "$SOURCE_SHA" \
+            --body "$notes" \
+            --prerelease "$prerelease" \
+            --latest "$latest" \
+            --audit "$audit" \
+            --required-actor jczhang02 \
+            --expected-current-latest "$CURRENT_LATEST" \
+            -- "${files[@]}")"
+          jq -e --arg tag "$CANDIDATE_TAG" --arg target "$SOURCE_SHA" \
+            '.tag == $tag and .target == $target and (.releaseId | type == "number")' <<< "$result"
+          echo "audit=$audit" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Compatibility publication transaction'
+            echo "- Tag: \`$CANDIDATE_TAG\`"
+            echo "- Target: \`$SOURCE_SHA\`"
+            echo "- Release ID: \`$(jq -r .releaseId <<< "$result")\`"
+            echo "- Publication occurred: \`$(jq -r .publicationOccurred <<< "$result")\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve publication audit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compatibility-publication-audit-${{ inputs.candidate_tag }}
+          path: ${{ steps.publish.outputs.audit }}
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Verify published channel cannot cross-contaminate latest
         env:
@@ -333,10 +442,6 @@ jobs:
           ASSETS: ${{ steps.assets.outputs.path }}
         run: |
           set -euo pipefail
-          verify="$RUNNER_TEMP/release-verify"
-          mkdir "$verify"
-          gh release download "$CANDIDATE_TAG" -D "$verify"
-          (cd "$verify" && sha256sum -c release-checksums.txt)
           if [[ "$CHANNEL" == stable ]]; then
             latest_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
             [[ "$latest_tag" == "$CANDIDATE_TAG" ]]

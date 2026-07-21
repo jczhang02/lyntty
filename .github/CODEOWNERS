@@ -5,7 +5,10 @@
 /Dockerfile @jczhang02
 /package.json @jczhang02
 /bun.lock @jczhang02
+/config/native-signing/ @jczhang02
+/config/release-trust-roots/ @jczhang02
 /packages/*/package.json @jczhang02
+/scripts/github-release.ts @jczhang02
 /scripts/release.ts @jczhang02
 /scripts/dev.ts @jczhang02
 /scripts/preview.ts @jczhang02

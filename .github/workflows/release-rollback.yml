@@ -11,6 +11,11 @@ on:
         description: New monotonic stable sequence for the rollback BOM
         required: true
         type: string
+      immutable_releases_enabled:
+        description: Confirm repository immutable Releases are enabled
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -22,6 +27,9 @@ env:
   SEQUENCE: ${{ inputs.sequence }}
   LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
   LYNTTY_BOM_KEY_ID: ${{ vars.LYNTTY_BOM_KEY_ID }}
+  IMMUTABLE_RELEASES_ENABLED: ${{ inputs.immutable_releases_enabled }}
+  REPOSITORY_IMMUTABILITY_GATE: ${{ vars.LYNTTY_IMMUTABLE_RELEASES_ENABLED }}
+  STABLE_TAG_RULESET_ID: ${{ vars.LYNTTY_STABLE_TAG_RULESET_ID }}
 
 concurrency:
   group: compatibility-promotion-stable
@@ -52,13 +60,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
           [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
           git fetch --no-tags origin main
-          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse origin/main)" ]]
           [[ "$TARGET_TAG" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
           [[ "$SEQUENCE" =~ ^[1-9][0-9]*$ ]]
           : "${LYNTTY_RELEASE_TRUST_ROOTS:?protected stable trust roots are required}"
           : "${LYNTTY_BOM_KEY_ID:?protected stable key id is required}"
+          [[ "$IMMUTABLE_RELEASES_ENABLED" == true ]]
+          [[ "$REPOSITORY_IMMUTABILITY_GATE" == true ]]
+          [[ "$STABLE_TAG_RULESET_ID" =~ ^[1-9][0-9]*$ ]]
+          ruleset_json="$(gh api "repos/$GITHUB_REPOSITORY/rulesets/$STABLE_TAG_RULESET_ID")"
+          [[ "$(jq -r .target <<< "$ruleset_json")" == tag ]]
+          [[ "$(jq -r .enforcement <<< "$ruleset_json")" == active ]]
+          [[ "$(jq -r '.bypass_actors | length' <<< "$ruleset_json")" == 0 ]]
+          jq -e '.conditions.ref_name == {exclude: [], include: ["refs/tags/compat-v*"]}' <<< "$ruleset_json"
+          jq -e '[.rules[].type] | sort == ["deletion", "update"]' <<< "$ruleset_json"
           release_rows="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --jq \
             '.[] | select(.prerelease == false and .draft == false and (.tag_name | startswith("compat-v"))) | [.published_at, .id, .tag_name] | @tsv')"
           retained=()
@@ -72,14 +92,11 @@ jobs:
           printf '%s\n' "${retained[@]:1}" | grep -Fqx "$TARGET_TAG"
           tag="compat-vrollback-${TARGET_TAG#compat-v}-s${SEQUENCE}"
           [[ "$tag" =~ ^[a-z0-9][A-Za-z0-9._-]{2,127}$ ]]
-          if existing_request_release="$(gh release view "$tag" --json isDraft 2>/dev/null)"; then
-            RELEASE_JSON="$existing_request_release" bun -e 'const x=JSON.parse(process.env.RELEASE_JSON);if(!x.isDraft)throw new Error("rollback release tag is already published")'
-          else
-            test -z "$(git ls-remote --tags origin "refs/tags/$tag")"
-          fi
           echo "current_tag=$current_tag" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          printf '%s\n' "$LYNTTY_RELEASE_TRUST_ROOTS" > "$RUNNER_TEMP/trust-roots.json"
+          printf '%s\n' "$LYNTTY_RELEASE_TRUST_ROOTS" > "$RUNNER_TEMP/configured-trust-roots.json"
+          [[ "$(jq -S -c . "$RUNNER_TEMP/configured-trust-roots.json")" == "$(jq -S -c . config/release-trust-roots/stable.json)" ]]
+          cp config/release-trust-roots/stable.json "$RUNNER_TEMP/trust-roots.json"
 
       - name: Download and verify current and target BOMs
         env:
@@ -145,47 +162,56 @@ jobs:
         with:
           subject-path: ${{ runner.temp }}/rollback/**
 
-      - name: Resume rollback draft and publish atomically as Stable latest
+      - name: Publish exact rollback Release-ID transaction as Stable latest
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
           CURRENT_TAG: ${{ steps.release.outputs.current_tag }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
           git fetch --no-tags origin main
-          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse origin/main)" ]]
           [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "$CURRENT_TAG" ]]
           root="$RUNNER_TEMP/rollback"
           files=("$root/compatibility-bom.json" "$root/compatibility-bom.sig.json" "$root/compatibility-matrix.json" "$root/bom-verification.json" "$root/release-checksums.txt")
-          notes="Signed monotonic rollback BOM. App remains at the current signed APK; CLI and Relay return to retained release $TARGET_TAG. No artifact was rebuilt."
-          if release_json="$(gh release view "$RELEASE_TAG" --json isDraft,targetCommitish 2>/dev/null)"; then
-            RELEASE_JSON="$release_json" bun -e '
-              const release=JSON.parse(process.env.RELEASE_JSON);
-              if (!release.isDraft || release.targetCommitish!==process.env.GITHUB_SHA) throw new Error("existing rollback release is not the exact resumable draft");
-            '
-          else
-            gh release create "$RELEASE_TAG" --draft --target "$GITHUB_SHA" \
-              --title "Lyntty stable rollback $RELEASE_TAG" --notes "$notes"
-          fi
-          existing_dir="$RUNNER_TEMP/existing-rollback-assets"; mkdir "$existing_dir"
-          mapfile -t existing < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)
-          for name in "${existing[@]}"; do
-            [[ -f "$root/$name" ]] || { echo "unexpected rollback draft asset: $name" >&2; exit 1; }
-            gh release download "$RELEASE_TAG" -p "$name" -D "$existing_dir" --clobber
-            cmp "$existing_dir/$name" "$root/$name"
-          done
-          for file in "${files[@]}"; do
-            name="$(basename "$file")"
-            printf '%s\n' "${existing[@]}" | grep -Fqx "$name" || gh release upload "$RELEASE_TAG" "$file"
-          done
-          desired_names="$(printf '%s\n' "${files[@]##*/}" | sort)"
-          published_names="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort)"
-          [[ "$published_names" == "$desired_names" ]]
-          git fetch --no-tags origin main
-          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
-          [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "$CURRENT_TAG" ]]
-          gh release edit "$RELEASE_TAG" --draft=false --latest
-          verify_dir="$RUNNER_TEMP/rollback-release-verify"; mkdir "$verify_dir"
-          gh release download "$RELEASE_TAG" -D "$verify_dir"
-          (cd "$verify_dir" && sha256sum -c release-checksums.txt)
+          notes="$RUNNER_TEMP/rollback-release-notes.md"
+          {
+            echo "# Lyntty Stable rollback $RELEASE_TAG"
+            echo
+            echo "Signed monotonic rollback sequence: \`$SEQUENCE\`"
+            echo "Current App retained from: \`$CURRENT_TAG\`"
+            echo "CLI, Relay, and Wire selected from: \`$TARGET_TAG\`"
+            echo "Source: \`$GITHUB_SHA\`"
+            echo
+            echo 'No application, CLI, or Relay artifact was rebuilt.'
+          } > "$notes"
+          audit="$RUNNER_TEMP/release-publication-audit.json"
+          result="$(bun scripts/github-release.ts publish \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --title "Lyntty stable rollback $RELEASE_TAG" \
+            --target "$GITHUB_SHA" \
+            --body "$notes" \
+            --prerelease false \
+            --latest true \
+            --audit "$audit" \
+            --required-actor jczhang02 \
+            --expected-current-latest "$CURRENT_TAG" \
+            -- "${files[@]}")"
+          jq -e --arg tag "$RELEASE_TAG" --arg target "$GITHUB_SHA" \
+            '.tag == $tag and .target == $target and (.releaseId | type == "number")' <<< "$result"
+          echo "audit=$audit" >> "$GITHUB_OUTPUT"
           [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "$RELEASE_TAG" ]]
+
+      - name: Preserve rollback publication audit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compatibility-rollback-publication-audit-${{ steps.release.outputs.tag }}
+          path: ${{ steps.publish.outputs.audit }}
+          if-no-files-found: error
+          retention-days: 90

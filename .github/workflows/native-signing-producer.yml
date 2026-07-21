@@ -1,0 +1,507 @@
+name: Produce signed native CLI staging
+run-name: Produce native CLI staging from ${{ github.sha }}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-signing-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release-native-signing
+    outputs:
+      cli_version: ${{ steps.release.outputs.cli_version }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      current_latest: ${{ steps.release.outputs.current_latest }}
+    steps:
+      - name: Checkout exact protected main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Validate source, trust roots, immutability, and tag policy
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
+          IMMUTABLE_RELEASES_ENABLED: ${{ vars.LYNTTY_IMMUTABLE_RELEASES_ENABLED }}
+          NATIVE_TAG_RULESET_ID: ${{ vars.LYNTTY_NATIVE_SIGNING_TAG_RULESET_ID }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse origin/main)" ]]
+          [[ "$IMMUTABLE_RELEASES_ENABLED" == true ]]
+          [[ "$NATIVE_TAG_RULESET_ID" =~ ^[1-9][0-9]*$ ]]
+          : "${LYNTTY_RELEASE_TRUST_ROOTS:?protected Stable trust roots are required}"
+          ruleset_json="$(gh api "repos/$GITHUB_REPOSITORY/rulesets/$NATIVE_TAG_RULESET_ID")"
+          [[ "$(jq -r .target <<< "$ruleset_json")" == tag ]]
+          [[ "$(jq -r .enforcement <<< "$ruleset_json")" == active ]]
+          [[ "$(jq -r '.bypass_actors | length' <<< "$ruleset_json")" == 0 ]]
+          jq -e '.conditions.ref_name == {exclude: [], include: ["refs/tags/native-signing-*"]}' <<< "$ruleset_json"
+          jq -e '[.rules[].type] | sort == ["deletion", "update"]' <<< "$ruleset_json"
+          TRUST_ENV="$LYNTTY_RELEASE_TRUST_ROOTS" bun -e '
+            const configured=JSON.stringify(JSON.parse(process.env.TRUST_ENV));
+            const committed=JSON.stringify(await Bun.file("config/release-trust-roots/stable.json").json());
+            if(configured!==committed)throw new Error("native signing trust roots do not match protected Stable source");
+          '
+          cli_version="$(jq -er .version packages/lyntty-cli/package.json)"
+          [[ "$cli_version" == 1.2.0 ]]
+          release_tag="native-signing-v${cli_version}-${GITHUB_SHA}-r${GITHUB_RUN_ID}-a${GITHUB_RUN_ATTEMPT}"
+          [[ "$release_tag" =~ ^native-signing-[0-9A-Za-z._-]+$ ]]
+          latest_error="$RUNNER_TEMP/latest-release.err"
+          if latest_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" 2>"$latest_error")"; then
+            current_latest="$(jq -er .tag_name <<< "$latest_json")"
+          elif grep -Fq '(HTTP 404)' "$latest_error"; then
+            current_latest=none
+          else
+            cat "$latest_error" >&2
+            exit 1
+          fi
+          echo "cli_version=$cli_version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "current_latest=$current_latest" >> "$GITHUB_OUTPUT"
+
+  sign-macos:
+    name: Sign and notarize ${{ matrix.target }}
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    environment: release-native-signing
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-x64
+            runner: macos-26-intel
+            architecture: x86_64
+          - target: darwin-arm64
+            runner: macos-26
+            architecture: arm64
+    steps:
+      - name: Checkout exact protected main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install deterministic build dependencies
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          untrusted="$(bun pm untrusted 2>&1)"
+          grep -Fq 'Found 0 untrusted dependencies with scripts.' <<< "$untrusted"
+
+      - name: Build, sign, finalize, notarize, and verify native root
+        env:
+          TARGET: ${{ matrix.target }}
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+          CLI_VERSION: ${{ needs.validate.outputs.cli_version }}
+          LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
+          APPLE_P12_BASE64: ${{ secrets.LYNTTY_APPLE_DEVELOPER_ID_P12_BASE64 }}
+          APPLE_P12_PASSWORD: ${{ secrets.LYNTTY_APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_ID: ${{ secrets.LYNTTY_APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.LYNTTY_APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.LYNTTY_APPLE_TEAM_ID }}
+          APPLE_SIGNING_AUTHORITY: ${{ vars.LYNTTY_APPLE_SIGNING_AUTHORITY }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse origin/main)" ]]
+          : "${APPLE_P12_BASE64:?Developer ID P12 is required}"
+          : "${APPLE_P12_PASSWORD:?Developer ID P12 password is required}"
+          : "${APPLE_ID:?Apple notarization account is required}"
+          : "${APPLE_APP_PASSWORD:?Apple notarization app password is required}"
+          : "${APPLE_TEAM_ID:?Apple Team ID is required}"
+          : "${APPLE_SIGNING_AUTHORITY:?Developer ID signing authority is required}"
+          out="$RUNNER_TEMP/native"
+          stem="lyntty-cli-${CLI_VERSION}-${TARGET}"
+          root="$out/$stem"
+          p12="$RUNNER_TEMP/developer-id.p12"
+          keychain="$RUNNER_TEMP/native-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          cleanup_signing_material() {
+            security delete-keychain "$keychain" >/dev/null 2>&1 || true
+            if command -v shred >/dev/null 2>&1; then shred -u "$p12" 2>/dev/null || true; else rm -f "$p12"; fi
+          }
+          trap cleanup_signing_material EXIT HUP INT TERM
+          P12_PATH="$p12" bun -e 'await Bun.write(process.env.P12_PATH,Buffer.from(process.env.APPLE_P12_BASE64,"base64"))'
+          chmod 600 "$p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$p12" -k "$keychain" -P "$APPLE_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          security find-identity -v -p codesigning "$keychain" | grep -F "$APPLE_SIGNING_AUTHORITY"
+          bun packages/lyntty-cli/scripts/build-artifact.ts --target "$TARGET" --out-dir "$out" --no-archive
+          ROOT="$root" bun -e '
+            const manifest=await Bun.file(`${process.env.ROOT}/artifact-manifest.json`).json();
+            const actual=manifest.files.filter(file=>file.executable).map(file=>file.path).sort();
+            const expected=["lyntty","lynttyd","tools/difft","tools/rg"];
+            if(JSON.stringify(actual)!==JSON.stringify(expected))throw new Error("macOS executable inventory is not exact");
+            await Bun.write(`${process.env.ROOT}/../executables.txt`,actual.join("\n")+"\n");
+          '
+          while IFS= read -r relative; do
+            [[ -n "$relative" ]] || continue
+            executable="$root/$relative"
+            file "$executable" | grep -F "$EXPECTED_ARCHITECTURE"
+            sign_args=(--force --sign "$APPLE_SIGNING_AUTHORITY" --keychain "$keychain" --options runtime --timestamp)
+            if [[ "$relative" == lyntty || "$relative" == lynttyd ]]; then
+              sign_args+=(--entitlements config/native-signing/bun-hardened-runtime.entitlements.plist)
+            fi
+            codesign "${sign_args[@]}" "$executable"
+          done < "$out/executables.txt"
+          bun packages/lyntty-cli/scripts/build-artifact.ts --target "$TARGET" --out-dir "$out" --finalize-existing --no-archive
+          submission="$RUNNER_TEMP/${stem}-notarization.zip"
+          ditto -c -k --keepParent "$root" "$submission"
+          xcrun notarytool submit "$submission" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" --wait --output-format json > "$RUNNER_TEMP/notarization.json"
+          jq -e '.status == "Accepted" and (.id | test("^[0-9a-fA-F-]{36}$"))' "$RUNNER_TEMP/notarization.json"
+          notarization_id="$(jq -er .id "$RUNNER_TEMP/notarization.json")"
+          xcrun notarytool info "$notarization_id" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" --output-format json > "$RUNNER_TEMP/notarization-info.json"
+          jq -e '.status == "Accepted"' "$RUNNER_TEMP/notarization-info.json"
+          while IFS= read -r relative; do
+            [[ -n "$relative" ]] || continue
+            executable="$root/$relative"
+            codesign --verify --strict --verbose=2 "$executable"
+            details="$(codesign -dvvv "$executable" 2>&1)"
+            grep -F "TeamIdentifier=$APPLE_TEAM_ID" <<< "$details"
+            grep -F "Authority=$APPLE_SIGNING_AUTHORITY" <<< "$details"
+            grep -E '^Timestamp=' <<< "$details"
+            spctl --assess --type execute --verbose=4 "$executable"
+          done < "$out/executables.txt"
+          PATH="/usr/bin:/bin" "$root/lyntty" --self-check --json > "$RUNNER_TEMP/self-check.json"
+          "$root/tools/rg" --version >/dev/null
+          "$root/tools/difft" --version >/dev/null
+          ROOT="$root" TARGET="$TARGET" CLI_VERSION="$CLI_VERSION" bun -e '
+            const result=await Bun.file(process.argv[1]).json();
+            if(!result.ok||result.version!==process.env.CLI_VERSION||`${result.target.os}-${result.target.arch}`!==process.env.TARGET)throw new Error("signed macOS runtime identity mismatch");
+          ' "$RUNNER_TEMP/self-check.json"
+          EVIDENCE="$RUNNER_TEMP/${TARGET}-signing-evidence.json" NOTARIZATION_ID="$notarization_id" bun -e '
+            const value={schemaVersion:1,target:process.env.TARGET,sourceCommit:process.env.GITHUB_SHA,notarizationId:process.env.NOTARIZATION_ID,appleTeamId:process.env.APPLE_TEAM_ID,appleSigningAuthority:process.env.APPLE_SIGNING_AUTHORITY};
+            await Bun.write(process.env.EVIDENCE,`${JSON.stringify(value,null,2)}\n`);
+          '
+          tar -czf "$RUNNER_TEMP/${TARGET}-transport.tar.gz" -C "$out" "$stem" "${stem}.manifest.sha256"
+          cleanup_signing_material
+          trap - EXIT HUP INT TERM
+
+      - name: Upload finalized signed macOS root
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-root-${{ matrix.target }}
+          path: |
+            ${{ runner.temp }}/${{ matrix.target }}-transport.tar.gz
+            ${{ runner.temp }}/${{ matrix.target }}-signing-evidence.json
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-windows:
+    name: Sign windows-x64
+    needs: validate
+    runs-on: windows-2025
+    timeout-minutes: 35
+    environment: release-native-signing
+    steps:
+      - name: Checkout exact protected main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install deterministic build dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          bun install --frozen-lockfile
+          $untrusted = bun pm untrusted 2>&1 | Out-String
+          if (-not $untrusted.Contains('Found 0 untrusted dependencies with scripts.')) { throw 'untrusted lifecycle scripts detected' }
+
+      - name: Build, sign, finalize, and verify Windows root
+        shell: pwsh
+        env:
+          CLI_VERSION: ${{ needs.validate.outputs.cli_version }}
+          LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
+          WINDOWS_PFX_BASE64: ${{ secrets.LYNTTY_WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_PFX_PASSWORD: ${{ secrets.LYNTTY_WINDOWS_CODESIGN_PFX_PASSWORD }}
+          WINDOWS_CERT_THUMBPRINT: ${{ vars.LYNTTY_WINDOWS_CERT_THUMBPRINT }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.LYNTTY_WINDOWS_RFC3161_TIMESTAMP_URL }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($env:GITHUB_ACTOR -ne 'jczhang02') { throw 'native signing is owner-dispatch only' }
+          if ($env:GITHUB_REF -ne 'refs/heads/main' -or $env:GITHUB_REF_PROTECTED -ne 'true') { throw 'native signing requires protected main' }
+          git fetch --no-tags origin main
+          if ((git rev-parse HEAD) -ne $env:GITHUB_SHA -or (git rev-parse origin/main) -ne $env:GITHUB_SHA) { throw 'native signing source is not current main' }
+          if (-not $env:WINDOWS_PFX_BASE64 -or -not $env:WINDOWS_PFX_PASSWORD) { throw 'Authenticode PFX credentials are required' }
+          if ($env:WINDOWS_CERT_THUMBPRINT -notmatch '^[A-Fa-f0-9]{40}$') { throw 'invalid Authenticode thumbprint' }
+          if ($env:WINDOWS_TIMESTAMP_URL -notmatch '^https://') { throw 'RFC3161 timestamp URL must use HTTPS' }
+          $target = 'windows-x64'
+          $stem = "lyntty-cli-$env:CLI_VERSION-$target"
+          $out = Join-Path $env:RUNNER_TEMP 'native'
+          $root = Join-Path $out $stem
+          $pfx = Join-Path $env:RUNNER_TEMP 'authenticode.pfx'
+          $certificate = $null
+          $importedCertificates = @()
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_PFX_BASE64))
+            $password = ConvertTo-SecureString $env:WINDOWS_PFX_PASSWORD -AsPlainText -Force
+            $importedCertificates = @(Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password -Exportable:$false)
+            $expectedThumbprint = $env:WINDOWS_CERT_THUMBPRINT.ToUpperInvariant()
+            $matchingCertificates = @($importedCertificates | Where-Object { $_.Thumbprint -eq $expectedThumbprint })
+            if ($matchingCertificates.Count -ne 1) { throw 'PFX does not contain exactly one configured Authenticode identity' }
+            $certificate = $matchingCertificates[0]
+            if (-not $certificate.HasPrivateKey) { throw 'imported Authenticode identity has no private key' }
+            $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+            if ($null -eq $signTool) { throw 'signtool.exe was not found' }
+            bun packages/lyntty-cli/scripts/build-artifact.ts --target $target --out-dir $out --no-archive
+            $env:ROOT = $root
+            bun -e @'
+            const manifest=await Bun.file(`${process.env.ROOT}/artifact-manifest.json`).json();
+            const actual=manifest.files.filter(file=>file.executable).map(file=>file.path).sort();
+            const expected=["lyntty.exe","lynttyd.exe","tools/difft.exe","tools/rg.exe"];
+            if(JSON.stringify(actual)!==JSON.stringify(expected))throw new Error("Windows executable inventory is not exact");
+            await Bun.write(`${process.env.ROOT}/../executables.txt`,actual.join("\n")+"\n");
+            '@
+            function Assert-X64PortableExecutable([string]$path) {
+              $bytes = [IO.File]::ReadAllBytes($path)
+              if ($bytes.Length -lt 64 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw "invalid PE executable: $path" }
+              $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
+              if ($peOffset -lt 0 -or $peOffset + 6 -gt $bytes.Length -or [BitConverter]::ToUInt32($bytes, $peOffset) -ne 0x00004550 -or [BitConverter]::ToUInt16($bytes, $peOffset + 4) -ne 0x8664) { throw "executable is not PE32+ x64: $path" }
+            }
+            foreach ($relative in Get-Content (Join-Path $out 'executables.txt')) {
+              if (-not $relative) { continue }
+              $executable = Join-Path $root $relative
+              Assert-X64PortableExecutable $executable
+              & $signTool.FullName sign /sha1 $env:WINDOWS_CERT_THUMBPRINT /fd SHA256 /tr $env:WINDOWS_TIMESTAMP_URL /td SHA256 $executable
+              if ($LASTEXITCODE -ne 0) { throw "signtool failed for $relative" }
+            }
+            bun packages/lyntty-cli/scripts/build-artifact.ts --target $target --out-dir $out --finalize-existing --no-archive
+            foreach ($relative in Get-Content (Join-Path $out 'executables.txt')) {
+              if (-not $relative) { continue }
+              $executable = Join-Path $root $relative
+              & $signTool.FullName verify /pa /all /v $executable
+              if ($LASTEXITCODE -ne 0) { throw "signtool verification failed for $relative" }
+              $signature = Get-AuthenticodeSignature -LiteralPath $executable
+              if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $env:WINDOWS_CERT_THUMBPRINT.ToUpperInvariant() -or $null -eq $signature.TimeStamperCertificate) { throw "invalid Authenticode identity or timestamp for $relative" }
+            }
+            & (Join-Path $root 'lyntty.exe') --self-check --json | Set-Content (Join-Path $env:RUNNER_TEMP 'self-check.json')
+            & (Join-Path $root 'tools/rg.exe') --version | Out-Null
+            & (Join-Path $root 'tools/difft.exe') --version | Out-Null
+            $selfCheck = Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'self-check.json') | ConvertFrom-Json
+            if (-not $selfCheck.ok -or $selfCheck.version -ne $env:CLI_VERSION -or "$($selfCheck.target.os)-$($selfCheck.target.arch)" -ne $target) { throw 'signed Windows runtime identity mismatch' }
+            $evidence = [ordered]@{schemaVersion=1;target=$target;sourceCommit=$env:GITHUB_SHA;windowsCertThumbprint=$env:WINDOWS_CERT_THUMBPRINT.ToUpperInvariant();windowsTimestampUrl=$env:WINDOWS_TIMESTAMP_URL}
+            $evidence | ConvertTo-Json | Set-Content (Join-Path $env:RUNNER_TEMP "$target-signing-evidence.json")
+            tar.exe -czf (Join-Path $env:RUNNER_TEMP "$target-transport.tar.gz") -C $out $stem "$stem.manifest.sha256"
+            if ($LASTEXITCODE -ne 0) { throw 'Windows transport archive failed' }
+          } finally {
+            foreach ($importedCertificate in $importedCertificates) {
+              Remove-Item -Force "Cert:\CurrentUser\My\$($importedCertificate.Thumbprint)" -ErrorAction SilentlyContinue
+            }
+            if (Test-Path $pfx) { Remove-Item -Force $pfx }
+          }
+
+      - name: Upload finalized signed Windows root
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-root-windows-x64
+          path: |
+            ${{ runner.temp }}/windows-x64-transport.tar.gz
+            ${{ runner.temp }}/windows-x64-signing-evidence.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Remove imported Windows signing identity
+        if: always()
+        shell: pwsh
+        env:
+          WINDOWS_CERT_THUMBPRINT: ${{ vars.LYNTTY_WINDOWS_CERT_THUMBPRINT }}
+        run: |
+          if ($env:WINDOWS_CERT_THUMBPRINT -match '^[A-Fa-f0-9]{40}$') {
+            Remove-Item -Force "Cert:\CurrentUser\My\$($env:WINDOWS_CERT_THUMBPRINT.ToUpperInvariant())" -ErrorAction SilentlyContinue
+          }
+          Remove-Item -Force (Join-Path $env:RUNNER_TEMP 'authenticode.pfx') -ErrorAction SilentlyContinue
+
+  publish:
+    name: Publish immutable native staging bytes
+    needs: [validate, sign-macos, sign-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release-native-signing
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact protected main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install deterministic publisher dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download signed native roots
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: native-root-*
+          path: ${{ runner.temp }}/transport
+          merge-multiple: true
+
+      - name: Re-finalize transported roots and prepare exact staging assets
+        id: assets
+        env:
+          CLI_VERSION: ${{ needs.validate.outputs.cli_version }}
+          RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
+          LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
+          APPLE_TEAM_ID: ${{ vars.LYNTTY_APPLE_TEAM_ID }}
+          APPLE_SIGNING_AUTHORITY: ${{ vars.LYNTTY_APPLE_SIGNING_AUTHORITY }}
+          WINDOWS_CERT_THUMBPRINT: ${{ vars.LYNTTY_WINDOWS_CERT_THUMBPRINT }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.LYNTTY_WINDOWS_RFC3161_TIMESTAMP_URL }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse origin/main)" ]]
+          final="$RUNNER_TEMP/final"
+          assets="$RUNNER_TEMP/native-release-assets"
+          mkdir "$final" "$assets"
+          for target in darwin-x64 darwin-arm64 windows-x64; do
+            tar -xzf "$RUNNER_TEMP/transport/${target}-transport.tar.gz" -C "$final"
+            bun packages/lyntty-cli/scripts/build-artifact.ts --target "$target" --out-dir "$final" --archive-finalized
+            stem="lyntty-cli-${CLI_VERSION}-${target}"
+            suffix=.tar.gz
+            [[ "$target" == windows-x64 ]] && suffix=.zip
+            cp "$final/${stem}${suffix}" "$final/${stem}${suffix}.sha256" "$final/${stem}.manifest.sha256" "$assets/"
+            cp "$RUNNER_TEMP/transport/${target}-signing-evidence.json" "$assets/"
+            ROOT="$final/$stem" bun -e '
+              const embedded=JSON.stringify(await Bun.file(`${process.env.ROOT}/runtime/release/trust-roots.json`).json());
+              const committed=JSON.stringify(await Bun.file("config/release-trust-roots/stable.json").json());
+              if(embedded!==committed)throw new Error("signed native root trust store mismatch");
+            '
+          done
+          TRUST_ENV="$LYNTTY_RELEASE_TRUST_ROOTS" bun -e '
+            const configured=JSON.stringify(JSON.parse(process.env.TRUST_ENV));
+            const committed=JSON.stringify(await Bun.file("config/release-trust-roots/stable.json").json());
+            if(configured!==committed)throw new Error("publisher trust roots mismatch");
+          '
+          ASSETS="$assets" bun - <<'BUN'
+          import { createHash } from 'node:crypto';
+          import { stat } from 'node:fs/promises';
+          const sha=async path=>createHash('sha256').update(await Bun.file(path).arrayBuffer()).digest('hex');
+          const evidence={};
+          for(const target of ['darwin-x64','darwin-arm64','windows-x64']) {
+            const value=await Bun.file(`${process.env.ASSETS}/${target}-signing-evidence.json`).json();
+            if(value.schemaVersion!==1||value.target!==target||value.sourceCommit!==process.env.GITHUB_SHA)throw new Error(`native signing evidence identity mismatch: ${target}`);
+            if(target.startsWith('darwin-')&&(value.appleTeamId!==process.env.APPLE_TEAM_ID||value.appleSigningAuthority!==process.env.APPLE_SIGNING_AUTHORITY||!/^[-0-9a-fA-F]{36}$/.test(value.notarizationId)))throw new Error(`macOS signing evidence mismatch: ${target}`);
+            if(target==='windows-x64'&&(value.windowsCertThumbprint!==process.env.WINDOWS_CERT_THUMBPRINT.toUpperCase()||value.windowsTimestampUrl!==process.env.WINDOWS_TIMESTAMP_URL))throw new Error('Windows signing evidence mismatch');
+            evidence[target]=value;
+          }
+          const archives={};
+          for(const target of ['darwin-x64','darwin-arm64','windows-x64']) {
+            const suffix=target==='windows-x64'?'.zip':'.tar.gz';
+            const name=`lyntty-cli-${process.env.CLI_VERSION}-${target}${suffix}`;
+            const path=`${process.env.ASSETS}/${name}`;
+            const entry={name,sha256:await sha(path),size:(await stat(path)).size};
+            if(target.startsWith('darwin-')) Object.assign(entry,{notarizationId:evidence[target].notarizationId,appleTeamId:process.env.APPLE_TEAM_ID,appleSigningAuthority:process.env.APPLE_SIGNING_AUTHORITY});
+            else Object.assign(entry,{windowsCertThumbprint:process.env.WINDOWS_CERT_THUMBPRINT.toUpperCase(),windowsTimestampUrl:process.env.WINDOWS_TIMESTAMP_URL});
+            archives[target]=entry;
+          }
+          const trustRootsSha256=await sha('config/release-trust-roots/stable.json');
+          const metadata={schemaVersion:1,repository:process.env.GITHUB_REPOSITORY,releaseTag:process.env.RELEASE_TAG,sourceCommit:process.env.GITHUB_SHA,workflowCommit:process.env.GITHUB_SHA,runId:Number(process.env.GITHUB_RUN_ID),runAttempt:Number(process.env.GITHUB_RUN_ATTEMPT),cliVersion:process.env.CLI_VERSION,trustRootsSha256,archives};
+          await Bun.write(`${process.env.ASSETS}/native-signing-metadata.json`,`${JSON.stringify(metadata,null,2)}\n`);
+          BUN
+          (cd "$assets" && sha256sum * | sort -k2 > native-signing-checksums.txt)
+          echo "path=$assets" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact immutable native staging Release-ID transaction
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSETS: ${{ steps.assets.outputs.path }}
+          RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
+          CURRENT_LATEST: ${{ needs.validate.outputs.current_latest }}
+          CLI_VERSION: ${{ needs.validate.outputs.cli_version }}
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find "$ASSETS" -maxdepth 1 -type f -print | sort)
+          notes="$RUNNER_TEMP/native-signing-release-notes.md"
+          {
+            echo "# Lyntty native signing staging $RELEASE_TAG"
+            echo
+            echo "Source: \`$GITHUB_SHA\`"
+            echo "CLI: \`$CLI_VERSION\`"
+            echo "Producer run: \`$GITHUB_RUN_ID\` attempt \`$GITHUB_RUN_ATTEMPT\`"
+            echo
+            echo 'These credential-free bytes are immutable staging inputs. Stable may consume them only after the independent `native-signing.yml` verifier attests every archive.'
+          } > "$notes"
+          audit="$RUNNER_TEMP/native-signing-release-publication-audit.json"
+          result="$(bun scripts/github-release.ts publish \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --title "Lyntty native signing $RELEASE_TAG" \
+            --target "$GITHUB_SHA" \
+            --body "$notes" \
+            --prerelease true \
+            --latest false \
+            --audit "$audit" \
+            --required-actor jczhang02 \
+            --expected-current-latest "$CURRENT_LATEST" \
+            -- "${files[@]}")"
+          jq -e --arg tag "$RELEASE_TAG" --arg target "$GITHUB_SHA" '.tag == $tag and .target == $target' <<< "$result"
+          metadata_sha256="$(sha256sum "$ASSETS/native-signing-metadata.json" | awk '{print $1}')"
+          echo "audit=$audit" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Native signing staging published'
+            echo "- Tag: \`$RELEASE_TAG\`"
+            echo "- Source: \`$GITHUB_SHA\`"
+            echo "- Metadata SHA-256: \`$metadata_sha256\`"
+            for target in darwin-x64 darwin-arm64 windows-x64; do
+              suffix=.tar.gz; [[ "$target" == windows-x64 ]] && suffix=.zip
+              name="lyntty-cli-${CLI_VERSION}-${target}${suffix}"
+              echo "- $target SHA-256: \`$(sha256sum "$ASSETS/$name" | awk '{print $1}')\`"
+            done
+            echo '- Next gate: dispatch `native-signing.yml` with this exact tag, metadata, archive hashes, and notarization IDs.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve native staging publication audit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-signing-publication-audit-${{ needs.validate.outputs.release_tag }}
+          path: ${{ steps.publish.outputs.audit }}
+          if-no-files-found: error
+          retention-days: 90

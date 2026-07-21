@@ -19,16 +19,22 @@ lyntty-cli-<version>-<target>/
 
 `runtime/pi` contains Pi themes, export templates, docs, assets, and Bun-adjusted examples. The Lyntty Pi extension remains embedded in both executables. Each newly built manifest records the exact 40-character source commit; formal artifact builds reject a dirty source tree or a mismatched `GITHUB_SHA`. Legacy local schema-1 manifests without this field remain readable, but protected native signing and Stable candidate workflows require an exact source-commit match. `lyntty --self-check --json` verifies the exact file inventory, file hashes, target, embedded extension digest, and sibling daemon build identity without authenticating or starting a service.
 
-Linux artifacts target glibc. Supported target names are `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`, and `windows-x64`. Windows currently receives an artifact and self-check only; user-service installation, transactional update, and stable release remain blocked on the Windows handoff and Authenticode gate.
+Linux artifacts target glibc. Supported target names are `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`, and `windows-x64`. Stable macOS/Windows bytes must pass the protected producer and independent verifier described in [`native-signing.md`](./native-signing.md); missing notarization, Authenticode, timestamp, or attestation blocks the entire Stable Candidate.
 
 ## Installation
 
 A release-specific installer command must pin both the archive SHA-256 and `artifact-manifest.json` SHA-256 from the signed Compatibility BOM. Do not copy hashes from an unsigned mirror.
 
+The formal Stable Release publishes `install.sh`, `install.sh.sha256`, `stable-release-trust-roots.json`, the detached signed BOM, and every selected archive together. Bootstrap by pinning the Release tag and first verifying the installer/root hashes against protected source or another reviewed channel; never pipe an unverified network response directly into a shell.
+
 ```bash
-curl --proto '=https' --tlsv1.2 -fsSL https://RELEASE_HOST/install.sh | sh -s -- \
-  --base-url https://RELEASE_HOST/cli-vX.Y.Z \
-  --version X.Y.Z \
+tag=compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1
+base="https://github.com/jczhang02/lyntty/releases/download/$tag"
+curl --proto '=https' --tlsv1.2 -fsSLO "$base/install.sh"
+printf '%s  install.sh\n' INSTALLER_SHA256_FROM_REVIEWED_RELEASE | sha256sum -c -
+sh ./install.sh \
+  --base-url "$base" \
+  --version 1.2.0 \
   --archive-sha256 ARCHIVE_SHA256_FROM_SIGNED_BOM \
   --manifest-sha256 MANIFEST_SHA256_FROM_SIGNED_BOM
 ```

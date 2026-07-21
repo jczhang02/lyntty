@@ -180,6 +180,9 @@ export const ReleaseTrustStoreSchema = z.object({
   if (new Set(store.roots.map(root => root.keyId)).size !== store.roots.length) {
     context.addIssue({ code: 'custom', path: ['roots'], message: 'Release trust-root key IDs must be unique' });
   }
+  if (new Set(store.roots.map(root => root.publicKeyBase64)).size !== store.roots.length) {
+    context.addIssue({ code: 'custom', path: ['roots'], message: 'Stable and Preview trust roots must use distinct public keys' });
+  }
 });
 export type ReleaseTrustStore = z.infer<typeof ReleaseTrustStoreSchema>;
 

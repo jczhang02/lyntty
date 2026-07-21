@@ -44,6 +44,7 @@ Decisions:
 ## VPS prerequisites
 
 - Linux VPS with Docker Engine and Docker Compose plugin.
+- `jq`, `curl`, `sha256sum`, and GNU `base64` available on the host.
 - Caddy installed on host.
 - Firewall allows inbound `80/tcp` and `443/tcp`; SSH restricted to owner IPs if practical.
 - Cloudflare DNS:
@@ -85,7 +86,7 @@ Permissions:
 sudo chmod 600 /opt/lyntty/.env
 ```
 
-Do not store `LYNTTY_MASTER_SECRET` in GitHub Actions. The deploy workflow needs SSH access, pinned known-host material, and a signed Stable BOM tag; it resolves the image digest from the BOM. `LYNTTY_RELEASE_TRUST_ROOTS` contains public keys and release identity pins, not private signing material. Existing Relay-schema-1 deployments using `HANDY_MASTER_SECRET` must copy the exact same secret bytes to `LYNTTY_MASTER_SECRET` before the schema-2 contract boundary; do not rotate the value during the name migration.
+Do not store `LYNTTY_MASTER_SECRET` in GitHub Actions. The deploy workflow needs SSH access, pinned known-host material, and a signed Stable BOM tag; it resolves the image digest from the BOM. `LYNTTY_RELEASE_TRUST_ROOTS` contains public keys and release identity pins, not private signing material. Existing Relay-schema-1 deployments using `HANDY_MASTER_SECRET` must copy the exact same secret bytes to `LYNTTY_MASTER_SECRET` before the schema-2 contract boundary; do not rotate the value during the name migration. Formal deployment requires exactly one non-empty, canonical `LYNTTY_MASTER_SECRET=...` entry (no `export`, leading whitespace, alternate assignment, or duplicate), mode `0600`/root ownership for `.env`, and an existing canonical `LYNTTY_RELAY_IMAGE` already pinned by digest. Convert any historical mutable `sha-*` reference and verify the old runtime before the first formal rollout.
 
 ## Docker Compose
 
@@ -184,7 +185,7 @@ ROOT
 curl -fsS https://relay.jczhang.cc/health
 ```
 
-Relay holds a schema lease while serving. Stop every old Relay replica before the explicit migration job; otherwise the migration waits rather than racing an active binary. The workflow enters the root-only directory through a privileged shell, accepts only the current signed Stable head, and requires its sequence to advance `deployed-sequence.txt`. Any failure after `.migration-incomplete` is written leaves Relay stopped; retries remain blocked until an operator verifies the named backup, restores or validates schema state, runs `doctor`, and explicitly removes the marker. Preserve the pre-deploy backup and its `.sha256` sidecar until rollback is no longer required.
+Relay holds a schema lease while serving. Stop every old Relay replica before the explicit migration job; otherwise the migration waits rather than racing an active binary. The workflow enters the root-only directory through a privileged shell, accepts only the current immutable signed Stable head, and requires its sequence to advance `deployed-sequence.txt`. It atomically writes the exact reviewed trust roots and `LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE`, verifies the resolved Compose image and running container `.Config.Image`, validates the backup and checksum sidecar, and requires local plus public `/v1/version` to return the expected BOM id/sequence/hash and APK URL/hash. A generic `/health` response is insufficient. Compose one-shot jobs detach stdin so they cannot consume the remote `bash -s` script stream. Any failure after `.migration-incomplete` is written leaves Relay stopped; a failed pre-migration restoration writes `.rollback-incomplete`. Retries remain blocked until an operator verifies the named backup or prior runtime, restores or validates schema state, runs `doctor`, and explicitly removes the applicable marker. Preserve the pre-deploy backup and its `.sha256` sidecar until rollback is no longer required.
 
 Do not run `git pull`, package installation, or source builds on the VPS.
 
@@ -306,7 +307,7 @@ Health endpoint expected shape:
 - [x] `relay.jczhang.cc` DNS resolves to VPS.
 - [x] Caddy obtains valid HTTPS certificate.
 - [x] `https://relay.jczhang.cc/health` returns healthy.
-- [ ] Protected deploy verifies the current signed Stable BOM, image signature, provenance, and SBOM before selecting an `@sha256:` reference; the new workflow has not been run with production approvals yet.
+- [ ] Protected deploy verifies the current immutable signed Stable BOM, image signature, provenance, SBOM, trust-root digest, running container digest, and exact `/v1/version` identity; the hardened workflow has not been run with production approvals yet.
 - [x] `/opt/lyntty/data` persists across restart.
 - [ ] Protected deploy applies the signed BOM-selected digest and records its monotonic sequence; the previous manual tag deployment is bootstrap history, not formal acceptance.
 - [ ] A higher-sequence signed rollback BOM has been deployed; not exercised yet because no formal predecessor release exists.
