@@ -112,9 +112,6 @@ function buildBom(options: {
           ...releaseFile(`lyntty-${target}-${sequence}${target === 'windows-x64' ? '.zip' : '.tar.gz'}`),
           target,
           artifactManifestSha256: HASH_B,
-          ...(channel === 'stable' && (target.startsWith('darwin-') || target === 'windows-x64')
-            ? { nativeSigningAttestation: releaseFile(`native-${target}-attestation.json`) }
-            : {}),
         })),
       },
       relay: {
@@ -202,11 +199,21 @@ describe('Compatibility BOM', () => {
       crypto: nodeCompatibilityCrypto,
       expectedChannel: 'stable',
     });
-    expect(verified.bomSha256).toBe('802c251cc64cb47cabc3824815ff2479f7cb9aaee87ab9363e03ae2638cc1c17');
+    expect(verified.bomSha256).toBe('5096fc24358de2130cbb676d65773a09d01c1b5c7da391502fffd38c8a396574');
     expect(canonicalCompatibilityBom(bom)).toBe(canonicalCompatibilityBom(JSON.parse(JSON.stringify(bom))));
     expect(selectAndroidRelease(verified.bom).apk.url).not.toContain('/latest/');
     expect(selectCliArchive(verified.bom, 'windows-x64').name).toEndWith('.zip');
+    expect(verified.bom.components.cli.archives.every(archive => archive.nativeSigningAttestation === undefined)).toBe(true);
     expect(selectRelayImage(verified.bom).reference).toBe(`ghcr.io/jczhang02/lyntty-relay@sha256:${HASH_B}`);
+  });
+
+  it('accepts optional native signing evidence without requiring it for Stable', () => {
+    const bom = buildBom({ sequence: 8 });
+    const darwin = bom.components.cli.archives.find(archive => archive.target === 'darwin-arm64')!;
+    darwin.nativeSigningAttestation = immutableFile('optional-native-darwin-arm64-attestation.json', 8);
+    const parsed = CompatibilityBomV1Schema.parse(bom);
+    expect(selectCliArchive(parsed, 'darwin-arm64').nativeSigningAttestation?.name)
+      .toBe('optional-native-darwin-arm64-attestation.json');
   });
 
   it('rejects tampering, channel confusion, replay, and a mismatched signer policy', async () => {

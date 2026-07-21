@@ -132,18 +132,7 @@ export const CompatibilityBomV1Schema = z.object({
     }).strict(),
   }).strict(),
   predecessors: z.array(PredecessorBomSchema).max(2),
-}).strict().superRefine((bom, context) => {
-  if (bom.channel !== 'stable') return;
-  for (const [index, archive] of bom.components.cli.archives.entries()) {
-    if ((archive.target.startsWith('darwin-') || archive.target === 'windows-x64') && !archive.nativeSigningAttestation) {
-      context.addIssue({
-        code: 'custom',
-        path: ['components', 'cli', 'archives', index, 'nativeSigningAttestation'],
-        message: `Stable native archive ${archive.target} requires pinned signing attestation evidence`,
-      });
-    }
-  }
-});
+}).strict();
 
 export type CompatibilityBomV1 = z.infer<typeof CompatibilityBomV1Schema>;
 

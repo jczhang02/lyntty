@@ -48,12 +48,6 @@ jobs:
       PREDECESSOR_2: ${{ inputs.predecessor_2 }}
       LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
       LYNTTY_BOM_KEY_ID: ${{ vars.LYNTTY_BOM_KEY_ID }}
-      SIGNED_DARWIN_X64_URL: ${{ vars.LYNTTY_SIGNED_DARWIN_X64_URL }}
-      SIGNED_DARWIN_X64_SHA256: ${{ vars.LYNTTY_SIGNED_DARWIN_X64_SHA256 }}
-      SIGNED_DARWIN_ARM64_URL: ${{ vars.LYNTTY_SIGNED_DARWIN_ARM64_URL }}
-      SIGNED_DARWIN_ARM64_SHA256: ${{ vars.LYNTTY_SIGNED_DARWIN_ARM64_SHA256 }}
-      SIGNED_WINDOWS_X64_URL: ${{ vars.LYNTTY_SIGNED_WINDOWS_X64_URL }}
-      SIGNED_WINDOWS_X64_SHA256: ${{ vars.LYNTTY_SIGNED_WINDOWS_X64_SHA256 }}
       LYNTTY_EXPO_PROJECT_ID: ${{ vars.LYNTTY_EXPO_PROJECT_ID }}
       LYNTTY_ANDROID_CERT_SHA256: ${{ vars.LYNTTY_ANDROID_CERT_SHA256 }}
     steps:
@@ -187,94 +181,6 @@ jobs:
         run: |
           set -euo pipefail
           bun packages/lyntty-cli/scripts/build-artifact.ts --all --out-dir "$RUNNER_TEMP/candidate/cli"
-
-      - name: Replace Stable native archives with externally signed bytes
-        if: inputs.channel == 'stable'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CLI_VERSION: ${{ steps.release.outputs.cli }}
-        run: |
-          set -euo pipefail
-          native_signer_workflow="$GITHUB_REPOSITORY/.github/workflows/native-signing.yml"
-          native_release_tag=
-          replace_signed_archive() {
-            local target="$1" url="$2" expected_sha="$3" suffix="$4"
-            : "${url:?Stable native archive URL for $target is required}"
-            : "${expected_sha:?Stable native archive SHA-256 for $target is required}"
-            [[ "$url" =~ ^https://github\.com/jczhang02/lyntty/releases/download/native-signing-[0-9A-Za-z._-]+/[^/?#]+$ ]]
-            [[ "$expected_sha" =~ ^[a-f0-9]{64}$ ]]
-            local release_tag asset_name release_json tag_json
-            read -r release_tag asset_name < <(URL="$url" bun -e '
-              const parsed=new URL(process.env.URL);const parts=parsed.pathname.split("/");
-              process.stdout.write(`${decodeURIComponent(parts[5]??"")} ${decodeURIComponent(parts[6]??"")}\n`);
-            ')
-            [[ "$release_tag" == native-signing-* ]]
-            if [[ -z "$native_release_tag" ]]; then native_release_tag="$release_tag"; else [[ "$native_release_tag" == "$release_tag" ]]; fi
-            release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$release_tag")"
-            [[ "$(jq -r .draft <<< "$release_json")" == false ]]
-            [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
-            [[ "$(jq -r .immutable <<< "$release_json")" == true ]]
-            [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
-            jq -e --arg name "$asset_name" --arg digest "sha256:$expected_sha" \
-              '[.assets[] | select(.name == $name and .state == "uploaded" and .digest == $digest)] | length == 1' <<< "$release_json"
-            tag_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$release_tag")"
-            [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
-            [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
-            local stem="lyntty-cli-${CLI_VERSION}-${target}"
-            [[ "$asset_name" == "${stem}${suffix}" ]]
-            local archive="$RUNNER_TEMP/candidate/cli/${stem}${suffix}"
-            curl -fsSL "$url" -o "$archive"
-            echo "$expected_sha  $archive" | sha256sum -c -
-            printf '%s  %s\n' "$expected_sha" "$(basename "$archive")" > "${archive}.sha256"
-            gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY" --source-digest "$GITHUB_SHA" \
-              --signer-workflow "$native_signer_workflow" --signer-digest "$GITHUB_SHA" --format json \
-              > "$RUNNER_TEMP/candidate/evidence/native-${target}-attestation.json"
-            local manifest="$RUNNER_TEMP/${stem}.artifact-manifest.json"
-            if [[ "$suffix" == .zip ]]; then
-              unzip -p "$archive" "$stem/artifact-manifest.json" > "$manifest"
-            else
-              tar -xOzf "$archive" "$stem/artifact-manifest.json" > "$manifest"
-            fi
-            EXPECTED_TARGET="$target" EXPECTED_VERSION="$CLI_VERSION" EXPECTED_SOURCE="$GITHUB_SHA" bun -e '
-              import { parseArtifactManifest } from "./packages/lyntty-cli/src/distribution/artifactManifest.ts";
-              const manifest=parseArtifactManifest(await Bun.file(process.argv[1]).json());
-              const target=`${manifest.target.os}-${manifest.target.arch}`;
-              if (manifest.version!==process.env.EXPECTED_VERSION || manifest.releaseId!==`lyntty-cli-${process.env.EXPECTED_VERSION}-${process.env.EXPECTED_TARGET}` || target!==process.env.EXPECTED_TARGET || manifest.sourceCommit!==process.env.EXPECTED_SOURCE) throw new Error("signed native archive identity/source mismatch");
-            ' "$manifest"
-            local extracted="$RUNNER_TEMP/signed-${target}"
-            rm -rf "$extracted"; mkdir "$extracted"
-            local entries
-            if [[ "$suffix" == .zip ]]; then entries="$(unzip -Z1 "$archive")"; else entries="$(tar -tzf "$archive")"; fi
-            [[ -n "$entries" ]]
-            if printf '%s\n' "$entries" | grep -Ev "^${stem}(/|$)"; then
-              echo "signed native archive contains an entry outside $stem" >&2; exit 1
-            fi
-            if printf '%s\n' "$entries" | sort | uniq -d | grep .; then
-              echo "signed native archive contains duplicate entries" >&2; exit 1
-            fi
-            if [[ "$suffix" == .zip ]]; then unzip -q "$archive" -d "$extracted"; else tar -xzf "$archive" -C "$extracted"; fi
-            mapfile -t archive_roots < <(find "$extracted" -mindepth 1 -maxdepth 1 -printf '%f\n')
-            [[ "${#archive_roots[@]}" -eq 1 && "${archive_roots[0]}" == "$stem" ]]
-            ARTIFACT_ROOT="$extracted/$stem" TRUST_ROOTS="$RUNNER_TEMP/trust-roots.json" bun -e '
-              import { chmod, readFile } from "node:fs/promises";
-              import { readArtifactManifest } from "./packages/lyntty-cli/src/distribution/artifactManifest.ts";
-              import { verifyArtifactFiles } from "./packages/lyntty-cli/src/distribution/selfCheck.ts";
-              const manifest=await readArtifactManifest(`${process.env.ARTIFACT_ROOT}/artifact-manifest.json`);
-              if (manifest.target.os==="windows") for (const file of manifest.files.filter(file=>file.executable)) await chmod(`${process.env.ARTIFACT_ROOT}/${file.path}`,0o755);
-              await verifyArtifactFiles(process.env.ARTIFACT_ROOT, manifest);
-              const expected=JSON.stringify(JSON.parse(await readFile(process.env.TRUST_ROOTS,"utf8")));
-              const embedded=JSON.stringify(JSON.parse(await readFile(`${process.env.ARTIFACT_ROOT}/runtime/release/trust-roots.json`,"utf8")));
-              if (embedded!==expected) throw new Error("signed native archive trust roots do not match candidate");
-            '
-            rm -rf "$extracted"
-            local manifest_sha
-            manifest_sha="$(sha256sum "$manifest" | awk '{print $1}')"
-            printf '%s  artifact-manifest.json\n' "$manifest_sha" > "$RUNNER_TEMP/candidate/cli/${stem}.manifest.sha256"
-            rm -f "$manifest"
-          }
-          replace_signed_archive darwin-x64 "$SIGNED_DARWIN_X64_URL" "$SIGNED_DARWIN_X64_SHA256" .tar.gz
-          replace_signed_archive darwin-arm64 "$SIGNED_DARWIN_ARM64_URL" "$SIGNED_DARWIN_ARM64_SHA256" .tar.gz
-          replace_signed_archive windows-x64 "$SIGNED_WINDOWS_X64_URL" "$SIGNED_WINDOWS_X64_SHA256" .zip
 
       - name: Verify compiled CLI identity without a host runtime
         env:
@@ -508,9 +414,9 @@ jobs:
               sourceCommit: process.env.SOURCE_SHA,
               verifier: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
               workflow: 'release-candidate.yml',
-              nativeSigningEvidence: component === 'cli'
-                ? (await readdir(join(root, 'evidence'))).filter(name => name.startsWith('native-') && name.endsWith('-attestation.json')).sort()
-                : [],
+              platformCodeSigning: component === 'cli'
+                ? { policy: 'not-required-self-use', evidence: [] }
+                : undefined,
             },
           };
           await Bun.write(join(root, 'evidence', `${component}.intoto.json`), `${JSON.stringify(statement, null, 2)}\n`);
@@ -548,10 +454,7 @@ jobs:
             const stem = `lyntty-cli-${process.env.CLI_VERSION}-${target}`;
             const suffix = target === 'windows-x64' ? '.zip' : '.tar.gz';
             const sidecar = (await Bun.file(join(root, 'cli', `${stem}.manifest.sha256`)).text()).trim().split(/\s+/)[0];
-            const nativeSigningAttestation = channel === 'stable' && (target.startsWith('darwin-') || target === 'windows-x64')
-              ? local(join(root, 'evidence', `native-${target}-attestation.json`))
-              : undefined;
-            archives.push({ ...local(join(root, 'cli', `${stem}${suffix}`)), target: cliMap[target], artifactManifestSha256: sidecar, ...(nativeSigningAttestation ? { nativeSigningAttestation } : {}) });
+            archives.push({ ...local(join(root, 'cli', `${stem}${suffix}`)), target: cliMap[target], artifactManifestSha256: sidecar });
           }
           const evidence = component => ({
             sbom: local(join(root, 'evidence', `${component}.spdx.json`)),
