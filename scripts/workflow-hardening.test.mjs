@@ -525,6 +525,10 @@ test('promotion publishes exact candidate bytes with protected stable/preview se
   assert.match(releasePromote, /immutable_releases_enabled/);
   assert.match(releasePromote, /LYNTTY_STABLE_TAG_RULESET_ID/);
   assert.match(releasePromote, /GITHUB_REF_PROTECTED/);
+  const setupBunIndex = releasePromote.indexOf('- name: Setup Bun');
+  assert.ok(setupBunIndex > 0);
+  assert.doesNotMatch(releasePromote.slice(0, setupBunIndex), /^\s*(?:[A-Z_]+="[^"]*"\s+)*bun(?:\s|$)/m);
+  assert.match(releasePromote.slice(0, setupBunIndex), /\.workflowName == "Compatibility release candidate"/);
   assert.match(releasePromote, /release-stable/);
   assert.match(releasePromote, /release-preview/);
   assert.match(releasePromote, /actions\/download-artifact@/);

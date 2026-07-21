@@ -113,10 +113,11 @@ jobs:
           jq -e '[.rules[].type] | sort == ["deletion", "update"]' <<< "$ruleset_json"
           : "${LYNTTY_RELEASE_TRUST_ROOTS:?protected channel trust roots are required}"
           run="$(gh run view "$CANDIDATE_RUN_ID" --json conclusion,event,headSha,workflowName)"
-          RUN_JSON="$run" bun -e '
-            const run=JSON.parse(process.env.RUN_JSON);
-            if (run.conclusion!=="success" || run.event!=="workflow_dispatch" || run.workflowName!=="Compatibility release candidate") throw new Error("candidate run identity is invalid");
-          '
+          jq -e '
+            .conclusion == "success"
+            and .event == "workflow_dispatch"
+            and .workflowName == "Compatibility release candidate"
+          ' <<< "$run" >/dev/null
           echo "$run" > "$RUNNER_TEMP/candidate-run.json"
           printf '%s\n' "$LYNTTY_RELEASE_TRUST_ROOTS" > "$RUNNER_TEMP/trust-roots.json"
           jq -e --arg channel "$CHANNEL" '.schemaVersion == 1 and (.roots | length > 0) and all(.roots[]; .channel == $channel)' "$RUNNER_TEMP/trust-roots.json"
