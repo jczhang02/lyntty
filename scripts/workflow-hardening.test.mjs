@@ -13,6 +13,8 @@ const releaseCandidatePath = new URL('../.github/workflows/release-candidate.yml
 const releasePromotePath = new URL('../.github/workflows/release-promote.yml', import.meta.url);
 const releaseRollbackPath = new URL('../.github/workflows/release-rollback.yml', import.meta.url);
 const nativeSigningPath = new URL('../.github/workflows/native-signing.yml', import.meta.url);
+const nativeSigningProducerPath = new URL('../.github/workflows/native-signing-producer.yml', import.meta.url);
+const githubReleasePath = new URL('./github-release.ts', import.meta.url);
 const androidGradlePath = new URL('../packages/lyntty-app/android/app/build.gradle', import.meta.url);
 const maestroRunnerPath = new URL('./e2e/run-maestro.sh', import.meta.url);
 const codeownersPath = new URL('../.github/CODEOWNERS', import.meta.url);
@@ -25,7 +27,7 @@ const previewRelayGatePath = new URL('../e2e/maestro/standalone/preview_first_ru
 const previewReleaseNotesPath = new URL('../docs/release/preview-apk-release-notes.md', import.meta.url);
 const previewBundleSmokePath = new URL('../packages/lyntty-app/scripts/bundle-smoke.ts', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, bunLockText, previewRelayGate, previewBundleSmoke] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, nativeSigningProducer, githubRelease, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, bunLockText, previewRelayGate, previewBundleSmoke] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
@@ -35,6 +37,8 @@ const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, android
   readFile(releasePromotePath, 'utf8'),
   readFile(releaseRollbackPath, 'utf8'),
   readFile(nativeSigningPath, 'utf8'),
+  readFile(nativeSigningProducerPath, 'utf8'),
+  readFile(githubReleasePath, 'utf8'),
   readFile(androidGradlePath, 'utf8'),
   readFile(maestroRunnerPath, 'utf8'),
   readFile(codeownersPath, 'utf8'),
@@ -61,6 +65,9 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /environment: production-relay/);
   assert.match(relayDeploy, /group: compatibility-promotion-stable/);
   assert.match(relayDeploy, /GITHUB_REF[^\n]*refs\/heads\/main/);
+  assert.match(relayDeploy, /GITHUB_REF_PROTECTED/);
+  assert.match(relayDeploy, /git rev-parse HEAD/);
+  assert.match(relayDeploy, /git rev-parse origin\/main/);
   assert.match(relayDeploy, /scripts\/release\.ts verify/);
   assert.match(relayDeploy, /ghcr\\\.io\/jczhang02\/lyntty-relay@sha256:/);
   assert.match(relayDeploy, /StrictHostKeyChecking=yes/);
@@ -75,6 +82,12 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /deployed-sequence\.txt/);
   assert.match(relayDeploy, /trap 'exit 130' HUP INT TERM/);
   assert.match(relayDeploy, /remains fail-stopped after migration began/);
+  assert.match(relayDeploy, /LYNTTY_RELEASE_TRUST_ROOTS/);
+  assert.match(relayDeploy, /LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE/);
+  assert.match(relayDeploy, /\.Config\.Image/);
+  assert.match(relayDeploy, /\/v1\/version/);
+  assert.match(relayDeploy, /bom_release_id/);
+  assert.match(relayDeploy, /bom_sequence/);
   assert.match(relayDeploy, /bun install --frozen-lockfile/);
   assert.match(relayDeploy, /bun --no-install scripts\/release\.ts/);
   assert.match(relayDeploy, / backup /);
@@ -95,6 +108,8 @@ test('relay image verification never publishes from an ordinary main push', () =
 test('Android component workflow verifies a candidate but cannot publish', () => {
   assert.match(androidRelease, /environment: production-android/);
   assert.match(androidRelease, /GITHUB_REF[^\n]*refs\/heads\/main/);
+  assert.match(androidRelease, /GITHUB_REF_PROTECTED/);
+  assert.match(androidRelease, /version_code > 5/);
   assert.match(androidRelease, /\^\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\$/);
   assert.doesNotMatch(androidRelease, /-PlynttyVersionName='\$\{\{ inputs\.version_name \}\}'/);
   assert.match(androidRelease, /gradle-runtime-audit\.sh/);
@@ -441,6 +456,13 @@ test('Preview release body extraction preserves exact trailing bytes', () => {
 test('candidate builds once under channel isolation and never publishes', () => {
   assert.match(releaseCandidate, /workflow_dispatch/);
   assert.doesNotMatch(releaseCandidate, /\non:\n  push:/);
+  assert.match(releaseCandidate, /GITHUB_REF_PROTECTED/);
+  assert.match(releaseCandidate, /\(\( SEQUENCE > 0 \)\)/);
+  assert.match(releaseCandidate, /\[\[ "\$SEQUENCE" == 1 \]\]/);
+  assert.match(releaseCandidate, /\[\[ "\$ANDROID_VERSION_CODE" == 6 \]\]/);
+  assert.match(releaseCandidate, /compat-v1\.2\.0_1\.2\.0_1\.2\.0_0\.2\.0-s1/);
+  assert.match(releaseCandidate, /gradle-production-guard-test\.sh "\$RUNNER_TEMP\/candidate\/evidence\/android-production-guard\.txt"/);
+  assert.match(releaseCandidate, /LYNTTY_EXPO_PROJECT_ID[^\n]*\^\[0-9a-fA-F\]/);
   assert.match(releaseCandidate, /release-stable-candidate/);
   assert.match(releaseCandidate, /release-preview-candidate/);
   assert.match(releaseCandidate, /build-artifact\.ts --all/);
@@ -481,6 +503,11 @@ test('candidate builds once under channel isolation and never publishes', () => 
 
 test('promotion publishes exact candidate bytes with protected stable/preview separation', () => {
   assert.match(releasePromote, /workflow_dispatch/);
+  assert.match(releasePromote, /physical_phone_accepted/);
+  assert.match(releasePromote, /accepted_android_apk_sha256/);
+  assert.match(releasePromote, /immutable_releases_enabled/);
+  assert.match(releasePromote, /LYNTTY_STABLE_TAG_RULESET_ID/);
+  assert.match(releasePromote, /GITHUB_REF_PROTECTED/);
   assert.match(releasePromote, /release-stable/);
   assert.match(releasePromote, /release-preview/);
   assert.match(releasePromote, /actions\/download-artifact@/);
@@ -488,8 +515,12 @@ test('promotion publishes exact candidate bytes with protected stable/preview se
   assert.match(releasePromote, /skopeo copy --all/);
   assert.match(releasePromote, /remote_digest/);
   assert.match(releasePromote, /cosign verify/);
-  assert.match(releasePromote, /--draft=false --latest/);
-  assert.match(releasePromote, /--draft=false --prerelease/);
+  assert.match(releasePromote, /scripts\/github-release\.ts publish/);
+  assert.match(releasePromote, /--expected-current-latest/);
+  assert.match(releasePromote, /release-publication-audit\.json/);
+  assert.doesNotMatch(releasePromote, /gh release create/);
+  assert.doesNotMatch(releasePromote, /gh release edit/);
+  assert.doesNotMatch(releasePromote, /gh release upload/);
   assert.match(releasePromote, /latest_tag.*!=.*compat-preview/);
   assert.match(releasePromote, /candidate source is no longer current protected main/);
   assert.match(releasePromote, /native-signing\.yml/);
@@ -499,9 +530,6 @@ test('promotion publishes exact candidate bytes with protected stable/preview se
   assert.match(releasePromote, /release_rows=.*gh api[\s\S]*--paginate/);
   assert.match(releasePromote, /info\.relaySchema!==bom\.components\.relay\.schema\.current/);
   assert.match(releasePromote, /existing candidate image tag has a different digest/);
-  assert.match(releasePromote, /existing release is not the exact resumable draft/);
-  assert.match(releasePromote, /gh release create "\$CANDIDATE_TAG" --draft/);
-  assert.match(releasePromote, /gh release edit "\$CANDIDATE_TAG" --draft=false/);
   assert.match(releasePromote, /bun install --frozen-lockfile/);
   assert.doesNotMatch(releasePromote, /gradlew|build-artifact\.ts|docker buildx|build-push-action/);
 });
@@ -515,23 +543,55 @@ test('stable rollback creates a higher signed BOM and reuses retained bytes', ()
   assert.match(releaseRollback, /components\.cli = target\.components\.cli/);
   assert.match(releaseRollback, /components\.relay = target\.components\.relay/);
   assert.match(releaseRollback, /SEQUENCE > current_sequence/);
-  assert.ok((releaseRollback.match(/git rev-parse origin\/main/g) ?? []).length >= 3);
-  const rollbackPublish = releaseRollback.indexOf('gh release edit "$RELEASE_TAG" --draft=false --latest');
-  const rollbackFinalMainCheck = releaseRollback.lastIndexOf('git rev-parse origin/main');
-  assert.ok(rollbackFinalMainCheck > releaseRollback.indexOf('published_names='));
-  assert.ok(rollbackFinalMainCheck < rollbackPublish);
+  assert.ok((releaseRollback.match(/git rev-parse origin\/main/g) ?? []).length >= 2);
   assert.match(releaseRollback, /scripts\/release\.ts verify-history/);
   assert.equal((releaseRollback.match(/secrets\.LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64/g) ?? []).length, 1);
-  assert.match(releaseRollback, /--latest/);
+  assert.match(releaseRollback, /GITHUB_REF_PROTECTED/);
+  assert.match(releaseRollback, /scripts\/github-release\.ts publish/);
+  assert.match(releaseRollback, /--expected-current-latest/);
+  assert.match(releaseRollback, /release-publication-audit\.json/);
+  assert.doesNotMatch(releaseRollback, /gh release create/);
+  assert.doesNotMatch(releaseRollback, /gh release edit/);
+  assert.doesNotMatch(releaseRollback, /gh release upload/);
   assert.match(releaseRollback, /bun install --frozen-lockfile/);
-  assert.match(releaseRollback, /existing rollback release is not the exact resumable draft/);
-  assert.match(releaseRollback, /gh release create "\$RELEASE_TAG" --draft/);
-  assert.match(releaseRollback, /gh release edit "\$RELEASE_TAG" --draft=false --latest/);
   assert.doesNotMatch(releaseRollback, /gradlew|build-artifact\.ts|docker buildx|build-push-action/);
+});
+
+test('exact Release publication is centralized behind one Release-ID transaction', () => {
+  assert.match(githubRelease, /Release ID/);
+  assert.match(githubRelease, /GITHUB_REF_PROTECTED/);
+  assert.match(githubRelease, /expectedCurrentLatest/);
+  assert.match(githubRelease, /Release asset ID changed/);
+  assert.match(githubRelease, /make_latest/);
+  assert.match(githubRelease, /immutable=true|immutable !== true/);
+  assert.match(githubRelease, /git fetch/);
+  assert.match(githubRelease, /git', 'push'|git", "push"|git push/);
+  assert.match(githubRelease, /git\/ref\/heads\/main/);
+  assert.doesNotMatch(githubRelease, /method:\s*['"]DELETE['"]/);
+  assert.doesNotMatch(githubRelease, /git\/refs/);
+});
+
+test('native signing producer uses current native runners and immutable exact staging', () => {
+  assert.match(nativeSigningProducer, /workflow_dispatch/);
+  assert.match(nativeSigningProducer, /environment: release-native-signing/);
+  assert.match(nativeSigningProducer, /macos-26-intel/);
+  assert.match(nativeSigningProducer, /macos-26/);
+  assert.match(nativeSigningProducer, /windows-/);
+  assert.match(nativeSigningProducer, /--finalize-existing/);
+  assert.match(nativeSigningProducer, /codesign/);
+  assert.match(nativeSigningProducer, /notarytool/);
+  assert.match(nativeSigningProducer, /signtool/i);
+  assert.match(nativeSigningProducer, /scripts\/github-release\.ts publish/);
+  assert.match(nativeSigningProducer, /native-signing-/);
+  assert.match(nativeSigningProducer, /LYNTTY_NATIVE_SIGNING_TAG_RULESET_ID/);
+  assert.doesNotMatch(nativeSigningProducer, /gh release (?:create|edit|upload|delete)/);
 });
 
 test('native signature verification pins platform identities and attests exact archives', () => {
   assert.match(nativeSigning, /environment: release-native-signing/);
+  assert.match(nativeSigning, /GITHUB_REF_PROTECTED/);
+  assert.match(nativeSigning, /macos-26-intel/);
+  assert.match(nativeSigning, /macos-26/);
   assert.match(nativeSigning, /codesign --verify --deep --strict --verbose=2 "\$root\/lyntty"/);
   assert.match(nativeSigning, /spctl --assess --type execute --verbose=4 "\$root\/lyntty"/);
   assert.match(nativeSigning, /grep -F "Authority=\$APPLE_SIGNING_AUTHORITY"/);
@@ -558,7 +618,7 @@ test('dependency audit pins the patched shell-quote release', () => {
 test('required PR hygiene verifies lifecycle trust and release contracts', () => {
   assert.match(typecheckWorkflow, /bun pm untrusted/);
   assert.match(typecheckWorkflow, /Found 0 untrusted dependencies with scripts/);
-  assert.match(typecheckWorkflow, /bun test scripts\/release\.test\.ts/);
+  assert.match(typecheckWorkflow, /bun test scripts\/release\.test\.ts scripts\/github-release\.test\.ts packages\/lyntty-cli\/scripts\/build-artifact\.test\.ts/);
 });
 
 test('supported CLI artifacts run on every release architecture in PR CI', () => {
@@ -582,6 +642,7 @@ test('isolated development lifecycle runs on Linux and macOS CI', () => {
 test('CODEOWNERS covers release trust inputs and its own policy', () => {
   for (const path of [
     '/.github/CODEOWNERS', '/.dockerignore', '/Dockerfile', '/bun.lock',
+    '/config/native-signing/', '/config/release-trust-roots/', '/scripts/github-release.ts',
     '/packages/lyntty-app/android/app/build.gradle',
     '/packages/lyntty-cli/scripts/build-artifact.ts',
     '/packages/lyntty-cli/src/distribution/',

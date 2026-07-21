@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "roots": [
+    {
+      "keyId": "stable-2026-01",
+      "channel": "stable",
+      "publicKeyBase64": "23LnF1henpvscvRqxEGv0m972wdWbf/GworsXo28xN0=",
+      "validFromSequence": 1,
+      "androidPackageId": "dev.jczhang.lyntty",
+      "androidSignerSha256": "25e3928a7cc228254e8249e684c6ab661f5c87140e23db7406afc64af29f0cf5",
+      "relayImageRepository": "ghcr.io/jczhang02/lyntty-relay"
+    }
+  ]
+}

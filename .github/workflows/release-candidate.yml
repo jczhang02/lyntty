@@ -54,6 +54,8 @@ jobs:
       SIGNED_DARWIN_ARM64_SHA256: ${{ vars.LYNTTY_SIGNED_DARWIN_ARM64_SHA256 }}
       SIGNED_WINDOWS_X64_URL: ${{ vars.LYNTTY_SIGNED_WINDOWS_X64_URL }}
       SIGNED_WINDOWS_X64_SHA256: ${{ vars.LYNTTY_SIGNED_WINDOWS_X64_SHA256 }}
+      LYNTTY_EXPO_PROJECT_ID: ${{ vars.LYNTTY_EXPO_PROJECT_ID }}
+      LYNTTY_ANDROID_CERT_SHA256: ${{ vars.LYNTTY_ANDROID_CERT_SHA256 }}
     steps:
       - name: Checkout exact main source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -65,12 +67,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
           [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
           git fetch --no-tags origin main
-          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse origin/main)" ]]
           [[ "$CHANNEL" == stable || "$CHANNEL" == preview ]]
           [[ "$SEQUENCE" =~ ^[0-9]+$ ]]
           [[ "$ANDROID_VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
+          if [[ "$CHANNEL" == stable ]]; then
+            (( SEQUENCE > 0 ))
+            [[ "$LYNTTY_EXPO_PROJECT_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$ ]]
+            [[ "$LYNTTY_ANDROID_CERT_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          fi
           : "${LYNTTY_RELEASE_TRUST_ROOTS:?protected channel trust roots are required}"
           : "${LYNTTY_BOM_KEY_ID:?protected channel key id is required}"
           for predecessor in "$PREDECESSOR_1" "$PREDECESSOR_2"; do
@@ -96,6 +106,10 @@ jobs:
           fi
           [[ "${PREDECESSOR_1:-}" == "${expected_predecessors[0]:-}" ]]
           [[ "${PREDECESSOR_2:-}" == "${expected_predecessors[1]:-}" ]]
+          if [[ "$CHANNEL" == stable && "${#expected_predecessors[@]}" -eq 0 ]]; then
+            [[ "$SEQUENCE" == 1 ]]
+            [[ "$ANDROID_VERSION_CODE" == 6 ]]
+          fi
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -128,12 +142,23 @@ jobs:
           bun audit
           mkdir -p "$RUNNER_TEMP/candidate"/{app,cli,relay,evidence,predecessors}
           printf '%s\n' "$LYNTTY_RELEASE_TRUST_ROOTS" > "$RUNNER_TEMP/trust-roots.json"
-          TRUST_STORE_PATH="$RUNNER_TEMP/trust-roots.json" KEY_ID="$LYNTTY_BOM_KEY_ID" bun -e '
+          TRUST_STORE_PATH="$RUNNER_TEMP/trust-roots.json" KEY_ID="$LYNTTY_BOM_KEY_ID" \
+            ANDROID_CERT="$LYNTTY_ANDROID_CERT_SHA256" bun -e '
             import { NON_PUBLISHABLE_TEST_BOM_KEY_IDS, NON_PUBLISHABLE_TEST_BOM_PUBLIC_KEY_BASE64, ReleaseTrustStoreSchema } from "lyntty-wire/compatibility";
             const store=ReleaseTrustStoreSchema.parse(await Bun.file(process.env.TRUST_STORE_PATH).json());
+            if(store.roots.some(root=>root.channel!==process.env.CHANNEL))throw new Error("channel trust store contains a cross-channel root");
             const selected=store.roots.filter(root=>root.channel===process.env.CHANNEL&&root.keyId===process.env.KEY_ID);
             if(selected.length!==1)throw new Error("protected signing key must select exactly one channel trust root");
             if(NON_PUBLISHABLE_TEST_BOM_KEY_IDS.includes(selected[0].keyId)||selected[0].publicKeyBase64===NON_PUBLISHABLE_TEST_BOM_PUBLIC_KEY_BASE64)throw new Error("test fixture BOM roots are never publishable");
+            if(process.env.CHANNEL==="stable") {
+              const committed=ReleaseTrustStoreSchema.parse(await Bun.file("config/release-trust-roots/stable.json").json());
+              if(JSON.stringify(store)!==JSON.stringify(committed))throw new Error("Stable environment trust roots do not match protected source");
+              if(selected[0].validFromSequence!==1||selected[0].androidPackageId!=="dev.jczhang.lyntty"||selected[0].androidSignerSha256!==process.env.ANDROID_CERT||selected[0].relayImageRepository!=="ghcr.io/jczhang02/lyntty-relay")throw new Error("Stable root identity pins are invalid");
+            } else {
+              const stable=ReleaseTrustStoreSchema.parse(await Bun.file("config/release-trust-roots/stable.json").json());
+              const stableKeys=new Set(stable.roots.map(root=>root.publicKeyBase64));
+              if(store.roots.some(root=>stableKeys.has(root.publicKeyBase64)))throw new Error("Preview trust roots reuse a Stable public key");
+            }
           '
 
       - name: Prepare channel identity
@@ -150,6 +175,11 @@ jobs:
           [[ "$CHANNEL" == preview ]] && prefix=compat-preview-v
           tag="${prefix}${app}_${cli}_${relay}_${wire}-s${SEQUENCE}"
           [[ "$tag" =~ ^[a-z0-9][A-Za-z0-9._-]{2,127}$ ]]
+          if [[ "$CHANNEL" == stable && -z "$PREDECESSOR_1" && -z "$PREDECESSOR_2" ]]; then
+            [[ "$app" == 1.2.0 && "$cli" == 1.2.0 && "$relay" == 1.2.0 && "$wire" == 0.2.0 ]]
+            [[ "$SEQUENCE" == 1 && "$ANDROID_VERSION_CODE" == 6 ]]
+            [[ "$tag" == compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1 ]]
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "release_id=$tag" >> "$GITHUB_OUTPUT"
 
@@ -166,16 +196,36 @@ jobs:
         run: |
           set -euo pipefail
           native_signer_workflow="$GITHUB_REPOSITORY/.github/workflows/native-signing.yml"
+          native_release_tag=
           replace_signed_archive() {
             local target="$1" url="$2" expected_sha="$3" suffix="$4"
             : "${url:?Stable native archive URL for $target is required}"
             : "${expected_sha:?Stable native archive SHA-256 for $target is required}"
             [[ "$url" =~ ^https://github\.com/jczhang02/lyntty/releases/download/native-signing-[0-9A-Za-z._-]+/[^/?#]+$ ]]
             [[ "$expected_sha" =~ ^[a-f0-9]{64}$ ]]
+            local release_tag asset_name release_json tag_json
+            read -r release_tag asset_name < <(URL="$url" bun -e '
+              const parsed=new URL(process.env.URL);const parts=parsed.pathname.split("/");
+              process.stdout.write(`${decodeURIComponent(parts[5]??"")} ${decodeURIComponent(parts[6]??"")}\n`);
+            ')
+            [[ "$release_tag" == native-signing-* ]]
+            if [[ -z "$native_release_tag" ]]; then native_release_tag="$release_tag"; else [[ "$native_release_tag" == "$release_tag" ]]; fi
+            release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$release_tag")"
+            [[ "$(jq -r .draft <<< "$release_json")" == false ]]
+            [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
+            [[ "$(jq -r .immutable <<< "$release_json")" == true ]]
+            [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
+            jq -e --arg name "$asset_name" --arg digest "sha256:$expected_sha" \
+              '[.assets[] | select(.name == $name and .state == "uploaded" and .digest == $digest)] | length == 1' <<< "$release_json"
+            tag_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$release_tag")"
+            [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
+            [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
             local stem="lyntty-cli-${CLI_VERSION}-${target}"
+            [[ "$asset_name" == "${stem}${suffix}" ]]
             local archive="$RUNNER_TEMP/candidate/cli/${stem}${suffix}"
             curl -fsSL "$url" -o "$archive"
             echo "$expected_sha  $archive" | sha256sum -c -
+            printf '%s  %s\n' "$expected_sha" "$(basename "$archive")" > "${archive}.sha256"
             gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY" --source-digest "$GITHUB_SHA" \
               --signer-workflow "$native_signer_workflow" --signer-digest "$GITHUB_SHA" --format json \
               > "$RUNNER_TEMP/candidate/evidence/native-${target}-attestation.json"
@@ -277,7 +327,11 @@ jobs:
           }
           trap cleanup_android_secrets EXIT
           app_env="$CHANNEL"
-          [[ "$CHANNEL" == stable ]] && app_env=production
+          if [[ "$CHANNEL" == stable ]]; then
+            app_env=production
+            [[ "$LYNTTY_EXPO_PROJECT_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$ ]]
+            ../scripts/gradle-production-guard-test.sh "$RUNNER_TEMP/candidate/evidence/android-production-guard.txt"
+          fi
           args=(./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2
             -x lintVitalAnalyzeRelease -x lintVitalRelease
             -Pandroid.enablePngCrunchInReleaseBuilds=false

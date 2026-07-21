@@ -1,11 +1,17 @@
 import { createHash } from 'node:crypto';
-import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 import { ReleaseTrustStoreSchema } from 'lyntty-wire/compatibility';
 
 import packageJson from '../package.json';
-import { ARTIFACT_MANIFEST_SCHEMA_VERSION, type ArtifactFile, type ArtifactManifestV1, type ArtifactTarget } from '../src/distribution/artifactManifest';
+import {
+  ARTIFACT_MANIFEST_SCHEMA_VERSION,
+  readArtifactManifest,
+  type ArtifactFile,
+  type ArtifactManifestV1,
+  type ArtifactTarget,
+} from '../src/distribution/artifactManifest';
 import { lynttyPiExtensionSha256 } from '../src/pi/piExtensionInstall';
 
 type BuildTargetId = 'linux-x64' | 'linux-arm64' | 'darwin-x64' | 'darwin-arm64' | 'windows-x64';
@@ -46,29 +52,50 @@ const packageDir = resolve(import.meta.dir, '..');
 const repoRoot = resolve(packageDir, '..', '..');
 const SOURCE_COMMIT_PATTERN = /^[a-f0-9]{40}$/;
 
-function parseArgs(args: string[]): { targets: BuildTarget[]; outputDir: string; archive: boolean } {
+function parseArgs(args: string[]): { targets: BuildTarget[]; outputDir: string; archive: boolean; finalizeExisting: boolean; archiveFinalized: boolean } {
   let requestedTarget: string | null = null;
+  let targetArgumentCount = 0;
+  let sawAll = false;
   let outputDir = join(packageDir, 'dist', 'artifacts');
   let archive = true;
+  let finalizeExisting = false;
+  let archiveFinalized = false;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]!;
-    if (arg === '--target') requestedTarget = args[++index] ?? '';
-    else if (arg.startsWith('--target=')) requestedTarget = arg.slice('--target='.length);
-    else if (arg === '--out-dir') outputDir = resolve(args[++index] ?? '');
+    if (arg === '--target') {
+      requestedTarget = args[++index] ?? '';
+      targetArgumentCount += 1;
+    } else if (arg.startsWith('--target=')) {
+      requestedTarget = arg.slice('--target='.length);
+      targetArgumentCount += 1;
+    } else if (arg === '--out-dir') outputDir = resolve(args[++index] ?? '');
     else if (arg.startsWith('--out-dir=')) outputDir = resolve(arg.slice('--out-dir='.length));
     else if (arg === '--no-archive') archive = false;
-    else if (arg === '--all') requestedTarget = 'all';
+    else if (arg === '--all') {
+      requestedTarget = 'all';
+      sawAll = true;
+    } else if (arg === '--finalize-existing') finalizeExisting = true;
+    else if (arg === '--archive-finalized') archiveFinalized = true;
     else throw new Error(`Unknown build-artifact argument: ${arg}`);
   }
 
+  if (finalizeExisting && archiveFinalized) {
+    throw new Error('--finalize-existing and --archive-finalized are mutually exclusive');
+  }
+  if ((finalizeExisting || archiveFinalized) && (sawAll || targetArgumentCount !== 1)) {
+    throw new Error('finalization requires exactly one concrete --target and cannot be used with --all');
+  }
+  if (archiveFinalized && !archive) {
+    throw new Error('--archive-finalized always creates an archive and cannot be used with --no-archive');
+  }
   if (!requestedTarget) {
     const os = process.platform === 'win32' ? 'windows' : process.platform;
     requestedTarget = `${os}-${process.arch}`;
   }
-  if (requestedTarget === 'all') return { targets: Object.values(TARGETS), outputDir, archive };
+  if (requestedTarget === 'all') return { targets: Object.values(TARGETS), outputDir, archive, finalizeExisting, archiveFinalized };
   const target = TARGETS[requestedTarget as BuildTargetId];
   if (!target) throw new Error(`Unsupported build target: ${requestedTarget}`);
-  return { targets: [target], outputDir, archive };
+  return { targets: [target], outputDir, archive, finalizeExisting, archiveFinalized };
 }
 
 async function run(command: string[], options: { cwd?: string; env?: Record<string, string | undefined> } = {}): Promise<string> {
@@ -195,6 +222,7 @@ async function listFiles(root: string, current = root): Promise<string[]> {
   const result: string[] = [];
   for (const entry of await readdir(current, { withFileTypes: true })) {
     const path = join(current, entry.name);
+    if (entry.isSymbolicLink()) throw new Error(`Artifact contains a symbolic link: ${relative(root, path)}`);
     if (entry.isDirectory()) result.push(...await listFiles(root, path));
     else if (entry.isFile()) result.push(relative(root, path).split(sep).join('/'));
     else throw new Error(`Artifact contains unsupported filesystem entry: ${path}`);
@@ -230,7 +258,8 @@ async function makeManifest(root: string, target: BuildTarget, releaseId: string
   for (const relativePath of await listFiles(root)) {
     if (relativePath === 'artifact-manifest.json') continue;
     const path = join(root, ...relativePath.split('/'));
-    const stats = await stat(path);
+    const stats = await lstat(path);
+    if (!stats.isFile() || stats.isSymbolicLink()) throw new Error(`Artifact file is not regular: ${relativePath}`);
     files.push({
       path: relativePath,
       sha256: await sha256(path),
@@ -249,6 +278,151 @@ async function makeManifest(root: string, target: BuildTarget, releaseId: string
     extensionSha256: lynttyPiExtensionSha256(),
     files,
   };
+}
+
+function artifactTargetsEqual(left: ArtifactTarget, right: ArtifactTarget): boolean {
+  return left.os === right.os && left.arch === right.arch && left.libc === right.libc;
+}
+
+async function validateExistingArtifact(
+  artifactRoot: string,
+  target: BuildTarget,
+  artifactName: string,
+  sourceCommit: string,
+  allowExecutableChanges: boolean,
+): Promise<void> {
+  const rootStats = await lstat(artifactRoot).catch(() => null);
+  if (!rootStats?.isDirectory() || rootStats.isSymbolicLink()) {
+    throw new Error('Existing artifact root must be a real directory, not a symbolic link');
+  }
+
+  const manifestPath = join(artifactRoot, 'artifact-manifest.json');
+  const manifestStats = await lstat(manifestPath).catch(() => null);
+  if (!manifestStats?.isFile() || manifestStats.isSymbolicLink()) {
+    throw new Error('Existing artifact manifest must be a regular file');
+  }
+  const oldManifest = await readArtifactManifest(manifestPath);
+  if (
+    oldManifest.schemaVersion !== ARTIFACT_MANIFEST_SCHEMA_VERSION
+    || oldManifest.product !== 'lyntty-cli'
+    || oldManifest.releaseId !== artifactName
+    || oldManifest.version !== packageJson.version
+    || oldManifest.sourceCommit !== sourceCommit
+    || oldManifest.stateSchema !== 1
+    || oldManifest.extensionSha256 !== lynttyPiExtensionSha256()
+    || !artifactTargetsEqual(oldManifest.target, target.manifestTarget)
+  ) {
+    throw new Error('Existing artifact manifest identity mismatch');
+  }
+
+  const oldFiles = new Map(oldManifest.files.map(file => [file.path, file]));
+  const executablePaths = [
+    `lyntty${target.executableSuffix}`,
+    `lynttyd${target.executableSuffix}`,
+    `tools/rg${target.executableSuffix}`,
+    `tools/difft${target.executableSuffix}`,
+  ];
+  for (const file of oldManifest.files) {
+    if (file.path === 'artifact-manifest.json' || file.executable !== isArtifactExecutable(file.path, target)) {
+      throw new Error(`Existing artifact manifest executable metadata mismatch: ${file.path}`);
+    }
+  }
+  for (const executablePath of executablePaths) {
+    if (!oldFiles.has(executablePath)) {
+      throw new Error(`Existing artifact manifest is missing executable: ${executablePath}`);
+    }
+  }
+
+  const actualPaths = (await listFiles(artifactRoot)).filter(path => path !== 'artifact-manifest.json');
+  const expectedPaths = [...oldFiles.keys()].sort();
+  if (JSON.stringify(actualPaths) !== JSON.stringify(expectedPaths)) {
+    const actual = new Set(actualPaths);
+    const expected = new Set(expectedPaths);
+    const unexpected = actualPaths.filter(path => !expected.has(path));
+    const missing = expectedPaths.filter(path => !actual.has(path));
+    throw new Error(
+      `Existing artifact inventory mismatch (unexpected: ${unexpected.join(', ') || 'none'}; missing: ${missing.join(', ') || 'none'})`,
+    );
+  }
+
+  for (const file of oldManifest.files) {
+    const path = join(artifactRoot, ...file.path.split('/'));
+    const stats = await lstat(path).catch(() => null);
+    if (!stats?.isFile() || stats.isSymbolicLink()) {
+      throw new Error(`Existing artifact file is missing or not regular: ${file.path}`);
+    }
+    if ((!file.executable || !allowExecutableChanges) && (stats.size !== file.size || await sha256(path) !== file.sha256)) {
+      throw new Error(`Existing artifact file changed outside the signing finalization seam: ${file.path}`);
+    }
+  }
+}
+
+export async function finalizeExistingArtifact(
+  targetId: BuildTargetId,
+  outputDir: string,
+  archive: boolean,
+  sourceCommit: string,
+): Promise<void> {
+  const target = TARGETS[targetId];
+  if (!target) throw new Error(`Unsupported build target: ${targetId}`);
+  if (!SOURCE_COMMIT_PATTERN.test(sourceCommit)) {
+    throw new Error('Artifact source commit must be an exact 40-character Git commit');
+  }
+
+  const resolvedOutputDir = resolve(outputDir);
+  const artifactName = `lyntty-cli-${packageJson.version}-${target.id}`;
+  const artifactRoot = join(resolvedOutputDir, artifactName);
+  await validateExistingArtifact(artifactRoot, target, artifactName, sourceCommit, true);
+
+  await canonicalizeArtifactModes(artifactRoot, target);
+  const manifest = await makeManifest(artifactRoot, target, artifactName, sourceCommit);
+  const manifestPath = join(artifactRoot, 'artifact-manifest.json');
+  await rm(manifestPath, { force: true });
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o644 });
+  await chmod(manifestPath, 0o644);
+  const manifestSha256 = await sha256(manifestPath);
+  await rm(join(resolvedOutputDir, `${artifactName}.manifest.sha256`), { force: true });
+  await writeFile(
+    join(resolvedOutputDir, `${artifactName}.manifest.sha256`),
+    `${manifestSha256}  artifact-manifest.json\n`,
+    { mode: 0o644 },
+  );
+  if (archive) await rm(join(resolvedOutputDir, `${artifactName}${target.archiveSuffix}.sha256`), { force: true });
+  const archivePath = archive ? await createArchive(resolvedOutputDir, artifactName, target.archiveSuffix) : null;
+  console.log(JSON.stringify({ artifactRoot, archivePath, manifestSha256, releaseId: artifactName, files: manifest.files.length }));
+}
+
+export async function archiveFinalizedArtifact(
+  targetId: BuildTargetId,
+  outputDir: string,
+  sourceCommit: string,
+): Promise<void> {
+  const target = TARGETS[targetId];
+  if (!target) throw new Error(`Unsupported build target: ${targetId}`);
+  if (!SOURCE_COMMIT_PATTERN.test(sourceCommit)) {
+    throw new Error('Artifact source commit must be an exact 40-character Git commit');
+  }
+
+  const resolvedOutputDir = resolve(outputDir);
+  const artifactName = `lyntty-cli-${packageJson.version}-${target.id}`;
+  const artifactRoot = join(resolvedOutputDir, artifactName);
+  await validateExistingArtifact(artifactRoot, target, artifactName, sourceCommit, false);
+  await canonicalizeArtifactModes(artifactRoot, target);
+  await validateExistingArtifact(artifactRoot, target, artifactName, sourceCommit, false);
+  const manifestPath = join(artifactRoot, 'artifact-manifest.json');
+  const manifestSha256 = await sha256(manifestPath);
+  const manifestSidecarPath = join(resolvedOutputDir, `${artifactName}.manifest.sha256`);
+  const manifestSidecarStats = await lstat(manifestSidecarPath).catch(() => null);
+  if (!manifestSidecarStats?.isFile() || manifestSidecarStats.isSymbolicLink()) {
+    throw new Error('Finalized artifact manifest sidecar must be a regular file');
+  }
+  const expectedManifestSidecar = `${manifestSha256}  artifact-manifest.json\n`;
+  if (await readFile(manifestSidecarPath, 'utf8') !== expectedManifestSidecar) {
+    throw new Error('Finalized artifact manifest sidecar does not match transported manifest bytes');
+  }
+  await chmod(manifestSidecarPath, 0o644);
+  const archivePath = await createArchive(resolvedOutputDir, artifactName, target.archiveSuffix);
+  console.log(JSON.stringify({ artifactRoot, archivePath, manifestSha256, releaseId: artifactName, mode: 'archive-finalized' }));
 }
 
 async function setZipTimestamps(root: string): Promise<void> {
@@ -345,7 +519,13 @@ async function buildTarget(target: BuildTarget, outputDir: string, archive: bool
   console.log(JSON.stringify({ artifactRoot, archivePath, manifestSha256, releaseId: artifactName, files: manifest.files.length }));
 }
 
-const { targets, outputDir, archive } = parseArgs(process.argv.slice(2));
-const sourceCommit = await resolveSourceCommit();
-await mkdir(outputDir, { recursive: true });
-for (const target of targets) await buildTarget(target, outputDir, archive, sourceCommit);
+if (import.meta.main) {
+  const { targets, outputDir, archive, finalizeExisting, archiveFinalized } = parseArgs(process.argv.slice(2));
+  const sourceCommit = await resolveSourceCommit();
+  await mkdir(outputDir, { recursive: true });
+  for (const target of targets) {
+    if (finalizeExisting) await finalizeExistingArtifact(target.id, outputDir, archive, sourceCommit);
+    else if (archiveFinalized) await archiveFinalizedArtifact(target.id, outputDir, sourceCommit);
+    else await buildTarget(target, outputDir, archive, sourceCommit);
+  }
+}

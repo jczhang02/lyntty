@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   CompatibilityBomV1Schema,
   NON_PUBLISHABLE_TEST_BOM_PUBLIC_KEY_BASE64,
+  ReleaseTrustStoreSchema,
   canonicalCompatibilityBom,
   compatibilityBomFileBytes,
   evaluateComponentCompatibility,
@@ -24,7 +25,9 @@ import {
 import { CURRENT_WIRE_OFFER } from './wireCompatibility';
 
 const PRIVATE_KEY_SEED_BASE64 = Buffer.from(Uint8Array.from({ length: 32 }, (_, index) => index + 1)).toString('base64');
+const PREVIEW_PRIVATE_KEY_SEED_BASE64 = Buffer.from(Uint8Array.from({ length: 32 }, (_, index) => index + 65)).toString('base64');
 const PUBLIC_KEY_BASE64 = deriveEd25519PublicKeyBase64(PRIVATE_KEY_SEED_BASE64);
+const PREVIEW_PUBLIC_KEY_BASE64 = deriveEd25519PublicKeyBase64(PREVIEW_PRIVATE_KEY_SEED_BASE64);
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
 const SOURCE_COMMIT = '1'.repeat(40);
@@ -141,7 +144,7 @@ function trustStore(channel: ReleaseChannel = 'stable'): ReleaseTrustStore {
     roots: [{
       keyId: `${channel}-test-key`,
       channel,
-      publicKeyBase64: PUBLIC_KEY_BASE64,
+      publicKeyBase64: channel === 'stable' ? PUBLIC_KEY_BASE64 : PREVIEW_PUBLIC_KEY_BASE64,
       validFromSequence: 0,
       androidPackageId: channel === 'stable' ? 'dev.jczhang.lyntty' : 'dev.jczhang.lyntty.preview',
       androidSignerSha256: channel === 'stable' ? HASH_A : HASH_B,
@@ -168,6 +171,21 @@ describe('Compatibility BOM', () => {
       keyId: 'stable-production-key',
       privateKeySeedBase64: PRIVATE_KEY_SEED_BASE64,
     })).toThrow('non-publishable test fixture');
+  });
+
+  it('rejects public-key reuse across Stable and Preview roots', () => {
+    const stable = trustStore().roots[0]!;
+    expect(() => ReleaseTrustStoreSchema.parse({
+      schemaVersion: 1,
+      roots: [stable, {
+        ...stable,
+        keyId: 'preview-other-key',
+        channel: 'preview',
+        androidPackageId: 'dev.jczhang.lyntty.preview',
+        androidSignerSha256: HASH_B,
+        relayImageRepository: 'ghcr.io/jczhang02/lyntty-relay-preview',
+      }],
+    })).toThrow('Stable and Preview trust roots must use distinct public keys');
   });
   it('canonicalizes, signs, verifies, and selects immutable artifacts', async () => {
     const bom = buildBom({ sequence: 3 });
@@ -228,12 +246,13 @@ describe('Compatibility BOM', () => {
   });
 
   it('keeps preview package, signer, image, and key isolated from stable', async () => {
+    expect(trustStore('preview').roots[0]!.publicKeyBase64).not.toBe(trustStore('stable').roots[0]!.publicKeyBase64);
     const preview = buildBom({ sequence: 7, channel: 'preview' });
     const signature = signCompatibilityBom({
       bom: preview,
       keyId: 'preview-test-key',
       channel: 'preview',
-      privateKeySeedBase64: PRIVATE_KEY_SEED_BASE64,
+      privateKeySeedBase64: PREVIEW_PRIVATE_KEY_SEED_BASE64,
     });
     const verified = await verifyCompatibilityBom({
       bom: preview,

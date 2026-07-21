@@ -1,4 +1,5 @@
 name: Verify native CLI signatures
+run-name: Verify native CLI ${{ inputs.release_tag }} at ${{ inputs.source_sha }}
 
 on:
   workflow_dispatch:
@@ -9,6 +10,18 @@ on:
         type: string
       cli_version:
         description: Exact CLI SemVer embedded in every archive
+        required: true
+        type: string
+      release_tag:
+        description: Exact immutable native-signing staging Release tag
+        required: true
+        type: string
+      metadata_url:
+        description: Exact native-signing-metadata.json URL from the staging Release
+        required: true
+        type: string
+      metadata_sha256:
+        description: SHA-256 of native-signing-metadata.json
         required: true
         type: string
       darwin_x64_url:
@@ -56,12 +69,12 @@ jobs:
       matrix:
         include:
           - target: darwin-x64
-            runner: macos-15-intel
+            runner: macos-26-intel
             url: ${{ inputs.darwin_x64_url }}
             sha256: ${{ inputs.darwin_x64_sha256 }}
             notarization_id: ${{ inputs.darwin_x64_notarization_id }}
           - target: darwin-arm64
-            runner: macos-15
+            runner: macos-26
             url: ${{ inputs.darwin_arm64_url }}
             sha256: ${{ inputs.darwin_arm64_sha256 }}
             notarization_id: ${{ inputs.darwin_arm64_notarization_id }}
@@ -82,11 +95,15 @@ jobs:
 
       - name: Verify archive inventory, runtime, Developer ID, and Gatekeeper
         env:
+          GH_TOKEN: ${{ github.token }}
           ARCHIVE_URL: ${{ matrix.url }}
           ARCHIVE_SHA256: ${{ matrix.sha256 }}
           TARGET: ${{ matrix.target }}
           CLI_VERSION: ${{ inputs.cli_version }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          METADATA_URL: ${{ inputs.metadata_url }}
+          METADATA_SHA256: ${{ inputs.metadata_sha256 }}
           NOTARIZATION_ID: ${{ matrix.notarization_id }}
           APPLE_ID: ${{ secrets.LYNTTY_APPLE_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.LYNTTY_APPLE_APP_PASSWORD }}
@@ -94,11 +111,38 @@ jobs:
           APPLE_SIGNING_AUTHORITY: ${{ vars.LYNTTY_APPLE_SIGNING_AUTHORITY }}
         run: |
           set -euo pipefail
+          [[ "$GITHUB_ACTOR" == jczhang02 ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
           [[ "$SOURCE_SHA" == "$GITHUB_SHA" && "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
           git fetch --no-tags origin main
           [[ "$GITHUB_SHA" == "$(git rev-parse origin/main)" ]]
+          [[ "$RELEASE_TAG" =~ ^native-signing-[0-9A-Za-z._-]+$ ]]
           [[ "$ARCHIVE_SHA256" =~ ^[a-f0-9]{64}$ ]]
-          [[ "$ARCHIVE_URL" =~ ^https://github\.com/jczhang02/lyntty/releases/download/native-signing-[0-9A-Za-z._-]+/lyntty-cli-${CLI_VERSION}-${TARGET}\.tar\.gz$ ]]
+          [[ "$METADATA_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$ARCHIVE_URL" == "https://github.com/jczhang02/lyntty/releases/download/$RELEASE_TAG/lyntty-cli-${CLI_VERSION}-${TARGET}.tar.gz" ]]
+          [[ "$METADATA_URL" == "https://github.com/jczhang02/lyntty/releases/download/$RELEASE_TAG/native-signing-metadata.json" ]]
+          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          [[ "$(jq -r .draft <<< "$release_json")" == false ]]
+          [[ "$(jq -r .prerelease <<< "$release_json")" == true ]]
+          [[ "$(jq -r .immutable <<< "$release_json")" == true ]]
+          [[ "$(jq -r .target_commitish <<< "$release_json")" == "$SOURCE_SHA" ]]
+          jq -e --arg archive "lyntty-cli-${CLI_VERSION}-${TARGET}.tar.gz" --arg archive_digest "sha256:$ARCHIVE_SHA256" \
+            --arg metadata_digest "sha256:$METADATA_SHA256" \
+            '([.assets[] | select(.name == $archive and .digest == $archive_digest)] | length == 1) and ([.assets[] | select(.name == "native-signing-metadata.json" and .digest == $metadata_digest)] | length == 1)' \
+            <<< "$release_json"
+          tag_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")"
+          [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
+          [[ "$(jq -r .object.sha <<< "$tag_json")" == "$SOURCE_SHA" ]]
+          metadata="$RUNNER_TEMP/native-signing-metadata.json"
+          curl -fsSL "$METADATA_URL" -o "$metadata"
+          echo "$METADATA_SHA256  $metadata" | shasum -a 256 -c -
+          METADATA="$metadata" bun -e '
+            const value=await Bun.file(process.env.METADATA).json();const archive=value.archives?.[process.env.TARGET];
+            const rootBytes=new Uint8Array(await Bun.file("config/release-trust-roots/stable.json").arrayBuffer());const hasher=new Bun.CryptoHasher("sha256");hasher.update(rootBytes);
+            if(value.schemaVersion!==1||value.repository!==process.env.GITHUB_REPOSITORY||value.releaseTag!==process.env.RELEASE_TAG||value.sourceCommit!==process.env.SOURCE_SHA||value.workflowCommit!==process.env.SOURCE_SHA||value.cliVersion!==process.env.CLI_VERSION||value.trustRootsSha256!==hasher.digest("hex"))throw new Error("native signing metadata identity mismatch");
+            if(archive?.name!==`lyntty-cli-${process.env.CLI_VERSION}-${process.env.TARGET}.tar.gz`||archive.sha256!==process.env.ARCHIVE_SHA256||archive.notarizationId!==process.env.NOTARIZATION_ID||archive.appleTeamId!==process.env.APPLE_TEAM_ID||archive.appleSigningAuthority!==process.env.APPLE_SIGNING_AUTHORITY)throw new Error("native macOS metadata mismatch");
+          '
           : "${APPLE_ID:?protected Apple notarization account is required}"
           : "${APPLE_APP_PASSWORD:?protected Apple app password is required}"
           : "${APPLE_TEAM_ID:?protected Apple Team ID is required}"
@@ -108,6 +152,10 @@ jobs:
           stem="lyntty-cli-${CLI_VERSION}-${TARGET}"
           curl -fsSL "$ARCHIVE_URL" -o "$archive"
           echo "$ARCHIVE_SHA256  $archive" | shasum -a 256 -c -
+          METADATA="$metadata" ARCHIVE="$archive" bun -e '
+            import { stat } from "node:fs/promises";const value=await Bun.file(process.env.METADATA).json();
+            if(value.archives?.[process.env.TARGET]?.size!==(await stat(process.env.ARCHIVE)).size)throw new Error("native macOS archive size does not match metadata");
+          '
           entries="$(tar -tzf "$archive")"
           [[ -n "$entries" ]]
           if printf '%s\n' "$entries" | grep -Ev "^${stem}(/|$)"; then
@@ -128,8 +176,10 @@ jobs:
             const manifest=await readArtifactManifest(`${process.env.ROOT}/artifact-manifest.json`);
             if (manifest.version!==process.env.VERSION || manifest.releaseId!==`lyntty-cli-${process.env.VERSION}-${process.env.TARGET}` || `${manifest.target.os}-${manifest.target.arch}`!==process.env.TARGET || manifest.sourceCommit!==process.env.SOURCE_SHA) throw new Error("native archive identity/source mismatch");
             await verifyArtifactFiles(process.env.ROOT,manifest);
-            if (!manifest.files.some(file=>file.path==="lyntty"&&file.executable)) throw new Error("primary CLI is not an executable manifest entry");
-            await writeFile(`${process.env.ROOT}/../executables.txt`,manifest.files.filter(file=>file.executable).map(file=>file.path).join("\n")+"\n");
+            const executables=manifest.files.filter(file=>file.executable).map(file=>file.path).sort();
+            const expected=["lyntty","lynttyd","tools/difft","tools/rg"];
+            if (JSON.stringify(executables)!==JSON.stringify(expected)) throw new Error("native archive executable inventory is not exact");
+            await writeFile(`${process.env.ROOT}/../executables.txt`,executables.join("\n")+"\n");
           '
           codesign --verify --deep --strict --verbose=2 "$root/lyntty"
           codesign -dv --verbose=4 "$root/lyntty" 2>&1 | grep -F "Authority=$APPLE_SIGNING_AUTHORITY"
@@ -144,6 +194,7 @@ jobs:
             details="$(codesign -dvvv "$executable" 2>&1)"
             grep -F "TeamIdentifier=$APPLE_TEAM_ID" <<< "$details"
             grep -F "Authority=$APPLE_SIGNING_AUTHORITY" <<< "$details"
+            grep -E '^Timestamp=' <<< "$details"
             spctl --assess --type execute --verbose=4 "$executable"
           done < "$extract/executables.txt"
           PATH="/usr/bin:/bin" "$root/lyntty" --self-check --json > "$RUNNER_TEMP/self-check.json"
@@ -155,7 +206,7 @@ jobs:
 
   verify-windows:
     name: Verify windows-x64 Authenticode and timestamp
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 20
     environment: release-native-signing
     steps:
@@ -172,29 +223,60 @@ jobs:
 
       - name: Install deterministic verifier dependencies
         shell: pwsh
-        run: bun install --frozen-lockfile
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          bun install --frozen-lockfile
 
       - name: Verify archive inventory, runtime, Authenticode, and timestamp
         shell: pwsh
         env:
+          GH_TOKEN: ${{ github.token }}
           ARCHIVE_URL: ${{ inputs.windows_x64_url }}
           ARCHIVE_SHA256: ${{ inputs.windows_x64_sha256 }}
           CLI_VERSION: ${{ inputs.cli_version }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          METADATA_URL: ${{ inputs.metadata_url }}
+          METADATA_SHA256: ${{ inputs.metadata_sha256 }}
           WINDOWS_CERT_THUMBPRINT: ${{ vars.LYNTTY_WINDOWS_CERT_THUMBPRINT }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.LYNTTY_WINDOWS_RFC3161_TIMESTAMP_URL }}
         run: |
           $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($env:GITHUB_ACTOR -ne 'jczhang02') { throw 'native verification is owner-dispatch only' }
+          if ($env:GITHUB_REF -ne 'refs/heads/main' -or $env:GITHUB_REF_PROTECTED -ne 'true') { throw 'native verification requires protected main' }
           if ($env:SOURCE_SHA -ne $env:GITHUB_SHA -or (git rev-parse HEAD) -ne $env:GITHUB_SHA) { throw 'source SHA mismatch' }
           git fetch --no-tags origin main
           if ((git rev-parse origin/main) -ne $env:GITHUB_SHA) { throw 'native verification source is not current protected main' }
-          if ($env:ARCHIVE_SHA256 -notmatch '^[a-f0-9]{64}$') { throw 'invalid archive SHA-256' }
-          if ($env:ARCHIVE_URL -notmatch "^https://github\\.com/jczhang02/lyntty/releases/download/native-signing-[0-9A-Za-z._-]+/lyntty-cli-$([regex]::Escape($env:CLI_VERSION))-windows-x64\\.zip$") { throw 'native archive URL is not an immutable Lyntty signing asset' }
-          if (-not $env:WINDOWS_CERT_THUMBPRINT) { throw 'protected Authenticode certificate thumbprint is required' }
+          if ($env:RELEASE_TAG -notmatch '^native-signing-[0-9A-Za-z._-]+$') { throw 'invalid native signing Release tag' }
+          if ($env:ARCHIVE_SHA256 -notmatch '^[a-f0-9]{64}$' -or $env:METADATA_SHA256 -notmatch '^[a-f0-9]{64}$') { throw 'invalid native SHA-256' }
           $target = 'windows-x64'
           $stem = "lyntty-cli-$env:CLI_VERSION-$target"
+          if ($env:ARCHIVE_URL -ne "https://github.com/jczhang02/lyntty/releases/download/$env:RELEASE_TAG/$stem.zip") { throw 'native archive URL is not exact' }
+          if ($env:METADATA_URL -ne "https://github.com/jczhang02/lyntty/releases/download/$env:RELEASE_TAG/native-signing-metadata.json") { throw 'native metadata URL is not exact' }
+          if ($env:WINDOWS_CERT_THUMBPRINT -notmatch '^[A-Fa-f0-9]{40}$') { throw 'protected Authenticode certificate thumbprint is required' }
+          if ($env:WINDOWS_TIMESTAMP_URL -notmatch '^https://') { throw 'protected RFC3161 timestamp URL is required' }
+          $expectedThumbprint = $env:WINDOWS_CERT_THUMBPRINT.ToUpperInvariant()
+          $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$env:RELEASE_TAG" | ConvertFrom-Json
+          if ($release.draft -or -not $release.prerelease -or -not $release.immutable -or $release.target_commitish -ne $env:SOURCE_SHA) { throw 'native staging Release is not exact and immutable' }
+          $archiveAssets = @($release.assets | Where-Object { $_.name -eq "$stem.zip" -and $_.digest -eq "sha256:$env:ARCHIVE_SHA256" })
+          $metadataAssets = @($release.assets | Where-Object { $_.name -eq 'native-signing-metadata.json' -and $_.digest -eq "sha256:$env:METADATA_SHA256" })
+          if ($archiveAssets.Count -ne 1 -or $metadataAssets.Count -ne 1) { throw 'native staging asset identity mismatch' }
+          $tagRef = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$env:RELEASE_TAG" | ConvertFrom-Json
+          if ($tagRef.object.type -ne 'commit' -or $tagRef.object.sha -ne $env:SOURCE_SHA) { throw 'native staging tag is not direct to source' }
+          $metadataPath = Join-Path $env:RUNNER_TEMP 'native-signing-metadata.json'
+          Invoke-WebRequest -Uri $env:METADATA_URL -OutFile $metadataPath
+          if ((Get-FileHash -Algorithm SHA256 $metadataPath).Hash.ToLowerInvariant() -ne $env:METADATA_SHA256) { throw 'native metadata SHA-256 mismatch' }
+          $metadata = Get-Content -Raw $metadataPath | ConvertFrom-Json
+          $metadataArchive = $metadata.archives.'windows-x64'
+          $trustRootsSha256 = (Get-FileHash -Algorithm SHA256 'config/release-trust-roots/stable.json').Hash.ToLowerInvariant()
+          if ($metadata.schemaVersion -ne 1 -or $metadata.repository -ne $env:GITHUB_REPOSITORY -or $metadata.releaseTag -ne $env:RELEASE_TAG -or $metadata.sourceCommit -ne $env:SOURCE_SHA -or $metadata.workflowCommit -ne $env:SOURCE_SHA -or $metadata.cliVersion -ne $env:CLI_VERSION -or $metadata.trustRootsSha256 -ne $trustRootsSha256) { throw 'native signing metadata identity mismatch' }
+          if ($metadataArchive.name -ne "$stem.zip" -or $metadataArchive.sha256 -ne $env:ARCHIVE_SHA256 -or $metadataArchive.windowsCertThumbprint -ne $expectedThumbprint -or $metadataArchive.windowsTimestampUrl -ne $env:WINDOWS_TIMESTAMP_URL) { throw 'native Windows metadata mismatch' }
           $archive = Join-Path $env:RUNNER_TEMP "$stem.zip"
           Invoke-WebRequest -Uri $env:ARCHIVE_URL -OutFile $archive
           if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne $env:ARCHIVE_SHA256) { throw 'archive SHA-256 mismatch' }
+          if ((Get-Item $archive).Length -ne $metadataArchive.size) { throw 'archive size does not match native metadata' }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
           try {
@@ -218,20 +300,24 @@ jobs:
           const manifest=await readArtifactManifest(`${process.env.ROOT}/artifact-manifest.json`);
           if (manifest.version!==process.env.VERSION || manifest.releaseId!==`lyntty-cli-${process.env.VERSION}-${process.env.TARGET}` || `${manifest.target.os}-${manifest.target.arch}`!==process.env.TARGET || manifest.sourceCommit!==process.env.SOURCE_SHA) throw new Error("native archive identity/source mismatch");
           await verifyArtifactFiles(process.env.ROOT,manifest);
-          if (!manifest.files.some(file=>file.path==="lyntty.exe"&&file.executable)) throw new Error("primary CLI is not an executable manifest entry");
-          await writeFile(`${process.env.ROOT}/../executables.txt`,manifest.files.filter(file=>file.executable).map(file=>file.path).join("\n")+"\n");
+          const executables=manifest.files.filter(file=>file.executable).map(file=>file.path).sort();
+          const expected=["lyntty.exe","lynttyd.exe","tools/difft.exe","tools/rg.exe"];
+          if (JSON.stringify(executables)!==JSON.stringify(expected)) throw new Error("native archive executable inventory is not exact");
+          await writeFile(`${process.env.ROOT}/../executables.txt`,executables.join("\n")+"\n");
           '@
           $primary = Join-Path $root 'lyntty.exe'
           $primarySignature = Get-AuthenticodeSignature -LiteralPath $primary
           if ($primarySignature.Status -ne 'Valid') { throw "invalid Authenticode status for primary CLI: $($primarySignature.Status)" }
-          if ($primarySignature.SignerCertificate.Thumbprint -ne $env:WINDOWS_CERT_THUMBPRINT) { throw 'unexpected Authenticode signer for primary CLI' }
+          if ($primarySignature.SignerCertificate.Thumbprint -ne $expectedThumbprint) { throw 'unexpected Authenticode signer for primary CLI' }
           if ($null -eq $primarySignature.TimeStamperCertificate) { throw 'missing Authenticode timestamp for primary CLI' }
           & $primary --self-check --json | Set-Content (Join-Path $env:RUNNER_TEMP 'self-check.json')
+          $selfCheck = Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'self-check.json') | ConvertFrom-Json
+          if (-not $selfCheck.ok -or $selfCheck.version -ne $env:CLI_VERSION -or $selfCheck.releaseId -ne $stem -or $selfCheck.sourceCommit -ne $env:SOURCE_SHA -or "$($selfCheck.target.os)-$($selfCheck.target.arch)" -ne $target) { throw 'verified Windows self-check identity mismatch' }
           foreach ($relative in Get-Content (Join-Path $extract 'executables.txt')) {
             if (-not $relative) { continue }
             $signature = Get-AuthenticodeSignature (Join-Path $root $relative)
             if ($signature.Status -ne 'Valid') { throw "invalid Authenticode signature: $relative ($($signature.Status))" }
-            if ($signature.SignerCertificate.Thumbprint -ne $env:WINDOWS_CERT_THUMBPRINT) { throw "unexpected Authenticode signer: $relative" }
+            if ($signature.SignerCertificate.Thumbprint -ne $expectedThumbprint) { throw "unexpected Authenticode signer: $relative" }
             if ($null -eq $signature.TimeStamperCertificate) { throw "missing Authenticode timestamp: $relative" }
           }
 
