@@ -32,9 +32,9 @@ Candidate checksums、签名 Compatibility BOM 和最终 Release checksums 会�
 
 ## 验证
 
-本地已通过：hardening/redaction/Relay-SBOM `30/0`、release/publication/Relay-SBOM/artifact `26/0`、Wire `36/0`、CLI `585/0`、Relay `119/0`、App `812/0`（3276 assertions）；全部 workflow YAML、25 个 Bash block 的 `bash -n`/error-level ShellCheck 及 `git diff --check` 通过。
+本地已通过：hardening/redaction/Relay-SBOM `30/0`、release/publication/Relay-SBOM/artifact `26/0`、Wire `36/0`、CLI `585/0`、Relay `119/0`、App `812/0`（3276 assertions）；全部 workflow YAML、25 个 Bash block 的 `bash -n`/error-level ShellCheck 及 `git diff --check` 通过。Protected PR run `29831474375` 的真实 Buildx/Syft `Relay image verification` 也通过。
 
-本机没有 Docker/Buildx/Syft，因此无法运行真实 OCI scan。PR #27 run `29829918659` 已证明 Buildx 产出预期的双平台/attestation layout，且两个精确 Syft scan 均成功；随后又 fail-closed 暴露一个假设：Syft 的 `oci-dir` SPDX 不会在原 described package checksum 中直接给出所选 image-manifest digest。Commit `aab7831...` 现在会在 scan 后加入并验证显式 manifest-identity package。合并前新的 protected `Relay image verification` 必须通过。
+本机没有 Docker/Buildx/Syft，因此无法运行真实 OCI scan。PR #27 run `29829918659` 已证明 Buildx 产出预期的双平台/attestation layout，且两个精确 Syft scan 均成功；随后又 fail-closed 暴露一个假设：Syft 的 `oci-dir` SPDX 不会在原 described package checksum 中直接给出所选 image-manifest digest。Commit `aab7831...` 会在 scan 后加入并验证显式 manifest-identity package。Protected run `29831474375` 随后完整通过真实 Buildx → 精确 amd64/arm64 Syft scan → manifest binding → SPDX index assembly 路径，且未发布。
 
 对抗式 review 推动修复了额外平台 coverage、child SBOM/manifest 绑定、symlink layout parent、signed-BOM supplementary evidence、逐字节 index 恢复和 adversarial tests。最终 follow-up review 也验证了产出的 SPDX 2.3 documents，并返回 `PASS`，无 P0/P1/P2。
 

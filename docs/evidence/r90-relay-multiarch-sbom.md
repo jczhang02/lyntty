@@ -68,9 +68,10 @@ Results:
 - App: `812 pass / 0 fail`, `3276` assertions;
 - all workflow YAML parsed;
 - `25` changed workflow Bash blocks passed `bash -n` and error-level ShellCheck;
+- protected PR run `29831474375` (`Relay image verification`): pass on the real Buildx/Syft path;
 - `git diff --check`: pass.
 
-The real Buildx/Syft regression path is not available in the local environment because Docker, Buildx, and Syft are absent. PR #27 run `29829918659` proved that Buildx produced the accepted two-platform/attestation layout and that both selected Syft scans completed. It then exposed a second fail-closed assumption: Syft's `oci-dir` SPDX does not itself put the selected image-manifest digest in its original described package checksum. Commit `aab7831...` now adds and validates an explicit manifest-identity package after each Syft scan. A new protected `Relay image verification` execution must pass before merge.
+The real Buildx/Syft regression path is not available in the local environment because Docker, Buildx, and Syft are absent. PR #27 run `29829918659` proved that Buildx produced the accepted two-platform/attestation layout and that both selected Syft scans completed. It then exposed a second fail-closed assumption: Syft's `oci-dir` SPDX does not itself put the selected image-manifest digest in its original described package checksum. Commit `aab7831...` adds and validates an explicit manifest-identity package after each Syft scan. Protected run `29831474375` then passed the complete real Buildx → exact amd64/arm64 Syft scans → manifest binding → SPDX index assembly path without publication.
 
 Adversarial reviews found and drove fixes for extra-platform coverage, child-SBOM/manifest binding, symlinked layout parents, signed-BOM supplementary evidence, byte-exact index restoration, and adversarial test coverage. The final follow-up review also validated the resulting SPDX 2.3 documents and returned `PASS` with no remaining P0/P1/P2.
 
