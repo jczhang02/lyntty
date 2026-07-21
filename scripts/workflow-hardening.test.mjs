@@ -3,6 +3,11 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'bun:test';
+import {
+  createStableAndroidValidation,
+  renderStableAndroidValidationWarning,
+  STABLE_ANDROID_WAIVER_PHRASE,
+} from './stable-release-validation.ts';
 
 const relayDeployPath = new URL('../.github/workflows/relay-deploy.yml', import.meta.url);
 const relayImagePath = new URL('../.github/workflows/relay-image.yml', import.meta.url);
@@ -515,6 +520,7 @@ test('candidate builds once under channel isolation and never publishes', () => 
 test('promotion publishes exact candidate bytes with protected stable/preview separation', () => {
   assert.match(releasePromote, /workflow_dispatch/);
   assert.match(releasePromote, /physical_phone_accepted/);
+  assert.match(releasePromote, /stable_unverified_release_waiver/);
   assert.match(releasePromote, /accepted_android_apk_sha256/);
   assert.match(releasePromote, /immutable_releases_enabled/);
   assert.match(releasePromote, /LYNTTY_STABLE_TAG_RULESET_ID/);
@@ -541,8 +547,90 @@ test('promotion publishes exact candidate bytes with protected stable/preview se
   assert.match(releasePromote, /release_rows=.*gh api[\s\S]*--paginate/);
   assert.match(releasePromote, /info\.relaySchema!==bom\.components\.relay\.schema\.current/);
   assert.match(releasePromote, /existing candidate image tag has a different digest/);
+  assert.match(releasePromote, /android-validation\.json/);
+  assert.match(releasePromote, /Physical Android validation: not performed; explicit owner self-use waiver/);
+  const auditIndex = releasePromote.indexOf('stable-release-validation.ts audit');
+  const checksumsIndex = releasePromote.indexOf('sha256sum * | sort -k2 > release-checksums.txt');
+  const warningIndex = releasePromote.indexOf('stable-release-validation.ts warning');
+  const headerIndex = releasePromote.indexOf('echo "# Lyntty Compatibility release');
+  assert.ok(auditIndex > 0 && auditIndex < checksumsIndex);
+  assert.ok(warningIndex > 0 && warningIndex < headerIndex);
   assert.match(releasePromote, /bun install --frozen-lockfile/);
   assert.doesNotMatch(releasePromote, /gradlew|build-artifact\.ts|docker buildx|build-push-action/);
+});
+
+test('Stable physical acceptance and owner waiver are explicit and mutually exclusive', () => {
+  const authorizationBlock = releasePromote.match(
+    /stable_waiver_phrase='I accept publishing this exact Stable Candidate without physical Android validation'[\s\S]*?\n\s+esac/,
+  )?.[0];
+  assert.ok(authorizationBlock);
+
+  const authorize = (physicalPhoneAccepted, waiver, acceptedSha256) => {
+    const result = Bun.spawnSync({
+      cmd: ['bash', '-c', `set -euo pipefail\n${authorizationBlock}`],
+      env: {
+        ...process.env,
+        PHYSICAL_PHONE_ACCEPTED: physicalPhoneAccepted,
+        STABLE_UNVERIFIED_RELEASE_WAIVER: waiver,
+        ACCEPTED_ANDROID_APK_SHA256: acceptedSha256,
+      },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    return result.exitCode;
+  };
+
+  const digest = 'a'.repeat(64);
+  const phrase = 'I accept publishing this exact Stable Candidate without physical Android validation';
+  assert.equal(authorize('true', '', digest), 0);
+  assert.equal(authorize('false', phrase, ''), 0);
+  assert.notEqual(authorize('false', '', ''), 0);
+  assert.notEqual(authorize('false', phrase, digest), 0);
+  assert.notEqual(authorize('true', phrase, digest), 0);
+  assert.notEqual(authorize('true', '', ''), 0);
+  assert.notEqual(authorize('unknown', '', ''), 0);
+});
+
+test('Stable validation audit and public warning stay truthful and deterministic', () => {
+  const digest = 'b'.repeat(64);
+  const waiver = createStableAndroidValidation({
+    physicalPhoneAccepted: 'false',
+    acceptedApkSha256: '',
+    actualApkSha256: digest,
+    ownerWaiverAcknowledgement: STABLE_ANDROID_WAIVER_PHRASE,
+  });
+  assert.deepEqual(waiver, {
+    schemaVersion: 1,
+    mode: false,
+    authorizationMode: 'owner-waiver-unverified',
+    physicalPhoneAccepted: false,
+    apkSha256: digest,
+    ownerWaiverAcknowledgement: STABLE_ANDROID_WAIVER_PHRASE,
+  });
+  const warning = renderStableAndroidValidationWarning(waiver);
+  assert.match(warning, /^> \[!WARNING\]\n/);
+  assert.match(warning, /was not physically validated/);
+  assert.match(warning, /未完成实体机验收/);
+  assert.doesNotMatch(warning, /Physical Android validation: accepted|实体机验收已通过/);
+  assert.match(warning, /\n\n$/);
+
+  const physical = createStableAndroidValidation({
+    physicalPhoneAccepted: 'true',
+    acceptedApkSha256: digest,
+    actualApkSha256: digest,
+    ownerWaiverAcknowledgement: '',
+  });
+  assert.equal(physical.mode, true);
+  assert.equal(physical.authorizationMode, 'physical-phone');
+  assert.equal(physical.physicalPhoneAccepted, true);
+  assert.equal(physical.ownerWaiverAcknowledgement, null);
+  assert.equal(renderStableAndroidValidationWarning(physical), '');
+
+  assert.throws(() => createStableAndroidValidation({
+    physicalPhoneAccepted: 'false', acceptedApkSha256: digest, actualApkSha256: digest,
+    ownerWaiverAcknowledgement: STABLE_ANDROID_WAIVER_PHRASE,
+  }), /empty physically accepted/);
+  assert.throws(() => renderStableAndroidValidationWarning({ ...waiver, mode: true }), /inconsistent/);
 });
 
 test('stable rollback creates a higher signed BOM and reuses retained bytes', () => {
