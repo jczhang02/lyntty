@@ -177,6 +177,16 @@ jobs:
           APK_VERSION_CODE="${10}"
           RELAY_SOURCE_COMMIT="${11}"
           RELAY_VERSION="${12}"
+          preflight_phase=argument-validation
+          report_preflight_exit() {
+            local status=$?
+            trap - EXIT
+            if (( status != 0 )); then
+              printf 'Relay deployment preflight failed during phase=%s\n' "$preflight_phase" >&2
+            fi
+            exit "$status"
+          }
+          trap report_preflight_exit EXIT
           [[ "$IMAGE_REFERENCE" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]]
           [[ "$BOM_TAG" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
           [[ "$BOM_SEQUENCE" =~ ^[1-9][0-9]*$ ]]
@@ -193,6 +203,7 @@ jobs:
           [[ "$TRUST_ROOTS" != *$'\n'* ]]
           [[ "$(printf '%s' "$TRUST_ROOTS" | sha256sum | awk '{print $1}')" == "$TRUST_ROOTS_SHA256" ]]
           command -v jq >/dev/null
+          preflight_phase=filesystem-and-marker-validation
           cd /opt/lyntty
           test -f .env
           test -f docker-compose.yml
@@ -549,6 +560,9 @@ jobs:
                   echo 'legacy Relay image-layout restoration failed; retry is blocked' >&2
                 fi
               fi
+              if (( original_status != 0 )); then
+                printf 'Relay deployment preflight failed during phase=%s\n' "$preflight_phase" >&2
+              fi
               exit "$original_status"
             }
             trap rollback_legacy_image_layout EXIT
@@ -578,9 +592,14 @@ jobs:
             unset LEGACY_IMAGE_ENV_STAGE LEGACY_IMAGE_COMPOSE_STAGE LEGACY_IMAGE_SOURCE_PROJECTION LEGACY_IMAGE_STAGE_PROJECTION
             unset LEGACY_IMAGE_MIGRATION_COMMITTED
           }
+          preflight_phase=master-secret-canonicalization
           canonicalize_required_assignment LYNTTY_MASTER_SECRET HANDY_MASTER_SECRET
+          preflight_phase=legacy-image-layout
           migrate_legacy_relay_image_layout
+          trap report_preflight_exit EXIT
+          preflight_phase=image-assignment-canonicalization
           canonicalize_required_assignment LYNTTY_RELAY_IMAGE
+          preflight_phase=optional-environment-validation
           [[ "$(stat -c '%U:%a' .env)" == root:600 ]]
           for key in LYNTTY_RELEASE_TRUST_ROOTS LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE; do
             assignment_count="$(grep -Ec "^[[:space:]]*(export[[:space:]]+)?${key}([[:space:]]*=|[[:space:]]+)" .env || true)"
@@ -647,12 +666,14 @@ jobs:
             exit 0
           fi
           (( BOM_SEQUENCE > deployed_sequence )) || { echo 'requested Stable BOM sequence is older than the deployed sequence' >&2; exit 1; }
+          preflight_phase=prior-runtime-verification
           previous_reference="$(sed -n 's/^LYNTTY_RELAY_IMAGE=//p' .env | tail -1)"
           [[ "$previous_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]] || {
             echo 'formal deployment requires the existing Relay to be pinned by digest for pre-migration rollback' >&2
             exit 1
           }
           verify_previous_runtime
+          preflight_phase=rollback-compatibility-preparation
           legacy_rollback_override="$(mktemp -p . .rollback-master-compat.XXXXXX.yml)"
           cat > "$legacy_rollback_override" <<'YAML'
           services:
