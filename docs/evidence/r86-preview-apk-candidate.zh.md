@@ -2,7 +2,7 @@
 
 日期：2026-07-21
 
-状态：Candidate 字节已完成审阅，可进入实体 Android 测试；尚未执行公开 Promotion。
+状态：Candidate 字节已完成审阅；未执行该精确 APK 的实体 Android 测试。所有者已于 2026-07-21 明确授权如实标注“未验证”后直接发布；受保护 waiver 策略 PR 与公开 Promotion 尚待执行。
 
 ## Candidate 身份
 
@@ -41,9 +41,21 @@ workflow 从受保护 `main` 运行，全部步骤成功：精确源码验证、
 
 `docs/evidence/artifacts/r86-preview-apk-candidate/` 下五个文件是 Candidate 对应 sidecar 的逐字节副本。APK 本身按设计不提交。`scripts/preview-apk-allowlist.json` 只新增一条对此 Candidate 字节的绑定。
 
-## 仍需实体 Android 验收
+## waiver 策略验证
 
-Promotion 必须使用同一 APK 和 hash。实体机矩阵如下：
+受保护策略变更在未创建 tag、draft 或 Release 的前提下完成验证：
+
+- `bun install --frozen-lockfile` 完成，lockfile 无变化；
+- `bun test scripts/workflow-hardening.test.mjs` 通过 18 项测试，包含 physical/waiver XOR 的可执行成功与失败用例，以及两种 Release 正文的逐字节生成验证；
+- Promotion YAML 解析通过，三个 shell block 全部通过 `bash -n` 与 error-level ShellCheck；
+- 两处序列化 exact-delta 检查完全一致，并与 Candidate source 到当前工作树的精确七个新增、五个修改路径相符；
+- 确定性的 waiver 正文以中英文警告开头，SHA-256 为 `087c0ab469b7a08ee09eada6c28db1ef77346eb628ad305184fcc8926f59b7e8`；
+- `bun run ci:fast` 在加入最终逐字节正文测试前通过：hardening/redaction 20 项、Wire 33/76、CLI 585/1272、Relay 119/332、App 90 个文件 812/3276 加真实 Preview bundle smoke、lifecycle 35/194；最终 targeted hardening/redaction 重跑通过 21 项；
+- `git diff --check` 通过。
+
+## 未执行实体 Android 验收
+
+Promotion 仍必须使用同一 APK 和 hash。原计划的实体机矩阵如下：
 
 1. 将已安装的 `1.1.0` / `910003` Preview APK 原位升级至 `1.2.0` / `920001`，确认既有有效 Relay 配置仍可使用；
 2. 清除 App 数据或全新安装，确认 Relay 设置完成前不能启动认证或同步；
@@ -51,8 +63,10 @@ Promotion 必须使用同一 APK 和 hash。实体机矩阵如下：
 4. 配对节点，打开 managed Pi session，从手机发送独特消息，收到独特 assistant 回复，并在重开 App 后确认连续性；
 5. 清除 Relay，确认 App 回到设置门禁，且不复用旧身份。
 
-实体机测试的精确 SHA-256 必须保持 `9025d83a142ded5a618ef15c56c9bdd5486fed8336a53f1b9f0c7336b325aae9`。实体机验收将由 Promotion workflow 输入和不可变 workflow 日志记录；本份测试前证据不声称其已完成。
+上述矩阵**没有针对 SHA-256 `9025d83a142ded5a618ef15c56c9bdd5486fed8336a53f1b9f0c7336b325aae9` 的 APK 执行**。此前 `1.1.0` / `910003` 的实体机通过、当前 CI、APK/runtime audit、attestation 以及最终 `main` 的隔离 Relay 预检，都不能替代对这份 `920001` 精确字节的实体测试。
+
+所有者于 2026-07-21 明确接受该残余风险并授权直接 Release。受保护 waiver 路径会保持 `physical_phone_accepted=false`，并要求 dispatch 精确输入 `I accept publishing this exact Candidate without physical Android validation`，不会生成虚假的实体机通过记录。公开 Release 正文必须以确定性的中英文警告开头，说明实体 Android 安装、升级和端到端行为仍未验证。
 
 ## 发布边界
 
-本审阅 PR 不创建公开 Release、Stable APK、CLI archive、Relay image、Compatibility BOM、托管 Preview Relay、Google Play artifact 或 OTA update。只有本 PR 通过受保护检查并合入，且同一 Candidate 字节完成实体机矩阵后，Promotion 才能继续。
+本策略 PR 本身不创建公开 Release。它通过受保护检查并合入后，Promotion 只可在审阅过的 tag/title 下发布同一份五项 Candidate 资产。不授权 Stable APK、CLI archive、Relay image、Compatibility BOM、托管 Preview Relay、Google Play artifact 或 OTA update。Candidate APK 字节、SHA-256、signer、provenance、attestation 与 allowlist 绑定保持不变。

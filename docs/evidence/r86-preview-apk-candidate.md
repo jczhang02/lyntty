@@ -2,7 +2,7 @@
 
 Date: 2026-07-21
 
-Status: Candidate bytes reviewed and approved for physical Android testing; public Promotion has not run.
+Status: Candidate bytes reviewed; exact physical Android testing was not run. The owner explicitly authorized truthful unverified publication on 2026-07-21; the protected waiver policy PR and public Promotion remain pending.
 
 ## Candidate identity
 
@@ -41,9 +41,21 @@ The downloaded candidate contained exactly the APK, SHA-256 sidecar, APK audit, 
 
 The five files under `docs/evidence/artifacts/r86-preview-apk-candidate/` are byte-for-byte copies of the corresponding Candidate sidecars. The APK itself is intentionally not committed. `scripts/preview-apk-allowlist.json` adds exactly one binding for these Candidate bytes.
 
-## Physical Android acceptance still required
+## Waiver policy verification
 
-Promotion must use this exact APK and hash. The physical-device matrix is:
+The protected policy change was verified without creating a tag, draft, or Release:
+
+- `bun install --frozen-lockfile` completed without lockfile changes;
+- `bun test scripts/workflow-hardening.test.mjs` passed 18 tests, including executable success/failure cases for the physical/waiver XOR and byte-exact generation of both release-body modes;
+- the Promotion YAML parsed, and all three shell blocks passed `bash -n` plus error-level ShellCheck;
+- both serialized exact-delta checks are identical and match the Candidate-source working tree at exactly seven added and five modified paths;
+- the deterministic waiver body begins with the bilingual warning and has SHA-256 `087c0ab469b7a08ee09eada6c28db1ef77346eb628ad305184fcc8926f59b7e8`;
+- `bun run ci:fast` passed before the final byte-exact body test was added: 20 hardening/redaction tests, Wire 33/76, CLI 585/1272, Relay 119/332, App 812/3276 across 90 files plus the real Preview bundle smoke, and lifecycle 35/194; the final targeted hardening/redaction rerun passed 21 tests;
+- `git diff --check` passed.
+
+## Physical Android acceptance was not run
+
+Promotion must still use this exact APK and hash. The planned physical-device matrix was:
 
 1. update the installed `1.1.0` / `910003` Preview APK to `1.2.0` / `920001` and confirm the existing valid Relay configuration remains usable;
 2. clear App data or perform a fresh install and confirm authentication/sync cannot start before Relay setup;
@@ -51,8 +63,10 @@ Promotion must use this exact APK and hash. The physical-device matrix is:
 4. pair the node, open the managed Pi session, send a distinct phone message, receive its distinct assistant reply, and verify continuity after reopening the App;
 5. clear Relay and confirm the App returns to the setup gate without reusing the prior identity.
 
-The exact tested SHA-256 must remain `9025d83a142ded5a618ef15c56c9bdd5486fed8336a53f1b9f0c7336b325aae9`. Physical acceptance will be recorded by the Promotion workflow input and immutable workflow log; it is not claimed in this pre-test evidence.
+That matrix was **not executed for APK SHA-256 `9025d83a142ded5a618ef15c56c9bdd5486fed8336a53f1b9f0c7336b325aae9`**. The earlier `1.1.0` / `910003` physical-phone pass, current CI, APK/runtime audits, attestations, and isolated final-main Relay preflight do not substitute for testing these exact `920001` bytes.
+
+On 2026-07-21 the owner explicitly authorized direct Release despite this residual risk. The protected waiver path keeps `physical_phone_accepted=false` and requires the exact dispatch phrase `I accept publishing this exact Candidate without physical Android validation`; it does not create a false physical-acceptance record. The public Release body must begin with a deterministic bilingual warning that physical Android installation, update, and end-to-end behavior remain unverified.
 
 ## Publication boundary
 
-No public Release, Stable APK, CLI archive, Relay image, Compatibility BOM, hosted Preview Relay, Google Play artifact, or OTA update is created by this review PR. Promotion remains blocked until this PR merges through protected checks and the physical-device matrix passes on the exact Candidate bytes.
+This policy PR does not itself create a public Release. After it passes protected checks and merges, Promotion may publish only the same five Candidate assets under the reviewed tag/title. No Stable APK, CLI archive, Relay image, Compatibility BOM, hosted Preview Relay, Google Play artifact, or OTA update is authorized. Candidate APK bytes, SHA-256, signer, provenance, attestations, and allowlist binding remain unchanged.

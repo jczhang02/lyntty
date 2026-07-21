@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       expected_sha256:
-        description: Exact APK SHA-256 confirmed during physical-phone testing
+        description: Exact reviewed Candidate APK SHA-256
         required: true
         type: string
       physical_phone_accepted:
@@ -16,6 +16,11 @@ on:
         required: true
         default: false
         type: boolean
+      unverified_release_waiver:
+        description: Exact owner waiver phrase; leave empty after physical Android acceptance
+        required: false
+        default: ""
+        type: string
       immutable_releases_enabled:
         description: Confirm repository release immutability and Preview tag protection are active
         required: true
@@ -52,6 +57,7 @@ jobs:
           CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
           EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
           PHYSICAL_PHONE_ACCEPTED: ${{ inputs.physical_phone_accepted }}
+          UNVERIFIED_RELEASE_WAIVER: ${{ inputs.unverified_release_waiver }}
           IMMUTABLE_RELEASES_ENABLED: ${{ inputs.immutable_releases_enabled }}
           REPOSITORY_IMMUTABILITY_GATE: ${{ vars.LYNTTY_IMMUTABLE_RELEASES_ENABLED }}
           PREVIEW_TAG_RULESET_ID: ${{ vars.LYNTTY_PREVIEW_TAG_RULESET_ID }}
@@ -62,7 +68,21 @@ jobs:
           [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
           [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$EXPECTED_SHA256" =~ ^[a-f0-9]{64}$ ]]
-          [[ "$PHYSICAL_PHONE_ACCEPTED" == true ]]
+          waiver_phrase='I accept publishing this exact Candidate without physical Android validation'
+          case "$PHYSICAL_PHONE_ACCEPTED" in
+            true)
+              [[ -z "$UNVERIFIED_RELEASE_WAIVER" ]]
+              release_mode=physical-phone
+              ;;
+            false)
+              [[ "$UNVERIFIED_RELEASE_WAIVER" == "$waiver_phrase" ]]
+              release_mode=owner-waiver-unverified
+              ;;
+            *)
+              echo "physical_phone_accepted must be true or false" >&2
+              exit 1
+              ;;
+          esac
           [[ "$IMMUTABLE_RELEASES_ENABLED" == true ]]
           [[ "$REPOSITORY_IMMUTABILITY_GATE" == true ]]
           [[ "$PREVIEW_TAG_RULESET_ID" =~ ^[1-9][0-9]*$ ]]
@@ -86,6 +106,7 @@ jobs:
           git merge-base --is-ancestor "$source_sha" HEAD
 
           expected_changes="$(cat <<'PATHS'
+          M	.github/workflows/android-preview-promote.yml
           A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt
           A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256
           A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json
@@ -93,7 +114,10 @@ jobs:
           A	docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json
           A	docs/evidence/r86-preview-apk-candidate.md
           A	docs/evidence/r86-preview-apk-candidate.zh.md
+          M	docs/release/android-apk.md
+          M	docs/release/android-apk.zh.md
           M	scripts/preview-apk-allowlist.json
+          M	scripts/workflow-hardening.test.mjs
           PATHS
           )"
           actual_changes="$(git diff --no-renames --name-status "$source_sha" HEAD | LC_ALL=C sort -k2)"
@@ -262,6 +286,33 @@ jobs:
           title="$(cat "$title_file")"
           [[ "$tag" == android-preview-v1.2.0-920001 ]]
           [[ "$title" == 'V1.2.0 Local First 📡' ]]
+          release_notes="$RUNNER_TEMP/android-preview-release-notes.md"
+          if [[ "$release_mode" == physical-phone ]]; then
+            cp "$notes" "$release_notes"
+          else
+            cat > "$release_notes" <<'WARNING'
+          > [!WARNING]
+          > **Physical Android validation was not completed for this exact Candidate.** This Pre-release was published under an explicit owner waiver. Static analysis, CI, APK/runtime audits, provenance, and attestations passed, but physical-device installation, update, and end-to-end behavior remain unverified.
+          >
+          > **此精确 Candidate 未完成实体 Android 验证。** 本 Pre-release 经所有者明确豁免后发布。静态分析、CI、APK/runtime audit、provenance 与 attestation 已通过，但实体设备安装、升级和端到端行为仍未验证。
+          WARNING
+            printf '\n' >> "$release_notes"
+            cat "$notes" >> "$release_notes"
+            grep -Fq 'Physical Android validation was not completed for this exact Candidate.' "$release_notes"
+            grep -Fq '此精确 Candidate 未完成实体 Android 验证。' "$release_notes"
+          fi
+          release_notes_sha256="$(sha256sum "$release_notes" | awk '{print $1}')"
+          [[ "$release_notes_sha256" =~ ^[a-f0-9]{64}$ ]]
+          {
+            echo '### Android Preview release authorization'
+            echo "- Actor: \`$GITHUB_ACTOR\`"
+            echo "- Mode: \`$release_mode\`"
+            echo "- Physical phone accepted: \`$PHYSICAL_PHONE_ACCEPTED\`"
+            echo "- Candidate run: \`$CANDIDATE_RUN_ID\`"
+            echo "- Candidate source: \`$source_sha\`"
+            echo "- APK SHA-256: \`$actual_sha\`"
+            echo "- Public notes SHA-256: \`$release_notes_sha256\`"
+          } >> "$GITHUB_STEP_SUMMARY"
           {
             echo "source_sha=$source_sha"
             echo "download=$download"
@@ -269,6 +320,9 @@ jobs:
             echo "apk_name=$apk_name"
             echo "tag=$tag"
             echo "title=$title"
+            echo "release_mode=$release_mode"
+            echo "release_notes=$release_notes"
+            echo "release_notes_sha256=$release_notes_sha256"
           } >> "$GITHUB_OUTPUT"
 
       - name: Create or resume exact draft release
@@ -280,9 +334,14 @@ jobs:
           APK_NAME: ${{ steps.candidate.outputs.apk_name }}
           RELEASE_TAG: ${{ steps.candidate.outputs.tag }}
           RELEASE_TITLE: ${{ steps.candidate.outputs.title }}
+          RELEASE_MODE: ${{ steps.candidate.outputs.release_mode }}
+          RELEASE_NOTES: ${{ steps.candidate.outputs.release_notes }}
+          RELEASE_NOTES_SHA256: ${{ steps.candidate.outputs.release_notes_sha256 }}
         run: |
           set -euo pipefail
-          notes="$DOWNLOAD/release-notes.md"
+          notes="$RELEASE_NOTES"
+          [[ "$RELEASE_MODE" == physical-phone || "$RELEASE_MODE" == owner-waiver-unverified ]]
+          [[ "$(sha256sum "$notes" | awk '{print $1}')" == "$RELEASE_NOTES_SHA256" ]]
           assets=(
             "$APK"
             "$DOWNLOAD/$APK_NAME.sha256"
@@ -336,14 +395,26 @@ jobs:
           RELEASE_TAG: ${{ steps.candidate.outputs.tag }}
           RELEASE_TITLE: ${{ steps.candidate.outputs.title }}
           SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+          RELEASE_MODE: ${{ steps.candidate.outputs.release_mode }}
+          RELEASE_NOTES: ${{ steps.candidate.outputs.release_notes }}
+          RELEASE_NOTES_SHA256: ${{ steps.candidate.outputs.release_notes_sha256 }}
           ALREADY_PUBLISHED: ${{ steps.release.outputs.already_published }}
         run: |
           set -euo pipefail
+          [[ "$RELEASE_MODE" == physical-phone || "$RELEASE_MODE" == owner-waiver-unverified ]]
+          [[ "$(sha256sum "$RELEASE_NOTES" | awk '{print $1}')" == "$RELEASE_NOTES_SHA256" ]]
+          if [[ "$RELEASE_MODE" == physical-phone ]]; then
+            cmp -s "$DOWNLOAD/release-notes.md" "$RELEASE_NOTES"
+          else
+            grep -Fq 'Physical Android validation was not completed for this exact Candidate.' "$RELEASE_NOTES"
+            grep -Fq '此精确 Candidate 未完成实体 Android 验证。' "$RELEASE_NOTES"
+          fi
           [[ "$GITHUB_REF" == refs/heads/main ]]
           [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
           git fetch --no-tags origin main
           [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
           expected_changes="$(cat <<'PATHS'
+          M	.github/workflows/android-preview-promote.yml
           A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt
           A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256
           A	docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json
@@ -351,7 +422,10 @@ jobs:
           A	docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json
           A	docs/evidence/r86-preview-apk-candidate.md
           A	docs/evidence/r86-preview-apk-candidate.zh.md
+          M	docs/release/android-apk.md
+          M	docs/release/android-apk.zh.md
           M	scripts/preview-apk-allowlist.json
+          M	scripts/workflow-hardening.test.mjs
           PATHS
           )"
           actual_changes="$(git diff --no-renames --name-status "$SOURCE_SHA" HEAD | LC_ALL=C sort -k2)"
@@ -398,7 +472,7 @@ jobs:
           [[ "$(jq -r .target_commitish <<< "$release_json")" == "$GITHUB_SHA" ]]
           [[ "$(jq -r .name <<< "$release_json")" == "$RELEASE_TITLE" ]]
           jq -j '.body // ""' <<< "$release_json" > "$RUNNER_TEMP/pre-publish-notes.md"
-          cmp -s "$DOWNLOAD/release-notes.md" "$RUNNER_TEMP/pre-publish-notes.md"
+          cmp -s "$RELEASE_NOTES" "$RUNNER_TEMP/pre-publish-notes.md"
           verify_release_assets pre-publish-assets
 
           tag_api="repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG"
@@ -425,9 +499,17 @@ jobs:
           [[ "$(jq -r .name <<< "$published")" == "$RELEASE_TITLE" ]]
           [[ "$(jq -r .targetCommitish <<< "$published")" == "$GITHUB_SHA" ]]
           jq -j '.body // ""' <<< "$published" > "$RUNNER_TEMP/post-publish-notes.md"
-          cmp -s "$DOWNLOAD/release-notes.md" "$RUNNER_TEMP/post-publish-notes.md"
+          cmp -s "$RELEASE_NOTES" "$RUNNER_TEMP/post-publish-notes.md"
           [[ "$(gh release list --limit 1000 --json tagName,isLatest --jq ".[] | select(.tagName == \"$RELEASE_TAG\") | .isLatest")" == false ]]
           tag_json="$(gh api "$tag_api")"
           [[ "$(jq -r .object.type <<< "$tag_json")" == commit ]]
           [[ "$(jq -r .object.sha <<< "$tag_json")" == "$GITHUB_SHA" ]]
           verify_release_assets post-publish-assets
+          {
+            echo '### Android Preview publication complete'
+            echo "- Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG"
+            echo "- Mode: \`$RELEASE_MODE\`"
+            echo "- Target: \`$GITHUB_SHA\`"
+            echo "- APK SHA-256: \`$(sha256sum "$APK" | awk '{print $1}')\`"
+            echo "- Public notes SHA-256: \`$RELEASE_NOTES_SHA256\`"
+          } >> "$GITHUB_STEP_SUMMARY"
