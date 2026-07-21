@@ -11,6 +11,7 @@
 /scripts/github-release.ts @jczhang02
 /scripts/relay-oci-sbom.ts @jczhang02
 /scripts/release.ts @jczhang02
+/scripts/stable-release-validation.ts @jczhang02
 /scripts/dev.ts @jczhang02
 /scripts/preview.ts @jczhang02
 /scripts/preview-apk-allowlist.json @jczhang02
