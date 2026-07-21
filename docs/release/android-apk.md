@@ -144,8 +144,8 @@ Trigger: `workflow_dispatch` only.
 Inputs:
 
 ```yaml
-version_name: "1.0.0"
-version_code: "4" # optional; defaults to GitHub workflow run number
+version_name: "1.2.0"
+version_code: "6" # first formal Stable; must remain monotonic
 ```
 
 Version and release-note rules:
@@ -154,7 +154,9 @@ Version and release-note rules:
 - `versionCode` is a separate monotonic Android integer supplied by the candidate run.
 - Compatibility release tags include independent App/CLI/Relay/Wire versions plus the channel sequence.
 - The Android-only workflow is retained as a protected signing/build verification job. It uploads a short-lived candidate and cannot create a GitHub Release.
+- The first formal Stable uses `versionCode=6`, which advances the existing production package at `5`, and must retain certificate SHA-256 `25e3928a7cc228254e8249e684c6ab661f5c87140e23db7406afc64af29f0cf5`.
 - Formal release notes and channel advancement belong to the signed Compatibility BOM promotion.
+- Stable Promotion has no unverified waiver: the exact Compatibility Candidate APK must pass physical Android validation, and the dispatch must provide both `physical_phone_accepted=true` and that APK's SHA-256.
 
 Build outline:
 
@@ -190,7 +192,7 @@ android-apk-audit.txt
 android-production-guard.txt
 ```
 
-Formal promotion publishes that exact APK alongside `compatibility-bom.json`, `compatibility-bom.sig.json`, SPDX SBOM, provenance, and release checksums. The BOM binds package id, `versionCode`, permanent certificate fingerprint, immutable APK URL, SHA-256, and size. See [Compatibility release and support policy](./compatibility-bom.md).
+The Android-only candidate proves the production signing path, but formal Promotion publishes only the exact APK built inside the approved Compatibility Candidate run. It appears alongside `compatibility-bom.json`, `compatibility-bom.sig.json`, SPDX SBOM, provenance, and release checksums. The BOM binds package id, `versionCode`, permanent certificate fingerprint, immutable APK URL, SHA-256, and size. See [Compatibility release and support policy](./compatibility-bom.md).
 
 ## Relay `/v1/version`
 

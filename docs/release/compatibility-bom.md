@@ -6,7 +6,7 @@ Lyntty releases App, CLI/`lynttyd`, Relay, and Wire independently. A signed Comp
 
 | Component | Source | Current line | SemVer responsibility |
 | --- | --- | --- | --- |
-| App | `packages/lyntty-app/package.json` | `1.1.x` | Android/iOS user behavior and native update contract |
+| App | `packages/lyntty-app/package.json` | `1.2.x` | Android user behavior and native update contract |
 | CLI + `lynttyd` | `packages/lyntty-cli/package.json` | `1.2.x` | local executable, service, Pi extension, and artifact manifest |
 | Relay | `packages/lyntty-relay/package.json` | `1.2.x` | API/Socket behavior, OCI runtime, and migration compatibility |
 | Wire | `packages/lyntty-wire/package.json` | `0.2.x` | shared schemas, capability negotiation, and BOM schema |
@@ -50,7 +50,7 @@ Predecessor references hash those same file bytes, including the LF; release inv
 
 Verification checks the signature, channel-specific trust root, sequence validity, Android package/certificate pin, Relay repository, internal component matrix, and digest/reference forms. Stable and Preview have separate key ids, certificate policy, package ids, environments, tags, and Relay repositories.
 
-`LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64` is canonical base64 for the raw 32-byte Ed25519 seed and exists only as a protected environment secret. Public roots are provided through reviewed `LYNTTY_RELEASE_TRUST_ROOTS` variables and embedded into formal CLI artifacts at build time. Each root binds `keyId`, `channel`, raw Ed25519 public key, sequence validity, Android package/certificate fingerprint, and allowed Relay repository. Stable and Preview roots must be different. The first stable CLI remains hash-pinned by the existing installer; the permanent Android signing certificate bootstraps App trust. Rotate a BOM key by shipping overlapping public roots under the old key for the complete three-BOM window before activating the new key. The deterministic R82 fixture is never a valid bootstrap: candidate preflight rejects its key ids and public root, while the release signer rejects its private seed.
+`LYNTTY_BOM_PRIVATE_KEY_SEED_BASE64` is canonical base64 for the raw 32-byte Ed25519 seed and exists only as a protected environment secret. Public roots are provided through reviewed `LYNTTY_RELEASE_TRUST_ROOTS` variables and embedded into formal CLI artifacts at build time. Each root binds `keyId`, `channel`, raw Ed25519 public key, sequence validity, Android package/certificate fingerprint, and allowed Relay repository. Stable and Preview roots must use distinct public keys, not merely different key ids. The reviewed Stable bootstrap root is also committed at `config/release-trust-roots/stable.json` and published as `stable-release-trust-roots.json`; candidate and Promotion require the protected environment value to match it exactly. The first stable CLI installer and root are hash-pinned release assets; the permanent Android signing certificate bootstraps App trust. Rotate a BOM key by shipping overlapping public roots under the old key for the complete three-BOM window before activating the new key. The deterministic R82 fixture is never a valid bootstrap: candidate preflight rejects its key ids and public root, while the release signer rejects its private seed.
 
 ## Build once, then promote
 
@@ -58,7 +58,7 @@ Verification checks the signature, channel-specific trust root, sequence validit
 
 `.github/workflows/release-candidate.yml` is manual-only. It requires exact protected `main`, selects a channel-specific candidate environment, and builds once:
 
-1. five standalone CLI archives; Stable replaces both macOS archives and the Windows archive with externally signed bytes from immutable credential-free `native-signing-*` staging assets. `.github/workflows/native-signing.yml` runs on matching native runners, verifies exact archive roots/inventory/runtime identity, Apple Team/Developer ID plus Gatekeeper notarization, or Authenticode thumbprint plus timestamp, and attests the archive at the exact source commit. Candidate verification pins that workflow and workflow commit and embeds each attestation proof in the BOM;
+1. five standalone CLI archives; Stable replaces both macOS archives and the Windows archive with bytes from `.github/workflows/native-signing-producer.yml`. The producer builds current protected `main` on matching native runners, signs every executable, regenerates the manifest from final signed bytes, notarizes or timestamps, and publishes one immutable credential-free `native-signing-*` prerelease through the same Release-ID transaction used by Stable. `.github/workflows/native-signing.yml` then independently verifies the exact staging Release, metadata, archive inventory/runtime identity, Apple Team/Developer ID plus Gatekeeper notarization, or Authenticode thumbprint plus timestamp, and attests each archive at the exact source commit. Candidate verification pins that verifier workflow and workflow commit and embeds each attestation proof in the BOM;
 2. one channel-bound, signed, non-debuggable APK under the Node-family execution audit;
 3. one amd64/arm64 Relay OCI layout without pushing;
 4. SPDX JSON and deterministic in-toto candidate-verification statements; externally signed native archives retain their pinned native workflow attestations rather than being attributed to the candidate builder;
@@ -73,9 +73,9 @@ The candidate tarball receives GitHub/Sigstore provenance and is retained as an 
 - pushes the existing OCI layout and proves the remote digest did not change; an interrupted run may resume only when an existing immutable tag has that exact digest;
 - keylessly signs and attests the image by digest;
 - attests release files and their SPDX SBOMs;
-- creates or resumes an exact draft, compares every pre-existing asset byte-for-byte, uploads only missing assets, verifies the complete asset set, and then publishes the exact candidate APK/archives/evidence/BOM assets atomically.
+- invokes `scripts/github-release.ts` to create or resume one exact Release ID, compare every asset ID/API digest/downloaded byte, upload only missing assets without deletion or replacement, and bind the final asset IDs. At the publication boundary it rechecks protected GitHub `main`, atomically creates the direct tag with a non-force Git push (or accepts only the same exact direct tag after an interrupted attempt), then publishes through one complete Release-ID `PATCH`; it verifies the immutable Release, direct tag commit, title/body/target, latest state, and exact assets again.
 
-Promotion contains no Gradle, Bun compile, or image build command. Candidate source must still equal current protected `main`; promotion re-resolves the channel head under its serialized lock, requires exact current/two predecessor references, a higher sequence, and a higher Android `versionCode`. Delayed candidates therefore cannot regress Stable or Preview.
+Promotion contains no Gradle, Bun compile, or image build command. Candidate source must still equal current protected `main`; promotion re-resolves the channel head under its serialized lock, requires exact current/two predecessor references, a higher sequence, and a higher Android `versionCode`. Stable additionally requires `physical_phone_accepted=true` and the SHA-256 of the exact physically tested Candidate APK; there is no Stable waiver path. Delayed or untested candidates therefore cannot regress or silently enter Stable.
 
 Stable creates a normal GitHub Release with `--latest`. Preview creates a prerelease and can never become GitHub latest. Therefore:
 
@@ -98,13 +98,25 @@ Stable retains current plus two predecessor BOMs for at least 90 days. Candidate
 - no artifact is rebuilt;
 - the new mixed set and all retained combinations must pass before it becomes Stable latest.
 
-Relay deploy is separate from release but shares the serialized Stable promotion/rollback lock. `.github/workflows/relay-deploy.yml` accepts only the current signed Stable BOM, resolves `ghcr.io/jczhang02/lyntty-relay@sha256:...`, uses pinned SSH known-host material, stops Relay, backs up, migrates, runs `doctor`, starts, health-checks, and records the deployed BOM and digest. Production deployment still requires its own `production-relay` approval.
+Relay deploy is separate from release but shares the serialized Stable promotion/rollback lock. `.github/workflows/relay-deploy.yml` accepts only the current immutable signed Stable BOM, resolves `ghcr.io/jczhang02/lyntty-relay@sha256:...`, uses pinned SSH known-host material, installs the exact reviewed public trust store and minimum sequence atomically, requires the previous image to be digest-pinned, verifies the backup and sidecar, migrates, runs `doctor`, and proves both the running container image and `/v1/version` BOM/APK identity locally and through `relay.jczhang.cc`. Generic health alone is not acceptance. Production deployment still requires its own `production-relay` approval.
 
 ## Consumers
 
 - Relay `/v1/version` fetches BOM and detached signature, verifies a configured trust store, rejects lower in-process sequences, and projects only the channel-matching Android APK fields. Preview has no Stable fallback.
 - Compiled `lyntty update check` verifies the BOM with the embedded or explicitly supplied trust store and selects the exact current-platform archive. It never treats an unsigned channel document as trusted.
 - Android re-hashes the complete APK with native streaming SHA-256 and hands it to Package Installer; Android enforces the permanent package signer.
+
+## First Stable identity
+
+The first formal Stable line is fixed before any candidate is dispatched:
+
+- App/CLI/Relay/Wire: `1.2.0` / `1.2.0` / `1.2.0` / `0.2.0`;
+- BOM sequence `1` and tag `compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1`;
+- Android package `dev.jczhang.lyntty`, `versionCode` `6`, and the existing permanent certificate SHA-256 `25e3928a7cc228254e8249e684c6ab661f5c87140e23db7406afc64af29f0cf5`;
+- Stable BOM key id `stable-2026-01`, valid from sequence `1`;
+- Relay repository `ghcr.io/jczhang02/lyntty-relay`.
+
+There is no predecessor BOM for sequence 1. Candidate enforces `versionCode > 5` in that case so the exact Stable APK upgrades the existing production package. Before Promotion, reviewers must verify the native staging attestations, Candidate evidence, exact APK hash, physical Android result, release body, and the protected environment configuration. The first production Relay rollout also requires a separately verified pre-deploy backup/sidecar and a digest-pinned existing image because a signed predecessor rollback BOM does not yet exist.
 
 ## Required repository settings
 
@@ -114,8 +126,8 @@ Workflow files cannot create environment protection rules. Before publication, r
 - `main`-only deployment branch policies and required CODEOWNERS review for release trust inputs;
 - Stable/Preview BOM secrets and public trust-root variables in their own environments;
 - permanent Android signing/Firebase/Expo/certificate-pin values only in Stable candidate environments;
-- immutable macOS/Windows archive URL/hash values plus a protected `release-native-signing` environment with `LYNTTY_APPLE_ID`, `LYNTTY_APPLE_APP_PASSWORD`, `LYNTTY_APPLE_TEAM_ID`, `LYNTTY_APPLE_SIGNING_AUTHORITY`, and `LYNTTY_WINDOWS_CERT_THUMBPRINT`; missing native verification or a source/workflow-digest mismatch blocks Stable;
-- protected/no-overwrite `compat-*` tags and immutable GitHub Releases;
+- immutable macOS/Windows archive URL/hash values plus a protected `release-native-signing` environment with Apple account/app password, Developer ID P12/password, Team/signing authority, Windows code-signing PFX/password, certificate thumbprint, and HTTPS RFC3161 timestamp URL; missing native production or independent verification blocks Stable;
+- active no-bypass update/deletion rulesets for `compat-v*` and `native-signing-*`, repository variables containing their IDs, and immutable GitHub Releases;
 - pinned `LYNTTY_VPS_KNOWN_HOSTS` for Relay deploy.
 
 Missing protection, signing, attestation, or platform-native credentials is a release blocker, not a reason to publish a partially trusted Stable artifact.
