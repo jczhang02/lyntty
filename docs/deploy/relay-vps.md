@@ -110,6 +110,8 @@ services:
       - "127.0.0.1:3005:3005"
 ```
 
+The protected deploy accepts one historical R65 layout for a one-time migration: the exact `ghcr.io/jczhang02/lyntty-relay:${LYNTTY_RELAY_IMAGE_TAG}` scalar (or its exact rendered R65 tag) and `LYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927`. Before stopping Relay, it proves that the configured tag, running container, local image ID, sole GHCR `RepoDigest`, and pulled immutable digest are the same bytes. It then creates paired root-private backups, atomically stages `${LYNTTY_RELAY_IMAGE}` plus the derived digest, and adds the persistent `/opt/lyntty/backups:/backups` bind if absent. Ambiguous YAML, alternate repositories, multiple digests, missing containers, or any identity mismatch fail before service/database mutation. Do not reproduce this with manual `sed` edits.
+
 Start:
 
 ```bash
@@ -165,27 +167,15 @@ Production environment variable:
 
 - `LYNTTY_RELEASE_TRUST_ROOTS` (reviewed public Stable roots and identity pins)
 
-Deployment script shape (brief maintenance window for both providers):
+Deployment transaction (brief maintenance window):
 
-```bash
-sudo env IMAGE_REFERENCE="$IMAGE_REFERENCE" BOM_TAG="$BOM_TAG" bash -se <<'ROOT'
-set -euo pipefail
-cd /opt/lyntty
-# Workflow has already verified the BOM signature and resolved IMAGE_REFERENCE.
-docker compose stop lyntty-relay
-sed -i "s#^LYNTTY_RELAY_IMAGE=.*#LYNTTY_RELAY_IMAGE=${IMAGE_REFERENCE}#" .env
-docker compose pull lyntty-relay
-docker compose run --rm lyntty-relay backup "/backups/predeploy-${BOM_TAG}.backup"
-docker compose run --rm lyntty-relay migrate
-docker compose run --rm lyntty-relay doctor
-docker compose up -d
-docker compose ps
-curl -fsS http://127.0.0.1:3005/health
-ROOT
-curl -fsS https://relay.jczhang.cc/health
-```
+1. Verify protected main, the current immutable signed Stable BOM, exact OCI digest, attestations, SSH host key, root-private files, and absence of incomplete markers.
+2. While the old Relay is still healthy, normalize the documented schema-1 secret key and R65 image layout only through the bounded backup-first migrations above. Resolve the prior digest from the running image bytes, never from a mutable remote tag.
+3. Prepare a root-private rollback-only Compose override that maps `HANDY_MASTER_SECRET` from the exact canonical `LYNTTY_MASTER_SECRET`; it is used only if the R65 image must be restarted before schema mutation.
+4. Stop the old Relay, atomically install the target digest/trust roots/sequence, pull and verify the target image, then create and checksum the persistent database backup.
+5. Write `.migration-incomplete`, run `migrate` and `doctor`, start the exact digest, and verify local and public `/health` plus the full `/v1/version` BOM/APK contract.
 
-Relay holds a schema lease while serving. Stop every old Relay replica before the explicit migration job; otherwise the migration waits rather than racing an active binary. The workflow enters the root-only directory through a privileged shell, accepts only the current immutable signed Stable head, and requires its sequence to advance `deployed-sequence.txt`. It atomically writes the exact reviewed trust roots and `LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE`, verifies the resolved Compose image and running container `.Config.Image`, validates the backup and checksum sidecar, and requires local plus public `/v1/version` to return the expected BOM id/sequence/hash and APK URL/hash. A generic `/health` response is insufficient. Compose one-shot jobs detach stdin so they cannot consume the remote `bash -s` script stream. Any failure after `.migration-incomplete` is written leaves Relay stopped; a failed pre-migration restoration writes `.rollback-incomplete`. Retries remain blocked until an operator verifies the named backup or prior runtime, restores or validates schema state, runs `doctor`, and explicitly removes the applicable marker. Preserve the pre-deploy backup and its `.sha256` sidecar until rollback is no longer required.
+Relay holds a schema lease while serving. The workflow accepts only the current immutable signed Stable head and requires its sequence to advance `deployed-sequence.txt`. A generic `/health` response is insufficient. Compose one-shot jobs detach stdin so they cannot consume the remote `bash -s` script stream. Before schema mutation, failure restores the prior env and restarts the exact prior image bytes with the private compatibility override; failed restoration writes `.rollback-incomplete`. Any failure after `.migration-incomplete` is written leaves Relay stopped. Retries remain blocked until an operator verifies the named backup or prior runtime, restores or validates schema state, runs `doctor`, and explicitly removes the applicable marker. Preserve the pre-deploy backup and its `.sha256` sidecar until rollback is no longer required.
 
 Do not run `git pull`, package installation, or source builds on the VPS.
 

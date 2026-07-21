@@ -6,6 +6,8 @@
 
 Bead：`lyntty-24v.2`
 
+> 后续：受保护 run `29866546707` 已在生产环境证明 master-secret migration；随后在独立的 `LYNTTY_RELAY_IMAGE` 缺失预检处停止。R98 记录下一项 legacy-layout boundary。
+
 ## 生产证据
 
 受保护部署 run `29864206703` 重新验证 current protected main、immutable Stable Release、签名 BOM、精确 Relay OCI digest 与 attestations，并通过 pinned SSH trust 登录；随后因 `LYNTTY_MASTER_SECRET` recognized assignments 为 0，在 backup、停服务、migration、configuration write 和 container replacement 前安全停止。

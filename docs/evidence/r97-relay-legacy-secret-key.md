@@ -6,6 +6,8 @@ Branch: `fix/relay-legacy-secret`
 
 Bead: `lyntty-24v.2`
 
+> Follow-up: protected run `29866546707` proved this master-secret migration live, then stopped at the separate missing `LYNTTY_RELAY_IMAGE` preflight. R98 records that next legacy-layout boundary.
+
 ## Production evidence
 
 Protected deployment run `29864206703` re-verified current protected main, immutable Stable Release, signed BOM, exact Relay OCI digest and attestations, then authenticated with pinned SSH trust. It stopped before backup, service shutdown, migration, configuration write, or container replacement because `LYNTTY_MASTER_SECRET` had zero recognized assignments.
