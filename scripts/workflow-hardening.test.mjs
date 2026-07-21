@@ -100,6 +100,9 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /HANDY_MASTER_SECRET: \$\{LYNTTY_MASTER_SECRET\}/);
   assert.match(relayDeploy, /Relay deployment preflight failed during phase=%s/);
   assert.match(relayDeploy, /preflight_phase=legacy-image-layout/);
+  for (const phase of ['source-model', 'rendered-model', 'running-container', 'repository-digest', 'staging', 'install']) {
+    assert.match(relayDeploy, new RegExp(`preflight_phase=legacy-image-${phase}`));
+  }
   assert.match(relayDeploy, /\.Config\.Image/);
   assert.match(relayDeploy, /\/v1\/version/);
   assert.match(relayDeploy, /bom_release_id/);

@@ -366,6 +366,7 @@ jobs:
             [[ "$(stat -c '%U:%a' "$target")" == root:600 ]] || return 1
           }
           migrate_legacy_relay_image_layout() {
+            preflight_phase=legacy-image-source-model
             local expected_tag='ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927'
             local target_key=LYNTTY_RELAY_IMAGE legacy_tag_key=LYNTTY_RELAY_IMAGE_TAG source_form
             local assignment_count canonical_count legacy_tag_assignment_count legacy_tag_canonical_count
@@ -407,6 +408,7 @@ jobs:
             }
             original_image_line="$(grep -E '^    image: [^[:space:]#]+$' docker-compose.yml)"
             raw_reference="${original_image_line#    image: }"
+            preflight_phase=legacy-image-rendered-model
             if ! rendered_json="$(compose config --format json 2>/dev/null)"; then
               echo 'legacy Relay Compose could not be rendered' >&2
               return 1
@@ -459,6 +461,7 @@ jobs:
               echo 'legacy Relay image migration requires an absent or one canonical target assignment' >&2
               return 1
             }
+            preflight_phase=legacy-image-running-container
             mapfile -t legacy_containers < <(compose ps -q lyntty-relay)
             [[ "${#legacy_containers[@]}" == 1 ]]
             container="${legacy_containers[0]}"
@@ -469,6 +472,7 @@ jobs:
             [[ "$container_image_id" =~ ^sha256:[a-f0-9]{64}$ ]]
             configured_image_id="$(docker image inspect --format '{{.Id}}' "$configured_reference")"
             [[ "$configured_image_id" == "$container_image_id" ]]
+            preflight_phase=legacy-image-repository-digest
             repo_digests="$(docker image inspect --format '{{json .RepoDigests}}' "$container_image_id")"
             jq -e 'type == "array" and length == 1' <<< "$repo_digests" >/dev/null
             previous_reference="$(jq -er '.[0]' <<< "$repo_digests")"
@@ -489,6 +493,7 @@ jobs:
               unset env_value
             fi
 
+            preflight_phase=legacy-image-staging
             env_backup="$(mktemp -p . ".env-precanonical-${target_key}-XXXXXXXX")"
             compose_backup="$(mktemp -p . ".compose-precanonical-${target_key}-XXXXXXXX")"
             cp --preserve=mode,ownership,timestamps .env "$env_backup"
@@ -533,6 +538,7 @@ jobs:
               <<< "$staged_json" >/dev/null
             unset staged_json
 
+            preflight_phase=legacy-image-install
             LEGACY_IMAGE_ENV_BACKUP="$env_backup"
             LEGACY_IMAGE_COMPOSE_BACKUP="$compose_backup"
             LEGACY_IMAGE_CONTAINER="$container"
