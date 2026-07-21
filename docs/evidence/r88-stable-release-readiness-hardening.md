@@ -2,6 +2,8 @@
 
 Date: 2026-07-21
 
+> Policy update: R89 supersedes R88 only for first-Stable approval and native platform-signing requirements. R88 remains evidence that the optional signing chain and exact publication/deployment seams were hardened; the owner-operated self-use release does not invoke Apple notarization or Windows Authenticode.
+
 Branch: `fix/stable-release-hardening`
 
 Bead: `lyntty-24v`

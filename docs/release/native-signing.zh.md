@@ -1,10 +1,10 @@
-# 原生 CLI 签名与 staging
+# 可选的原生 CLI 签名与 staging
 
-Stable 包含五个独立 CLI/`lynttyd` archive。Linux archive 由 Compatibility Candidate 直接产生；两个 macOS archive 和一个 Windows archive 必须先经过受保护的生产签名与独立验证。
+Stable 包含五个独立 CLI/`lynttyd` archive。首次 owner-operated 自用 Stable 明确不对 macOS/Windows archive 做 Apple notarization 或 Authenticode；签名 BOM、hash、provenance 和 GitHub attestation 仍是强制门禁。下面的 workflow 仅保留为未来可选工具，当前 Candidate 不会调用或消费其输出；重新接入必须通过 protected PR 和精确字节复核。
 
-## 受保护 environment
+## 可选受保护 environment
 
-建立 `release-native-signing`，只允许 `main`，要求独立 reviewer，并关闭 self-review。
+只有明确启用平台代码签名时才建立 `release-native-signing`。只允许 `main`，并要求 owner 显式审批。
 
 Secrets：
 
@@ -46,10 +46,10 @@ Ubuntu publisher 会再次验证 transport root、生成确定性 archive，并�
 
 ## 独立验证
 
-不要立刻把 staging URL 配给 Stable Candidate。先 dispatch `.github/workflows/native-signing.yml`，传入精确 source SHA、CLI version、release tag、metadata URL/hash、三个 archive URL/hash，以及 metadata 中两个 notarization UUID。
+未来若选择平台签名，可 dispatch `.github/workflows/native-signing.yml`，传入精确 source SHA、CLI version、release tag、metadata URL/hash、三个 archive URL/hash，以及 metadata 中两个 notarization UUID。
 
-Verifier 在匹配架构的 macOS/Windows runner 上重新检查不可变 Release、metadata、每个 archive 字节、平台签名和 runtime，并分别生成 GitHub attestation。Stable Candidate 只接受这个 verifier 在同一 source commit 上生成的 attestation。
+Verifier 在匹配架构的 macOS/Windows runner 上重新检查不可变 Release、metadata、每个 archive 字节、平台签名和 runtime，并分别生成 GitHub attestation。
 
-三个 attestation 全部成功后，才能把 archive URL/hash 写入 `release-stable-candidate` variables。Verifier 失败的 prerelease 不可信；瞬时验证失败可以对同一字节重跑，字节错误必须重新运行 producer 并使用新 tag。
+当前自用 Candidate 不接受外部 native archive URL/hash，因此 staging 输出不能静默替换 Candidate 字节。未来政策变更必须通过 protected PR 重新接入精确输入和 verifier attestations。Verifier 瞬时失败可对同一字节重跑；字节错误必须重新运行 producer 并使用新 tag。
 
 裸 Mach-O 不能像 PKG/DMG 一样 staple ticket，因此当前链使用包含最终 root 的 ZIP、在线 notary acceptance 和每个 executable 的 Gatekeeper assessment。若 Apple 不再支持，必须停止并通过受保护 PR 改为 PKG/DMG，不能绕过。硬件或云托管 Windows 证书同样需要专用 provider 集成，不能伪造或导出替代品。

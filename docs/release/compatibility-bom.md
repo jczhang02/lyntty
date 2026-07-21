@@ -58,10 +58,10 @@ Verification checks the signature, channel-specific trust root, sequence validit
 
 `.github/workflows/release-candidate.yml` is manual-only. It requires exact protected `main`, selects a channel-specific candidate environment, and builds once:
 
-1. five standalone CLI archives; Stable replaces both macOS archives and the Windows archive with bytes from `.github/workflows/native-signing-producer.yml`. The producer builds current protected `main` on matching native runners, signs every executable, regenerates the manifest from final signed bytes, notarizes or timestamps, and publishes one immutable credential-free `native-signing-*` prerelease through the same Release-ID transaction used by Stable. `.github/workflows/native-signing.yml` then independently verifies the exact staging Release, metadata, archive inventory/runtime identity, Apple Team/Developer ID plus Gatekeeper notarization, or Authenticode thumbprint plus timestamp, and attests each archive at the exact source commit. Candidate verification pins that verifier workflow and workflow commit and embeds each attestation proof in the BOM;
+1. five standalone CLI archives built from the same exact protected source; for this owner-operated self-use Stable line, the macOS and Windows executables are intentionally not Apple-notarized or Authenticode-signed;
 2. one channel-bound, signed, non-debuggable APK under the Node-family execution audit;
 3. one amd64/arm64 Relay OCI layout without pushing;
-4. SPDX JSON and deterministic in-toto candidate-verification statements; externally signed native archives retain their pinned native workflow attestations rather than being attributed to the candidate builder;
+4. SPDX JSON and deterministic in-toto candidate-verification statements. CLI provenance records `platformCodeSigning.policy=not-required-self-use`, while archive SHA-256, internal manifest SHA-256, exact source commit, runtime-free self-checks, signed BOM, and GitHub attestations remain mandatory;
 5. canonical BOM, detached signature, retained rolling matrix, and complete checksums.
 
 The candidate tarball receives GitHub/Sigstore provenance and is retained as an Actions artifact. The job has no package or release publication permission.
@@ -116,18 +116,17 @@ The first formal Stable line is fixed before any candidate is dispatched:
 - Stable BOM key id `stable-2026-01`, valid from sequence `1`;
 - Relay repository `ghcr.io/jczhang02/lyntty-relay`.
 
-There is no predecessor BOM for sequence 1. Candidate enforces `versionCode > 5` in that case so the exact Stable APK upgrades the existing production package. Before Promotion, reviewers must verify the native staging attestations, Candidate evidence, exact APK hash, physical Android result, release body, and the protected environment configuration. The first production Relay rollout also requires a separately verified pre-deploy backup/sidecar and a digest-pinned existing image because a signed predecessor rollback BOM does not yet exist.
+There is no predecessor BOM for sequence 1. Candidate enforces `versionCode > 5` in that case so the exact Stable APK upgrades the existing production package. Before Promotion, the owner must verify the Candidate evidence, unsigned-platform disclosure, exact APK hash, physical Android result, release body, and protected environment configuration. The first production Relay rollout also requires a separately verified pre-deploy backup/sidecar and a digest-pinned existing image because a signed predecessor rollback BOM does not yet exist.
 
 ## Required repository settings
 
 Workflow files cannot create environment protection rules. Before publication, repository administration must configure:
 
-- required reviewers with self-review disabled for `release-stable`, `release-preview`, `release-stable-candidate`, `release-preview-candidate`, `release-native-signing`, `production-android`, and `production-relay`;
-- `main`-only deployment branch policies and required CODEOWNERS review for release trust inputs;
+- explicit owner approval for `release-stable`, `release-preview`, `release-stable-candidate`, `release-preview-candidate`, `production-android`, and `production-relay`;
+- `main`-only deployment branch policies and protected-PR checks for release trust inputs;
 - Stable/Preview BOM secrets and public trust-root variables in their own environments;
-- permanent Android signing/Firebase/Expo/certificate-pin values only in Stable candidate environments;
-- immutable macOS/Windows archive URL/hash values plus a protected `release-native-signing` environment with Apple account/app password, Developer ID P12/password, Team/signing authority, Windows code-signing PFX/password, certificate thumbprint, and HTTPS RFC3161 timestamp URL; missing native production or independent verification blocks Stable;
-- active no-bypass update/deletion rulesets for `compat-v*` and `native-signing-*`, repository variables containing their IDs, and immutable GitHub Releases;
+- permanent Android signing/Firebase/Expo/certificate-pin values available only to protected release jobs;
+- active no-bypass update/deletion rulesets for `compat-v*`, its repository variable, and immutable GitHub Releases;
 - pinned `LYNTTY_VPS_KNOWN_HOSTS` for Relay deploy.
 
-Missing protection, signing, attestation, or platform-native credentials is a release blocker, not a reason to publish a partially trusted Stable artifact.
+Apple Developer ID/notarization and Windows Authenticode credentials are not required for this owner-operated self-use Stable line. The Release body and provenance must disclose that those archives are platform-unsigned. Missing BOM signing, Android signing continuity, checksums, provenance, attestations, protection, or Relay trust inputs remains a release blocker.

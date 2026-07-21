@@ -159,11 +159,6 @@ jobs:
           git fetch --no-tags origin main
           [[ "$source_sha" == "$(git rev-parse origin/main)" ]] || { echo 'candidate source is no longer current protected main' >&2; exit 1; }
           if [[ "$CHANNEL" == stable ]]; then
-            for native_archive in "$CANDIDATE/cli/"*darwin-*.tar.gz "$CANDIDATE/cli/"*windows-x64.zip; do
-              [[ -f "$native_archive" ]]
-              gh attestation verify "$native_archive" --repo "$GITHUB_REPOSITORY" --source-digest "$source_sha" \
-                --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/native-signing.yml" --signer-digest "$source_sha" >/dev/null
-            done
             stable_apk="$CANDIDATE/app/lyntty-stable.apk"
             [[ -f "$stable_apk" ]]
             actual_android_apk_sha256="$(sha256sum "$stable_apk" | awk '{print $1}')"
@@ -396,6 +391,7 @@ jobs:
             echo "Relay: \`${{ steps.image.outputs.repository }}@${{ steps.image.outputs.digest }}\`"
             if [[ "$CHANNEL" == stable ]]; then
               echo "Physical Android validation: accepted for APK SHA-256 \`$ACCEPTED_ANDROID_APK_SHA256\`"
+              echo 'macOS and Windows CLI archives: intentionally not platform code-signed for this owner-operated self-use release.'
             fi
             echo
             if [[ "$CHANNEL" == stable ]]; then

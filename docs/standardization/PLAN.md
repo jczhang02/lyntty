@@ -91,9 +91,9 @@ The supported components are independently versioned:
 - Run critical Maestro shared-control, restart, ownership, and `history_gap` paths.
 - Prove PGlite/PostgreSQL upgrade and rollback with preserved data.
 - Run supported-platform artifact/service smoke tests.
-- Obtain independent zero-P0/P1 review and merge through the protected PR.
+- Obtain zero-P0/P1 review and merge through the protected PR.
 
-macOS Developer ID/notarization, Windows Authenticode, production Android signing, and production Relay rollout are explicit external gates. Missing credentials block only the corresponding stable platform or production deployment; they are never replaced with unsigned artifacts presented as stable.
+Production Android signing and production Relay rollout remain explicit external gates. For the owner-operated self-use Stable line, macOS Developer ID/notarization and Windows Authenticode are explicitly not required; those archives remain in the five-platform matrix but must be disclosed as platform-unsigned and protected by exact hashes, manifests, signed BOM, provenance, and GitHub attestations.
 
 ## Verification
 

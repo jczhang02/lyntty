@@ -89,9 +89,6 @@ export function createCompatibilityBomFixture(options: {
           ...immutableFile(`lyntty-${target}${target === 'windows-x64' ? '.zip' : '.tar.gz'}`, tag),
           target,
           artifactManifestSha256: 'b'.repeat(64),
-          ...(channel === 'stable' && (target.startsWith('darwin-') || target === 'windows-x64')
-            ? { nativeSigningAttestation: immutableFile(`native-${target}-attestation.json`, tag, 'c'.repeat(64)) }
-            : {}),
         })),
       },
       relay: {
