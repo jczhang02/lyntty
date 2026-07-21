@@ -196,9 +196,28 @@ jobs:
           cd /opt/lyntty
           test -f .env
           test -f docker-compose.yml
+          test -d /opt/lyntty/backups
           [[ ! -L .env ]]
+          [[ ! -L docker-compose.yml ]]
+          [[ ! -L /opt/lyntty/backups ]]
+          [[ "$(stat -c '%U' /opt/lyntty/backups)" == root ]]
+          [[ -w /opt/lyntty/backups ]]
           [[ ! -L .env-canonicalization.log && ( ! -e .env-canonicalization.log || -f .env-canonicalization.log ) ]]
           [[ "$(stat -c '%U:%a' .env)" == root:600 ]]
+          [[ "$(stat -c '%U:%a' docker-compose.yml)" == root:600 ]]
+          [[ "$(tail -c 1 .env | od -An -t u1 | tr -d ' ')" == 10 ]]
+          [[ "$(tail -c 1 docker-compose.yml | od -An -t u1 | tr -d ' ')" == 10 ]]
+          incomplete_marker=.migration-incomplete
+          rollback_marker=.rollback-incomplete
+          [[ ! -e "$incomplete_marker" && ! -L "$incomplete_marker" ]] || { echo 'incomplete Relay migration marker exists; restore/verify explicitly before retrying' >&2; exit 1; }
+          [[ ! -e "$rollback_marker" && ! -L "$rollback_marker" ]] || { echo 'incomplete pre-migration rollback marker exists; repair the prior runtime explicitly' >&2; exit 1; }
+          compose() {
+            env -u COMPOSE_FILE -u COMPOSE_PATH_SEPARATOR -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES \
+              -u LYNTTY_MASTER_SECRET -u HANDY_MASTER_SECRET -u LYNTTY_RELAY_IMAGE \
+              -u LYNTTY_RELEASE_TRUST_ROOTS -u LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE \
+              docker compose --project-directory /opt/lyntty --project-name lyntty \
+              --file /opt/lyntty/docker-compose.yml --env-file /opt/lyntty/.env "$@"
+          }
           restore_env_backup() {
             local backup="$1" restore_path
             restore_path="$(mktemp -p . .env-restore-XXXXXXXX)"
@@ -252,10 +271,7 @@ jobs:
               echo "$key must have exactly one canonical, exported, or unique supported legacy assignment (assignments=$assignment_count canonical=$canonical_count exported=$exported_count legacy_assignments=$legacy_assignment_count legacy_canonical=$legacy_canonical_count legacy_exported=$legacy_exported_count)" >&2
               return 1
             fi
-            if [[ "$source_key" != "$key" ]] && ! env \
-              -u LYNTTY_MASTER_SECRET -u HANDY_MASTER_SECRET -u LYNTTY_RELAY_IMAGE \
-              -u LYNTTY_RELEASE_TRUST_ROOTS -u LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE \
-              docker compose --env-file .env config --format json 2>/dev/null \
+            if [[ "$source_key" != "$key" ]] && ! compose config --format json 2>/dev/null \
               | jq -e --arg key "$key" '.services["lyntty-relay"].environment | has($key) | not' >/dev/null; then
               echo "Docker Compose already resolves $key or could not prove its absence; refusing legacy rename" >&2
               return 1
@@ -297,10 +313,7 @@ jobs:
               normalized=true
             fi
             unset before_value after_value
-            if ! parsed_value="$(env \
-              -u LYNTTY_MASTER_SECRET -u HANDY_MASTER_SECRET -u LYNTTY_RELAY_IMAGE \
-              -u LYNTTY_RELEASE_TRUST_ROOTS -u LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE \
-              docker compose --env-file .env config --format json 2>/dev/null \
+            if ! parsed_value="$(compose config --format json 2>/dev/null \
               | jq -er --arg key "$key" '
                   if $key == "LYNTTY_MASTER_SECRET" then .services["lyntty-relay"].environment[$key]
                   elif $key == "LYNTTY_RELAY_IMAGE" then .services["lyntty-relay"].image
@@ -329,7 +342,244 @@ jobs:
               chmod 600 .env-canonicalization.log
             fi
           }
+          restore_private_backup() {
+            local backup="$1" target="$2" restore_path
+            restore_path="$(mktemp -p . ".$(basename "$target").restore-XXXXXXXX")"
+            if ! cp --preserve=mode,ownership,timestamps "$backup" "$restore_path" \
+              || ! chmod 600 "$restore_path" \
+              || ! mv -f -- "$restore_path" "$target"; then
+              rm -f "$restore_path"
+              return 1
+            fi
+            cmp -s "$backup" "$target" || return 1
+            [[ "$(stat -c '%U:%a' "$target")" == root:600 ]] || return 1
+          }
+          migrate_legacy_relay_image_layout() {
+            local expected_tag='ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927'
+            local target_key=LYNTTY_RELAY_IMAGE legacy_tag_key=LYNTTY_RELAY_IMAGE_TAG source_form
+            local assignment_count canonical_count legacy_tag_assignment_count legacy_tag_canonical_count
+            local services_key_count service_key_count raw_image_count strict_image_count data_mount_count backup_target_count backup_mount_count
+            local rendered_json configured_reference raw_reference container container_reference container_image_id configured_image_id
+            local repo_digests repo_tags previous_reference previous_image_id env_value
+            local -a legacy_containers=()
+            local env_backup compose_backup env_stage compose_stage source_projection stage_projection staged_json image_indent original_image_line
+            assignment_count="$(grep -Ec "^[[:space:]]*(export[[:space:]]+)?${target_key}([[:space:]]*=|[[:space:]]+)" .env || true)"
+            canonical_count="$(grep -c "^${target_key}=" .env || true)"
+            legacy_tag_assignment_count="$(grep -Ec "^[[:space:]]*(export[[:space:]]+)?${legacy_tag_key}([[:space:]]*=|[[:space:]]+)" .env || true)"
+            legacy_tag_canonical_count="$(grep -c "^${legacy_tag_key}=" .env || true)"
+            if LC_ALL=C grep -q $'\357\273\277\|\r\|\t' docker-compose.yml \
+              || [[ "$(wc -c < docker-compose.yml)" != "$(LC_ALL=C tr -d '\000' < docker-compose.yml | wc -c)" ]]; then
+              echo 'legacy Relay Compose contains a forbidden BOM, CR, tab, or NUL byte' >&2
+              return 1
+            fi
+            if grep -Eq "\\\\|^[[:space:]]*\\?|(^|[[:space:]])![^[:space:]]|(^|[[:space:]])[&*][A-Za-z0-9_-]+|^[[:space:]]*<<[[:space:]]*:|^[[:space:]]*['\"]?(include|extends)['\"]?[[:space:]]*:|^%" docker-compose.yml; then
+              echo 'legacy Relay Compose may not use includes, extensions, directives, anchors, aliases, or merges' >&2
+              return 1
+            fi
+            services_key_count="$(grep -Ec "^[[:space:]]*['\"]?services['\"]?[[:space:]]*:" docker-compose.yml || true)"
+            service_key_count="$(grep -Ec "^[[:space:]]*['\"]?lyntty-relay['\"]?[[:space:]]*:" docker-compose.yml || true)"
+            [[ "$services_key_count" == 1 && "$(grep -c '^services:$' docker-compose.yml || true)" == 1 ]]
+            [[ "$service_key_count" == 1 && "$(grep -c '^  lyntty-relay:$' docker-compose.yml || true)" == 1 ]]
+            raw_image_count="$(grep -Ec "^[[:space:]]*['\"]?image['\"]?[[:space:]]*:" docker-compose.yml || true)"
+            strict_image_count="$(grep -Ec '^    image: [^[:space:]#]+$' docker-compose.yml || true)"
+            [[ "$raw_image_count" == 1 && "$strict_image_count" == 1 ]] || {
+              echo 'legacy Relay Compose must contain exactly one canonical image scalar' >&2
+              return 1
+            }
+            data_mount_count="$(grep -c '^      - /opt/lyntty/data:/data$' docker-compose.yml || true)"
+            backup_target_count="$(grep -Ec '^[[:space:]]*-[[:space:]]*[^#[:space:]]+:/backups([[:space:]]|$)' docker-compose.yml || true)"
+            backup_mount_count="$(grep -c '^      - /opt/lyntty/backups:/backups$' docker-compose.yml || true)"
+            [[ "$data_mount_count" == 1 ]]
+            [[ "$backup_target_count" == "$backup_mount_count" && "$backup_mount_count" -le 1 ]] || {
+              echo 'Relay Compose has an ambiguous /backups mount' >&2
+              return 1
+            }
+            original_image_line="$(grep -E '^    image: [^[:space:]#]+$' docker-compose.yml)"
+            raw_reference="${original_image_line#    image: }"
+            if ! rendered_json="$(compose config --format json 2>/dev/null)"; then
+              echo 'legacy Relay Compose could not be rendered' >&2
+              return 1
+            fi
+            jq -e '.services | type == "object" and keys == ["lyntty-relay"]' <<< "$rendered_json" >/dev/null
+            configured_reference="$(jq -er '.services["lyntty-relay"].image' <<< "$rendered_json")"
+            jq -e --argjson backups "$backup_mount_count" '
+                .services["lyntty-relay"].volumes as $volumes
+                | ([ $volumes[] | select(.type == "bind" and .source == "/opt/lyntty/data" and .target == "/data") ] | length) == 1
+                  and ([ $volumes[] | select(.target == "/backups") ] | length) == $backups
+                  and ([ $volumes[] | select(.target == "/backups" and .type == "bind" and .source == "/opt/lyntty/backups") ] | length) == $backups
+              ' <<< "$rendered_json" >/dev/null
+            if [[ "$raw_reference" == '${LYNTTY_RELAY_IMAGE}' ]]; then
+              [[ "$assignment_count" == 1 ]] || { echo 'canonical Relay Compose requires exactly one image assignment' >&2; return 1; }
+              [[ "$legacy_tag_assignment_count" == 0 || "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]] || {
+                echo 'canonical Relay Compose has an invalid legacy image-tag retry state' >&2
+                return 1
+              }
+              if [[ "$legacy_tag_assignment_count" == 1 ]]; then
+                [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]]
+              fi
+              [[ "$backup_mount_count" == 1 ]] || { echo 'canonical Relay Compose requires the persistent backup mount' >&2; return 1; }
+              [[ "$configured_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]] || {
+                echo 'canonical Relay Compose did not resolve an exact repository digest' >&2
+                return 1
+              }
+              unset rendered_json
+              return 0
+            fi
+            if [[ "$raw_reference" == 'ghcr.io/jczhang02/lyntty-relay:${LYNTTY_RELAY_IMAGE_TAG}' ]]; then
+              source_form=legacy-compose-tag-variable
+              [[ "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]]
+              [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]]
+            elif [[ "$raw_reference" == "$expected_tag" ]]; then
+              source_form=legacy-compose-hardcoded-tag
+              [[ "$legacy_tag_assignment_count" == 0 || "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]] || return 1
+              if [[ "$legacy_tag_assignment_count" == 1 ]]; then
+                [[ "$(sed -n "s/^${legacy_tag_key}=//p" .env)" == sha-9752c689c927 ]]
+              fi
+            else
+              echo 'legacy Relay Compose image is not the documented R65 source tag' >&2
+              return 1
+            fi
+            [[ "$configured_reference" == "$expected_tag" ]] || {
+              echo 'rendered Relay image differs from the documented R65 source tag' >&2
+              return 1
+            }
+            unset rendered_json
+            [[ "$assignment_count" == 0 || "$assignment_count" == 1 && "$canonical_count" == 1 ]] || {
+              echo 'legacy Relay image migration requires an absent or one canonical target assignment' >&2
+              return 1
+            }
+            mapfile -t legacy_containers < <(compose ps -q lyntty-relay)
+            [[ "${#legacy_containers[@]}" == 1 ]]
+            container="${legacy_containers[0]}"
+            [[ "$(docker inspect --format '{{.State.Running}}' "$container")" == true ]]
+            container_reference="$(docker inspect --format '{{.Config.Image}}' "$container")"
+            [[ "$container_reference" == "$expected_tag" ]]
+            container_image_id="$(docker inspect --format '{{.Image}}' "$container")"
+            [[ "$container_image_id" =~ ^sha256:[a-f0-9]{64}$ ]]
+            configured_image_id="$(docker image inspect --format '{{.Id}}' "$configured_reference")"
+            [[ "$configured_image_id" == "$container_image_id" ]]
+            repo_digests="$(docker image inspect --format '{{json .RepoDigests}}' "$container_image_id")"
+            jq -e 'type == "array" and length == 1' <<< "$repo_digests" >/dev/null
+            previous_reference="$(jq -er '.[0]' <<< "$repo_digests")"
+            [[ "$previous_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]]
+            repo_tags="$(docker image inspect --format '{{json .RepoTags}}' "$container_image_id")"
+            jq -e --arg expected "$expected_tag" \
+              'type == "array" and length >= 1 and index($expected) != null and all(.[]; test("^ghcr\\.io/jczhang02/lyntty-relay:[0-9A-Za-z._-]+$"))' \
+              <<< "$repo_tags" >/dev/null
+            docker pull "$previous_reference" >/dev/null
+            previous_image_id="$(docker image inspect --format '{{.Id}}' "$previous_reference")"
+            [[ "$previous_image_id" == "$container_image_id" ]]
+            if [[ "$assignment_count" == 1 ]]; then
+              env_value="$(sed -n "s/^${target_key}=//p" .env)"
+              [[ "$env_value" == "$previous_reference" ]] || {
+                echo 'interrupted legacy Relay image migration has a mismatched target digest' >&2
+                return 1
+              }
+              unset env_value
+            fi
+
+            env_backup="$(mktemp -p . ".env-precanonical-${target_key}-XXXXXXXX")"
+            compose_backup="$(mktemp -p . ".compose-precanonical-${target_key}-XXXXXXXX")"
+            cp --preserve=mode,ownership,timestamps .env "$env_backup"
+            cp --preserve=mode,ownership,timestamps docker-compose.yml "$compose_backup"
+            chmod 600 "$env_backup" "$compose_backup"
+            cmp -s .env "$env_backup"
+            cmp -s docker-compose.yml "$compose_backup"
+
+            env_stage="$(mktemp -p . ".env-image-layout-XXXXXXXX")"
+            compose_stage="$(mktemp -p . ".compose-image-layout-XXXXXXXX")"
+            source_projection="$(mktemp -p . ".compose-source-projection-XXXXXXXX")"
+            stage_projection="$(mktemp -p . ".compose-stage-projection-XXXXXXXX")"
+            grep -vE "^${target_key}=" .env > "$env_stage"
+            printf '%s=%s\n' "$target_key" "$previous_reference" >> "$env_stage"
+            grep -vE "^${target_key}=" .env > "$source_projection"
+            grep -vE "^${target_key}=" "$env_stage" > "$stage_projection"
+            cmp -s "$source_projection" "$stage_projection"
+            image_indent="${original_image_line%%image:*}"
+            awk -v replacement="${image_indent}image: \${LYNTTY_RELAY_IMAGE}" -v add_backup="$((backup_mount_count == 0 ? 1 : 0))" '
+              /^[[:space:]]*image[[:space:]]*:/ { count += 1; print replacement; next }
+              /^      - \/opt\/lyntty\/data:\/data$/ { print; if (add_backup == 1) print "      - /opt/lyntty/backups:/backups"; next }
+              { print }
+              END { if (count != 1) exit 42 }
+            ' docker-compose.yml > "$compose_stage"
+            grep -vE '^    image:|^      - /opt/lyntty/backups:/backups$' docker-compose.yml > "$source_projection"
+            grep -vE '^    image:|^      - /opt/lyntty/backups:/backups$' "$compose_stage" > "$stage_projection"
+            cmp -s "$source_projection" "$stage_projection"
+            [[ "$(grep -c '^    image: \${LYNTTY_RELAY_IMAGE}$' "$compose_stage" || true)" == 1 ]]
+            [[ "$(grep -c '^      - /opt/lyntty/backups:/backups$' "$compose_stage" || true)" == 1 ]]
+            [[ "$(grep -Ec "^(${target_key})=" "$env_stage" || true)" == 1 ]]
+            [[ "$(grep -Ec "^(${legacy_tag_key})=" "$env_stage" || true)" == "$legacy_tag_assignment_count" ]]
+            chown --reference=.env "$env_stage"
+            chown --reference=docker-compose.yml "$compose_stage"
+            chmod 600 "$env_stage" "$compose_stage"
+            staged_json="$(env -u COMPOSE_FILE -u COMPOSE_PATH_SEPARATOR -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES \
+              -u LYNTTY_MASTER_SECRET -u HANDY_MASTER_SECRET -u LYNTTY_RELAY_IMAGE \
+              docker compose --project-directory /opt/lyntty --project-name lyntty \
+              --file "$compose_stage" --env-file "$env_stage" config --format json 2>/dev/null)"
+            jq -e --arg image "$previous_reference" \
+              '.services | type == "object" and keys == ["lyntty-relay"] and .["lyntty-relay"].image == $image
+                and ([ .["lyntty-relay"].volumes[] | select(.target == "/backups" and .type == "bind" and .source == "/opt/lyntty/backups") ] | length) == 1' \
+              <<< "$staged_json" >/dev/null
+            unset staged_json
+
+            LEGACY_IMAGE_ENV_BACKUP="$env_backup"
+            LEGACY_IMAGE_COMPOSE_BACKUP="$compose_backup"
+            LEGACY_IMAGE_CONTAINER="$container"
+            LEGACY_IMAGE_CONTAINER_ID="$container_image_id"
+            LEGACY_IMAGE_EXPECTED_TAG="$expected_tag"
+            LEGACY_IMAGE_ENV_STAGE="$env_stage"
+            LEGACY_IMAGE_COMPOSE_STAGE="$compose_stage"
+            LEGACY_IMAGE_SOURCE_PROJECTION="$source_projection"
+            LEGACY_IMAGE_STAGE_PROJECTION="$stage_projection"
+            LEGACY_IMAGE_MIGRATION_COMMITTED=false
+            rollback_legacy_image_layout() {
+              local original_status=$? rollback_failed=false
+              trap - EXIT HUP INT TERM
+              rm -f "$LEGACY_IMAGE_ENV_STAGE" "$LEGACY_IMAGE_COMPOSE_STAGE" "$LEGACY_IMAGE_SOURCE_PROJECTION" "$LEGACY_IMAGE_STAGE_PROJECTION"
+              if [[ "$LEGACY_IMAGE_MIGRATION_COMMITTED" != true ]]; then
+                restore_private_backup "$LEGACY_IMAGE_COMPOSE_BACKUP" docker-compose.yml || rollback_failed=true
+                restore_private_backup "$LEGACY_IMAGE_ENV_BACKUP" .env || rollback_failed=true
+                if [[ "$rollback_failed" == false ]]; then
+                  [[ "$(compose config --format json 2>/dev/null | jq -er '.services["lyntty-relay"].image')" == "$LEGACY_IMAGE_EXPECTED_TAG" ]] || rollback_failed=true
+                  [[ "$(docker inspect --format '{{.State.Running}} {{.Image}}' "$LEGACY_IMAGE_CONTAINER")" == "true $LEGACY_IMAGE_CONTAINER_ID" ]] || rollback_failed=true
+                fi
+                if [[ "$rollback_failed" == true ]]; then
+                  printf '%s legacy-image-layout-restore-failed\n' "$BOM_TAG" > "$rollback_marker"
+                  chmod 600 "$rollback_marker"
+                  echo 'legacy Relay image-layout restoration failed; retry is blocked' >&2
+                fi
+              fi
+              exit "$original_status"
+            }
+            trap rollback_legacy_image_layout EXIT
+            trap 'exit 130' HUP INT TERM
+            mv -f -- "$env_stage" .env
+            LEGACY_IMAGE_ENV_STAGE=
+            mv -f -- "$compose_stage" docker-compose.yml
+            LEGACY_IMAGE_COMPOSE_STAGE=
+            rm -f "$source_projection" "$stage_projection"
+            LEGACY_IMAGE_SOURCE_PROJECTION=
+            LEGACY_IMAGE_STAGE_PROJECTION=
+            [[ "$(stat -c '%U:%a' .env)" == root:600 ]]
+            [[ "$(stat -c '%U:%a' docker-compose.yml)" == root:600 ]]
+            [[ "$(compose config --format json 2>/dev/null | jq -er '.services["lyntty-relay"].image')" == "$previous_reference" ]]
+            compose config --format json 2>/dev/null | jq -e '
+              [ .services["lyntty-relay"].volumes[] | select(.target == "/backups" and .type == "bind" and .source == "/opt/lyntty/backups") ] | length == 1
+            ' >/dev/null
+            [[ "$(docker image inspect --format '{{.Id}}' "$previous_reference")" == "$container_image_id" ]]
+            [[ "$(docker inspect --format '{{.State.Running}} {{.Image}}' "$container")" == "true $container_image_id" ]]
+            printf '%s key=%s source_form=%s target_form=env-digest compose_backup=%s env_backup=%s\n' \
+              "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$target_key" "$source_form" "$(basename "$compose_backup")" "$(basename "$env_backup")" \
+              >> .env-canonicalization.log
+            chmod 600 .env-canonicalization.log
+            LEGACY_IMAGE_MIGRATION_COMMITTED=true
+            trap - EXIT HUP INT TERM
+            unset LEGACY_IMAGE_ENV_BACKUP LEGACY_IMAGE_COMPOSE_BACKUP LEGACY_IMAGE_CONTAINER LEGACY_IMAGE_CONTAINER_ID LEGACY_IMAGE_EXPECTED_TAG
+            unset LEGACY_IMAGE_ENV_STAGE LEGACY_IMAGE_COMPOSE_STAGE LEGACY_IMAGE_SOURCE_PROJECTION LEGACY_IMAGE_STAGE_PROJECTION
+            unset LEGACY_IMAGE_MIGRATION_COMMITTED
+          }
           canonicalize_required_assignment LYNTTY_MASTER_SECRET HANDY_MASTER_SECRET
+          migrate_legacy_relay_image_layout
           canonicalize_required_assignment LYNTTY_RELAY_IMAGE
           [[ "$(stat -c '%U:%a' .env)" == root:600 ]]
           for key in LYNTTY_RELEASE_TRUST_ROOTS LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE; do
@@ -346,10 +596,6 @@ jobs:
           [[ "$(grep -c '^LYNTTY_RELEASE_TRUST_ROOTS=' .env || true)" -le 1 ]]
           [[ "$(grep -c '^LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE=' .env || true)" -le 1 ]]
           unset master_secret
-          incomplete_marker=.migration-incomplete
-          rollback_marker=.rollback-incomplete
-          [[ ! -e "$incomplete_marker" ]] || { echo 'incomplete Relay migration marker exists; restore/verify explicitly before retrying' >&2; exit 1; }
-          [[ ! -e "$rollback_marker" ]] || { echo 'incomplete pre-migration rollback marker exists; repair the prior runtime explicitly' >&2; exit 1; }
           verify_image_identity() {
             local revision version_json
             revision="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_REFERENCE")"
@@ -360,9 +606,9 @@ jobs:
           verify_running_release() {
             local container configured_image response
             verify_image_identity
-            configured_image="$(docker compose config --images | grep -Fx "$IMAGE_REFERENCE" | wc -l)"
+            configured_image="$(compose config --images | grep -Fx "$IMAGE_REFERENCE" | wc -l)"
             [[ "$configured_image" == 1 ]]
-            container="$(docker compose ps -q lyntty-relay)"
+            container="$(compose ps -q lyntty-relay)"
             [[ -n "$container" ]]
             [[ "$(docker inspect --format '{{.State.Running}}' "$container")" == true ]]
             [[ "$(docker inspect --format '{{.Config.Image}}' "$container")" == "$IMAGE_REFERENCE" ]]
@@ -378,14 +624,18 @@ jobs:
               <<< "$response" >/dev/null
           }
           verify_previous_runtime() {
-            local container configured_image
-            configured_image="$(docker compose config --images | grep -Fx "$previous_reference" | wc -l)"
-            [[ "$configured_image" == 1 ]]
-            container="$(docker compose ps -q lyntty-relay)"
-            [[ -n "$container" ]]
-            [[ "$(docker inspect --format '{{.State.Running}}' "$container")" == true ]]
-            [[ "$(docker inspect --format '{{.Config.Image}}' "$container")" == "$previous_reference" ]]
-            curl -fsS http://127.0.0.1:3005/health >/dev/null
+            local container configured_image container_reference container_image_id reference_image_id
+            configured_image="$(compose config --images | grep -Fx "$previous_reference" | wc -l)" || return 1
+            [[ "$configured_image" == 1 ]] || return 1
+            container="$(compose ps -q lyntty-relay)" || return 1
+            [[ -n "$container" ]] || return 1
+            [[ "$(docker inspect --format '{{.State.Running}}' "$container")" == true ]] || return 1
+            container_reference="$(docker inspect --format '{{.Config.Image}}' "$container")" || return 1
+            [[ "$container_reference" == "$previous_reference" || "$container_reference" == ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927 ]] || return 1
+            container_image_id="$(docker inspect --format '{{.Image}}' "$container")" || return 1
+            reference_image_id="$(docker image inspect --format '{{.Id}}' "$previous_reference")" || return 1
+            [[ "$container_image_id" == "$reference_image_id" ]] || return 1
+            curl -fsS http://127.0.0.1:3005/health >/dev/null || return 1
           }
           deployed_sequence=0
           [[ ! -f deployed-sequence.txt ]] || deployed_sequence="$(cat deployed-sequence.txt)"
@@ -403,8 +653,39 @@ jobs:
             exit 1
           }
           verify_previous_runtime
-          previous_env="$(mktemp /opt/lyntty/.env.predeploy.XXXXXX)"
-          cp --preserve=mode,ownership,timestamps .env "$previous_env"
+          legacy_rollback_override="$(mktemp -p . .rollback-master-compat.XXXXXX.yml)"
+          cat > "$legacy_rollback_override" <<'YAML'
+          services:
+            lyntty-relay:
+              environment:
+                HANDY_MASTER_SECRET: ${LYNTTY_MASTER_SECRET}
+          YAML
+          chown root:root "$legacy_rollback_override"
+          chmod 600 "$legacy_rollback_override"
+          compose_with_legacy_master() {
+            env -u COMPOSE_FILE -u COMPOSE_PATH_SEPARATOR -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES \
+              -u LYNTTY_MASTER_SECRET -u HANDY_MASTER_SECRET -u LYNTTY_RELAY_IMAGE \
+              docker compose --project-directory /opt/lyntty --project-name lyntty \
+              --file /opt/lyntty/docker-compose.yml --file "$legacy_rollback_override" --env-file /opt/lyntty/.env "$@"
+          }
+          if ! rollback_compat_json="$(compose_with_legacy_master config --format json 2>/dev/null)" \
+            || ! jq -e '
+              .services["lyntty-relay"].environment as $environment
+              | ($environment.LYNTTY_MASTER_SECRET | type == "string" and length > 0)
+                and $environment.HANDY_MASTER_SECRET == $environment.LYNTTY_MASTER_SECRET
+            ' <<< "$rollback_compat_json" >/dev/null; then
+            rm -f "$legacy_rollback_override"
+            unset rollback_compat_json
+            echo 'prior Relay compatibility override could not be validated' >&2
+            exit 1
+          fi
+          unset rollback_compat_json
+          if ! previous_env="$(mktemp -p . .env.predeploy.XXXXXX)" \
+            || ! cp --preserve=mode,ownership,timestamps .env "$previous_env"; then
+            rm -f "${previous_env:-}" "$legacy_rollback_override"
+            echo 'prior Relay environment could not be staged for rollback' >&2
+            exit 1
+          fi
           env_next=
           schema_mutation_started=false
           success=false
@@ -420,33 +701,37 @@ jobs:
             [[ -z "$env_next" ]] || remove_private_file "$env_next"
             if [[ "$success" == true ]]; then
               remove_private_file "$previous_env"
+              remove_private_file "$legacy_rollback_override"
               exit "$original_status"
             fi
-            docker compose stop lyntty-relay >/dev/null 2>&1 || true
+            compose stop lyntty-relay >/dev/null 2>&1 || true
             if [[ "$schema_mutation_started" == false ]]; then
               if ! mv -f "$previous_env" .env; then rollback_failed=true; fi
               if [[ "$rollback_failed" == false ]]; then
                 chmod 600 .env
-                docker compose pull lyntty-relay || rollback_failed=true
-                docker compose up -d lyntty-relay || rollback_failed=true
+                compose_with_legacy_master pull lyntty-relay || rollback_failed=true
+                compose_with_legacy_master up -d lyntty-relay || rollback_failed=true
                 verify_previous_runtime || rollback_failed=true
               fi
               if [[ "$rollback_failed" == true ]]; then
                 printf '%s %s pre-migration-restore-failed\n' "$BOM_TAG" "$previous_reference" > "$rollback_marker"
                 chmod 600 "$rollback_marker"
                 echo 'Pre-migration Relay rollback failed; Relay state is not accepted and .rollback-incomplete blocks retries.' >&2
+              else
+                remove_private_file "$legacy_rollback_override"
               fi
             else
               remove_private_file "$previous_env"
+              remove_private_file "$legacy_rollback_override"
               echo 'Relay remains fail-stopped after migration began; verify backup/restore and doctor before any restart.' >&2
             fi
             exit "$original_status"
           }
           trap rollback_environment EXIT
           trap 'exit 130' HUP INT TERM
-          docker compose stop lyntty-relay
+          compose stop lyntty-relay
           env_next="$(mktemp /opt/lyntty/.env.next.XXXXXX)"
-          grep -vE '^(LYNTTY_RELAY_IMAGE|LYNTTY_RELEASE_TRUST_ROOTS|LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE)=' .env > "$env_next"
+          grep -vE '^(LYNTTY_RELAY_IMAGE|LYNTTY_RELAY_IMAGE_TAG|LYNTTY_RELEASE_TRUST_ROOTS|LYNTTY_STABLE_MINIMUM_BOM_SEQUENCE)=' .env > "$env_next"
           {
             printf 'LYNTTY_RELAY_IMAGE=%s\n' "$IMAGE_REFERENCE"
             printf 'LYNTTY_RELEASE_TRUST_ROOTS=%s\n' "$TRUST_ROOTS"
@@ -457,11 +742,11 @@ jobs:
           mv -f "$env_next" .env
           env_next=
           [[ "$(printf '%s' "$(sed -n 's/^LYNTTY_RELEASE_TRUST_ROOTS=//p' .env | tail -1)" | sha256sum | awk '{print $1}')" == "$TRUST_ROOTS_SHA256" ]]
-          [[ "$(docker compose config --images | grep -Fx "$IMAGE_REFERENCE" | wc -l)" == 1 ]]
-          docker compose pull lyntty-relay
+          [[ "$(compose config --images | grep -Fx "$IMAGE_REFERENCE" | wc -l)" == 1 ]]
+          compose pull lyntty-relay
           verify_image_identity
           backup="/backups/predeploy-${BOM_TAG}-$(date -u +%Y%m%dT%H%M%SZ).backup"
-          docker compose run --rm -T lyntty-relay backup "$backup" </dev/null
+          compose run --rm -T lyntty-relay backup "$backup" </dev/null
           host_backup="/opt/lyntty${backup}"
           test -s "$host_backup"
           test -s "${host_backup}.sha256"
@@ -470,9 +755,9 @@ jobs:
           chmod 600 "${incomplete_marker}.tmp"
           mv "${incomplete_marker}.tmp" "$incomplete_marker"
           schema_mutation_started=true
-          docker compose run --rm -T lyntty-relay migrate </dev/null
-          docker compose run --rm -T lyntty-relay doctor </dev/null
-          docker compose up -d lyntty-relay
+          compose run --rm -T lyntty-relay migrate </dev/null
+          compose run --rm -T lyntty-relay doctor </dev/null
+          compose up -d lyntty-relay
           deadline=$((SECONDS + 90))
           until curl -fsS http://127.0.0.1:3005/health >/dev/null; do
             if (( SECONDS >= deadline )); then
@@ -496,8 +781,9 @@ jobs:
           success=true
           rm -f "$incomplete_marker"
           remove_private_file "$previous_env"
+          remove_private_file "$legacy_rollback_override"
           trap - EXIT HUP INT TERM
-          docker compose ps
+          compose ps
           REMOTE
 
       - name: Verify public Relay serves the deployed signed BOM
