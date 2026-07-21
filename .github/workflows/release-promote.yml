@@ -312,7 +312,8 @@ jobs:
           cp "$CANDIDATE/evidence/"*.spdx.json "$CANDIDATE/evidence/"*.intoto.json \
             "$CANDIDATE/evidence/android-exec-audit.txt" "$CANDIDATE/evidence/android-apk-audit.txt" \
             "$CANDIDATE/evidence/cli-self-check.json" "$CANDIDATE/evidence/relay-build-info.json" \
-            "$CANDIDATE/evidence/relay-schema-doctor.json" "$CANDIDATE/evidence/retained-runtime-verification.json" "$assets/"
+            "$CANDIDATE/evidence/relay-schema-doctor.json" "$CANDIDATE/evidence/relay-oci-platforms.json" \
+            "$CANDIDATE/evidence/retained-runtime-verification.json" "$assets/"
           if compgen -G "$CANDIDATE/evidence/native-*-attestation.json" >/dev/null; then
             cp "$CANDIDATE/evidence/"native-*-attestation.json "$assets/"
           fi

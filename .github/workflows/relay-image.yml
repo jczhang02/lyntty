@@ -25,6 +25,12 @@ jobs:
           platforms: arm64
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Set up Syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
       - name: Build Relay image without publishing
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
@@ -32,11 +38,46 @@ jobs:
           file: ./Dockerfile
           push: false
           platforms: linux/amd64,linux/arm64
+          outputs: type=oci,dest=${{ runner.temp }}/relay-image.oci.tar
           tags: ghcr.io/jczhang02/lyntty-relay:verify-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/jczhang02/lyntty
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=lyntty-relay
+      - name: Verify both Relay platform SBOMs
+        run: |
+          set -euo pipefail
+          layout="$RUNNER_TEMP/relay-oci-layout"
+          evidence="$RUNNER_TEMP/relay-sbom-evidence"
+          selection="$evidence/relay-oci-platforms.json"
+          mkdir "$layout" "$evidence"
+          tar -xf "$RUNNER_TEMP/relay-image.oci.tar" -C "$layout"
+          bun scripts/relay-oci-sbom.ts prepare --layout "$layout" --output "$selection"
+          index_digest="$(bun -e 'const value=await Bun.file(process.argv[1]).json();process.stdout.write(value.indexDigest)' "$selection")"
+          restore_relay_index() {
+            bun scripts/relay-oci-sbom.ts restore --layout "$layout" --selection "$selection"
+          }
+          trap restore_relay_index EXIT
+          bun scripts/relay-oci-sbom.ts select --layout "$layout" --selection "$selection" --platform linux/amd64
+          syft scan --platform linux/amd64 "oci-dir:$layout" -o spdx-json="$evidence/relay-linux-amd64.spdx.json"
+          bun scripts/relay-oci-sbom.ts bind --selection "$selection" --platform linux/amd64 \
+            --sbom "$evidence/relay-linux-amd64.spdx.json" --repository ghcr.io/jczhang02/lyntty-relay
+          bun scripts/relay-oci-sbom.ts select --layout "$layout" --selection "$selection" --platform linux/arm64
+          syft scan --platform linux/arm64 "oci-dir:$layout" -o spdx-json="$evidence/relay-linux-arm64.spdx.json"
+          bun scripts/relay-oci-sbom.ts bind --selection "$selection" --platform linux/arm64 \
+            --sbom "$evidence/relay-linux-arm64.spdx.json" --repository ghcr.io/jczhang02/lyntty-relay
+          restore_relay_index
+          trap - EXIT
+          bun scripts/relay-oci-sbom.ts assemble \
+            --selection "$selection" \
+            --amd64-sbom "$evidence/relay-linux-amd64.spdx.json" \
+            --arm64-sbom "$evidence/relay-linux-arm64.spdx.json" \
+            --output "$evidence/relay.spdx.json" \
+            --source-commit "$GITHUB_SHA" \
+            --version "$(bun -e 'const value=await Bun.file("packages/lyntty-relay/package.json").json();process.stdout.write(value.version)')" \
+            --repository ghcr.io/jczhang02/lyntty-relay \
+            --created "$(git show -s --format=%cI "$GITHUB_SHA")" \
+            --expected-index-digest "$index_digest"
 
 # GHCR publication belongs to the compatibility-BOM release workflow. A stable
 # component release must not publish from an ordinary push to main.

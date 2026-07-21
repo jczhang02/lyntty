@@ -33,7 +33,16 @@ export type ImmutableFile = z.infer<typeof ImmutableFileSchema>;
 const SupplyChainEvidenceSchema = z.object({
   sbom: ImmutableFileSchema,
   provenance: ImmutableFileSchema,
-}).strict();
+  supplementary: z.array(ImmutableFileSchema).max(8).optional(),
+}).strict().superRefine((evidence, context) => {
+  const files = [evidence.sbom, evidence.provenance, ...(evidence.supplementary ?? [])];
+  if (new Set(files.map(file => file.name)).size !== files.length) {
+    context.addIssue({ code: 'custom', path: ['supplementary'], message: 'Supply-chain evidence file names must be unique' });
+  }
+  if (new Set(files.map(file => file.url)).size !== files.length) {
+    context.addIssue({ code: 'custom', path: ['supplementary'], message: 'Supply-chain evidence URLs must be unique' });
+  }
+});
 
 const ComponentRequirementsSchema = z.object({
   app: VersionRangeSchema.optional(),

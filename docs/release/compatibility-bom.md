@@ -35,7 +35,7 @@ The CLI also writes its offer into encrypted machine metadata, allowing App vers
 - stable/preview Android package, `versionCode`, certificate fingerprint, immutable APK URL, SHA-256, and size;
 - all five CLI archives plus archive SHA-256, size, and internal artifact-manifest SHA-256;
 - multiarchitecture Relay repository and OCI `@sha256:` digest;
-- per-component SPDX SBOM and provenance assets;
+- per-component SPDX SBOM and provenance assets, plus optional unique supplementary evidence; the Relay uses this to bind both platform SPDX documents and its OCI selection record;
 - zero to two retained predecessor BOM/signature references.
 
 Every file URL must be immutable HTTPS without query, fragment, or `/latest/`. Relay images must use a digest reference, never a tag. Canonical JSON sorts object keys and preserves array order.
@@ -60,7 +60,7 @@ Verification checks the signature, channel-specific trust root, sequence validit
 
 1. five standalone CLI archives built from the same exact protected source; for this owner-operated self-use Stable line, the macOS and Windows executables are intentionally not Apple-notarized or Authenticode-signed;
 2. one channel-bound, signed, non-debuggable APK under the Node-family execution audit;
-3. one amd64/arm64 Relay OCI layout without pushing;
+3. one amd64/arm64 Relay OCI layout without pushing. Because Syft cannot treat the nested multiarchitecture index as one image, Candidate verifies the exact index and platform-manifest descriptor hashes, scans the amd64 and arm64 views separately, and creates an SPDX 2.3 index that hash-references both platform documents;
 4. SPDX JSON and deterministic in-toto candidate-verification statements. CLI provenance records `platformCodeSigning.policy=not-required-self-use`, while archive SHA-256, internal manifest SHA-256, exact source commit, runtime-free self-checks, signed BOM, and GitHub attestations remain mandatory;
 5. canonical BOM, detached signature, retained rolling matrix, and complete checksums.
 
