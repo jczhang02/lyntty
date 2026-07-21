@@ -16,6 +16,8 @@ BOM、签名与 predecessor digest 都绑定带末尾 LF 的精确 canonical 文
 
 本次 owner-operated 自用 Stable 仍发布五个平台 CLI/`lynttyd` archive，但 macOS/Windows executable 明确不做 Apple notarization 或 Windows Authenticode。Candidate 直接从同一 protected source 构建五个平台，并在 provenance 中记录 `platformCodeSigning.policy=not-required-self-use`。archive SHA-256、内部 manifest SHA-256、source commit、runtime-free self-check、签名 BOM 与 GitHub attestations 仍是强制门禁。
 
+Relay Candidate 对同一 multiarch OCI layout 的 amd64/arm64 manifest 分别运行 Syft，并生成 hash-reference 两个平台 SPDX document 的 SPDX 2.3 index；不能把只扫描 host 架构的 SBOM 冒充 multiarch coverage。
+
 Promotion 与 rollback 统一调用 `scripts/github-release.ts`：绑定单一 Release ID 和 asset ID，逐项验证 API digest 与下载字节，不删除、不替换资产；发布边界再次检查 GitHub `main`，用 non-force Git push 原子创建精确 direct tag（中断重试只接受同一 tag/commit），再通过一个完整 Release-ID `PATCH` 发布。Stable 还必须提供精确 Candidate APK 的实体 Android 验收及其 SHA-256；没有 waiver。
 
 Stable 由 owner 显式审批；无需独立 reviewer，也不要求 Apple/Windows 生产证书。Release body 必须披露 macOS/Windows archive 未做平台代码签名，不能把 BOM 签名或 GitHub attestation 描述成平台签名。
