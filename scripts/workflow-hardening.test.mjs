@@ -98,6 +98,8 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /--project-name lyntty/);
   assert.match(relayDeploy, /grep -vE '[^']*LYNTTY_RELAY_IMAGE_TAG/);
   assert.match(relayDeploy, /HANDY_MASTER_SECRET: \$\{LYNTTY_MASTER_SECRET\}/);
+  assert.match(relayDeploy, /Relay deployment preflight failed during phase=%s/);
+  assert.match(relayDeploy, /preflight_phase=legacy-image-layout/);
   assert.match(relayDeploy, /\.Config\.Image/);
   assert.match(relayDeploy, /\/v1\/version/);
   assert.match(relayDeploy, /bom_release_id/);
@@ -347,7 +349,7 @@ console.log(result);
 
 test('Relay legacy image layout migration binds the running bytes to one prior digest', async () => {
   const functionBlock = relayDeploy.match(
-    /(          compose\(\) \{[\s\S]*?\n          \})\n          canonicalize_required_assignment LYNTTY_MASTER_SECRET/,
+    /(          compose\(\) \{[\s\S]*?\n          \})\n          preflight_phase=master-secret-canonicalization/,
   )?.[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
   assert.ok(functionBlock);
   const block = `${functionBlock}\nmigrate_legacy_relay_image_layout`;
@@ -373,7 +375,7 @@ test('Relay legacy image layout migration binds the running bytes to one prior d
   try {
     const execute = (dir, overrides = {}) => {
       const result = Bun.spawnSync({
-        cmd: ['bash', '-c', `set -Eeuo pipefail\ncd "$ROOT"\nBOM_TAG=compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1\nrollback_marker=.rollback-incomplete\n${block}`],
+        cmd: ['bash', '-c', `set -Eeuo pipefail\ncd "$ROOT"\nBOM_TAG=compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1\nrollback_marker=.rollback-incomplete\npreflight_phase=legacy-image-layout\n${block}`],
         env: {
           ...process.env,
           ROOT: dir,
