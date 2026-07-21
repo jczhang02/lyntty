@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'bun:test';
 
 const relayDeployPath = new URL('../.github/workflows/relay-deploy.yml', import.meta.url);
@@ -46,6 +48,14 @@ const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, android
 ]);
 const rootPackage = JSON.parse(rootPackageText);
 const previewReleaseNotes = await readFile(previewReleaseNotesPath, 'utf8');
+const resolvedPreviewReleaseNotes = previewReleaseNotes
+  .replaceAll('{{VERSION_NAME}}', '1.2.0')
+  .replaceAll('{{VERSION_CODE}}', '920001')
+  .replaceAll('{{APK_NAME}}', 'lyntty-preview-v1.2.0-920001.apk')
+  .replaceAll('{{APK_NAME_NO_EXT}}', 'lyntty-preview-v1.2.0-920001')
+  .replaceAll('{{TAG}}', 'android-preview-v1.2.0-920001')
+  .replaceAll('{{SHA256}}', '7139219f0051ab0ad705932f15175ea1e5d8903f91e0491b19f800aa97d4038b')
+  .replaceAll('{{SOURCE_COMMIT}}', 'ef0853524fb78ecf31697103ff5597a0b20b1ed6');
 
 test('relay deploy resolves only a signed stable BOM to an immutable image', () => {
   assert.match(relayDeploy, /environment: production-relay/);
@@ -135,6 +145,19 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /candidate_run_id/);
   assert.match(androidPreviewPromote, /expected_sha256/);
   assert.match(androidPreviewPromote, /physical_phone_accepted/);
+  assert.match(androidPreviewPromote, /unverified_release_waiver/);
+  assert.match(androidPreviewPromote, /I accept publishing this exact Candidate without physical Android validation/);
+  assert.match(androidPreviewPromote, /release_mode=physical-phone/);
+  assert.match(androidPreviewPromote, /release_mode=owner-waiver-unverified/);
+  assert.match(androidPreviewPromote, /\[\[ -z "\$UNVERIFIED_RELEASE_WAIVER" \]\]/);
+  assert.match(androidPreviewPromote, /\[\[ "\$UNVERIFIED_RELEASE_WAIVER" == "\$waiver_phrase" \]\]/);
+  assert.doesNotMatch(androidPreviewPromote, /^\s*\[\[ "\$PHYSICAL_PHONE_ACCEPTED" == true \]\]$/m);
+  assert.match(androidPreviewPromote, /Physical Android validation was not completed for this exact Candidate\./);
+  assert.match(androidPreviewPromote, /此精确 Candidate 未完成实体 Android 验证。/);
+  assert.match(androidPreviewPromote, /notes="\$RELEASE_NOTES"/);
+  assert.match(androidPreviewPromote, /release_notes_sha256/);
+  assert.match(androidPreviewPromote, /GITHUB_ACTOR/);
+  assert.equal((androidPreviewPromote.match(/cmp -s "\$RELEASE_NOTES"/g) ?? []).length, 2);
   assert.match(androidPreviewPromote, /LYNTTY_IMMUTABLE_RELEASES_ENABLED/);
   assert.match(androidPreviewPromote, /LYNTTY_PREVIEW_TAG_RULESET_ID/);
   assert.match(androidPreviewPromote, /GITHUB_REF_PROTECTED/g);
@@ -151,8 +174,24 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /scripts\/preview-apk-allowlist\.json/);
   assert.match(androidPreviewPromote, /docs\/evidence\/r86-preview-apk-candidate\.md/);
   assert.match(androidPreviewPromote, /git diff --no-renames --name-status/);
-  assert.match(androidPreviewPromote, /A\s+docs\/evidence\/r86-preview-apk-candidate\.md/);
+  assert.match(androidPreviewPromote, /M\s+docs\/evidence\/r86-preview-apk-candidate\.md/);
   assert.match(androidPreviewPromote, /M\s+scripts\/preview-apk-allowlist\.json/);
+  for (const path of [
+    '.github/workflows/android-preview-promote.yml',
+    'docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk-audit.txt',
+    'docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-apk.sha256',
+    'docs/evidence/artifacts/r86-preview-apk-candidate/android-preview-provenance.json',
+    'docs/evidence/artifacts/r86-preview-apk-candidate/candidate-manifest.json',
+    'docs/evidence/r86-preview-apk-candidate.md',
+    'docs/evidence/r86-preview-apk-candidate.zh.md',
+    'docs/release/android-apk.md',
+    'docs/release/android-apk.zh.md',
+    'scripts/preview-apk-allowlist.json',
+    'scripts/workflow-hardening.test.mjs',
+  ]) {
+    assert.equal(androidPreviewPromote.split(`M\t${path}`).length - 1, 2, `${path} must be in both exact-delta checks`);
+  }
+  assert.doesNotMatch(androidPreviewPromote, /M\s+docs\/evidence\/artifacts\/r86-preview-apk-candidate\/android-preview-runtime-audit\.txt/);
   assert.match(androidPreviewPromote, /sourceTree/);
   assert.match(androidPreviewPromote, /isImmutable/);
   assert.match(androidPreviewPromote, /bypass_actors/);
@@ -172,6 +211,83 @@ test('Preview APK promotion publishes only exact tested candidate bytes', () => 
   assert.match(androidPreviewPromote, /gh release edit[^\n]*--draft=false[^\n]*--prerelease[^\n]*--latest=false/);
   assert.match(androidPreviewPromote, /android-preview-v/);
   assert.doesNotMatch(androidPreviewPromote, /gradlew|assembleRelease/);
+});
+
+test('Preview waiver authorization is explicit and mutually exclusive', () => {
+  const authorizationBlock = androidPreviewPromote.match(
+    /waiver_phrase='I accept publishing this exact Candidate without physical Android validation'[\s\S]*?\n\s+esac/,
+  )?.[0];
+  assert.ok(authorizationBlock);
+
+  const authorize = (physicalPhoneAccepted, waiver) => {
+    const result = Bun.spawnSync({
+      cmd: ['bash', '-c', `set -euo pipefail\n${authorizationBlock}\nprintf '%s' "$release_mode"`],
+      env: {
+        ...process.env,
+        PHYSICAL_PHONE_ACCEPTED: physicalPhoneAccepted,
+        UNVERIFIED_RELEASE_WAIVER: waiver,
+      },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    return {
+      exitCode: result.exitCode,
+      stdout: new TextDecoder().decode(result.stdout),
+    };
+  };
+
+  assert.deepEqual(authorize('true', ''), { exitCode: 0, stdout: 'physical-phone' });
+  assert.deepEqual(
+    authorize('false', 'I accept publishing this exact Candidate without physical Android validation'),
+    { exitCode: 0, stdout: 'owner-waiver-unverified' },
+  );
+  assert.notEqual(authorize('false', '').exitCode, 0);
+  assert.notEqual(
+    authorize('true', 'I accept publishing this exact Candidate without physical Android validation').exitCode,
+    0,
+  );
+  assert.notEqual(authorize('unknown', '').exitCode, 0);
+});
+
+test('Preview waiver release body is generated byte-for-byte with a leading warning', async () => {
+  const generationBlock = androidPreviewPromote.match(
+    /          release_notes="\$RUNNER_TEMP\/android-preview-release-notes\.md"[\s\S]*?\n          fi/,
+  )?.[0].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  assert.ok(generationBlock);
+  const root = await mkdtemp(join(tmpdir(), 'lyntty-preview-waiver-notes-'));
+  try {
+    const notes = join(root, 'candidate-release-notes.md');
+    assert.doesNotMatch(resolvedPreviewReleaseNotes, /\{\{/);
+    await writeFile(notes, resolvedPreviewReleaseNotes);
+    const generate = async (releaseMode) => {
+      const runnerTemp = join(root, releaseMode);
+      await mkdir(runnerTemp);
+      const child = Bun.spawn({
+        cmd: ['bash', '-c', `set -euo pipefail\n${generationBlock}`],
+        env: { ...process.env, RUNNER_TEMP: runnerTemp, release_mode: releaseMode, notes },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      const [stderr, exitCode] = await Promise.all([
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+      assert.equal(exitCode, 0, stderr);
+      return readFile(join(runnerTemp, 'android-preview-release-notes.md'), 'utf8');
+    };
+
+    assert.equal(await generate('physical-phone'), resolvedPreviewReleaseNotes);
+    const waiverBody = await generate('owner-waiver-unverified');
+    assert.match(waiverBody, /^> \[!WARNING\]\n/);
+    assert.equal(waiverBody.split('Physical Android validation was not completed for this exact Candidate.').length - 1, 1);
+    assert.equal(waiverBody.split('此精确 Candidate 未完成实体 Android 验证。').length - 1, 1);
+    assert.ok(waiverBody.endsWith(resolvedPreviewReleaseNotes));
+    const hasher = new Bun.CryptoHasher('sha256');
+    hasher.update(waiverBody);
+    assert.equal(hasher.digest('hex'), '9cdc3d6fade06530de3440cfe3e6df1f4f35ae9ae7a86dda2b312b899094f08a');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('Preview release body extraction preserves exact trailing bytes', () => {

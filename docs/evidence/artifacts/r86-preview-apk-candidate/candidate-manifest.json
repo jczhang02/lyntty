@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "33d7a99c57cce0783d069e95ba6d4abc59a53c1d",
+  "sourceCommit": "ef0853524fb78ecf31697103ff5597a0b20b1ed6",
   "files": [
     {
       "name": "android-preview-provenance.json",
       "size": 759,
-      "sha256": "b53d9bae853aa3174f4959b0644a4ddf8961527e6144d7016fe0a04b29c731cf"
+      "sha256": "35c68fa1efebcfd3a22b0377e25cb347d72a2954491ad7cb3bf451cac0cd306f"
     },
     {
       "name": "android-preview-runtime-audit.txt",
@@ -14,23 +14,23 @@
     },
     {
       "name": "lyntty-preview-v1.2.0-920001.apk",
-      "size": 126797863,
-      "sha256": "9025d83a142ded5a618ef15c56c9bdd5486fed8336a53f1b9f0c7336b325aae9"
+      "size": 126797859,
+      "sha256": "7139219f0051ab0ad705932f15175ea1e5d8903f91e0491b19f800aa97d4038b"
     },
     {
       "name": "lyntty-preview-v1.2.0-920001.apk.sha256",
       "size": 99,
-      "sha256": "8e9207d33780bcef1d1b0843e6b974df76bdfb3e86a318a695806b64a88a1b92"
+      "sha256": "fd9d425540e8e139e576f6aa1d95ed36f0b21e473a6e19d78bfad91d78c8e27b"
     },
     {
       "name": "lyntty-preview-v1.2.0-920001.audit.txt",
       "size": 419,
-      "sha256": "e4c67cf20ad7f57ae32ffb828a961acb127f3697c47c328bf8b8b9614aab98f9"
+      "sha256": "6fe2d4b71a1be3ae00404b9ff972c7f3e2954d0430c7addfdaea220f76ccb7d4"
     },
     {
       "name": "release-notes.md",
       "size": 2759,
-      "sha256": "e4da17b75c8537c56e6ae6b19c466a15084ffcc53a26ea09404ccf7c70470c00"
+      "sha256": "be8e9f2de049038df26b10a2c9b831328a40f206f7a95010260040d166b4f267"
     },
     {
       "name": "release-title.txt",
