@@ -76,6 +76,8 @@ const obsoleteBrandingPaths = [
   'packages/lyntty-app/logo.png',
   '.github/mascot.png',
   '.github/header.png',
+  '.github/logotype-dark.png',
+  '.github/logotype-light.png',
 ];
 const obsoleteNeonIconSha256 = '6bf41612ebe282a6813cc02fca02c92ae169c854ae285b0249d776fc0105dc17';
 
@@ -84,8 +86,20 @@ test('repository keeps the current launcher icon and rejects obsolete neon brand
     await assert.rejects(stat(join(repositoryRoot, path)), error => error?.code === 'ENOENT');
   }
 
-  const appConfig = await readFile(join(repositoryRoot, 'packages/lyntty-app/app.config.js'), 'utf8');
-  assert.match(appConfig, /icon:\s*"\.\/sources\/assets\/images\/icon\.png"/);
+  const appConfigUrl = new URL('../packages/lyntty-app/app.config.js', import.meta.url).href;
+  const resolvedConfig = Bun.spawnSync({
+    cmd: [
+      process.execPath,
+      '-e',
+      `const config = (await import(${JSON.stringify(appConfigUrl)})).default; process.stdout.write(JSON.stringify(config.expo.icon));`,
+    ],
+    cwd: repositoryRoot,
+    env: { ...process.env, APP_ENV: 'development' },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  assert.equal(resolvedConfig.exitCode, 0, resolvedConfig.stderr.toString());
+  assert.equal(JSON.parse(resolvedConfig.stdout.toString()), './sources/assets/images/icon.png');
   await stat(join(repositoryRoot, 'packages/lyntty-app/sources/assets/images/icon-source.svg'));
   await stat(join(repositoryRoot, 'packages/lyntty-app/sources/assets/images/icon.png'));
 
@@ -97,7 +111,14 @@ test('repository keeps the current launcher icon and rejects obsolete neon brand
   });
   assert.equal(tracked.exitCode, 0, tracked.stderr.toString());
   for (const path of tracked.stdout.toString().split('\0').filter(Boolean)) {
-    const digest = createHash('sha256').update(await readFile(join(repositoryRoot, path))).digest('hex');
+    const blob = Bun.spawnSync({
+      cmd: ['git', 'show', `:${path}`],
+      cwd: repositoryRoot,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    assert.equal(blob.exitCode, 0, blob.stderr.toString());
+    const digest = createHash('sha256').update(blob.stdout).digest('hex');
     assert.notEqual(digest, obsoleteNeonIconSha256, `obsolete neon icon remains tracked at ${path}`);
   }
 });
