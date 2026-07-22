@@ -52,6 +52,6 @@ Canonical state 只接受 documented historical prior digest、workflow 传入�
 
 Protected integration 前必须通过 repository hardening、audit、YAML/shell syntax、error-level ShellCheck 与 `git diff --check`。
 
-## 残余风险
+## Live 后续
 
-下一次受保护部署必须证明 live running bytes 命中精确 successor mapping。历史 workflow 和 registry 证据不能替代 live container/image/RepoDigest chain。
+受保护 run `29883473315` 已证明 live running bytes 命中精确 successor mapping，并完成 backup/migrate/doctor/deploy，把生产切换到 signed Stable digest。Run `29883633696` 随后证明 idempotent replay。见 R104。
