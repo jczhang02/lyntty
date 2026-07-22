@@ -55,4 +55,6 @@ Repository hardening: `35 pass / 0 fail`. `bun audit`: clean. Untrusted lifecycl
 
 ## Residual risk
 
+> Follow-up: run `29880608810` proved the running container was not R65, so this repair correctly made no change. R103 documents the exact later production image/deploy/provenance identity instead of widening the drift-repair path.
+
 The next protected deployment is the live proof. If the running container is not the documented R65 runtime, this repair will fail before mutation and the operator must produce new exact image identity/provenance evidence instead of widening this path.

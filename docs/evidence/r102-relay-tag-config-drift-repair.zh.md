@@ -55,4 +55,6 @@ Repository hardening：`35 pass / 0 fail`；`bun audit`：clean；untrusted life
 
 ## 残余风险
 
+> 后续：run `29880608810` 证明 running container 不是 R65，因此本 repair 正确地没有修改任何状态。R103 记录了更晚的精确生产 image/deploy/provenance 身份，而不是扩宽 drift-repair path。
+
 下一次受保护部署才是 live proof。如果 running container 不是 documented R65 runtime，本修复会在 mutation 前失败；operator 必须提供新的精确 image identity/provenance 证据，不能扩宽此路径。
