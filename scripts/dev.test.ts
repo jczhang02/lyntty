@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { chmod, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseCoordination, parseDarwinBsdStartToken, parseKernProcargs2, pathIsInside, reconcileCoordinationAllocations } from './dev';
+import {
+  parseCoordination,
+  parseDarwinBsdStartToken,
+  parseKernProcargs2,
+  pathIsInside,
+  reconcileCoordinationAllocations,
+  supervisorOwnership,
+} from './dev';
 
 interface RunResult {
   stdout: string;
@@ -177,6 +184,33 @@ describe('public bun dev commands', () => {
     expect(parseKernProcargs2(buffer)).toEqual({ argv, environment });
     expect(pathIsInside('/tmp/work tree', '/tmp/work tree/packages/lyntty-app/android')).toBe(true);
     expect(pathIsInside('/tmp/work tree', '/tmp/work tree-other')).toBe(false);
+  });
+
+  it('rechecks liveness when a process exits during identity proof', async () => {
+    const child = Bun.spawn({
+      cmd: [process.execPath, '-e', 'await Bun.sleep(30_000)'],
+      cwd: join(import.meta.dir, '..'),
+      env: { ...Bun.env },
+      stdin: 'ignore',
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    const ownershipPromise = supervisorOwnership(
+      { canonicalRoot: join(import.meta.dir, '..'), scriptPath: script } as Parameters<typeof supervisorOwnership>[0],
+      { instanceId: 'identity-race' } as Parameters<typeof supervisorOwnership>[1],
+      { pid: child.pid, role: 'relay', processStartToken: 'identity-race' },
+    );
+    child.kill('SIGKILL');
+    const ownership = await ownershipPromise;
+    await child.exited;
+
+    expect(ownership).toEqual({
+      pid: child.pid,
+      role: 'relay',
+      alive: false,
+      owned: false,
+      reason: 'not-running',
+    });
   });
 
   it('rejects unsupported arguments at every public seam', async () => {
@@ -428,7 +462,9 @@ describe('public bun dev commands', () => {
     expect(await waitForLaunchFile(launchDir, 'receipt-')).not.toBeNull();
 
     const down = await runDev(['down', '--json']);
-    expect(down.exitCode).toBe(0);
+    if (down.exitCode !== 0) {
+      throw new Error(`dev:down failed after atomic-claim recovery\n${down.stdout}${down.stderr}`);
+    }
     expect(await readdir(launchDir)).toEqual([]);
   }, 30_000);
 
@@ -438,7 +474,9 @@ describe('public bun dev commands', () => {
       LYNTTY_DEV_ALLOW_TEST_HOOKS: '1',
       LYNTTY_DEV_TEST_CRASH_ROLE: 'daemon',
     });
-    expect(crashed.exitCode).not.toBe(0);
+    if (crashed.exitCode === 0) {
+      throw new Error(`dev:up unexpectedly survived the receipt crash hook\n${crashed.stdout}${crashed.stderr}`);
+    }
 
     const launchDir = join(state!.stateDir, 'launches');
     const names = await readdir(launchDir);
