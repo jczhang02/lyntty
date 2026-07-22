@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { chmod, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseCoordination, parseDarwinBsdStartToken, parseKernProcargs2, pathIsInside, reconcileCoordinationAllocations } from './dev';
+import {
+  parseCoordination,
+  parseDarwinBsdStartToken,
+  parseKernProcargs2,
+  pathIsInside,
+  reconcileCoordinationAllocations,
+  supervisorOwnership,
+} from './dev';
 
 interface RunResult {
   stdout: string;
@@ -177,6 +184,33 @@ describe('public bun dev commands', () => {
     expect(parseKernProcargs2(buffer)).toEqual({ argv, environment });
     expect(pathIsInside('/tmp/work tree', '/tmp/work tree/packages/lyntty-app/android')).toBe(true);
     expect(pathIsInside('/tmp/work tree', '/tmp/work tree-other')).toBe(false);
+  });
+
+  it('rechecks liveness when a process exits during identity proof', async () => {
+    const child = Bun.spawn({
+      cmd: [process.execPath, '-e', 'await Bun.sleep(30_000)'],
+      cwd: join(import.meta.dir, '..'),
+      env: { ...Bun.env },
+      stdin: 'ignore',
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    const ownershipPromise = supervisorOwnership(
+      { canonicalRoot: join(import.meta.dir, '..'), scriptPath: script } as Parameters<typeof supervisorOwnership>[0],
+      { instanceId: 'identity-race' } as Parameters<typeof supervisorOwnership>[1],
+      { pid: child.pid, role: 'relay', processStartToken: 'identity-race' },
+    );
+    child.kill('SIGKILL');
+    const ownership = await ownershipPromise;
+    await child.exited;
+
+    expect(ownership).toEqual({
+      pid: child.pid,
+      role: 'relay',
+      alive: false,
+      owned: false,
+      reason: 'not-running',
+    });
   });
 
   it('rejects unsupported arguments at every public seam', async () => {
