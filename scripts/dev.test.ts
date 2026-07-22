@@ -428,7 +428,9 @@ describe('public bun dev commands', () => {
     expect(await waitForLaunchFile(launchDir, 'receipt-')).not.toBeNull();
 
     const down = await runDev(['down', '--json']);
-    expect(down.exitCode).toBe(0);
+    if (down.exitCode !== 0) {
+      throw new Error(`dev:down failed after atomic-claim recovery\n${down.stdout}${down.stderr}`);
+    }
     expect(await readdir(launchDir)).toEqual([]);
   }, 30_000);
 
@@ -438,7 +440,9 @@ describe('public bun dev commands', () => {
       LYNTTY_DEV_ALLOW_TEST_HOOKS: '1',
       LYNTTY_DEV_TEST_CRASH_ROLE: 'daemon',
     });
-    expect(crashed.exitCode).not.toBe(0);
+    if (crashed.exitCode === 0) {
+      throw new Error(`dev:up unexpectedly survived the receipt crash hook\n${crashed.stdout}${crashed.stderr}`);
+    }
 
     const launchDir = join(state!.stateDir, 'launches');
     const names = await readdir(launchDir);
