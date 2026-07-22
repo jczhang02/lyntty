@@ -52,6 +52,6 @@ The extracted remote seam covers both documented identities, the current signed 
 
 Repository hardening, audit, YAML/shell syntax, error-level ShellCheck, and `git diff --check` must pass before protected integration.
 
-## Residual risk
+## Live follow-up
 
-The next protected deployment must prove the live running bytes match the exact successor mapping. Historical workflow and registry evidence does not substitute for that live container/image/RepoDigest chain.
+Protected run `29883473315` proved the live running bytes matched the exact successor mapping, completed backup/migrate/doctor/deploy, and switched production to the signed Stable digest. Run `29883633696` then proved idempotent replay. See R104.
