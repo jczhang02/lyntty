@@ -222,6 +222,44 @@ jobs:
           rollback_marker=.rollback-incomplete
           [[ ! -e "$incomplete_marker" && ! -L "$incomplete_marker" ]] || { echo 'incomplete Relay migration marker exists; restore/verify explicitly before retrying' >&2; exit 1; }
           [[ ! -e "$rollback_marker" && ! -L "$rollback_marker" ]] || { echo 'incomplete pre-migration rollback marker exists; repair the prior runtime explicitly' >&2; exit 1; }
+          deployed_sequence=0
+          recorded_deployed_reference=
+          if [[ -e deployed-sequence.txt || -L deployed-sequence.txt || -e deployed-bom.txt || -L deployed-bom.txt ]]; then
+            [[ -f deployed-sequence.txt && ! -L deployed-sequence.txt && "$(stat -c '%U:%a' deployed-sequence.txt)" == root:600 ]] || {
+              echo 'recorded deployed sequence must be one root-private regular file' >&2
+              exit 1
+            }
+            [[ -f deployed-bom.txt && ! -L deployed-bom.txt && "$(stat -c '%U:%a' deployed-bom.txt)" == root:600 ]] || {
+              echo 'recorded deployed BOM must be one root-private regular file' >&2
+              exit 1
+            }
+            if LC_ALL=C grep -q $'\357\273\277\|\r\|\t' deployed-sequence.txt deployed-bom.txt \
+              || [[ "$(wc -c < deployed-sequence.txt)" != "$(LC_ALL=C tr -d '\000' < deployed-sequence.txt | wc -c)" ]] \
+              || [[ "$(wc -c < deployed-bom.txt)" != "$(LC_ALL=C tr -d '\000' < deployed-bom.txt | wc -c)" ]]; then
+              echo 'recorded deployed identity files contain a forbidden BOM, CR, tab, or NUL byte' >&2
+              exit 1
+            fi
+            [[ "$(wc -l < deployed-sequence.txt)" == 1 && "$(tail -c 1 deployed-sequence.txt | od -An -t u1 | tr -d ' ')" == 10 ]] || {
+              echo 'recorded deployed sequence must contain exactly one newline-terminated line' >&2
+              exit 1
+            }
+            [[ "$(wc -l < deployed-bom.txt)" == 1 && "$(tail -c 1 deployed-bom.txt | od -An -t u1 | tr -d ' ')" == 10 ]] || {
+              echo 'recorded deployed BOM must contain exactly one newline-terminated line' >&2
+              exit 1
+            }
+            deployed_sequence="$(cat deployed-sequence.txt)"
+            [[ "$deployed_sequence" =~ ^[1-9][0-9]*$ ]] || { echo 'recorded deployed sequence is invalid' >&2; exit 1; }
+            read -r recorded_deployed_tag recorded_deployed_reference recorded_deployed_extra < deployed-bom.txt
+            [[ -z "${recorded_deployed_extra:-}" \
+              && "$recorded_deployed_tag" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ \
+              && "$recorded_deployed_tag" == *"-s${deployed_sequence}" \
+              && "$recorded_deployed_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ \
+              && "$(cat deployed-bom.txt)" == "$recorded_deployed_tag $recorded_deployed_reference" ]] || {
+              echo 'recorded deployed BOM identity is invalid' >&2
+              exit 1
+            }
+            unset recorded_deployed_tag recorded_deployed_extra
+          fi
           compose() {
             env -u COMPOSE_FILE -u COMPOSE_PATH_SEPARATOR -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES \
               -u LYNTTY_MASTER_SECRET -u HANDY_MASTER_SECRET -u LYNTTY_RELAY_IMAGE \
@@ -367,9 +405,13 @@ jobs:
           }
           migrate_legacy_relay_image_layout() {
             preflight_phase=legacy-image-source-model
-            local expected_tag='ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927'
+            local r65_tag='ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927'
+            local r65_reference='ghcr.io/jczhang02/lyntty-relay@sha256:2eb926b37741e9b047b6e6f178ffdb0e84ed41c6649180421b3f4861838ff715'
+            local successor_tag='ghcr.io/jczhang02/lyntty-relay:sha-e243429200bd'
+            local successor_reference='ghcr.io/jczhang02/lyntty-relay@sha256:fe3bf95fd7e19cd34c3f94ff2aedeced9497535db797f07ba37241083dd8e83d'
+            local expected_tag="$r65_tag" expected_prior_reference="$r65_reference"
             local target_key=LYNTTY_RELAY_IMAGE legacy_tag_key=LYNTTY_RELAY_IMAGE_TAG source_form
-            local legacy_tag_value_pattern="^LYNTTY_RELAY_IMAGE_TAG=[[:space:]]*(sha-9752c689c927|'sha-9752c689c927'|\"sha-9752c689c927\")[[:space:]]*$"
+            local legacy_tag_value_pattern="^LYNTTY_RELAY_IMAGE_TAG=[[:space:]]*(sha-9752c689c927|sha-e243429200bd|'sha-9752c689c927'|'sha-e243429200bd'|\"sha-9752c689c927\"|\"sha-e243429200bd\")[[:space:]]*$"
             local assignment_count canonical_count legacy_tag_assignment_count legacy_tag_canonical_count
             local services_key_count service_key_count raw_image_count strict_image_count data_mount_count backup_target_count backup_mount_count
             local rendered_json configured_reference raw_reference container container_reference container_image_id configured_image_id
@@ -380,7 +422,7 @@ jobs:
             report_legacy_tag_classification() {
               local assignment category=other
               assignment="$(grep "^${legacy_tag_key}=" .env)"
-              if LC_ALL=C grep -Eq "^${legacy_tag_key}=[[:space:]]*(sha-9752c689c927|'sha-9752c689c927'|\"sha-9752c689c927\")[[:space:]]+#[[:print:][:space:]]*$" <<< "$assignment"; then
+              if LC_ALL=C grep -Eq "^${legacy_tag_key}=[[:space:]]*(sha-9752c689c927|sha-e243429200bd|'sha-9752c689c927'|'sha-e243429200bd'|\"sha-9752c689c927\"|\"sha-e243429200bd\")[[:space:]]+#[[:print:][:space:]]*$" <<< "$assignment"; then
                 category=expected-value-inline-comment
               elif LC_ALL=C grep -Eq "^${legacy_tag_key}=[[:space:]]*['\"]?sha-[a-f0-9]{7,64}['\"]?[[:space:]]*(#[[:print:][:space:]]*)?$" <<< "$assignment"; then
                 category=alternate-sha-tag
@@ -571,8 +613,10 @@ jobs:
                 }
               fi
               [[ "$backup_mount_count" == 1 ]] || { echo 'canonical Relay Compose requires the persistent backup mount' >&2; return 1; }
-              [[ "$configured_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]] || {
-                echo 'canonical Relay Compose did not resolve an exact repository digest' >&2
+              [[ "$configured_reference" == "$r65_reference" || "$configured_reference" == "$successor_reference" \
+                || "$configured_reference" == "$IMAGE_REFERENCE" \
+                || -n "$recorded_deployed_reference" && "$configured_reference" == "$recorded_deployed_reference" ]] || {
+                echo 'canonical Relay Compose did not resolve a documented prior or current signed target digest' >&2
                 return 1
               }
               unset rendered_json
@@ -593,7 +637,7 @@ jobs:
                   return 1
                 fi
               fi
-            elif [[ "$raw_reference" == "$expected_tag" ]]; then
+            elif [[ "$raw_reference" == "$r65_tag" || "$raw_reference" == "$successor_tag" ]]; then
               source_form=legacy-compose-hardcoded-tag
               [[ "$legacy_tag_assignment_count" == 0 || "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]] || {
                 echo 'hardcoded legacy Relay source has an invalid image-tag retry assignment' >&2
@@ -607,8 +651,24 @@ jobs:
                 }
               fi
             else
-              echo 'legacy Relay Compose image is not the documented R65 source tag' >&2
+              echo 'legacy Relay Compose image is not a documented production source tag' >&2
               return 1
+            fi
+            if [[ "$legacy_tag_repair_required" != true ]]; then
+              case "$configured_reference" in
+                "$r65_tag")
+                  expected_tag="$r65_tag"
+                  expected_prior_reference="$r65_reference"
+                  ;;
+                "$successor_tag")
+                  expected_tag="$successor_tag"
+                  expected_prior_reference="$successor_reference"
+                  ;;
+                *)
+                  echo 'rendered Relay image is not one of the documented production source identities' >&2
+                  return 1
+                  ;;
+              esac
             fi
             if [[ "$legacy_tag_repair_required" == true ]]; then
               [[ "$configured_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay:sha-[a-f0-9]{7,64}$ && "$configured_reference" != "$expected_tag" ]] || {
@@ -653,6 +713,10 @@ jobs:
             jq -e 'type == "array" and length == 1' <<< "$repo_digests" >/dev/null
             previous_reference="$(jq -er '.[0]' <<< "$repo_digests")"
             [[ "$previous_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay@sha256:[a-f0-9]{64}$ ]]
+            [[ "$previous_reference" == "$expected_prior_reference" ]] || {
+              echo 'running legacy Relay RepoDigest does not match its documented production identity' >&2
+              return 1
+            }
             repo_tags="$(docker image inspect --format '{{json .RepoTags}}' "$container_image_id")"
             jq -e --arg expected "$expected_tag" \
               'type == "array" and length >= 1 and index($expected) != null and all(.[]; test("^ghcr\\.io/jczhang02/lyntty-relay:[0-9A-Za-z._-]+$"))' \
@@ -836,15 +900,22 @@ jobs:
             [[ -n "$container" ]] || return 1
             [[ "$(docker inspect --format '{{.State.Running}}' "$container")" == true ]] || return 1
             container_reference="$(docker inspect --format '{{.Config.Image}}' "$container")" || return 1
-            [[ "$container_reference" == "$previous_reference" || "$container_reference" == ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927 ]] || return 1
+            if [[ "$container_reference" == "$previous_reference" ]]; then
+              :
+            elif [[ "$container_reference" == ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927 \
+              && "$previous_reference" == ghcr.io/jczhang02/lyntty-relay@sha256:2eb926b37741e9b047b6e6f178ffdb0e84ed41c6649180421b3f4861838ff715 ]]; then
+              :
+            elif [[ "$container_reference" == ghcr.io/jczhang02/lyntty-relay:sha-e243429200bd \
+              && "$previous_reference" == ghcr.io/jczhang02/lyntty-relay@sha256:fe3bf95fd7e19cd34c3f94ff2aedeced9497535db797f07ba37241083dd8e83d ]]; then
+              :
+            else
+              return 1
+            fi
             container_image_id="$(docker inspect --format '{{.Image}}' "$container")" || return 1
             reference_image_id="$(docker image inspect --format '{{.Id}}' "$previous_reference")" || return 1
             [[ "$container_image_id" == "$reference_image_id" ]] || return 1
             curl -fsS http://127.0.0.1:3005/health >/dev/null || return 1
           }
-          deployed_sequence=0
-          [[ ! -f deployed-sequence.txt ]] || deployed_sequence="$(cat deployed-sequence.txt)"
-          [[ "$deployed_sequence" =~ ^[0-9]+$ ]]
           if (( BOM_SEQUENCE == deployed_sequence )); then
             grep -Fqx "$BOM_TAG $IMAGE_REFERENCE" deployed-bom.txt
             verify_running_release
