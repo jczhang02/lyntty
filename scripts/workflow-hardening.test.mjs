@@ -484,6 +484,7 @@ const arg = (name) => { const index = args.findIndex((value, offset) => (value =
 let result;
 const backupVolumes = input.services?.['lyntty-relay']?.volumes?.filter(value => value.target === '/backups' && value.type === 'bind' && value.source === '/opt/lyntty/backups') ?? [];
 if (query.includes('keys == ["lyntty-relay"]') && query.includes('.image == $image')) result = Object.keys(input.services ?? {}).join(',') === 'lyntty-relay' && input.services['lyntty-relay'].image === arg('image') && (!query.includes('/backups') || backupVolumes.length === 1);
+else if (query.includes('keys == ["lyntty-relay"]') && query.includes('.image == $expected')) result = Object.keys(input.services ?? {}).join(',') === 'lyntty-relay' && input.services['lyntty-relay'].image === arg('expected');
 else if (query.includes('keys == ["lyntty-relay"]')) result = Object.keys(input.services ?? {}).join(',') === 'lyntty-relay';
 else if (query.includes('.services["lyntty-relay"].image')) result = input.services?.['lyntty-relay']?.image;
 else if (query.includes('$backups')) result = (input.services?.['lyntty-relay']?.volumes?.filter(value => value.type === 'bind' && value.source === '/opt/lyntty/data' && value.target === '/data').length ?? 0) === 1 && backupVolumes.length === arg('backups');
@@ -513,6 +514,20 @@ if [[ "${'${MOCK_FAIL_ENV_INSTALL:-false}'}" == true && "$source_path" == ./.env
 fi
 if [[ "${'${MOCK_FAIL_COMPOSE_INSTALL:-false}'}" == true && "$source_path" == ./.compose-image-layout-* && "$target_path" == docker-compose.yml && ! -e .mv-failed-once ]]; then
   : > .mv-failed-once
+  exit 95
+fi
+if [[ "${'${MOCK_SIGNAL_TAG_REPAIR_AFTER_INSTALL:-false}'}" == true && "$source_path" == ./.env-tag-repair-* && "$target_path" == .env && ! -e .mv-tag-signalled-once ]]; then
+  : > .mv-tag-signalled-once
+  /usr/bin/mv "$@"
+  kill -TERM "$PPID"
+  exit 0
+fi
+if [[ "${'${MOCK_FAIL_TAG_RECEIPT_INSTALL:-false}'}" == true && "$source_path" == ./.env-tag-receipt-* && "$target_path" == .env-canonicalization.log && ! -e .mv-tag-receipt-failed-once ]]; then
+  : > .mv-tag-receipt-failed-once
+  exit 95
+fi
+if [[ "${'${MOCK_FAIL_TAG_REPAIR_RESTORE:-false}'}" == true && "$source_path" == ./..env.restore-* && "$target_path" == .env && ! -e .mv-tag-restore-failed-once ]]; then
+  : > .mv-tag-restore-failed-once
   exit 95
 fi
 exec /usr/bin/mv "$@"
@@ -559,6 +574,67 @@ exec /usr/bin/mv "$@"
       assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /fixture-secret-never-log/, name);
     }
 
+    const driftEnv = 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-aaaaaaaaaaaa\n';
+    const drift = await createFixture('stale-tag-drift', { envContent: driftEnv });
+    const repaired = execute(drift.dir);
+    assert.equal(repaired.exitCode, 0, repaired.stderr);
+    assert.equal(
+      await readFile(join(drift.dir, '.env'), 'utf8'),
+      `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927\nLYNTTY_RELAY_IMAGE=${priorDigest}\n`,
+    );
+    const repairedNames = await readdir(drift.dir);
+    const driftBackup = repairedNames.find(name => name.startsWith('.env-precanonical-LYNTTY_RELAY_IMAGE_TAG-'));
+    assert.ok(driftBackup);
+    assert.equal(await readFile(join(drift.dir, driftBackup), 'utf8'), driftEnv);
+    assert.equal((await stat(join(drift.dir, driftBackup))).mode & 0o777, 0o600);
+    const driftReceipt = await readFile(join(drift.dir, '.env-canonicalization.log'), 'utf8');
+    assert.match(driftReceipt, /key=LYNTTY_RELAY_IMAGE_TAG source_form=alternate-sha-config-drift target_form=documented-r65-tag/);
+    assert.doesNotMatch(`${repaired.stdout}\n${repaired.stderr}\n${driftReceipt}`, /fixture-secret-never-log|sha-aaaaaaaaaaaa/);
+    const driftNamesBeforeRetry = (await readdir(drift.dir)).filter(name => name !== '.commands.log').sort();
+    assert.equal(execute(drift.dir).exitCode, 0);
+    assert.deepEqual((await readdir(drift.dir)).filter(name => name !== '.commands.log').sort(), driftNamesBeforeRetry);
+
+    const repairRollback = await createFixture('stale-tag-repair-rollback', { envContent: driftEnv });
+    const repairRollbackResult = execute(repairRollback.dir, { MOCK_POST_STATE_ONCE: `false ${imageId}` });
+    assert.notEqual(repairRollbackResult.exitCode, 0);
+    assert.equal(await readFile(join(repairRollback.dir, '.env'), 'utf8'), driftEnv);
+    assert.equal(await readFile(join(repairRollback.dir, 'docker-compose.yml'), 'utf8'), composeContent);
+    assert.equal(await Bun.file(join(repairRollback.dir, '.rollback-incomplete')).exists(), false);
+    assert.doesNotMatch(`${repairRollbackResult.stdout}\n${repairRollbackResult.stderr}`, /fixture-secret-never-log|sha-aaaaaaaaaaaa/);
+
+    for (const [name, overrides] of [
+      ['stale-tag-receipt-install-failure', { MOCK_FAIL_TAG_RECEIPT_INSTALL: 'true' }],
+      ['stale-tag-repair-signal', { MOCK_SIGNAL_TAG_REPAIR_AFTER_INSTALL: 'true' }],
+    ]) {
+      const interruptedRepair = await createFixture(name, { envContent: driftEnv });
+      const interruptedResult = execute(interruptedRepair.dir, overrides);
+      assert.notEqual(interruptedResult.exitCode, 0, name);
+      assert.equal(await readFile(join(interruptedRepair.dir, '.env'), 'utf8'), driftEnv, `${name}: ${interruptedResult.stderr}`);
+      assert.equal(await Bun.file(join(interruptedRepair.dir, '.env-canonicalization.log')).exists(), false, name);
+      assert.equal(await Bun.file(join(interruptedRepair.dir, '.rollback-incomplete')).exists(), false, name);
+      assert.match(interruptedResult.stderr, /original configuration restored/, name);
+      assert.doesNotMatch(`${interruptedResult.stdout}\n${interruptedResult.stderr}`, /fixture-secret-never-log|sha-aaaaaaaaaaaa/, name);
+    }
+
+    const failedRestore = await createFixture('stale-tag-repair-restore-failure', { envContent: driftEnv });
+    const failedRestoreResult = execute(failedRestore.dir, {
+      MOCK_POST_STATE_ONCE: `false ${imageId}`,
+      MOCK_FAIL_TAG_REPAIR_RESTORE: 'true',
+    });
+    assert.notEqual(failedRestoreResult.exitCode, 0);
+    const repairMarker = join(failedRestore.dir, '.rollback-incomplete');
+    assert.equal(await Bun.file(repairMarker).text(), 'compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1 legacy-image-tag-repair-restore-failed\n');
+    assert.equal((await stat(repairMarker)).mode & 0o777, 0o600);
+    assert.match(failedRestoreResult.stderr, /retry is blocked/);
+    assert.doesNotMatch(`${failedRestoreResult.stdout}\n${failedRestoreResult.stderr}`, /fixture-secret-never-log|sha-aaaaaaaaaaaa/);
+    const retryGuard = '[[ ! -e "$rollback_marker" && ! -L "$rollback_marker" ]] || { echo \'incomplete pre-migration rollback marker exists; repair the prior runtime explicitly\' >&2; exit 1; }';
+    assert.ok(relayDeploy.includes(retryGuard));
+    const blockedRetry = Bun.spawnSync({
+      cmd: ['bash', '-c', `cd "$ROOT"\nrollback_marker=.rollback-incomplete\n${retryGuard}`],
+      env: { ...process.env, ROOT: failedRestore.dir },
+    });
+    assert.notEqual(blockedRetry.exitCode, 0);
+
     const interruptedEnv = `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927\nLYNTTY_RELAY_IMAGE=${priorDigest}\n`;
     const interrupted = await createFixture('env-first-retry', { envContent: interruptedEnv });
     assert.equal(execute(interrupted.dir).exitCode, 0);
@@ -581,7 +657,7 @@ exec /usr/bin/mv "$@"
       ['spaced-extends', { composeContent: composeContent.replace('    restart: unless-stopped', '    extends : legacy-base') }, {}],
       ['interpolated-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=${UNTRUSTED_TAG}\n' }, { UNTRUSTED_TAG: 'sha-9752c689c927' }],
       ['commented-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927 # unrecorded syntax\n' }, {}],
-      ['wrong-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-aaaaaaaaaaaa\n' }, {}],
+      ['wrong-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-aaaaaaaaaaaa\n' }, { MOCK_CONTAINER_REFERENCE: 'ghcr.io/jczhang02/lyntty-relay:sha-aaaaaaaaaaaa' }],
       ['repository-qualified-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927\n' }, {}],
       ['mismatched-target', { envContent: `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927\nLYNTTY_RELAY_IMAGE=ghcr.io/jczhang02/lyntty-relay@sha256:${'9'.repeat(64)}\n` }, {}],
       ['multiple-digests', {}, { MOCK_REPO_DIGESTS: JSON.stringify([priorDigest, `ghcr.io/jczhang02/lyntty-relay@sha256:${'3'.repeat(64)}`]) }],
@@ -605,8 +681,12 @@ exec /usr/bin/mv "$@"
         'repository-qualified-legacy-tag': 'repository-qualified-tag',
       }[name];
       if (expectedTagCategory) {
-        assert.match(result.stderr, /not a supported syntax for the documented R65 value/, name);
         assert.match(result.stderr, new RegExp(`syntax category=${expectedTagCategory}`), name);
+        if (name === 'wrong-legacy-tag') {
+          assert.match(result.stderr, /drift repair requires the running documented R65 container reference/, name);
+        } else {
+          assert.match(result.stderr, /not a supported syntax for the documented R65 value/, name);
+        }
       }
       const commands = await readFile(join(rejected.dir, '.commands.log'), 'utf8').catch(() => '');
       assert.doesNotMatch(commands, /\b(stop|run|migrate|backup|up)\b/, name);

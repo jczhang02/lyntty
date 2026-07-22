@@ -373,7 +373,8 @@ jobs:
             local assignment_count canonical_count legacy_tag_assignment_count legacy_tag_canonical_count
             local services_key_count service_key_count raw_image_count strict_image_count data_mount_count backup_target_count backup_mount_count
             local rendered_json configured_reference raw_reference container container_reference container_image_id configured_image_id
-            local repo_digests repo_tags previous_reference previous_image_id env_value
+            local repo_digests repo_tags previous_reference previous_image_id env_value identity_reference
+            local legacy_tag_syntax_category=accepted legacy_tag_repair_required=false
             local -a legacy_containers=()
             local env_backup compose_backup env_stage compose_stage source_projection stage_projection staged_json image_indent original_image_line
             report_legacy_tag_classification() {
@@ -390,8 +391,116 @@ jobs:
               elif LC_ALL=C grep -q '[^[:print:][:space:]]' <<< "$assignment"; then
                 category=non-printing-bytes
               fi
+              legacy_tag_syntax_category="$category"
               printf 'legacy Relay source image-tag syntax category=%s\n' "$category" >&2
               unset assignment
+            }
+            repair_legacy_tag_drift() {
+              local backup stage source_projection stage_projection staged_json log_backup='' log_stage
+              rollback_legacy_tag_repair() {
+                local original_status=$? rollback_failed=false
+                trap - EXIT HUP INT TERM
+                rm -f "$LEGACY_TAG_REPAIR_STAGE" "$LEGACY_TAG_REPAIR_SOURCE_PROJECTION" \
+                  "$LEGACY_TAG_REPAIR_STAGE_PROJECTION" "$LEGACY_TAG_REPAIR_LOG_STAGE" || rollback_failed=true
+                if [[ "$LEGACY_TAG_REPAIR_INSTALLED" == true && "$LEGACY_TAG_REPAIR_COMMITTED" != true ]]; then
+                  restore_private_backup "$LEGACY_TAG_REPAIR_ENV_BACKUP" .env || rollback_failed=true
+                  if [[ "$LEGACY_TAG_REPAIR_ORIGINAL_LOG_EXISTED" == true ]]; then
+                    restore_private_backup "$LEGACY_TAG_REPAIR_LOG_BACKUP" .env-canonicalization.log || rollback_failed=true
+                  elif [[ "$LEGACY_TAG_REPAIR_RECEIPT_INSTALLED" == true ]]; then
+                    rm -f .env-canonicalization.log || rollback_failed=true
+                  fi
+                  if [[ "$rollback_failed" == false ]]; then
+                    [[ "$(compose config --format json 2>/dev/null | jq -er '.services["lyntty-relay"].image')" == "$LEGACY_TAG_REPAIR_ORIGINAL_REFERENCE" ]] || rollback_failed=true
+                    [[ "$(docker inspect --format '{{.State.Running}} {{.Image}}' "$LEGACY_TAG_REPAIR_CONTAINER")" == "true $LEGACY_TAG_REPAIR_CONTAINER_ID" ]] || rollback_failed=true
+                    if [[ "$LEGACY_TAG_REPAIR_ORIGINAL_LOG_EXISTED" == true ]]; then
+                      cmp -s "$LEGACY_TAG_REPAIR_LOG_BACKUP" .env-canonicalization.log || rollback_failed=true
+                    else
+                      [[ ! -e .env-canonicalization.log && ! -L .env-canonicalization.log ]] || rollback_failed=true
+                    fi
+                  fi
+                  if [[ "$rollback_failed" == true ]]; then
+                    printf '%s legacy-image-tag-repair-restore-failed\n' "$BOM_TAG" > "$rollback_marker"
+                    chmod 600 "$rollback_marker"
+                    echo 'documented R65 image-tag drift repair failed and could not restore its original configuration; retry is blocked' >&2
+                  else
+                    echo 'documented R65 image-tag drift repair failed; original configuration restored' >&2
+                  fi
+                fi
+                if (( original_status != 0 )); then
+                  printf 'Relay deployment preflight failed during phase=%s\n' "$preflight_phase" >&2
+                fi
+                exit "$original_status"
+              }
+              backup="$(mktemp -p . ".env-precanonical-${legacy_tag_key}-XXXXXXXX")"
+              stage="$(mktemp -p . ".env-tag-repair-XXXXXXXX")"
+              source_projection="$(mktemp -p . ".env-tag-source-projection-XXXXXXXX")"
+              stage_projection="$(mktemp -p . ".env-tag-stage-projection-XXXXXXXX")"
+              log_stage="$(mktemp -p . ".env-tag-receipt-XXXXXXXX")"
+              LEGACY_TAG_REPAIR_ENV_BACKUP="$backup"
+              LEGACY_TAG_REPAIR_STAGE="$stage"
+              LEGACY_TAG_REPAIR_SOURCE_PROJECTION="$source_projection"
+              LEGACY_TAG_REPAIR_STAGE_PROJECTION="$stage_projection"
+              LEGACY_TAG_REPAIR_LOG_BACKUP=''
+              LEGACY_TAG_REPAIR_LOG_STAGE="$log_stage"
+              LEGACY_TAG_REPAIR_ORIGINAL_REFERENCE="$configured_reference"
+              LEGACY_TAG_REPAIR_CONTAINER="$container"
+              LEGACY_TAG_REPAIR_CONTAINER_ID="$container_image_id"
+              LEGACY_TAG_REPAIR_ORIGINAL_LOG_EXISTED=false
+              LEGACY_TAG_REPAIR_INSTALLED=false
+              LEGACY_TAG_REPAIR_RECEIPT_INSTALLED=false
+              LEGACY_TAG_REPAIR_COMMITTED=false
+              trap rollback_legacy_tag_repair EXIT
+              trap 'exit 130' HUP INT TERM
+              cp --preserve=mode,ownership,timestamps .env "$backup"
+              chmod 600 "$backup"
+              cmp -s .env "$backup"
+              sed -E "s/^${legacy_tag_key}=.*$/${legacy_tag_key}=sha-9752c689c927/" .env > "$stage"
+              grep -vE "^${legacy_tag_key}=" .env > "$source_projection"
+              grep -vE "^${legacy_tag_key}=" "$stage" > "$stage_projection"
+              cmp -s "$source_projection" "$stage_projection"
+              [[ "$(grep -c "^${legacy_tag_key}=sha-9752c689c927$" "$stage" || true)" == 1 ]]
+              [[ "$(grep -Ec "^[[:space:]]*(export[[:space:]]+)?${legacy_tag_key}([[:space:]]*=|[[:space:]]+)" "$stage" || true)" == 1 ]]
+              chown --reference=.env "$stage"
+              chmod 600 "$stage"
+              staged_json="$(env -u COMPOSE_FILE -u COMPOSE_PATH_SEPARATOR -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES \
+                -u LYNTTY_MASTER_SECRET -u HANDY_MASTER_SECRET -u LYNTTY_RELAY_IMAGE -u LYNTTY_RELAY_IMAGE_TAG \
+                docker compose --project-directory /opt/lyntty --project-name lyntty \
+                --file /opt/lyntty/docker-compose.yml --env-file "$stage" config --format json 2>/dev/null)"
+              jq -e --arg expected "$expected_tag" \
+                '.services | type == "object" and keys == ["lyntty-relay"] and .["lyntty-relay"].image == $expected' \
+                <<< "$staged_json" >/dev/null
+              unset staged_json
+              if [[ -e .env-canonicalization.log ]]; then
+                LEGACY_TAG_REPAIR_ORIGINAL_LOG_EXISTED=true
+                log_backup="$(mktemp -p . ".env-canonicalization-log-pre-tag-repair-XXXXXXXX")"
+                LEGACY_TAG_REPAIR_LOG_BACKUP="$log_backup"
+                cp --preserve=mode,ownership,timestamps .env-canonicalization.log "$log_backup"
+                chmod 600 "$log_backup"
+                cp --preserve=mode,ownership,timestamps .env-canonicalization.log "$log_stage"
+              else
+                chown --reference=.env "$log_stage"
+              fi
+              printf '%s key=%s source_form=alternate-sha-config-drift target_form=documented-r65-tag backup=%s\n' \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$legacy_tag_key" "$(basename "$backup")" >> "$log_stage"
+              chmod 600 "$log_stage"
+              LEGACY_TAG_REPAIR_INSTALLED=true
+              if ! mv -f -- "$stage" .env; then
+                echo 'documented R65 image-tag drift repair could not be installed' >&2
+                exit 1
+              fi
+              rm -f "$source_projection" "$stage_projection"
+              if [[ "$(compose config --format json 2>/dev/null | jq -er '.services["lyntty-relay"].image')" != "$expected_tag" ]] \
+                || [[ "$(docker inspect --format '{{.State.Running}} {{.Image}}' "$container")" != "true $container_image_id" ]]; then
+                echo 'documented R65 image-tag drift repair could not be verified' >&2
+                exit 1
+              fi
+              LEGACY_TAG_REPAIR_RECEIPT_INSTALLED=true
+              mv -f -- "$log_stage" .env-canonicalization.log
+              [[ "$(stat -c '%U:%a' .env-canonicalization.log)" == root:600 ]]
+              LEGACY_TAG_REPAIR_COMMITTED=true
+              trap - EXIT HUP INT TERM
+              trap report_preflight_exit EXIT
+              echo 'documented R65 image-tag configuration drift repaired to the verified running runtime' >&2
             }
             assignment_count="$(grep -Ec "^[[:space:]]*(export[[:space:]]+)?${target_key}([[:space:]]*=|[[:space:]]+)" .env || true)"
             canonical_count="$(grep -c "^${target_key}=" .env || true)"
@@ -475,11 +584,15 @@ jobs:
                 echo 'legacy Relay image tag must have one canonical source assignment' >&2
                 return 1
               }
-              LC_ALL=C grep -Eq "$legacy_tag_value_pattern" .env || {
+              if ! LC_ALL=C grep -Eq "$legacy_tag_value_pattern" .env; then
                 report_legacy_tag_classification
-                echo 'legacy Relay source image tag is not a supported syntax for the documented R65 value' >&2
-                return 1
-              }
+                if [[ "$legacy_tag_syntax_category" == alternate-sha-tag ]]; then
+                  legacy_tag_repair_required=true
+                else
+                  echo 'legacy Relay source image tag is not a supported syntax for the documented R65 value' >&2
+                  return 1
+                fi
+              fi
             elif [[ "$raw_reference" == "$expected_tag" ]]; then
               source_form=legacy-compose-hardcoded-tag
               [[ "$legacy_tag_assignment_count" == 0 || "$legacy_tag_assignment_count" == 1 && "$legacy_tag_canonical_count" == 1 ]] || {
@@ -497,10 +610,17 @@ jobs:
               echo 'legacy Relay Compose image is not the documented R65 source tag' >&2
               return 1
             fi
-            [[ "$configured_reference" == "$expected_tag" ]] || {
-              echo 'rendered Relay image differs from the documented R65 source tag' >&2
-              return 1
-            }
+            if [[ "$legacy_tag_repair_required" == true ]]; then
+              [[ "$configured_reference" =~ ^ghcr\.io/jczhang02/lyntty-relay:sha-[a-f0-9]{7,64}$ && "$configured_reference" != "$expected_tag" ]] || {
+                echo 'alternate legacy image-tag configuration did not render one different same-repository SHA tag' >&2
+                return 1
+              }
+            else
+              [[ "$configured_reference" == "$expected_tag" ]] || {
+                echo 'rendered Relay image differs from the documented R65 source tag' >&2
+                return 1
+              }
+            fi
             unset rendered_json
             [[ "$assignment_count" == 0 || "$assignment_count" == 1 && "$canonical_count" == 1 ]] || {
               echo 'legacy Relay image migration requires an absent or one canonical target assignment' >&2
@@ -512,10 +632,21 @@ jobs:
             container="${legacy_containers[0]}"
             [[ "$(docker inspect --format '{{.State.Running}}' "$container")" == true ]]
             container_reference="$(docker inspect --format '{{.Config.Image}}' "$container")"
-            [[ "$container_reference" == "$expected_tag" ]]
+            [[ "$container_reference" == "$expected_tag" ]] || {
+              if [[ "$legacy_tag_repair_required" == true ]]; then
+                echo 'legacy image-tag drift repair requires the running documented R65 container reference' >&2
+              else
+                echo 'running legacy Relay container does not use the documented R65 tag' >&2
+              fi
+              return 1
+            }
             container_image_id="$(docker inspect --format '{{.Image}}' "$container")"
             [[ "$container_image_id" =~ ^sha256:[a-f0-9]{64}$ ]]
-            configured_image_id="$(docker image inspect --format '{{.Id}}' "$configured_reference")"
+            identity_reference="$configured_reference"
+            if [[ "$legacy_tag_repair_required" == true ]]; then
+              identity_reference="$expected_tag"
+            fi
+            configured_image_id="$(docker image inspect --format '{{.Id}}' "$identity_reference")"
             [[ "$configured_image_id" == "$container_image_id" ]]
             preflight_phase=legacy-image-repository-digest
             repo_digests="$(docker image inspect --format '{{json .RepoDigests}}' "$container_image_id")"
@@ -529,6 +660,10 @@ jobs:
             docker pull "$previous_reference" >/dev/null
             previous_image_id="$(docker image inspect --format '{{.Id}}' "$previous_reference")"
             [[ "$previous_image_id" == "$container_image_id" ]]
+            if [[ "$legacy_tag_repair_required" == true ]]; then
+              repair_legacy_tag_drift
+              configured_reference="$expected_tag"
+            fi
             if [[ "$assignment_count" == 1 ]]; then
               env_value="$(sed -n "s/^${target_key}=//p" .env)"
               [[ "$env_value" == "$previous_reference" ]] || {
