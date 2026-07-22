@@ -1070,17 +1070,12 @@ async function waitForSupervisorReceipt(
     ) {
       throw new Error(`Supervisor receipt identity mismatch for ${intent.role}`);
     }
-    if (!processIsAlive(receipt.pid)) return false;
-    const actualStartToken = await processStartToken(receipt.pid);
-    if (!actualStartToken) return false;
-    if (actualStartToken !== receipt.processStartToken) {
-      throw new Error(`Supervisor receipt PID/start-token mismatch for ${intent.role}`);
-    }
     const ownership = await supervisorOwnership(layout, state, {
       pid: receipt.pid,
       role: receipt.role,
       processStartToken: receipt.processStartToken,
     });
+    if (!ownership.alive) return false;
     if (!ownership.owned) {
       throw new Error(`Unable to validate ${intent.role} supervisor receipt: ${ownership.reason ?? 'ownership not proven'}`);
     }
@@ -1505,6 +1500,29 @@ async function readProcessIdentity(layout: { canonicalRoot: string }, pid: numbe
   };
 }
 
+async function processIsActive(pid: number): Promise<boolean> {
+  if (!processIsAlive(pid)) return false;
+  try {
+    const current = (await listProcessGroups()).find(member => member.pid === pid);
+    if (current) return !isZombie(current);
+  } catch {
+    // A failed status refresh is not proof that a live process is safe.
+  }
+  // If the process disappeared after the status snapshot, it is no longer an
+  // ownership conflict. A missing but still-live (including PID-reused)
+  // process remains fail-closed.
+  return processIsAlive(pid);
+}
+
+async function ownershipFailureAfterRecheck(
+  pid: number,
+  role: SupervisorRole,
+  reason: string,
+): Promise<OwnershipResult> {
+  if (!(await processIsActive(pid))) return { pid, role, alive: false, owned: false, reason: 'not-running' };
+  return { pid, role, alive: true, owned: false, reason };
+}
+
 async function supervisorOwnership(
   layout: DevLayout,
   state: DevState,
@@ -1513,15 +1531,17 @@ async function supervisorOwnership(
   const alive = processIsAlive(record.pid);
   if (!alive) return { pid: record.pid, role: record.role, alive: false, owned: false, reason: 'not-running' };
   const identity = await readProcessIdentity(layout, record.pid);
-  if (!identity) return { pid: record.pid, role: record.role, alive: true, owned: false, reason: 'unable-to-read-proc-identity' };
+  if (!identity) {
+    return ownershipFailureAfterRecheck(record.pid, record.role, 'unable-to-read-proc-identity');
+  }
 
   if (record.processStartToken) {
     const actualStartToken = await processStartToken(record.pid);
     if (!actualStartToken || actualStartToken !== record.processStartToken) {
-      return { pid: record.pid, role: record.role, alive: true, owned: false, reason: 'process-start-token-mismatch' };
+      return ownershipFailureAfterRecheck(record.pid, record.role, 'process-start-token-mismatch');
     }
   } else {
-    return { pid: record.pid, role: record.role, alive: true, owned: false, reason: 'process-start-token-missing' };
+    return ownershipFailureAfterRecheck(record.pid, record.role, 'process-start-token-missing');
   }
   const expectedRole = `${record.role}-supervisor`;
   const expectedArgv = [process.execPath, layout.scriptPath, INTERNAL_SUPERVISOR, record.role];
@@ -1532,9 +1552,9 @@ async function supervisorOwnership(
     && hasExactEnvironment(identity.environment, 'LYNTTY_DEV_ROOT', layout.canonicalRoot)
     && hasExactEnvironment(identity.environment, 'LYNTTY_DEV_WORKTREE_HASH', layout.worktreeHash);
   const cwdOwned = identity.cwd === layout.canonicalRoot;
-  if (!commandOwned) return { pid: record.pid, role: record.role, alive: true, owned: false, reason: 'command-mismatch' };
-  if (!environmentOwned) return { pid: record.pid, role: record.role, alive: true, owned: false, reason: 'environment-mismatch' };
-  if (!cwdOwned) return { pid: record.pid, role: record.role, alive: true, owned: false, reason: 'cwd-mismatch' };
+  if (!commandOwned) return ownershipFailureAfterRecheck(record.pid, record.role, 'command-mismatch');
+  if (!environmentOwned) return ownershipFailureAfterRecheck(record.pid, record.role, 'environment-mismatch');
+  if (!cwdOwned) return ownershipFailureAfterRecheck(record.pid, record.role, 'cwd-mismatch');
   return { pid: record.pid, role: record.role, alive: true, owned: true };
 }
 
@@ -1572,16 +1592,20 @@ async function childOwnership(
   const alive = processIsAlive(pid);
   if (!alive) return { pid, role: record.role, alive: false, owned: false, reason: 'not-running' };
   const identity = await readProcessIdentity(layout, pid);
-  if (!identity) return { pid, role: record.role, alive: true, owned: false, reason: 'unable-to-read-proc-identity' };
+  if (!identity) return ownershipFailureAfterRecheck(pid, record.role, 'unable-to-read-proc-identity');
   const spec = childCommandSpec(layout, state, record.role);
-  if (!childCommandMatches(identity, spec)) return { pid, role: record.role, alive: true, owned: false, reason: 'child-command-mismatch' };
+  if (!childCommandMatches(identity, spec)) {
+    return ownershipFailureAfterRecheck(pid, record.role, 'child-command-mismatch');
+  }
   if (!hasExactEnvironment(identity.environment, 'LYNTTY_DEV_INSTANCE_ID', state.instanceId)
     || !hasExactEnvironment(identity.environment, 'LYNTTY_DEV_ROLE', record.role)
     || !hasExactEnvironment(identity.environment, 'LYNTTY_DEV_ROOT', layout.canonicalRoot)
     || !hasExactEnvironment(identity.environment, 'LYNTTY_DEV_WORKTREE_HASH', layout.worktreeHash)) {
-    return { pid, role: record.role, alive: true, owned: false, reason: 'child-environment-mismatch' };
+    return ownershipFailureAfterRecheck(pid, record.role, 'child-environment-mismatch');
   }
-  if (identity.cwd !== layout.canonicalRoot) return { pid, role: record.role, alive: true, owned: false, reason: 'child-cwd-mismatch' };
+  if (identity.cwd !== layout.canonicalRoot) {
+    return ownershipFailureAfterRecheck(pid, record.role, 'child-cwd-mismatch');
+  }
   return { pid, role: record.role, alive: true, owned: true };
 }
 
@@ -1599,14 +1623,16 @@ async function descendantOwnership(
   const alive = processIsAlive(pid);
   if (!alive) return { pid, role: record.role, alive: false, owned: false, reason: 'not-running' };
   const identity = await readProcessIdentity(layout, pid);
-  if (!identity) return { pid, role: record.role, alive: true, owned: false, reason: 'unable-to-read-proc-identity' };
+  if (!identity) return ownershipFailureAfterRecheck(pid, record.role, 'unable-to-read-proc-identity');
   if (!hasExactEnvironment(identity.environment, 'LYNTTY_DEV_INSTANCE_ID', state.instanceId)
     || !hasExactEnvironment(identity.environment, 'LYNTTY_DEV_ROLE', record.role)
     || !hasExactEnvironment(identity.environment, 'LYNTTY_DEV_ROOT', layout.canonicalRoot)
     || !hasExactEnvironment(identity.environment, 'LYNTTY_DEV_WORKTREE_HASH', layout.worktreeHash)) {
-    return { pid, role: record.role, alive: true, owned: false, reason: 'descendant-environment-mismatch' };
+    return ownershipFailureAfterRecheck(pid, record.role, 'descendant-environment-mismatch');
   }
-  if (!pathIsInside(layout.canonicalRoot, identity.cwd)) return { pid, role: record.role, alive: true, owned: false, reason: 'descendant-cwd-mismatch' };
+  if (!pathIsInside(layout.canonicalRoot, identity.cwd)) {
+    return ownershipFailureAfterRecheck(pid, record.role, 'descendant-cwd-mismatch');
+  }
   return { pid, role: record.role, alive: true, owned: true };
 }
 
@@ -1693,7 +1719,7 @@ async function inspectOwnedProcessGroup(
           ? discoveredChildOwnership ?? await childOwnership(layout, state, record, member.pid)
           : hasOwnedChildAncestor(member, rootChildPids, membersByPid)
             ? await descendantOwnership(layout, state, record, member.pid)
-            : { pid: member.pid, role: record.role, alive: true, owned: false, reason: 'unrelated-process-group-member' };
+            : await ownershipFailureAfterRecheck(member.pid, record.role, 'unrelated-process-group-member');
     // A member may exit between the process-group snapshot and identity proof.
     // It no longer needs a signal and must not turn a clean shutdown race into
     // an ownership failure. Every member still alive remains fail closed.
@@ -1814,18 +1840,19 @@ async function reconcileLaunchMetadata(layout: DevLayout, state: DevState | null
       role: value.role,
       processStartToken: value.processStartToken,
     };
-    if (processIsAlive(value.pid)) {
-      const actualStartToken = await processStartToken(value.pid);
-      if (!actualStartToken || actualStartToken !== value.processStartToken) {
-        throw new Error(`Development supervisor receipt PID/start-token mismatch for ${value.role}`);
-      }
-      const ownership = await supervisorOwnership(layout, state, record);
+    const ownership = await supervisorOwnership(layout, state, record);
+    if (ownership.alive) {
       if (!ownership.owned) {
         throw new Error(`Development supervisor receipt ownership is not proven for ${value.role}: ${ownership.reason ?? 'unknown'}`);
       }
     } else {
       const group = await inspectOwnedProcessGroup(layout, state, record, await listProcessGroups());
       if (group.members.length === 0) {
+        const groupStillExists = (await listProcessGroups())
+          .some(member => member.pgid === group.pgid && !isZombie(member));
+        if (groupStillExists) {
+          throw new Error(`Development supervisor process group changed during receipt reconciliation for ${value.role}; retry`);
+        }
         cleanup.add(receipt.path);
         completedLaunchIds.add(value.launchId);
         continue;
