@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test } from 'bun:test';
 import {
   createStableAndroidValidation,
@@ -67,6 +69,38 @@ const resolvedPreviewReleaseNotes = previewReleaseNotes
   .replaceAll('{{TAG}}', 'android-preview-v1.2.0-920001')
   .replaceAll('{{SHA256}}', '7139219f0051ab0ad705932f15175ea1e5d8903f91e0491b19f800aa97d4038b')
   .replaceAll('{{SOURCE_COMMIT}}', 'ef0853524fb78ecf31697103ff5597a0b20b1ed6');
+
+const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
+const obsoleteBrandingPaths = [
+  'logo.png',
+  'packages/lyntty-app/logo.png',
+  '.github/mascot.png',
+  '.github/header.png',
+];
+const obsoleteNeonIconSha256 = '6bf41612ebe282a6813cc02fca02c92ae169c854ae285b0249d776fc0105dc17';
+
+test('repository keeps the current launcher icon and rejects obsolete neon branding', async () => {
+  for (const path of obsoleteBrandingPaths) {
+    await assert.rejects(stat(join(repositoryRoot, path)), error => error?.code === 'ENOENT');
+  }
+
+  const appConfig = await readFile(join(repositoryRoot, 'packages/lyntty-app/app.config.js'), 'utf8');
+  assert.match(appConfig, /icon:\s*"\.\/sources\/assets\/images\/icon\.png"/);
+  await stat(join(repositoryRoot, 'packages/lyntty-app/sources/assets/images/icon-source.svg'));
+  await stat(join(repositoryRoot, 'packages/lyntty-app/sources/assets/images/icon.png'));
+
+  const tracked = Bun.spawnSync({
+    cmd: ['git', 'ls-files', '-z', '--', '*.png'],
+    cwd: repositoryRoot,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  assert.equal(tracked.exitCode, 0, tracked.stderr.toString());
+  for (const path of tracked.stdout.toString().split('\0').filter(Boolean)) {
+    const digest = createHash('sha256').update(await readFile(join(repositoryRoot, path))).digest('hex');
+    assert.notEqual(digest, obsoleteNeonIconSha256, `obsolete neon icon remains tracked at ${path}`);
+  }
+});
 
 test('relay deploy resolves only a signed stable BOM to an immutable image', () => {
   assert.match(relayDeploy, /environment: production-relay/);
