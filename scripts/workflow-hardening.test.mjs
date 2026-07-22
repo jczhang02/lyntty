@@ -87,6 +87,9 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /sudo \/bin\/bash -se/);
   assert.match(relayDeploy, /production deploy requires the current signed Stable head/);
   assert.match(relayDeploy, /deployed-sequence\.txt/);
+  assert.match(relayDeploy, /recorded deployed sequence must be one root-private regular file/);
+  assert.match(relayDeploy, /recorded deployed BOM identity is invalid/);
+  assert.match(relayDeploy, /recorded_deployed_reference/);
   assert.match(relayDeploy, /trap 'exit 130' HUP INT TERM/);
   assert.match(relayDeploy, /remains fail-stopped after migration began/);
   assert.match(relayDeploy, /LYNTTY_RELEASE_TRUST_ROOTS/);
@@ -95,6 +98,8 @@ test('relay deploy resolves only a signed stable BOM to an immutable image', () 
   assert.match(relayDeploy, /\[\[ ! -L docker-compose\.yml \]\]/);
   assert.match(relayDeploy, /\.env-canonicalization\.log/);
   assert.match(relayDeploy, /\.RepoDigests/);
+  assert.match(relayDeploy, /2eb926b37741e9b047b6e6f178ffdb0e84ed41c6649180421b3f4861838ff715/);
+  assert.match(relayDeploy, /fe3bf95fd7e19cd34c3f94ff2aedeced9497535db797f07ba37241083dd8e83d/);
   assert.match(relayDeploy, /--project-name lyntty/);
   assert.match(relayDeploy, /grep -vE '[^']*LYNTTY_RELAY_IMAGE_TAG/);
   assert.match(relayDeploy, /HANDY_MASTER_SECRET: \$\{LYNTTY_MASTER_SECRET\}/);
@@ -361,15 +366,24 @@ console.log(result);
 });
 
 test('Relay legacy image layout migration binds the running bytes to one prior digest', async () => {
+  const deindent = (value) => value.split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  const recordBlock = relayDeploy.match(/(          deployed_sequence=0[\s\S]*?)\n          compose\(\) \{/)?.[1];
+  const sequenceGate = relayDeploy.match(/          (\(\( BOM_SEQUENCE > deployed_sequence \)\) \|\| \{[^\n]+\})/)?.[1];
   const functionBlock = relayDeploy.match(
     /(          compose\(\) \{[\s\S]*?\n          \})\n          preflight_phase=master-secret-canonicalization/,
   )?.[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  assert.ok(recordBlock);
+  assert.ok(sequenceGate);
   assert.ok(functionBlock);
   const block = `${functionBlock}\nmigrate_legacy_relay_image_layout`;
   const root = await mkdtemp(join(tmpdir(), 'lyntty-relay-image-layout-'));
   const imageId = `sha256:${'1'.repeat(64)}`;
-  const priorDigest = `ghcr.io/jczhang02/lyntty-relay@sha256:${'2'.repeat(64)}`;
+  const priorDigest = 'ghcr.io/jczhang02/lyntty-relay@sha256:2eb926b37741e9b047b6e6f178ffdb0e84ed41c6649180421b3f4861838ff715';
   const legacyTag = 'ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927';
+  const successorDigest = 'ghcr.io/jczhang02/lyntty-relay@sha256:fe3bf95fd7e19cd34c3f94ff2aedeced9497535db797f07ba37241083dd8e83d';
+  const successorTag = 'ghcr.io/jczhang02/lyntty-relay:sha-e243429200bd';
+  const signedTargetDigest = 'ghcr.io/jczhang02/lyntty-relay@sha256:a2fb96b60c48767b242f920a8a6e4f9637d0d50607a5787bc67a503cc39c64ed';
+  const recordedPredecessorDigest = `ghcr.io/jczhang02/lyntty-relay@sha256:${'7'.repeat(64)}`;
   const legacyImageScalar = 'ghcr.io/jczhang02/lyntty-relay:${LYNTTY_RELAY_IMAGE_TAG}';
   const composeContent = [
     'services:',
@@ -388,7 +402,7 @@ test('Relay legacy image layout migration binds the running bytes to one prior d
   try {
     const execute = (dir, overrides = {}) => {
       const result = Bun.spawnSync({
-        cmd: ['bash', '-c', `set -Eeuo pipefail\ncd "$ROOT"\nBOM_TAG=compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1\nrollback_marker=.rollback-incomplete\npreflight_phase=legacy-image-layout\n${block}`],
+        cmd: ['bash', '-c', `set -Eeuo pipefail\ncd "$ROOT"\nBOM_TAG=compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1\nBOM_SEQUENCE="${'${MOCK_BOM_SEQUENCE:-1}'}"\nIMAGE_REFERENCE=${signedTargetDigest}\nrollback_marker=.rollback-incomplete\npreflight_phase=legacy-image-layout\n${deindent(recordBlock)}\n${sequenceGate}\n${block}`],
         env: {
           ...process.env,
           ROOT: dir,
@@ -413,6 +427,14 @@ test('Relay legacy image layout migration binds the running bytes to one prior d
       const envContent = options.envContent ?? 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927\n';
       await writeFile(join(dir, '.env'), envContent, { mode: 0o600 });
       await writeFile(join(dir, 'docker-compose.yml'), options.composeContent ?? composeContent, { mode: 0o600 });
+      if (options.deployedSequence !== undefined) {
+        await writeFile(join(dir, 'deployed-sequence.txt'), options.deployedSequence, { mode: options.deployedSequenceMode ?? 0o600 });
+        await chmod(join(dir, 'deployed-sequence.txt'), options.deployedSequenceMode ?? 0o600);
+      }
+      if (options.deployedBom !== undefined) {
+        await writeFile(join(dir, 'deployed-bom.txt'), options.deployedBom, { mode: options.deployedBomMode ?? 0o600 });
+        await chmod(join(dir, 'deployed-bom.txt'), options.deployedBomMode ?? 0o600);
+      }
       await chmod(join(dir, '.env'), 0o600);
       await chmod(join(dir, 'docker-compose.yml'), 0o600);
       await writeFile(join(dir, 'bin', 'docker'), `#!/usr/bin/env bun
@@ -562,6 +584,35 @@ exec /usr/bin/mv "$@"
     assert.equal(execute(fixture.dir).exitCode, 0);
     assert.deepEqual((await readdir(fixture.dir)).filter(name => name !== '.commands.log').sort(), namesBeforeRetry);
 
+    const successorEnv = 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-e243429200bd\n';
+    const successor = await createFixture('documented-successor', { envContent: successorEnv });
+    const successorResult = execute(successor.dir, {
+      MOCK_CONTAINER_REFERENCE: successorTag,
+      MOCK_REPO_DIGESTS: JSON.stringify([successorDigest]),
+      MOCK_REPO_TAGS: JSON.stringify([successorTag]),
+    });
+    assert.equal(successorResult.exitCode, 0, successorResult.stderr);
+    assert.equal(
+      await readFile(join(successor.dir, '.env'), 'utf8'),
+      `${successorEnv}LYNTTY_RELAY_IMAGE=${successorDigest}\n`,
+    );
+    assert.equal(await readFile(join(successor.dir, 'docker-compose.yml'), 'utf8'), canonicalCompose(composeContent));
+    assert.doesNotMatch(`${successorResult.stdout}\n${successorResult.stderr}`, /fixture-secret-never-log/);
+
+    const signedTarget = await createFixture('signed-target-retry', {
+      envContent: `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE=${signedTargetDigest}\n`,
+      composeContent: canonicalCompose(composeContent),
+    });
+    assert.equal(execute(signedTarget.dir).exitCode, 0);
+
+    const recordedPredecessor = await createFixture('recorded-predecessor-upgrade', {
+      envContent: `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE=${recordedPredecessorDigest}\n`,
+      composeContent: canonicalCompose(composeContent),
+      deployedSequence: '1\n',
+      deployedBom: `compat-v1.0.0_1.0.0_1.0.0_0.1.0-s1 ${recordedPredecessorDigest}\n`,
+    });
+    assert.equal(execute(recordedPredecessor.dir, { MOCK_BOM_SEQUENCE: '2' }).exitCode, 0);
+
     for (const [name, envContent] of [
       ['single-quoted-tag', "LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG='sha-9752c689c927'\n"],
       ['double-quoted-spaced-tag', 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=  "sha-9752c689c927"  \n'],
@@ -647,6 +698,11 @@ exec /usr/bin/mv "$@"
     assert.equal(await readFile(join(hardcoded.dir, 'docker-compose.yml'), 'utf8'), canonicalCompose(hardcodedCompose));
 
     for (const [name, fixtureOptions, overrides] of [
+      ['record-missing-pair', { deployedSequence: '1\n' }, { MOCK_BOM_SEQUENCE: '2' }],
+      ['record-nul-sequence', { deployedSequence: '1\0\n', deployedBom: `compat-v1.0.0_1.0.0_1.0.0_0.1.0-s1 ${recordedPredecessorDigest}\n` }, { MOCK_BOM_SEQUENCE: '2' }],
+      ['record-nul-bom', { deployedSequence: '1\n', deployedBom: `compat-v1.0.0_1.0.0_1.0.0_0.1.0-s1 ${recordedPredecessorDigest}\0\n` }, { MOCK_BOM_SEQUENCE: '2' }],
+      ['record-sequence-mismatch', { deployedSequence: '1\n', deployedBom: `compat-v1.0.0_1.0.0_1.0.0_0.1.0-s2 ${recordedPredecessorDigest}\n` }, { MOCK_BOM_SEQUENCE: '2' }],
+      ['record-public-mode', { deployedSequence: '1\n', deployedSequenceMode: 0o644, deployedBom: `compat-v1.0.0_1.0.0_1.0.0_0.1.0-s1 ${recordedPredecessorDigest}\n` }, { MOCK_BOM_SEQUENCE: '2' }],
       ['duplicate-image', { composeContent: composeContent.replace('    restart: unless-stopped', `    image: ${legacyTag}`) }, {}],
       ['bom-compose', { composeContent: `\uFEFF${composeContent}` }, {}],
       ['anchor-compose', { composeContent: composeContent.replace('services:', 'services: &services') }, {}],
@@ -659,6 +715,8 @@ exec /usr/bin/mv "$@"
       ['commented-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927 # unrecorded syntax\n' }, {}],
       ['wrong-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-aaaaaaaaaaaa\n' }, { MOCK_CONTAINER_REFERENCE: 'ghcr.io/jczhang02/lyntty-relay:sha-aaaaaaaaaaaa' }],
       ['repository-qualified-legacy-tag', { envContent: 'LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=ghcr.io/jczhang02/lyntty-relay:sha-9752c689c927\n' }, {}],
+      ['successor-mismatched-digest', { envContent: successorEnv }, { MOCK_CONTAINER_REFERENCE: successorTag, MOCK_REPO_DIGESTS: JSON.stringify([priorDigest]), MOCK_REPO_TAGS: JSON.stringify([successorTag]) }],
+      ['unknown-canonical-digest', { envContent: `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE=ghcr.io/jczhang02/lyntty-relay@sha256:${'8'.repeat(64)}\n`, composeContent: canonicalCompose(composeContent) }, {}],
       ['mismatched-target', { envContent: `LYNTTY_MASTER_SECRET=fixture-secret-never-log\nLYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927\nLYNTTY_RELAY_IMAGE=ghcr.io/jczhang02/lyntty-relay@sha256:${'9'.repeat(64)}\n` }, {}],
       ['multiple-digests', {}, { MOCK_REPO_DIGESTS: JSON.stringify([priorDigest, `ghcr.io/jczhang02/lyntty-relay@sha256:${'3'.repeat(64)}`]) }],
       ['foreign-digest', {}, { MOCK_REPO_DIGESTS: JSON.stringify([`ghcr.io/other/relay@sha256:${'2'.repeat(64)}`]) }],
@@ -674,6 +732,14 @@ exec /usr/bin/mv "$@"
       assert.equal(await readFile(join(rejected.dir, '.env'), 'utf8'), beforeEnv, name);
       assert.equal(await readFile(join(rejected.dir, 'docker-compose.yml'), 'utf8'), beforeCompose, name);
       assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /fixture-secret-never-log/, name);
+      const expectedRecordError = {
+        'record-missing-pair': /recorded deployed BOM must be one root-private regular file/,
+        'record-nul-sequence': /forbidden BOM, CR, tab, or NUL byte/,
+        'record-nul-bom': /forbidden BOM, CR, tab, or NUL byte/,
+        'record-sequence-mismatch': /recorded deployed BOM identity is invalid/,
+        'record-public-mode': /recorded deployed sequence must be one root-private regular file/,
+      }[name];
+      if (expectedRecordError) assert.match(result.stderr, expectedRecordError, name);
       const expectedTagCategory = {
         'interpolated-legacy-tag': 'interpolation',
         'commented-legacy-tag': 'expected-value-inline-comment',
@@ -713,7 +779,7 @@ exec /usr/bin/mv "$@"
 test('Relay pre-schema rollback supplies the legacy master-secret alias without exposing it', async () => {
   const deindent = (value) => value.split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
   const composeBlock = relayDeploy.match(/(          compose\(\) \{[\s\S]*?\n          \})\n          restore_env_backup/)?.[1];
-  const verifyBlock = relayDeploy.match(/(          verify_previous_runtime\(\) \{[\s\S]*?\n          \})\n          deployed_sequence=/)?.[1];
+  const verifyBlock = relayDeploy.match(/(          verify_previous_runtime\(\) \{[\s\S]*?\n          \})\n          if \(\( BOM_SEQUENCE/)?.[1];
   const rollbackBlock = relayDeploy.match(/(          legacy_rollback_override="\$\(mktemp[\s\S]*?\n          trap 'exit 130' HUP INT TERM)\n          compose stop/)?.[1];
   assert.ok(composeBlock);
   assert.ok(verifyBlock);
@@ -721,12 +787,16 @@ test('Relay pre-schema rollback supplies the legacy master-secret alias without 
   const root = await mkdtemp(join(tmpdir(), 'lyntty-relay-rollback-alias-'));
   const priorDigest = `ghcr.io/jczhang02/lyntty-relay@sha256:${'2'.repeat(64)}`;
   const imageId = `sha256:${'1'.repeat(64)}`;
-  const script = `${deindent(composeBlock)}\n${deindent(verifyBlock)}\n${deindent(rollbackBlock)}\nfalse`;
+  const successorPriorDigest = 'ghcr.io/jczhang02/lyntty-relay@sha256:fe3bf95fd7e19cd34c3f94ff2aedeced9497535db797f07ba37241083dd8e83d';
+  const successorTag = 'ghcr.io/jczhang02/lyntty-relay:sha-e243429200bd';
+  const script = `${deindent(composeBlock)}\n${deindent(verifyBlock)}\nverify_previous_runtime\n${deindent(rollbackBlock)}\nfalse`;
   try {
-    const run = async (name, upFails = false) => {
+    const run = async (name, upFails = false, options = {}) => {
+      const selectedPriorDigest = options.priorDigest ?? priorDigest;
+      const containerReference = options.containerReference ?? selectedPriorDigest;
       const dir = join(root, name);
       await mkdir(join(dir, 'bin'), { recursive: true });
-      await writeFile(join(dir, '.env'), `LYNTTY_MASTER_SECRET=rollback-fixture-secret\nLYNTTY_RELAY_IMAGE=${priorDigest}\n`, { mode: 0o600 });
+      await writeFile(join(dir, '.env'), `LYNTTY_MASTER_SECRET=rollback-fixture-secret\nLYNTTY_RELAY_IMAGE=${selectedPriorDigest}\n`, { mode: 0o600 });
       await writeFile(join(dir, 'docker-compose.yml'), [
         'services:',
         '  lyntty-relay:',
@@ -762,7 +832,7 @@ if (args[0] === 'compose') {
 if (args[0] === 'inspect') {
   const format = after('--format');
   if (format === '{{.State.Running}}') console.log('true');
-  else if (format === '{{.Config.Image}}') console.log(process.env.PRIOR_DIGEST);
+  else if (format === '{{.Config.Image}}') console.log(process.env.CONTAINER_REFERENCE);
   else if (format === '{{.Image}}') console.log(process.env.IMAGE_ID);
   else process.exit(83);
   process.exit(0);
@@ -784,7 +854,8 @@ process.exit(typeof environment?.LYNTTY_MASTER_SECRET === 'string' && environmen
           ...process.env,
           ROOT: dir,
           PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
-          PRIOR_DIGEST: priorDigest,
+          PRIOR_DIGEST: selectedPriorDigest,
+          CONTAINER_REFERENCE: containerReference,
           IMAGE_ID: imageId,
           MOCK_UP_FAIL: String(upFails),
         },
@@ -807,6 +878,15 @@ process.exit(typeof environment?.LYNTTY_MASTER_SECRET === 'string' && environmen
     assert.match(commands, /--file \.\/\.rollback-master-compat\.[^ ]+\.yml/);
     assert.match(commands, /\bup -d lyntty-relay\b/);
     assert.doesNotMatch(`${restored.stdout}\n${restored.stderr}\n${commands}`, /rollback-fixture-secret/);
+
+    const successor = await run('successor', false, { priorDigest: successorPriorDigest, containerReference: successorTag });
+    assert.notEqual(successor.exitCode, 0);
+    assert.equal(await Bun.file(join(successor.dir, '.rollback-incomplete')).exists(), false);
+    assert.match(await readFile(join(successor.dir, '.commands.log'), 'utf8'), /\bup -d lyntty-relay\b/);
+
+    const mismatchedSuccessor = await run('successor-mismatched-prior', false, { containerReference: successorTag });
+    assert.notEqual(mismatchedSuccessor.exitCode, 0);
+    assert.doesNotMatch(await readFile(join(mismatchedSuccessor.dir, '.commands.log'), 'utf8'), /\bup -d lyntty-relay\b/);
 
     const blocked = await run('failure', true);
     assert.notEqual(blocked.exitCode, 0);

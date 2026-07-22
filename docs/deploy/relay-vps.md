@@ -110,7 +110,7 @@ services:
       - "127.0.0.1:3005:3005"
 ```
 
-The protected deploy accepts one historical R65 layout for a one-time migration: the exact `ghcr.io/jczhang02/lyntty-relay:${LYNTTY_RELAY_IMAGE_TAG}` scalar (or its exact rendered R65 tag) and `LYNTTY_RELAY_IMAGE_TAG=sha-9752c689c927`. Before stopping Relay, it proves that the configured tag, running container, local image ID, sole GHCR `RepoDigest`, and pulled immutable digest are the same bytes. It then creates paired root-private backups, atomically stages `${LYNTTY_RELAY_IMAGE}` plus the derived digest, and adds the persistent `/opt/lyntty/backups:/backups` bind if absent. Ambiguous YAML, alternate repositories, multiple digests, missing containers, or any identity mismatch fail before service/database mutation. Do not reproduce this with manual `sed` edits.
+The protected deploy accepts the historical variable-based Compose layout for a one-time migration only when it resolves to one of two audited production identities: R65 `sha-9752c689c927` → `sha256:2eb926b37741e9b047b6e6f178ffdb0e84ed41c6649180421b3f4861838ff715`, or its later deployed successor `sha-e243429200bd` → `sha256:fe3bf95fd7e19cd34c3f94ff2aedeced9497535db797f07ba37241083dd8e83d` (R103). Before stopping Relay, it proves that the configured tag, running container, local image ID, expected RepoTag, sole GHCR `RepoDigest`, pulled immutable digest, and exact tag-to-digest mapping are the same bytes. It then creates paired root-private backups, atomically stages `${LYNTTY_RELAY_IMAGE}` plus the derived digest, and adds the persistent `/opt/lyntty/backups:/backups` bind if absent. Ambiguous YAML, unlisted runtime tags/digests, alternate repositories, multiple digests, missing containers, or any identity mismatch fail before service/database mutation. The R102 exception repairs only stale configuration back to exact proven R65 running bytes; it does not accept the unlisted configured SHA as a runtime. For later Stable N→N+1 upgrades, the canonical predecessor digest is accepted only from the paired, root-owned mode-600 `deployed-bom.txt` and `deployed-sequence.txt`; the running-byte check still applies. Do not reproduce this with manual `sed` edits.
 
 Start:
 
@@ -170,8 +170,8 @@ Production environment variable:
 Deployment transaction (brief maintenance window):
 
 1. Verify protected main, the current immutable signed Stable BOM, exact OCI digest, attestations, SSH host key, root-private files, and absence of incomplete markers.
-2. While the old Relay is still healthy, normalize the documented schema-1 secret key and R65 image layout only through the bounded backup-first migrations above. Resolve the prior digest from the running image bytes, never from a mutable remote tag.
-3. Prepare a root-private rollback-only Compose override that maps `HANDY_MASTER_SECRET` from the exact canonical `LYNTTY_MASTER_SECRET`; it is used only if the R65 image must be restarted before schema mutation.
+2. While the old Relay is still healthy, normalize the documented schema-1 secret key and pre-Stable image layout only through the bounded backup-first migrations above. Resolve the prior digest from the running image bytes and require its audited tag-to-digest mapping; never trust a mutable remote tag alone.
+3. Prepare a root-private rollback-only Compose override that maps `HANDY_MASTER_SECRET` from the exact canonical `LYNTTY_MASTER_SECRET`; it is used only if the verified pre-Stable image must be restarted before schema mutation.
 4. Stop the old Relay, atomically install the target digest/trust roots/sequence, pull and verify the target image, then create and checksum the persistent database backup.
 5. Write `.migration-incomplete`, run `migrate` and `doctor`, start the exact digest, and verify local and public `/health` plus the full `/v1/version` BOM/APK contract.
 
