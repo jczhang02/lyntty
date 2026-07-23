@@ -89,3 +89,22 @@ out/
 # Generated Fumadocs pages; source docs stay in Markdown.
 content/docs/
 docs/.site/content/docs/
+
+# Shared release-agent policy. Keep all other agent state local.
+!CLAUDE.md
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/release-flow/
+.agents/skills/release-flow/*
+!.agents/skills/release-flow/SKILL.md
+!.agents/skills/release-notes/
+.agents/skills/release-notes/*
+!.agents/skills/release-notes/SKILL.md
+!.claude/
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/release-flow
+!.claude/skills/release-notes

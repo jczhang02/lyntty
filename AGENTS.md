@@ -119,6 +119,13 @@ Do not run `lynttyd`, Pi mirror, or Pi extension tests against live `~/.lyntty` 
 
 The Bun workspace contains only these four packages. Pi remote-control commands and the development app-log receiver live in `packages/lyntty-cli`; do not recreate removed agent, app-logs, or Codium workspaces.
 
+## Release agent workflow
+
+- Before a release-producing Compatibility or Preview candidate, promotion, GitHub Release, prerelease, rollback, or release-audit task, load `.agents/skills/release-flow/SKILL.md`. Pure Actions Artifact work, including the Android-only verification candidate and the normal 14-day Expo Dev artifact, is excluded: it is not a GitHub Release and does not use curated Release Notes.
+- `.agents/skills/release-flow/SKILL.md` and `.agents/skills/release-notes/SKILL.md` are the canonical cross-agent sources. `CLAUDE.md` must remain a symlink to `AGENTS.md`; `.claude/skills/release-flow` and `.claude/skills/release-notes` must remain relative symlinks to their canonical `.agents/skills/` directories. Do not add copied rule bodies or `.pi` mirrors.
+- Curated notes are user-invoked only through `/skill:release-notes <version> <CodeName> <emoji> <channel-or-tag>`. The exact version, CodeName, emoji, and channel or tag must come from the user, never inference.
+- Loading either skill does not grant permission for a workflow dispatch, push, PR, tag, Release creation or edit, publication, rollback, or reaction. Every external operation still requires explicit current-task authorization and the repository Git rules above.
+
 ## Testing and verification
 
 Use the narrowest reliable check first, then broaden when behavior crosses layers.
