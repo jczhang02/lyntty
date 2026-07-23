@@ -2,7 +2,7 @@
 
 日期：2026-07-23
 
-状态：实现、隔离的本地 APK/模拟器路径，以及首次受保护 `main` GitHub Actions 发布均已验证。该通道产出一份保留 14 天的 Actions Artifact；没有创建 tag、Draft、prerelease 或 GitHub Release。
+状态：实现、隔离的本地 APK/模拟器路径、首次受保护 `main` GitHub Actions 发布，以及所有者明确授权的 immutable GitHub prerelease 均已验证。workflow 仍只产出保留 14 天的 Actions Artifact；其中 7 个已验证文件随后原样提升为独立 Expo Dev prerelease。
 
 ## 范围与边界
 
@@ -148,7 +148,27 @@ manifest SHA-256：8fd05428913ce3fe1de77218b0f895e5dd88eee3a78488a5ce315075b58b4
 
 下载后的 7 个文件与严格 manifest 的 6 项加 manifest 自身完全一致。provenance 绑定 run ID/number/attempt、源码 commit/tree、package、Debug/Metro 身份、signer、ABI、APK 大小与 checksum。对下载 APK 重新执行本地 audit 后与上传 audit 逐字一致：`dev.jczhang.lyntty.dev`、`debuggable=true`、唯一固定 v2 signer、无 standalone bundle、Metro `8081`、`arm64-v8a,x86_64`。
 
-`gh attestation verify` 分别验证 APK 与 manifest，并锁定仓库 `jczhang02/lyntty`、signer workflow `.github/workflows/android-expo-dev.yml`、source ref `refs/heads/main`、精确 source/signer digest `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968`、SLSA provenance v1 与拒绝 self-hosted runner 策略；两者都有已验证的 transparency timestamp。没有创建 tag 或 GitHub Release，这是该通道的有意边界。
+`gh attestation verify` 分别验证 APK 与 manifest，并锁定仓库 `jczhang02/lyntty`、signer workflow `.github/workflows/android-expo-dev.yml`、source ref `refs/heads/main`、精确 source/signer digest `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968`、SLSA provenance v1 与拒绝 self-hosted runner 策略；两者都有已验证的 transparency timestamp。workflow run 本身没有创建 tag 或 GitHub Release，其权限和仅产出 Artifact 的行为未变。
+
+### 所有者授权的 immutable prerelease
+
+所有者随后明确要求发布 GitHub Release，7 个已验证文件因此原样手动提升至 [`android-expo-dev-v1.2.0-930001`](https://github.com/jczhang02/lyntty/releases/tag/android-expo-dev-v1.2.0-930001)。该 Release 先作为 Draft 准备，正式发布前经过独立复核，最终身份如下：
+
+```text
+release database ID：358594428
+名称：Lyntty Expo Dev v1.2.0 (930001)
+tag：android-expo-dev-v1.2.0-930001
+tag target：04b63ea7a35f98c3012cc2ca6b00b7dae9e76968
+发布时间：2026-07-23T10:33:23Z
+draft：false
+prerelease：true
+immutable：true
+显式 Release assets：7
+```
+
+lightweight tag 直接指向 GitHub 已验证签名的精确构建源码 commit，其 tree 为预审过的 `3fb04f264a362f7a169d3d9d0b0ad47380d4ebcd`。Stable Latest endpoint 仍是 `compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1`；该 Expo Dev prerelease 没有替换 Stable、Preview 或任何 Compatibility BOM 引用。
+
+正式发布后，从 Release 重新下载了全部 7 个资产。文件名、大小与 SHA-256 同时匹配 GitHub Release asset API 和原始严格 manifest；APK checksum 通过，provenance 仍绑定 run `29993286277` 与 source `04b63ea7…`，新执行的 APK audit 与已发布 audit 逐字一致，两份 GitHub attestation 也针对 Release 下载字节再次验证通过。APK 与 checksum 的匿名公开 range download 成功。Release notes 在安装说明前明确标注 Metro `8081`、Debug/无 bundle、公开 signer、独立通道和未做实体手机验证等边界。
 
 仓库内证据：
 
@@ -158,8 +178,9 @@ manifest SHA-256：8fd05428913ce3fe1de77218b0f895e5dd88eee3a78488a5ce315075b58b4
 - `docs/evidence/artifacts/r107-expo-dev-apk/emulator-smoke.txt`
 - `docs/evidence/artifacts/r107-expo-dev-apk/validation-inputs.json`
 - `docs/evidence/artifacts/r107-expo-dev-apk/github-actions-publish.txt`
+- `docs/evidence/artifacts/r107-expo-dev-apk/github-release-publish.txt`
 
-196 MiB APK、完整 Gradle/strace 日志、模拟器数据、logcat、UI XML 与截图只保留为临时本地验证数据，不是仓库交付物，也不被表述为发布字节。
+本地构建的 196 MiB 验证 APK、完整 Gradle/strace 日志、模拟器数据、logcat、UI XML 与截图仍是未跟踪临时数据，不包含被声称的 Release 字节。从 Actions Artifact 和 GitHub Release 新下载的文件也只是未跟踪复验副本；持久证据记录其精确 hash 与审计结果，而不向仓库提交 APK 字节。
 
 ## 验收审计
 
@@ -169,8 +190,9 @@ manifest SHA-256：8fd05428913ce3fe1de77218b0f895e5dd88eee3a78488a5ce315075b58b4
 | Development Debug 身份 | workflow 常量、Gradle mapping、本地与下载 APK audit | 通过 |
 | Debuggable、必须 Metro、无 standalone bundle | mode-aware tests、两次 APK audit、无 Metro 失败与有 Metro 成功 | 通过 |
 | 固定端口、双 ABI、稳定开发 signer | 下载 APK 的 resource/ABI/signature audit 与证书 pin | 通过 |
-| 与 Version Preview/Compatibility 隔离 | Preview workflow 无 delta、无写权限/Release 路径、hardening assertions、未创建 tag/Release | 通过 |
-| Artifact 身份与可审阅性 | attempt-1 身份、严格 manifest/provenance/checksum、下载重审计、两份已验证 attestation | 通过 |
+| 与 Version Preview/Compatibility 隔离 | 独立 `.dev` package/tag、prerelease 且非 Latest、Preview workflow/BOM/self-update 路径未变 | 通过 |
+| Artifact 与 Release 身份 | attempt-1 身份、严格 manifest/provenance/checksum、两次独立下载/重审计、精确 tag target、7 个 API digest、两份已验证 attestation | 通过 |
+| GitHub prerelease 发布 | immutable release `358594428`、经复核的警告正文、7 个资产、匿名公开下载、Stable Latest 未变 | 通过 |
 | 自动化门禁 | 本地 focused/full gates、13 项 PR checks、YAML/Bash/ShellCheck、最终独立 verifier | 通过 |
 | 文档与持久证据 | 中英文 runbook、R107 sidecars、984-input 本地 manifest、发布记录 | 通过 |
 | 签名提交与受保护合并 | 三个 Good OpenPGP 逻辑 commit 与 GitHub-verified squash merge | 通过 |
@@ -178,7 +200,7 @@ manifest SHA-256：8fd05428913ce3fe1de77218b0f895e5dd88eee3a78488a5ce315075b58b4
 
 ## 未执行项与剩余风险
 
-- 未使用实体手机。API 35 隔离模拟器已经证明 Metro 依赖与 App 正常渲染，但不覆盖 USB driver 或实体设备差异；此短期开发 artifact 不以实体机验收为发布门禁。
-- 公开开发证书不提供身份认证；拥有仓库的人都能签名 `.dev` 包。信任边界是精确源码 SHA、checksum、provenance 与 GitHub attestations。
-- Artifact `android-expo-dev-29993286277` 将于 `2026-08-06T09:24:53Z` 过期，且离开兼容源码 checkout 与 `8081` Metro 无法运行。
-- 没有创建 tag、Draft、prerelease 或 GitHub Release。短期 Actions Artifact 是该 Metro-bound 通道完整且有意的分发面。
+- 未使用实体手机。API 35 隔离模拟器已经证明 Metro 依赖与 App 正常渲染，但不覆盖 USB driver 或实体设备差异；该开发 prerelease 明确不以实体机验收为发布门禁。
+- 公开开发证书不提供身份认证；拥有仓库的人都能签名 `.dev` 包。信任边界是精确源码 SHA、checksum、provenance、GitHub asset digest 与 attestations。
+- Actions Artifact `android-expo-dev-29993286277` 仍将于 `2026-08-06T09:24:53Z` 过期；immutable GitHub prerelease 现在提供持久下载。两个副本都必须配合兼容源码 checkout 和 `8081` Metro。
+- workflow 无法发布或更新该 prerelease。这是一次所有者明确授权的手动提升，不是新的自动发布或 Compatibility 路径。
