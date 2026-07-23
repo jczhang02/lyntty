@@ -2,7 +2,7 @@
 
 Date: 2026-07-23
 
-Status: Implementation and an isolated local APK/emulator path are verified. The GitHub workflow has not been dispatched because it is not yet on protected `main`; no external artifact, tag, Draft, prerelease, or Release was created.
+Status: Implementation, the isolated local APK/emulator path, and the first protected-`main` GitHub Actions publication are verified. The channel produced one 14-day Actions Artifact; no tag, Draft, prerelease, or GitHub Release was created.
 
 ## Scope and boundary
 
@@ -135,7 +135,28 @@ The APK audit tests were written red-first: Metro acceptance initially failed on
 
 A read-only reviewer found no blocking issue. It identified one medium identity risk—GitHub reruns reuse `GITHUB_RUN_ID` and `GITHUB_RUN_NUMBER`—plus two low test gaps. The implementation now rejects `GITHUB_RUN_ATTEMPT > 1`, records `runAttempt` in provenance, locks the exact trigger/permission block, and adds the missing APK audit negative cases. Focused re-review marked all three findings resolved and found no new blocker.
 
-A separate acceptance verifier correctly noted that the signer, workflow, and evidence were still untracked and unsigned at its pre-commit checkpoint. Those are delivery-state checks rather than implementation defects; final verification must prove the files are tracked, commits are signed, and the worktree is clean before closure. A follow-up verifier rehashed all 984 entries in `validation-inputs.json`, found no remaining content issue, and confirmed the intended boundary: this is a content-bound local validation record, not independent proof of APK bytes that were deliberately not retained.
+A separate acceptance verifier correctly noted that the signer, workflow, and evidence were still untracked and unsigned at its pre-commit checkpoint. Those are delivery-state checks rather than implementation defects; final verification proved the files were tracked, all three logical commits had Good OpenPGP signatures, and the worktree was clean before closure. A follow-up verifier rehashed all 984 entries in `validation-inputs.json`, found no remaining content issue, and confirmed the intended boundary: this is a content-bound local validation record, not independent proof of APK bytes that were deliberately not retained.
+
+## Protected-main publication
+
+PR [#47](https://github.com/jczhang02/lyntty/pull/47) passed all 13 reported checks and was squash-merged to protected `main` as GitHub-verified commit `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968`. Its tree is the pre-reviewed tree `3fb04f264a362f7a169d3d9d0b0ad47380d4ebcd`.
+
+The first manual run, [Android Expo Dev APK #29993286277](https://github.com/jczhang02/lyntty/actions/runs/29993286277), completed successfully on attempt 1 from exact `main` SHA `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968`. Every build, APK/runtime audit, attestation, upload, and summary step passed. It published only Actions Artifact [`android-expo-dev-29993286277`](https://github.com/jczhang02/lyntty/actions/runs/29993286277/artifacts/8558651887):
+
+```text
+artifact ID: 8558651887
+archive size: 76662528 bytes
+created: 2026-07-23T09:24:57Z
+expires: 2026-08-06T09:24:53Z
+APK: lyntty-expo-dev-04b63ea7a35f-930001.apk
+APK size: 205436682 bytes
+APK SHA-256: 4c306d6c0b4e8856ac72aec8b2a9ca88a504d6b07ea3b64235b087e604fec8b8
+manifest SHA-256: 8fd05428913ce3fe1de77218b0f895e5dd88eee3a78488a5ce315075b58b4704
+```
+
+The downloaded seven-file artifact matched its strict six-entry manifest plus the manifest itself. Provenance bound run ID/number/attempt, source commit/tree, package, Debug/Metro identity, signer, ABI set, APK size, and checksum. A fresh local audit of the downloaded APK exactly matched the uploaded audit: `dev.jczhang.lyntty.dev`, `debuggable=true`, one pinned v2 signer, no standalone bundle, Metro `8081`, and `arm64-v8a,x86_64`.
+
+`gh attestation verify` independently verified the APK and manifest against repository `jczhang02/lyntty`, signer workflow `.github/workflows/android-expo-dev.yml`, source ref `refs/heads/main`, exact source/signer digest `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968`, SLSA provenance v1, and the deny-self-hosted-runner policy. Both had a verified transparency timestamp. No tag or GitHub Release was created; that remains an intentional channel boundary.
 
 Tracked evidence:
 
@@ -144,6 +165,7 @@ Tracked evidence:
 - `docs/evidence/artifacts/r107-expo-dev-apk/apk.sha256`
 - `docs/evidence/artifacts/r107-expo-dev-apk/emulator-smoke.txt`
 - `docs/evidence/artifacts/r107-expo-dev-apk/validation-inputs.json`
+- `docs/evidence/artifacts/r107-expo-dev-apk/github-actions-publish.txt`
 
 The 196 MiB APK, full Gradle/strace logs, emulator image, logcat, UI XML, and screenshot remain untracked temporary validation data. They contain no claimed release bytes and are not repository deliverables.
 
@@ -151,21 +173,20 @@ The 196 MiB APK, full Gradle/strace logs, emulator image, logcat, UI XML, and sc
 
 | Requirement | Evidence | State |
 | --- | --- | --- |
-| Manual-only, exact protected `main` | exact `on`/permission hardening plus event/ref/protection/HEAD/origin checks | static contract pass; GitHub run not yet executed |
-| Development Debug identity | workflow constants, Gradle mapping, real APK audit | pass |
-| Debuggable, Metro-required, no standalone bundle | mode-aware audit tests, real APK audit, no-Metro failure and Metro success | pass |
-| Fixed port, dual ABI, stable development signer | real APK resource/ABI/signature audit and certificate pin | pass |
-| Separate from Version Preview and Compatibility | no Preview workflow delta, no write/Release path, hardening assertions | pass |
-| Artifact identity and reviewability | first-attempt-only run identity, SHA/provenance/manifest/README, attestation steps | static contract pass; GitHub attestation/upload not yet executed |
-| Automated gates | focused tests, `ci:fast`, YAML/Bash/ShellCheck, independent re-review | pass |
-| Documentation and durable local evidence | English/Chinese runbooks, R107 sidecars, 984-input content manifest | content pass; tracking is verified after commit |
-| Signed Conventional Commits | existing OpenPGP identity required by repository policy | pending GPG-agent unlock |
-| Bead and Goal closure | completion audit after signed commits and clean worktree | pending |
+| Manual-only, exact protected `main` | exact hardening plus successful attempt-1 run `29993286277` at merged `main` SHA | pass |
+| Development Debug identity | workflow constants, Gradle mapping, local and downloaded APK audits | pass |
+| Debuggable, Metro-required, no standalone bundle | mode-aware tests, two APK audits, no-Metro failure and Metro success | pass |
+| Fixed port, dual ABI, stable development signer | downloaded APK resource/ABI/signature audit and certificate pin | pass |
+| Separate from Version Preview and Compatibility | no Preview workflow delta, no write/Release path, hardening assertions, no tag/Release created | pass |
+| Artifact identity and reviewability | attempt-1 identity, strict manifest/provenance/checksum, downloaded re-audit, two verified attestations | pass |
+| Automated gates | local focused/full gates, 13 PR checks, YAML/Bash/ShellCheck, independent final verifier | pass |
+| Documentation and durable evidence | English/Chinese runbooks, R107 sidecars, 984-input local manifest, publication record | pass |
+| Signed commits and protected merge | three Good OpenPGP logical commits and GitHub-verified squash merge | pass |
+| Bead and Goal closure | `lyntty-74p` closed after signed-commit/clean-worktree completion audit | pass |
 
 ## Not run and residual risk
 
-- The new GitHub workflow was not dispatched. Protected-main validation, GitHub-hosted Java 17 execution, attestations, and Actions artifact upload can run only after review and merge; no result is claimed for them yet.
 - No physical phone was used. An isolated API 35 emulator proves Metro dependency and successful app rendering, but not USB-driver or physical-device behavior. Physical acceptance is not a gate for this ephemeral development artifact.
-- The public development certificate authenticates nothing: anyone with the repository can sign the `.dev` package. Source SHA, checksum, provenance, and GitHub attestation are the trust boundary.
-- The artifact expires after 14 days and cannot run without a compatible source checkout and Metro on port `8081`.
-- `bun run ci:fast` is complete. Independent review and the final signed commit are recorded after they complete; this document must not be read as a publication or merge record.
+- The public development certificate authenticates nothing: anyone with the repository can sign the `.dev` package. Exact source SHA, checksum, provenance, and GitHub attestations are the trust boundary.
+- Artifact `android-expo-dev-29993286277` expires at `2026-08-06T09:24:53Z` and cannot run without a compatible source checkout and Metro on port `8081`.
+- No tag, Draft, prerelease, or GitHub Release was created. The short-lived Actions Artifact is the complete and intentional distribution surface for this Metro-bound channel.
