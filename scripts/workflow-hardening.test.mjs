@@ -14,6 +14,7 @@ import {
 const relayDeployPath = new URL('../.github/workflows/relay-deploy.yml', import.meta.url);
 const relayImagePath = new URL('../.github/workflows/relay-image.yml', import.meta.url);
 const androidReleasePath = new URL('../.github/workflows/android-release.yml', import.meta.url);
+const androidExpoDevPath = new URL('../.github/workflows/android-expo-dev.yml', import.meta.url);
 const androidPreviewCandidatePath = new URL('../.github/workflows/android-preview-candidate.yml', import.meta.url);
 const androidPreviewPromotePath = new URL('../.github/workflows/android-preview-promote.yml', import.meta.url);
 const releaseCandidatePath = new URL('../.github/workflows/release-candidate.yml', import.meta.url);
@@ -35,10 +36,11 @@ const previewRelayGatePath = new URL('../e2e/maestro/standalone/preview_first_ru
 const previewReleaseNotesPath = new URL('../docs/release/preview-apk-release-notes.md', import.meta.url);
 const previewBundleSmokePath = new URL('../packages/lyntty-app/scripts/bundle-smoke.ts', import.meta.url);
 
-const [relayDeploy, relayImage, androidRelease, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, nativeSigningProducer, githubRelease, relayOciSbom, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, bunLockText, previewRelayGate, previewBundleSmoke] = await Promise.all([
+const [relayDeploy, relayImage, androidRelease, androidExpoDev, androidPreviewCandidate, androidPreviewPromote, releaseCandidate, releasePromote, releaseRollback, nativeSigning, nativeSigningProducer, githubRelease, relayOciSbom, androidGradle, maestroRunner, codeowners, typecheckWorkflow, cliSmokeWorkflow, cliArtifactBuilder, rootPackageText, bunLockText, previewRelayGate, previewBundleSmoke] = await Promise.all([
   readFile(relayDeployPath, 'utf8'),
   readFile(relayImagePath, 'utf8'),
   readFile(androidReleasePath, 'utf8'),
+  readFile(androidExpoDevPath, 'utf8'),
   readFile(androidPreviewCandidatePath, 'utf8'),
   readFile(androidPreviewPromotePath, 'utf8'),
   readFile(releaseCandidatePath, 'utf8'),
@@ -990,6 +992,37 @@ test('Android component workflow verifies a candidate but cannot publish', () =>
   assert.doesNotMatch(androidRelease, /LYNTTY_EAS_PROJECT_ID/);
 });
 
+test('Expo Dev APK workflow produces only Metro-bound development artifacts', () => {
+  assert.match(androidExpoDev, /\non:\n  workflow_dispatch:\n\npermissions:\n  contents: read\n  attestations: write\n  id-token: write\n\nconcurrency:/);
+  assert.equal(androidExpoDev.match(/^\s*permissions:/gm)?.length, 1);
+  assert.doesNotMatch(androidExpoDev, /\non:\n  (push|pull_request):/);
+  assert.match(androidExpoDev, /GITHUB_REF[^\n]*refs\/heads\/main/);
+  assert.match(androidExpoDev, /GITHUB_REF_PROTECTED/);
+  assert.match(androidExpoDev, /\[\[ "\$GITHUB_RUN_ATTEMPT" == 1 \]\]/);
+  assert.match(androidExpoDev, /runAttempt: Number\(process\.env\.GITHUB_RUN_ATTEMPT\)/);
+  assert.match(androidExpoDev, /APP_ENV: development/);
+  assert.match(androidExpoDev, /NODE_ENV: development/);
+  assert.match(androidExpoDev, /RCT_METRO_PORT: 8081/);
+  assert.match(androidExpoDev, /assembleDebug/);
+  assert.match(androidExpoDev, /reactNativeDevServerPort=8081/);
+  assert.match(androidExpoDev, /reactNativeArchitectures=x86_64,arm64-v8a/);
+  assert.match(androidExpoDev, /dev\.jczhang\.lyntty\.dev/);
+  assert.match(androidExpoDev, /lyntty-expo-dev\.keystore/);
+  assert.match(androidExpoDev, /374ea213bdd5667f7e274aa70b89cfa21ea8ba1222a948169904e9664ec69d16/);
+  assert.match(androidExpoDev, /apk-audit\.sh[^\n]*\\?\n?[\s\S]*metro 8081/);
+  assert.match(androidExpoDev, /debuggable=true/);
+  assert.match(androidExpoDev, /runtime_mode=metro/);
+  assert.match(androidExpoDev, /standalone_bundle=absent/);
+  assert.match(androidExpoDev, /Node-family execve matches: 0/);
+  assert.match(androidExpoDev, /lyntty-expo-dev-/);
+  assert.match(androidExpoDev, /android-expo-dev-\$\{\{ github\.run_id \}\}/);
+  assert.match(androidExpoDev, /retention-days: 14/);
+  assert.match(androidExpoDev, /actions\/attest@/);
+  assert.match(androidExpoDev, /actions\/upload-artifact@/);
+  assert.doesNotMatch(androidExpoDev, /contents: write/);
+  assert.doesNotMatch(androidExpoDev, /gh release|github-release\.ts|release-(candidate|promote)\.yml|scripts\/release\.ts|APP_ENV: preview|assembleRelease/);
+});
+
 test('Preview APK candidate builds audited dual-ABI bytes without publishing', () => {
   assert.match(androidPreviewCandidate, /workflow_dispatch/);
   assert.match(androidPreviewCandidate, /GITHUB_REF[^\n]*refs\/heads\/main/);
@@ -1612,6 +1645,7 @@ test('CODEOWNERS covers release trust inputs and its own policy', () => {
     '/.github/CODEOWNERS', '/.dockerignore', '/Dockerfile', '/bun.lock',
     '/config/native-signing/', '/config/release-trust-roots/', '/scripts/github-release.ts', '/scripts/relay-oci-sbom.ts',
     '/packages/lyntty-app/android/app/build.gradle',
+    '/packages/lyntty-app/android/app/lyntty-expo-dev.keystore',
     '/packages/lyntty-cli/scripts/build-artifact.ts',
     '/packages/lyntty-cli/src/distribution/',
     '/scripts/dev.ts',
@@ -1624,6 +1658,8 @@ test('Android Gradle binds stable, preview, and development to distinct identiti
   assert.match(androidGradle, /development: 'dev\.jczhang\.lyntty\.dev'/);
   assert.match(androidGradle, /preview: 'dev\.jczhang\.lyntty\.preview'/);
   assert.match(androidGradle, /production: 'dev\.jczhang\.lyntty'/);
+  assert.match(androidGradle, /lynttyExpoDevKeystoreFile/);
+  assert.match(androidGradle, /keyAlias 'lyntty-expo-dev'/);
   assert.match(androidGradle, /APP_ENV=production permits explicit Release tasks only/);
   assert.match(androidGradle, /taskGraph\.whenReady/);
   assert.doesNotMatch(androidGradle, /applicationIdSuffix/);
