@@ -1,5 +1,7 @@
 # Lyntty CLI / Daemon Agent Instructions
 
+The root `AGENTS.md` applies here. This guide adds CLI/daemon-specific deltas and cannot weaken root safety, permission, product, release, or verification rules.
+
 This package contains the `lyntty` CLI, local `lynttyd`, Pi SDK runtime adapter, Pi extension installer/source generator, local-control bridge, `lyntty remote`, and `lyntty dev app-logs`.
 
 ## Product boundary
@@ -47,7 +49,9 @@ phone -> relay -> lynttyd -> local Pi extension -> pi.sendUserMessage()/ctx.abor
 - Keep token-bearing state files at `0600`, cap payloads/queues, and clear active state on shutdown.
 - Do not add generic machine-scope shell or filesystem RPCs. Worktree RPCs must stay narrow, validated, output-capped, and backed by `execFile('git', args)`.
 
-## Verification
+## Verification tiers
+
+Use isolated focused checks while iterating:
 
 ```bash
 bun run --filter lyntty-cli typecheck
@@ -55,4 +59,16 @@ HOME="$(mktemp -d)" LYNTTY_HOME_DIR="$(mktemp -d)" \
   bun run --filter lyntty-cli test
 ```
 
-Important focused coverage includes Pi extension events/install, Session Protocol mapping/history, ordinary-Pi shared control, daemon ownership/queueing, `ApiSessionClient`, `ApiMachineClient`, `lyntty remote`, and app-log receiver behavior.
+Before a commit or claim about the CLI package, run the package claim gate, which typechecks, builds the distributable package output, and runs unit tests:
+
+```bash
+bun run ci:cli
+```
+
+Changes to daemon lifecycle, Pi extension IPC, compiled executable behavior, local control, or process ownership additionally require the isolated integration gate. This gate compiles both `lyntty` and `lynttyd`, builds the standalone Relay, and exercises their integration:
+
+```bash
+bun run ci:daemon-integration
+```
+
+Important focused coverage includes Pi extension events/install, Session Protocol mapping/history, ordinary-Pi shared control, daemon ownership/queueing, `ApiSessionClient`, `ApiMachineClient`, `lyntty remote`, and app-log receiver behavior. Keep every integration run off the user's live `~/.pi`, `~/.lyntty`, and current Pi process.

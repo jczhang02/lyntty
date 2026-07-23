@@ -95,8 +95,10 @@ test('release-flow separates channels, authority, and immutable state', async ()
     'Expo Dev',
     'Rollback',
     'Actions Artifact',
+    'Release deletion',
     'release-notes',
     'gh release edit',
+    'gh release delete',
   ]) {
     assert.match(skill, new RegExp(term, 'i'));
   }
@@ -106,6 +108,19 @@ test('release-flow separates channels, authority, and immutable state', async ()
   assert.match(skill, /Expo Dev has no repository publication workflow/);
   assert.match(skill, /Never run `gh release create`/);
   assert.doesNotMatch(skill, /^\s*gh release create\b/m);
+  const deletionBlock = skill.match(/```bash\n(gh release delete[\s\S]*?)\n```/);
+  assert.ok(deletionBlock, 'release-flow must contain one bounded Release deletion command');
+  assert.equal(deletionBlock[1], 'gh release delete "$tag" --repo jczhang02/lyntty --yes');
+  assert.doesNotMatch(deletionBlock[1], /--cleanup-tag/);
+  assert.match(skill, /Expo Dev.*creation, edit, deletion or cleanup, or audit/is);
+  assert.match(skill, /explicitly authorizes deletion of each exact existing tag/i);
+  assert.match(skill, /deletes the Release object and every attached asset/i);
+  assert.match(skill, /--cleanup-tag.*separate explicit authorization|separate explicit authorization.*--cleanup-tag/is);
+  assert.match(skill, /Snapshot each target Release's numeric\/node ID.*every asset's ID, name, size, and digest/is);
+  assert.match(skill, /HTTP 404 for the deleted Release by tag and former numeric ID/i);
+  assert.match(skill, /HTTP 404 for every former Release asset ID/i);
+  assert.match(skill, /direct tag object.*remain structurally equal/i);
+  assert.match(skill, /all preserved Releases.*asset tuples.*GitHub Latest identity.*remain equal/is);
   assert.match(skill, /preserve that workflow-mandated disclosure verbatim as a leading prefix/i);
   assert.match(skill, /tag.*assets.*target.*draft.*prerelease.*immutable.*latest/is);
   assert.match(skill, /Metro.*8081.*cannot run standalone/is);
@@ -126,8 +141,10 @@ test('release-notes is explicit-only and fail-closed', async () => {
     '  --title "$title" \\',
     '  --notes-file "$draft_file"',
   ].join('\n'), 'only repo, title, and notes-file options are allowed');
-  assert.match(skill, /Never run `gh release create`/);
+  assert.match(skill, /Release deletion belongs to `release-flow`/);
+  assert.match(skill, /Never run `gh release create` or `gh release delete`/);
   assert.doesNotMatch(skill, /^\s*gh release create\b/m);
+  assert.doesNotMatch(skill, /^\s*gh release delete\b/m);
 
   assert.match(skill, /<div align="center">/);
   assert.match(skill, /<h1[^>]*>Lyntty<\/h1>/);

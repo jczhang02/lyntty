@@ -1,6 +1,6 @@
 ---
 name: release-flow
-description: Lyntty release runbook for candidate, promotion, GitHub Release, prerelease, rollback, and release-audit work across Stable, Preview, and Expo Dev channels. Use before any release-flavored task; pure Actions Artifact tasks are explicitly excluded.
+description: Lyntty release runbook for candidate, promotion, GitHub Release creation, edit, deletion, prerelease, rollback, and release-audit work across Stable, Preview, Expo Dev, and retained historical Releases. Use before any release-flavored task; pure Actions Artifact tasks are explicitly excluded.
 ---
 
 # Lyntty Release Flow
@@ -14,13 +14,14 @@ Before acting, classify the request as one of these intents:
 - read-only release audit;
 - candidate build or validation;
 - promotion or publication;
-- curated Release Notes;
+- curated Release Notes or another existing-Release metadata edit;
+- exact historical Release deletion or cleanup;
 - rollback;
 - pure Actions Artifact production or inspection.
 
 Restate the exact channel or tag, the external operations that will be touched, and the channels that will not be touched. If the user already stated that scope explicitly, record it without asking again.
 
-Loading this skill never authorizes an external side effect. Workflow dispatch, push, PR creation or merge, tag creation, Release creation or edit, publication, rollback, and reactions each require explicit current-task authorization. Read-only GitHub inspection is not publication authority.
+Loading this skill never authorizes an external side effect. Workflow dispatch, push, PR creation or merge, tag creation or deletion, Release creation, edit, deletion or publication, rollback, and reactions each require explicit current-task authorization for the exact object and operation. Authority to delete a Release never implies authority to delete its Git tag. Read-only GitHub inspection is not mutation authority.
 
 Read the relevant runbook before changing state:
 
@@ -46,11 +47,11 @@ A pure Actions Artifact has no GitHub Release page and does not receive curated 
 
 If classification finds pure Actions Artifact work, stop applying this skill after recording the exclusion. Follow the relevant build or artifact runbook instead. Do not continue into Release preflight, publication, curated notes, or post-publication steps.
 
-This Release flow applies to Expo Dev only when the user explicitly scopes a durable GitHub prerelease creation, edit, or audit. Expo Dev has no repository publication workflow: a durable prerelease is an exceptional operator-run promotion of already verified Artifact bytes, with its own explicit authorization, Draft review, invariant snapshot, post-publication audit, and durable evidence. The explicit `release-notes` skill can edit that existing prerelease but can never create it.
+This Release flow applies to Expo Dev only when the user explicitly scopes a durable GitHub prerelease creation, edit, deletion or cleanup, or audit. Expo Dev has no repository publication workflow: a durable prerelease is an exceptional operator-run promotion of already verified Artifact bytes, with its own explicit authorization, Draft review, invariant snapshot, post-publication audit, and durable evidence. The explicit `release-notes` skill can edit that existing prerelease but can never create it.
 
 ## Release sequence
 
-1. **Fix the scope**: record intent, exact channel or tag, source commit, requested side effects, and explicit exclusions.
+1. **Fix the scope**: record intent, exact channel or tag, source commit, requested side effects, and explicit exclusions. For deletion, distinguish the Release object and attached assets from its direct Git tag.
 2. **Inspect live state**: read the current workflow, runbook, latest matching evidence, protected branch state, target Release if one exists, and current Stable Latest identity.
 3. **Run the channel preflight**: use the exact checks and protected environment required by that channel. Do not substitute one channel's evidence for another.
 4. **Build once**: candidate workflows produce the bytes. Promotion and rollback must not rebuild or silently replace them.
@@ -84,6 +85,36 @@ Treat a metadata-only correction as a narrowly bounded publication:
 
 If the Release does not exist, stop. Missing notes are not permission to create one.
 
+## Existing Release deletion
+
+Release deletion is destructive cleanup, not a notes correction, failed-promotion repair, rollback, or implicit channel migration. It deletes the Release object and every attached asset. Use it only when the user explicitly authorizes deletion of each exact existing tag in the current task.
+
+Before deleting:
+
+1. Resolve and show every exact Release tag. Do not infer a similarly named channel or expand an instruction such as "old Releases" without an enumerated set.
+2. State that attached assets will be deleted. Separately state whether the direct Git tags will be preserved; Release-deletion authority alone preserves them.
+3. Inspect current distribution and retention dependencies, including Latest, update manifests, pinned download URLs, matching runbooks, and durable evidence. Report any live consumer or required retention conflict before mutation.
+4. Snapshot each target Release's numeric/node ID, title/body, target, draft, prerelease, immutable state, timestamps, direct tag ref, and every asset's ID, name, size, and digest.
+5. Snapshot every preserved current-channel Release, its direct tag and asset tuples, plus the GitHub Latest identity. For multiple deletions, complete one preflight for the entire exact set before the first mutation.
+
+With explicit current-task authorization for the exact Release and with the tag-preservation scope recorded, run only:
+
+```bash
+gh release delete "$tag" --repo jczhang02/lyntty --yes
+```
+
+Do not pass `--cleanup-tag`; that flag requires separate explicit authorization for deletion of the exact Git tag. Never delete a tag merely because its Release was deleted. Do not use `gh api --method DELETE` as an alternate path around this bounded command.
+
+After each deletion and again after the complete set:
+
+- require HTTP 404 for the deleted Release by tag and former numeric ID;
+- require HTTP 404 for every former Release asset ID;
+- require the direct tag object to remain structurally equal to its snapshot when tag preservation was scoped;
+- require all preserved Releases, direct tags, asset tuples, and GitHub Latest identity to remain equal to their pre-delete snapshots;
+- record exact commands, deleted identities, preserved identities, not-run checks, and downstream URL implications in durable evidence.
+
+If a target is missing, has drifted since preflight, is required by a current retention/update path, or cannot be independently verified, stop. Do not broaden deletion or delete a tag as a repair.
+
 ## Mandatory public disclosures
 
 The compact format removes optional safety and integrity sections, not release-policy requirements:
@@ -111,4 +142,4 @@ Preserve workflow-generated notes and mandatory disclosures. A rollback reselect
 
 ## Audit-only requests
 
-A release audit is read-only unless the user separately authorizes a mutation. Compare the live Release, tag, assets, attestations, channel state, and Latest identity with source and durable evidence. Report drift before proposing a repair, and do not turn an audit request into publication authority.
+A release audit is read-only unless the user separately authorizes a mutation. Compare the live Release, tag, assets, attestations, channel state, and Latest identity with source and durable evidence. Report drift before proposing a repair, and do not turn an audit request into creation, edit, publication, or deletion authority.

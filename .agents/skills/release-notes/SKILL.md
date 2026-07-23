@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Lyntty Release Notes
 
-This skill owns curated public notes after the exact GitHub Release already exists. It can edit that Release's title and body only. It cannot create a Release or mutate its tag, assets, target, channel, or publication state.
+This skill owns curated public notes after the exact GitHub Release already exists. It can edit that Release's title and body only. It cannot create or delete a Release or mutate its tag, assets, target, channel, or publication state. Release deletion belongs to `release-flow` and requires separate exact-tag authority.
 
 ## Invocation contract
 
@@ -29,7 +29,7 @@ Invoking the skill authorizes the drafting workflow, not an automatic public edi
 
 ## Existing Release requirement
 
-Confirm that one exact Release already exists. If it is missing, wait for the authorized workflow or operator process. Never run `gh release create`; missing or poor notes are not a reason to create a competing Release.
+Confirm that one exact Release already exists. If it is missing, wait for the authorized workflow or operator process. Never run `gh release create` or `gh release delete`; missing or poor notes are not a reason to create a competing Release or remove history.
 
 Before drafting:
 
@@ -130,7 +130,7 @@ gh release edit "$tag" --repo jczhang02/lyntty \
   --notes-file "$draft_file"
 ```
 
-Never run `gh release create`. Do not pass flags that change target, draft, prerelease, or Latest state. Do not upload, replace, rename, or delete assets, and do not move or recreate the tag.
+Never run `gh release create` or `gh release delete`. Do not pass flags that change target, draft, prerelease, or Latest state. Do not upload, replace, rename, or delete assets, and do not move or recreate the tag.
 
 Re-read the Release and require:
 
