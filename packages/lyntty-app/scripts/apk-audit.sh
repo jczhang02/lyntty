@@ -13,12 +13,22 @@ require_equal() {
   [[ "$actual" == "$expected" ]] || fail "$field mismatch: expected <$expected>, got <$actual>"
 }
 
-apk="${1:?usage: apk-audit.sh <apk> <application-id> [version-name] [version-code] [signer-sha256] [native-abis]}"
+apk="${1:?usage: apk-audit.sh <apk> <application-id> [version-name] [version-code] [signer-sha256] [native-abis] [runtime-mode] [metro-port]}"
 expected_application_id="${2:?expected application id is required}"
 expected_version_name="${3:-}"
 expected_version_code="${4:-}"
 expected_signer_sha256="${5:-}"
 expected_native_abis="${6:-}"
+runtime_mode="${7:-standalone}"
+expected_metro_port="${8:-}"
+case "$runtime_mode" in
+  standalone) ;;
+  metro)
+    [[ "$expected_metro_port" =~ ^[1-9][0-9]{0,4}$ ]] || fail 'Metro mode requires a valid expected port'
+    (( expected_metro_port <= 65535 )) || fail 'Metro mode expected port exceeds 65535'
+    ;;
+  *) fail "unsupported runtime mode: $runtime_mode" ;;
+esac
 android_home="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 [[ -n "$android_home" ]] || fail 'ANDROID_HOME or ANDROID_SDK_ROOT is required'
 [[ -d "$android_home/build-tools" ]] || fail 'Android SDK build-tools directory is missing'
@@ -73,11 +83,20 @@ if ! apk_entries="$(unzip -Z1 "$apk")"; then
   fail 'could not enumerate APK entries'
 fi
 bundle_count="$(awk '$0 == "assets/index.android.bundle" { count++ } END { print count + 0 }' <<<"$apk_entries")"
-[[ "$bundle_count" -eq 1 ]] || fail "expected one standalone Android bundle, got $bundle_count"
 native_abis="$(awk -F/ '$1 == "lib" && NF >= 3 { print $2 }' <<<"$apk_entries" | sort -u | paste -sd, -)"
 
 require_equal application_id "$application_id" "$expected_application_id"
-require_equal debuggable "$debuggable" false
+if [[ "$runtime_mode" == standalone ]]; then
+  require_equal debuggable "$debuggable" false
+  [[ "$bundle_count" -eq 1 ]] || fail "expected one standalone Android bundle, got $bundle_count"
+else
+  require_equal debuggable "$debuggable" true
+  [[ "$bundle_count" -eq 0 ]] || fail "expected no standalone Android bundle in Metro mode, got $bundle_count"
+  if ! metro_port="$($apkanalyzer resources value --config default --type integer --name react_native_dev_server_port "$apk")"; then
+    fail 'apkanalyzer could not read the Metro development server port'
+  fi
+  require_equal metro_port "$metro_port" "$expected_metro_port"
+fi
 if [[ -n "$expected_version_name" ]]; then require_equal version_name "$version_name" "$expected_version_name"; fi
 if [[ -n "$expected_version_code" ]]; then require_equal version_code "$version_code" "$expected_version_code"; fi
 if [[ -n "$expected_signer_sha256" ]]; then
@@ -89,4 +108,9 @@ if [[ -n "$expected_native_abis" ]]; then require_equal native_abis "$native_abi
 
 printf 'application_id=%s\nversion_name=%s\nversion_code=%s\ndebuggable=%s\nsigner_count=1\nsigner_sha256=%s\n' \
   "$application_id" "$version_name" "$version_code" "$debuggable" "$signer_sha256"
-printf 'signature_scheme_v2=true\nstandalone_bundle=assets/index.android.bundle\nnative_abis=%s\n' "$native_abis"
+if [[ "$runtime_mode" == standalone ]]; then
+  printf 'signature_scheme_v2=true\nstandalone_bundle=assets/index.android.bundle\nnative_abis=%s\n' "$native_abis"
+else
+  printf 'signature_scheme_v2=true\nruntime_mode=metro\nstandalone_bundle=absent\nmetro_port=%s\nnative_abis=%s\n' \
+    "$metro_port" "$native_abis"
+fi

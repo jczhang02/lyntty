@@ -1,0 +1,16 @@
+system_image=system-images;android-35;google_apis;x86_64
+emulator_port=5584
+isolated_adb_server_port=5041
+application_id=dev.jczhang.lyntty.dev
+install=Success
+metro_absent_before_first_launch=true
+no_metro_failure=Failed to connect to /10.0.2.2:8081
+no_metro_result=Unable to load script
+metro_status=packager-status:running
+adb_reverse=host-17 tcp:8081 tcp:8081
+metro_bundle=Android Bundled 12543ms packages/lyntty-app/index.ts (3371 modules)
+final_ui=Lyntty mobile control for pi | Create account | Link or restore account
+ui_loaded=true
+development_warning=Reanimated reduced motion setting enabled by test animation scale
+fatal_app_crash=false
+isolated_process_cleanup=ok

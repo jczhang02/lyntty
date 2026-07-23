@@ -1,0 +1,11 @@
+application_id=dev.jczhang.lyntty.dev
+version_name=1.2.0
+version_code=930001
+debuggable=true
+signer_count=1
+signer_sha256=374ea213bdd5667f7e274aa70b89cfa21ea8ba1222a948169904e9664ec69d16
+signature_scheme_v2=true
+runtime_mode=metro
+standalone_bundle=absent
+metro_port=8081
+native_abis=arm64-v8a,x86_64

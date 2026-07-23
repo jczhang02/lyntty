@@ -22,6 +22,35 @@ bun dev:up --android
 
 该入口使用开发 APK、Metro 和模拟器专用 `10.0.2.2`，不属于下面的实体手机 Preview 手测流程。
 
+## 短期 Expo Dev APK artifact
+
+需要预构建开发 APK 时，在 GitHub Actions 中手动运行 **Android Expo Dev APK**。workflow 只接受受保护 `main` 的精确提交，上传名为 `android-expo-dev-<run-id>` 的 14 天短期 artifact，不创建 tag 或 GitHub Release。同一 GitHub run 的 rerun 会因复用身份而被拒绝；失败后应重新手动 dispatch。
+
+其中的 `lyntty-expo-dev-<source-sha>-<version-code>.apk` 固定为：
+
+- package `dev.jczhang.lyntty.dev`，显示名 **Lyntty (dev)**；
+- Android Debug variant，`debuggable=true`；
+- 同时包含 `arm64-v8a` 与 `x86_64`；
+- 不包含 `assets/index.android.bundle`；
+- Metro 端口固定为 `8081`；
+- 使用仓库内公开、仅供 Expo Dev 的固定 signer。
+
+从 artifact 所记录的精确源码提交运行：
+
+```bash
+bun install --frozen-lockfile
+adb install -r lyntty-expo-dev-<source-sha>-<version-code>.apk
+adb reverse tcp:8081 tcp:8081
+cd packages/lyntty-app
+APP_ENV=development bunx expo start --dev-client --port 8081
+```
+
+Metro 就绪后再启动或重启 **Lyntty (dev)**。没有 Metro 时，该 APK 无法加载 JavaScript，出现 `Unable to load script` 开发错误属于预期行为。若旧的本地开发 APK 使用了不同 debug signer，只卸载 `dev.jczhang.lyntty.dev` 后重装。
+
+这里的“Expo Dev APK”指已签入 Expo 原生工程的 Debug variant。它不包含可选的 `expo-dev-client` 包或 Expo Dev Launcher；`--dev-client` 只是为该原生 Debug App 选择 Expo CLI 的开发服务器模式。
+
+artifact 同时包含 APK checksum、APK/runtime audit、源码 provenance、严格文件 manifest 和使用 README。它与 standalone Version Preview APK 完全分离，不进入 `compat-preview`、Compatibility BOM promotion、`latest`、App 自更新路径或任何 Preview GitHub Release。
+
 ## 实体手机 Preview 快速手测
 
 在实体 Android 手机上测试当前 worktree 的 standalone、release-style Preview APK：

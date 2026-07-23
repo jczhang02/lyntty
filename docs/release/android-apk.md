@@ -25,7 +25,7 @@ Hard requirements:
 
 | Variant | Package id | Use |
 | --- | --- | --- |
-| development | `dev.jczhang.lyntty.dev` | Local testing, E2E, emulator. |
+| development | `dev.jczhang.lyntty.dev` | Local or short-lived Metro-backed testing, E2E, emulator. |
 | preview | `dev.jczhang.lyntty.preview` | Optional preview channel. |
 | production | `dev.jczhang.lyntty` | Daily-use APK from GitHub Releases. |
 
@@ -34,6 +34,32 @@ Rules:
 - Production, preview, and development data are isolated by package id.
 - No automatic cross-package data migration.
 - If an old `dev.jczhang.lyntty` exists with different signing key, uninstall it once and reinstall the new production APK.
+
+## Short-lived Expo Dev debug artifact
+
+`.github/workflows/android-expo-dev.yml` is a separate development distribution path, not a release channel. It runs only through `workflow_dispatch`, requires exact protected `main`, has no `contents: write`, and uploads one 14-day Actions artifact without creating a tag, Draft, prerelease, or Release.
+
+Its contract is intentionally incompatible with a standalone Version Preview APK:
+
+| Property | Expo Dev artifact |
+| --- | --- |
+| Package | `dev.jczhang.lyntty.dev` |
+| Gradle variant | `Debug` |
+| App environment | `development` |
+| Debuggable | `true` |
+| JavaScript | no embedded `assets/index.android.bundle`; Metro required |
+| Metro port | `8081` |
+| ABIs | `arm64-v8a`, `x86_64` |
+| Signer | checked-in public development signer |
+| Distribution | short-lived Actions artifact only |
+
+The workflow derives `versionName` from the App package, derives a monotonic development-only `versionCode` as `930000 + GITHUB_RUN_NUMBER`, and names the APK with the source SHA and version code. It rejects `GITHUB_RUN_ATTEMPT > 1`; a failed run must be replaced by a new manual dispatch so version, APK, artifact, and provenance identities cannot be reused. Before upload it verifies the package, version, debuggable flag, sole v2 signer, signer certificate, ABI set, absent standalone bundle, embedded Metro port, and zero Node-family Gradle execution. It adds SHA-256, APK/runtime audits, provenance, a strict manifest, usage instructions, and GitHub attestations.
+
+The fixed signer is intentionally public and provides only repeatable `.dev` upgrades; it is not a production trust credential. Consumers must rely on the source-bound checksum and GitHub attestation rather than treating this certificate as publisher authentication.
+
+“Expo Dev APK” here means the checked-in Expo native project's Debug variant. The optional `expo-dev-client` dependency and Dev Launcher are not installed. The app still uses the normal React Native Debug host and the Expo CLI Metro mode described in [`docs/development.md`](../development.md).
+
+This path cannot publish or update Version Preview, Stable, `compat-preview`, a Compatibility BOM, Relay, CLI, Google Play, EAS Update, or the App self-update feed. The existing Preview candidate/promotion workflows remain unchanged.
 
 ## APK-only Preview prerelease
 
@@ -78,8 +104,8 @@ lyntty-release.jks
 
 Rules:
 
-- Never commit `.jks` or `.keystore`.
-- Keep local encrypted backup.
+- Never commit the production `.jks` or any secret keystore. The checked-in Dev/Preview signers are intentionally public exceptions and are not trust credentials.
+- Keep local encrypted backup of the production key.
 - Store CI copy in GitHub Secrets as base64 plus passwords.
 - Android background push notifications require a first-party Firebase project for `dev.jczhang.lyntty`.
 - Store `google-services.json` as a base64 GitHub Secret; keep the file out of git.
@@ -130,7 +156,7 @@ Accepted direction: use checked-in `packages/lyntty-app/android/` as release sou
 
 Implemented behavior:
 
-- `APP_ENV=development` always selects `dev.jczhang.lyntty.dev`;
+- `APP_ENV=development` always selects `dev.jczhang.lyntty.dev`; Debug uses the checked-in public Expo-Dev-only signer;
 - `APP_ENV=preview` always selects `dev.jczhang.lyntty.preview` and the checked-in preview-only signer for debug or release-style validation;
 - `APP_ENV=production` permits explicit Release tasks only, selects `dev.jczhang.lyntty`, and uses the injected permanent release keystore;
 - production release fails if signing/version properties are missing or if the output signer fingerprint differs from `LYNTTY_ANDROID_CERT_SHA256`;
@@ -341,7 +367,7 @@ Device/emulator checks:
 
 ## Security notes
 
-- Keep keystore and Firebase service files out of git and artifacts except encrypted backup / GitHub Secret.
+- Keep the production keystore and Firebase service files out of git and artifacts except encrypted backup / GitHub Secret; only the explicitly public Dev/Preview signers are checked in.
 - Do not commit generated APKs.
 - Do not log manifest URLs with tokens; current GitHub Release APK URL is public and tokenless.
 - Redact pairing URLs, auth tokens, headers, public-key blobs used as auth material, and secrets in evidence.

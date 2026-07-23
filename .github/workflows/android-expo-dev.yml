@@ -1,0 +1,248 @@
+name: Android Expo Dev APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: android-expo-dev-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact main source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Validate protected source and derive artifact identity
+        id: artifact
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "${GITHUB_REF_PROTECTED:-false}" == true ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GITHUB_RUN_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GITHUB_RUN_ATTEMPT" == 1 ]] || {
+            echo 'Workflow reruns are not allowed; start a new manual dispatch for a unique artifact identity.' >&2
+            exit 1
+          }
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse origin/main)" ]]
+          version_name="$(bun -e 'const x=await Bun.file("packages/lyntty-app/package.json").json();process.stdout.write(x.version)')"
+          [[ "$version_name" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          version_code=$((930000 + GITHUB_RUN_NUMBER))
+          (( version_code <= 2100000000 ))
+          short_sha="${GITHUB_SHA:0:12}"
+          apk_name="lyntty-expo-dev-${short_sha}-${version_code}.apk"
+          {
+            echo "version_name=$version_name"
+            echo "version_code=$version_code"
+            echo "short_sha=$short_sha"
+            echo "apk_name=$apk_name"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install process audit tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends strace
+
+      - name: Reject unreviewed inputs and verify Expo Dev signer
+        env:
+          EXPO_DEV_SIGNER_SHA256: 374ea213bdd5667f7e274aa70b89cfa21ea8ba1222a948169904e9664ec69d16
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          env_files=(packages/lyntty-app/.env*)
+          for path in "${env_files[@]}" packages/lyntty-app/google-services.json packages/lyntty-app/android/app/google-services.json; do
+            [[ ! -e "$path" ]] || {
+              echo "Refusing unreviewed Expo Dev build input: $path" >&2
+              exit 1
+            }
+          done
+          keystore=packages/lyntty-app/android/app/lyntty-expo-dev.keystore
+          [[ -f "$keystore" && ! -L "$keystore" ]]
+          signer_sha256="$(keytool -exportcert -keystore "$keystore" -storepass lyntty-expo-dev \
+            -alias lyntty-expo-dev 2>/dev/null | sha256sum | awk '{print $1}')"
+          [[ "$signer_sha256" == "$EXPO_DEV_SIGNER_SHA256" ]]
+
+      - name: Build dual-ABI Metro-required debug APK
+        working-directory: packages/lyntty-app/android
+        env:
+          APP_ENV: development
+          NODE_ENV: development
+          EXPO_NO_DOTENV: "1"
+          BUN_EXECUTABLE: bun
+          RCT_METRO_PORT: 8081
+          VERSION_NAME: ${{ steps.artifact.outputs.version_name }}
+          VERSION_CODE: ${{ steps.artifact.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          while IFS='=' read -r key _; do
+            [[ "$key" == EXPO_PUBLIC_* ]] && unset "$key"
+          done < <(env)
+          ../scripts/gradle-runtime-audit.sh "$RUNNER_TEMP/android-expo-dev-runtime-audit.txt" -- \
+            ./gradlew :app:assembleDebug --no-daemon --stacktrace --max-workers=2 \
+              -PreactNativeArchitectures=x86_64,arm64-v8a \
+              -PlynttyVersionName="$VERSION_NAME" \
+              -PlynttyVersionCode="$VERSION_CODE" \
+              -PreactNativeDevServerPort=8081
+
+      - name: Audit and stage Expo Dev artifact
+        env:
+          APK_NAME: ${{ steps.artifact.outputs.apk_name }}
+          VERSION_NAME: ${{ steps.artifact.outputs.version_name }}
+          VERSION_CODE: ${{ steps.artifact.outputs.version_code }}
+          EXPO_DEV_SIGNER_SHA256: 374ea213bdd5667f7e274aa70b89cfa21ea8ba1222a948169904e9664ec69d16
+          EXPECTED_ABIS: arm64-v8a,x86_64
+        run: |
+          set -euo pipefail
+          artifact="$RUNNER_TEMP/android-expo-dev"
+          mkdir -p "$artifact"
+          apk="$artifact/$APK_NAME"
+          cp packages/lyntty-app/android/app/build/outputs/apk/debug/app-debug.apk "$apk"
+          runtime_audit="$artifact/android-expo-dev-runtime-audit.txt"
+          cp "$RUNNER_TEMP/android-expo-dev-runtime-audit.txt" "$runtime_audit"
+          audit="$artifact/${APK_NAME%.apk}.audit.txt"
+          packages/lyntty-app/scripts/apk-audit.sh \
+            "$apk" dev.jczhang.lyntty.dev "$VERSION_NAME" "$VERSION_CODE" \
+            "$EXPO_DEV_SIGNER_SHA256" "$EXPECTED_ABIS" metro 8081 > "$audit"
+          grep -Fx 'application_id=dev.jczhang.lyntty.dev' "$audit"
+          grep -Fx 'debuggable=true' "$audit"
+          grep -Fx 'runtime_mode=metro' "$audit"
+          grep -Fx 'standalone_bundle=absent' "$audit"
+          grep -Fx 'metro_port=8081' "$audit"
+          grep -Fx 'native_abis=arm64-v8a,x86_64' "$audit"
+          grep -Fx 'Node-family execve matches: 0' "$runtime_audit"
+          grep -Fx 'Sentinel invocations: 0' "$runtime_audit"
+          sha256="$(sha256sum "$apk" | awk '{print $1}')"
+          printf '%s  %s\n' "$sha256" "$APK_NAME" > "$artifact/$APK_NAME.sha256"
+          source_tree="$(git rev-parse 'HEAD^{tree}')"
+          export ARTIFACT="$artifact" APK_NAME VERSION_NAME VERSION_CODE EXPO_DEV_SIGNER_SHA256
+          export SHA256="$sha256" APK_SIZE="$(stat -c '%s' "$apk")" SOURCE_TREE="$source_tree"
+          bun - <<'BUN'
+          const provenance = {
+            schemaVersion: 1,
+            artifact: process.env.APK_NAME,
+            distribution: 'github-actions-artifact',
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: '.github/workflows/android-expo-dev.yml',
+            runId: Number(process.env.GITHUB_RUN_ID),
+            runNumber: Number(process.env.GITHUB_RUN_NUMBER),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            sourceCommit: process.env.GITHUB_SHA,
+            sourceTree: process.env.SOURCE_TREE,
+            applicationId: 'dev.jczhang.lyntty.dev',
+            appEnvironment: 'development',
+            buildType: 'debug',
+            debuggable: true,
+            runtimeMode: 'metro',
+            metroPort: 8081,
+            standaloneBundle: false,
+            versionName: process.env.VERSION_NAME,
+            versionCode: Number(process.env.VERSION_CODE),
+            signerSha256: process.env.EXPO_DEV_SIGNER_SHA256,
+            abis: ['arm64-v8a', 'x86_64'],
+            sha256: process.env.SHA256,
+            size: Number(process.env.APK_SIZE),
+          };
+          await Bun.write(`${process.env.ARTIFACT}/android-expo-dev-provenance.json`, `${JSON.stringify(provenance, null, 2)}\n`);
+          BUN
+          cat > "$artifact/README.md" <<README
+          # Lyntty Expo Dev APK
+
+          This is a debuggable development APK for \`dev.jczhang.lyntty.dev\`.
+          It contains no JavaScript bundle and cannot run without Metro on port 8081.
+          It is not the standalone Version Preview APK and is not part of \`compat-preview\`.
+
+          Source commit: \`$GITHUB_SHA\`
+          APK SHA-256: \`$sha256\`
+
+          From a checkout of the exact source commit:
+
+          \`\`\`bash
+          bun install --frozen-lockfile
+          adb install -r "$APK_NAME"
+          adb reverse tcp:8081 tcp:8081
+          cd packages/lyntty-app
+          APP_ENV=development bunx expo start --dev-client --port 8081
+          \`\`\`
+
+          Launch \`Lyntty (dev)\` after Metro is ready. If Android reports a signing mismatch
+          with an older local debug build, uninstall only \`dev.jczhang.lyntty.dev\` and retry.
+          README
+          bun - <<'BUN'
+          const names = [
+            process.env.APK_NAME,
+            `${process.env.APK_NAME}.sha256`,
+            `${process.env.APK_NAME.replace(/\.apk$/, '')}.audit.txt`,
+            'android-expo-dev-runtime-audit.txt',
+            'android-expo-dev-provenance.json',
+            'README.md',
+          ].sort();
+          const files = [];
+          for (const name of names) {
+            const file = Bun.file(`${process.env.ARTIFACT}/${name}`);
+            if (!await file.exists()) throw new Error(`missing Expo Dev artifact file: ${name}`);
+            const hasher = new Bun.CryptoHasher('sha256');
+            for await (const chunk of file.stream()) hasher.update(chunk);
+            files.push({ name, size: file.size, sha256: hasher.digest('hex') });
+          }
+          const manifest = { schemaVersion: 1, sourceCommit: process.env.GITHUB_SHA, files };
+          await Bun.write(`${process.env.ARTIFACT}/android-expo-dev-manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+          BUN
+
+      - name: Attest exact Expo Dev APK
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: ${{ runner.temp }}/android-expo-dev/${{ steps.artifact.outputs.apk_name }}
+
+      - name: Attest exact Expo Dev manifest
+        uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
+        with:
+          subject-path: ${{ runner.temp }}/android-expo-dev/android-expo-dev-manifest.json
+
+      - name: Upload short-lived Expo Dev artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-expo-dev-${{ github.run_id }}
+          path: ${{ runner.temp }}/android-expo-dev/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Summarize Metro requirement
+        env:
+          APK_NAME: ${{ steps.artifact.outputs.apk_name }}
+        run: |
+          {
+            echo '### Expo Dev APK ready'
+            echo
+            echo "- Artifact: \`android-expo-dev-$GITHUB_RUN_ID\`"
+            echo "- APK: \`$APK_NAME\`"
+            echo '- Package: `dev.jczhang.lyntty.dev`'
+            echo '- Runtime: **Metro required on port 8081; no standalone JavaScript bundle is embedded.**'
+            echo '- This artifact is separate from Version Preview and `compat-preview`.'
+          } >> "$GITHUB_STEP_SUMMARY"
