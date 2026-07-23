@@ -2,7 +2,7 @@
 
 Date: 2026-07-23
 
-Status: Implementation, the isolated local APK/emulator path, and the first protected-`main` GitHub Actions publication are verified. The channel produced one 14-day Actions Artifact; no tag, Draft, prerelease, or GitHub Release was created.
+Status: Implementation, the isolated local APK/emulator path, the first protected-`main` GitHub Actions publication, and the owner-authorized immutable GitHub prerelease are verified. The workflow still produces a 14-day Actions Artifact only; its seven verified files were later promoted unchanged to a separate Expo Dev prerelease.
 
 ## Scope and boundary
 
@@ -156,7 +156,27 @@ manifest SHA-256: 8fd05428913ce3fe1de77218b0f895e5dd88eee3a78488a5ce315075b58b47
 
 The downloaded seven-file artifact matched its strict six-entry manifest plus the manifest itself. Provenance bound run ID/number/attempt, source commit/tree, package, Debug/Metro identity, signer, ABI set, APK size, and checksum. A fresh local audit of the downloaded APK exactly matched the uploaded audit: `dev.jczhang.lyntty.dev`, `debuggable=true`, one pinned v2 signer, no standalone bundle, Metro `8081`, and `arm64-v8a,x86_64`.
 
-`gh attestation verify` independently verified the APK and manifest against repository `jczhang02/lyntty`, signer workflow `.github/workflows/android-expo-dev.yml`, source ref `refs/heads/main`, exact source/signer digest `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968`, SLSA provenance v1, and the deny-self-hosted-runner policy. Both had a verified transparency timestamp. No tag or GitHub Release was created; that remains an intentional channel boundary.
+`gh attestation verify` independently verified the APK and manifest against repository `jczhang02/lyntty`, signer workflow `.github/workflows/android-expo-dev.yml`, source ref `refs/heads/main`, exact source/signer digest `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968`, SLSA provenance v1, and the deny-self-hosted-runner policy. Both had a verified transparency timestamp. The workflow run itself created no tag or GitHub Release; its permissions and artifact-only behavior remain unchanged.
+
+### Owner-authorized immutable prerelease
+
+After an explicit owner request for a GitHub Release, the seven verified files were manually promoted unchanged to [`android-expo-dev-v1.2.0-930001`](https://github.com/jczhang02/lyntty/releases/tag/android-expo-dev-v1.2.0-930001). It was prepared as a Draft, independently reviewed before publication, and published with this identity:
+
+```text
+release database ID: 358594428
+name: Lyntty Expo Dev v1.2.0 (930001)
+tag: android-expo-dev-v1.2.0-930001
+tag target: 04b63ea7a35f98c3012cc2ca6b00b7dae9e76968
+published: 2026-07-23T10:33:23Z
+draft: false
+prerelease: true
+immutable: true
+explicit Release assets: 7
+```
+
+The lightweight tag points directly to the exact GitHub-verified build-source commit and its reviewed tree `3fb04f264a362f7a169d3d9d0b0ad47380d4ebcd`. The Stable Latest endpoint remains `compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1`; this Expo Dev prerelease did not replace Stable, Preview, or any Compatibility BOM reference.
+
+All seven Release assets were downloaded into a fresh directory after publication. Their names, sizes, and SHA-256 values matched both the GitHub Release asset API and the original strict manifest. The APK checksum passed, provenance remained bound to run `29993286277` and source `04b63ea7…`, a fresh APK audit exactly matched the published audit, and both GitHub attestations verified again against the downloaded Release bytes. Unauthenticated public range downloads succeeded for the APK and checksum. The Release notes state the Metro `8081`, Debug/no-bundle, public-signer, separate-channel, and no-physical-phone boundaries before the install instructions.
 
 Tracked evidence:
 
@@ -166,8 +186,9 @@ Tracked evidence:
 - `docs/evidence/artifacts/r107-expo-dev-apk/emulator-smoke.txt`
 - `docs/evidence/artifacts/r107-expo-dev-apk/validation-inputs.json`
 - `docs/evidence/artifacts/r107-expo-dev-apk/github-actions-publish.txt`
+- `docs/evidence/artifacts/r107-expo-dev-apk/github-release-publish.txt`
 
-The 196 MiB APK, full Gradle/strace logs, emulator image, logcat, UI XML, and screenshot remain untracked temporary validation data. They contain no claimed release bytes and are not repository deliverables.
+The locally built 196 MiB validation APK, full Gradle/strace logs, emulator image, logcat, UI XML, and screenshot remain untracked temporary data and contain no claimed Release bytes. Fresh Actions Artifact and GitHub Release downloads were also untracked verification copies; the durable evidence records their exact hashes and audit results instead of committing APK bytes.
 
 ## Acceptance audit
 
@@ -177,8 +198,9 @@ The 196 MiB APK, full Gradle/strace logs, emulator image, logcat, UI XML, and sc
 | Development Debug identity | workflow constants, Gradle mapping, local and downloaded APK audits | pass |
 | Debuggable, Metro-required, no standalone bundle | mode-aware tests, two APK audits, no-Metro failure and Metro success | pass |
 | Fixed port, dual ABI, stable development signer | downloaded APK resource/ABI/signature audit and certificate pin | pass |
-| Separate from Version Preview and Compatibility | no Preview workflow delta, no write/Release path, hardening assertions, no tag/Release created | pass |
-| Artifact identity and reviewability | attempt-1 identity, strict manifest/provenance/checksum, downloaded re-audit, two verified attestations | pass |
+| Separate from Version Preview and Compatibility | distinct `.dev` package/tag, prerelease and not Latest, unchanged Preview workflows/BOM/self-update path | pass |
+| Artifact and Release identity | attempt-1 identity, strict manifest/provenance/checksum, two independent downloads/re-audits, exact tag target, seven API digests, two verified attestations | pass |
+| GitHub prerelease publication | immutable release `358594428`, reviewed warning body, seven assets, public unauthenticated download, Stable Latest unchanged | pass |
 | Automated gates | local focused/full gates, 13 PR checks, YAML/Bash/ShellCheck, independent final verifier | pass |
 | Documentation and durable evidence | English/Chinese runbooks, R107 sidecars, 984-input local manifest, publication record | pass |
 | Signed commits and protected merge | three Good OpenPGP logical commits and GitHub-verified squash merge | pass |
@@ -186,7 +208,7 @@ The 196 MiB APK, full Gradle/strace logs, emulator image, logcat, UI XML, and sc
 
 ## Not run and residual risk
 
-- No physical phone was used. An isolated API 35 emulator proves Metro dependency and successful app rendering, but not USB-driver or physical-device behavior. Physical acceptance is not a gate for this ephemeral development artifact.
-- The public development certificate authenticates nothing: anyone with the repository can sign the `.dev` package. Exact source SHA, checksum, provenance, and GitHub attestations are the trust boundary.
-- Artifact `android-expo-dev-29993286277` expires at `2026-08-06T09:24:53Z` and cannot run without a compatible source checkout and Metro on port `8081`.
-- No tag, Draft, prerelease, or GitHub Release was created. The short-lived Actions Artifact is the complete and intentional distribution surface for this Metro-bound channel.
+- No physical phone was used. An isolated API 35 emulator proves Metro dependency and successful app rendering, but not USB-driver or physical-device behavior. Physical acceptance was explicitly not a gate for this development prerelease.
+- The public development certificate authenticates nothing: anyone with the repository can sign the `.dev` package. Exact source SHA, checksum, provenance, GitHub asset digests, and attestations are the trust boundary.
+- Actions Artifact `android-expo-dev-29993286277` still expires at `2026-08-06T09:24:53Z`; the immutable GitHub prerelease now provides the durable download. Both copies require a compatible source checkout and Metro on port `8081`.
+- The workflow cannot publish or update this prerelease. This was an explicit one-time owner-authorized manual promotion, not a new automated release or Compatibility path.
