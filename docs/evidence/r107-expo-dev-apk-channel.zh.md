@@ -2,7 +2,7 @@
 
 日期：2026-07-23
 
-状态：实现与隔离的本地 APK/模拟器路径已经验证。新 workflow 尚未进入受保护 `main`，因此没有触发 GitHub Actions，也没有创建外部 artifact、tag、Draft、prerelease 或 Release。
+状态：实现、隔离的本地 APK/模拟器路径，以及首次受保护 `main` GitHub Actions 发布均已验证。该通道产出一份保留 14 天的 Actions Artifact；没有创建 tag、Draft、prerelease 或 GitHub Release。
 
 ## 范围与边界
 
@@ -127,7 +127,28 @@ APK audit test 按 red-first 编写：实现前，Metro acceptance 会撞上旧�
 
 只读 reviewer 没有发现 blocking issue，但指出一项中风险身份问题：GitHub rerun 会复用 `GITHUB_RUN_ID` 与 `GITHUB_RUN_NUMBER`；另外有两项低风险测试缺口。当前实现已经拒绝 `GITHUB_RUN_ATTEMPT > 1`、在 provenance 中记录 `runAttempt`、锁定精确 trigger/permission block，并补齐 APK audit 负例。针对性复查确认三项均 resolved，且没有新 blocker。
 
-另一名 acceptance verifier 在提交前检查点正确指出 signer、workflow 和 evidence 当时仍未 tracked/signed。这属于交付状态而非实现缺陷；关闭任务前必须证明这些文件已跟踪、commit 已签名、worktree 已 clean。后续 verifier 复算了 `validation-inputs.json` 的全部 984 项，未发现剩余内容问题，并确认其边界：这是按内容绑定的本地验证记录，不是对有意不保留的 APK 原始字节的独立证明。
+另一名 acceptance verifier 在提交前检查点正确指出 signer、workflow 和 evidence 当时仍未 tracked/signed。这属于交付状态而非实现缺陷；最终验证在关闭任务前证明了文件已跟踪、三个逻辑 commit 都有 Good OpenPGP signature、worktree clean。后续 verifier 复算了 `validation-inputs.json` 的全部 984 项，未发现剩余内容问题，并确认其边界：这是按内容绑定的本地验证记录，不是对有意不保留的 APK 原始字节的独立证明。
+
+## 受保护 main 发布
+
+PR [#47](https://github.com/jczhang02/lyntty/pull/47) 的 13 项 checks 全部通过，并以 GitHub-verified commit `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968` squash merge 到受保护 `main`；其 tree 是预审过的 `3fb04f264a362f7a169d3d9d0b0ad47380d4ebcd`。
+
+首次手动运行 [Android Expo Dev APK #29993286277](https://github.com/jczhang02/lyntty/actions/runs/29993286277) 从精确 `main` SHA `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968` 以 attempt 1 成功完成。build、APK/runtime audit、两份 attestation、upload 与 summary 步骤全部通过，只发布 Actions Artifact [`android-expo-dev-29993286277`](https://github.com/jczhang02/lyntty/actions/runs/29993286277/artifacts/8558651887)：
+
+```text
+artifact ID：8558651887
+archive 大小：76662528 bytes
+创建时间：2026-07-23T09:24:57Z
+过期时间：2026-08-06T09:24:53Z
+APK：lyntty-expo-dev-04b63ea7a35f-930001.apk
+APK 大小：205436682 bytes
+APK SHA-256：4c306d6c0b4e8856ac72aec8b2a9ca88a504d6b07ea3b64235b087e604fec8b8
+manifest SHA-256：8fd05428913ce3fe1de77218b0f895e5dd88eee3a78488a5ce315075b58b4704
+```
+
+下载后的 7 个文件与严格 manifest 的 6 项加 manifest 自身完全一致。provenance 绑定 run ID/number/attempt、源码 commit/tree、package、Debug/Metro 身份、signer、ABI、APK 大小与 checksum。对下载 APK 重新执行本地 audit 后与上传 audit 逐字一致：`dev.jczhang.lyntty.dev`、`debuggable=true`、唯一固定 v2 signer、无 standalone bundle、Metro `8081`、`arm64-v8a,x86_64`。
+
+`gh attestation verify` 分别验证 APK 与 manifest，并锁定仓库 `jczhang02/lyntty`、signer workflow `.github/workflows/android-expo-dev.yml`、source ref `refs/heads/main`、精确 source/signer digest `04b63ea7a35f98c3012cc2ca6b00b7dae9e76968`、SLSA provenance v1 与拒绝 self-hosted runner 策略；两者都有已验证的 transparency timestamp。没有创建 tag 或 GitHub Release，这是该通道的有意边界。
 
 仓库内证据：
 
@@ -136,6 +157,7 @@ APK audit test 按 red-first 编写：实现前，Metro acceptance 会撞上旧�
 - `docs/evidence/artifacts/r107-expo-dev-apk/apk.sha256`
 - `docs/evidence/artifacts/r107-expo-dev-apk/emulator-smoke.txt`
 - `docs/evidence/artifacts/r107-expo-dev-apk/validation-inputs.json`
+- `docs/evidence/artifacts/r107-expo-dev-apk/github-actions-publish.txt`
 
 196 MiB APK、完整 Gradle/strace 日志、模拟器数据、logcat、UI XML 与截图只保留为临时本地验证数据，不是仓库交付物，也不被表述为发布字节。
 
@@ -143,21 +165,20 @@ APK audit test 按 red-first 编写：实现前，Metro acceptance 会撞上旧�
 
 | 要求 | 证据 | 状态 |
 | --- | --- | --- |
-| 仅手动触发、精确受保护 `main` | 精确 `on`/permission hardening，以及 event/ref/protection/HEAD/origin 检查 | 静态契约通过；GitHub run 尚未执行 |
-| Development Debug 身份 | workflow 常量、Gradle mapping、真实 APK audit | 通过 |
-| Debuggable、必须 Metro、无 standalone bundle | mode-aware audit tests、真实 APK audit、无 Metro 失败与有 Metro 成功 | 通过 |
-| 固定端口、双 ABI、稳定开发 signer | 真实 APK resource/ABI/signature audit 与证书 pin | 通过 |
-| 与 Version Preview/Compatibility 隔离 | Preview workflow 无 delta、无写权限/Release 路径、hardening assertions | 通过 |
-| Artifact 身份与可审阅性 | 只允许首次 attempt、SHA/provenance/manifest/README、attestation steps | 静态契约通过；GitHub attestation/upload 尚未执行 |
-| 自动化门禁 | focused tests、`ci:fast`、YAML/Bash/ShellCheck、独立复查 | 通过 |
-| 文档与持久本地证据 | 中英文 runbook、R107 sidecars、984-input content manifest | 内容通过；commit 后验证 tracked |
-| 签名 Conventional Commits | 仓库策略要求使用现有 OpenPGP identity | 等待 GPG agent 解锁 |
-| Bead 与 Goal 关闭 | 签名提交及 clean worktree 后执行 completion audit | 等待 |
+| 仅手动触发、精确受保护 `main` | 精确 hardening，以及 merged `main` SHA 上成功的 attempt-1 run `29993286277` | 通过 |
+| Development Debug 身份 | workflow 常量、Gradle mapping、本地与下载 APK audit | 通过 |
+| Debuggable、必须 Metro、无 standalone bundle | mode-aware tests、两次 APK audit、无 Metro 失败与有 Metro 成功 | 通过 |
+| 固定端口、双 ABI、稳定开发 signer | 下载 APK 的 resource/ABI/signature audit 与证书 pin | 通过 |
+| 与 Version Preview/Compatibility 隔离 | Preview workflow 无 delta、无写权限/Release 路径、hardening assertions、未创建 tag/Release | 通过 |
+| Artifact 身份与可审阅性 | attempt-1 身份、严格 manifest/provenance/checksum、下载重审计、两份已验证 attestation | 通过 |
+| 自动化门禁 | 本地 focused/full gates、13 项 PR checks、YAML/Bash/ShellCheck、最终独立 verifier | 通过 |
+| 文档与持久证据 | 中英文 runbook、R107 sidecars、984-input 本地 manifest、发布记录 | 通过 |
+| 签名提交与受保护合并 | 三个 Good OpenPGP 逻辑 commit 与 GitHub-verified squash merge | 通过 |
+| Bead 与 Goal 关闭 | `lyntty-74p` 在签名提交/clean worktree completion audit 后关闭 | 通过 |
 
 ## 未执行项与剩余风险
 
-- 尚未触发新 GitHub workflow。受保护 main 校验、GitHub-hosted Java 17、attestation 与 Actions artifact 上传只能在审阅合并后执行，目前不声称通过。
 - 未使用实体手机。API 35 隔离模拟器已经证明 Metro 依赖与 App 正常渲染，但不覆盖 USB driver 或实体设备差异；此短期开发 artifact 不以实体机验收为发布门禁。
-- 公开开发证书不提供身份认证；拥有仓库的人都能签名 `.dev` 包。信任边界是源码 SHA、checksum、provenance 与 GitHub attestation。
-- artifact 14 天后过期，且离开兼容源码 checkout 与 `8081` Metro 无法运行。
-- `bun run ci:fast` 已完成；独立复核与最终签名提交会在完成后补记。本文不是发布或合并记录。
+- 公开开发证书不提供身份认证；拥有仓库的人都能签名 `.dev` 包。信任边界是精确源码 SHA、checksum、provenance 与 GitHub attestations。
+- Artifact `android-expo-dev-29993286277` 将于 `2026-08-06T09:24:53Z` 过期，且离开兼容源码 checkout 与 `8081` Metro 无法运行。
+- 没有创建 tag、Draft、prerelease 或 GitHub Release。短期 Actions Artifact 是该 Metro-bound 通道完整且有意的分发面。
