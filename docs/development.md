@@ -95,6 +95,35 @@ Only this form starts worktree-local Metro and runs the development APK install 
 
 The Android option targets a locally available Android emulator. It does not install production/preview identities or use permanent signing material.
 
+## Short-lived Expo Dev APK artifact
+
+Use the manual **Android Expo Dev APK** Actions workflow when a prebuilt development APK is more convenient than letting `bun dev:up --android` build one locally. The workflow accepts only exact protected `main` and uploads a 14-day Actions artifact named `android-expo-dev-<run-id>`; it creates no tag or GitHub Release. A GitHub rerun is rejected because it would reuse the run identity—start a new manual dispatch instead.
+
+The downloaded `lyntty-expo-dev-<source-sha>-<version-code>.apk` has this fixed contract:
+
+- package `dev.jczhang.lyntty.dev` and label **Lyntty (dev)**;
+- Android Debug variant with `debuggable=true`;
+- `arm64-v8a` and `x86_64` native libraries;
+- no `assets/index.android.bundle`;
+- Metro development-server port `8081`;
+- the checked-in, intentionally public Expo-Dev-only signer.
+
+Install and run it from a checkout of the artifact's exact source commit:
+
+```bash
+bun install --frozen-lockfile
+adb install -r lyntty-expo-dev-<source-sha>-<version-code>.apk
+adb reverse tcp:8081 tcp:8081
+cd packages/lyntty-app
+APP_ENV=development bunx expo start --dev-client --port 8081
+```
+
+Start or restart **Lyntty (dev)** after Metro reports that it is ready. Without Metro, the APK cannot load JavaScript and is expected to show an `Unable to load script` development error. If an older local APK used a different debug signer, uninstall only `dev.jczhang.lyntty.dev` and retry.
+
+Here “Expo Dev APK” means the Debug variant of the checked-in Expo native project. It does not include the optional `expo-dev-client` package or Expo Dev Launcher; `--dev-client` selects the Expo CLI development-server mode used by this native Debug app.
+
+Every artifact includes an APK checksum, APK/runtime audits, source provenance, a strict file manifest, and a usage README. It is deliberately separate from the standalone Version Preview APK: it never enters `compat-preview`, Compatibility BOM promotion, `latest`, the self-update path, or any Preview GitHub Release.
+
 ## Supported hosts and safety
 
 The process-ownership guard supports Linux (`/proc`) and macOS (`ps` plus `lsof`) and fails clearly elsewhere. The commands never send keys or lifecycle controls to tmux/Pi panes. Development secrets, logs, databases, and evidence remain ignored under the worktree's `dist/` directory.

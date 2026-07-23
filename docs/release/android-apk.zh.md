@@ -1,6 +1,6 @@
 # Android APK 发布（中文同步说明）
 
-> 同步状态（2026-07-19）：签名输入、证书 pin、channel 与审计步骤见英文版 [`android-apk.md`](./android-apk.md)，当前以英文版为准。
+> 同步状态（2026-07-23）：签名输入、证书 pin、channel 与审计步骤见英文版 [`android-apk.md`](./android-apk.md)，当前以英文版为准。
 
 Production APK 必须使用永久密钥并 fail closed；本地 throwaway/Preview signer 只能用于独立 Preview 包，不能冒充 Stable 签名证据。
 
@@ -9,6 +9,32 @@ Production APK 必须使用永久密钥并 fail closed；本地 throwaway/Previe
 首次 Compatibility Stable 固定为 App `1.2.0`、`versionCode=6`、package `dev.jczhang.lyntty`，并沿用现有 production certificate SHA-256 `25e3928a7cc228254e8249e684c6ab661f5c87140e23db7406afc64af29f0cf5`。`6` 必须能从现有 production `5` 原位升级。
 
 Android-only workflow 只验证永久签名/build 路径并上传短期 artifact，不能发布。最终 Promotion 只允许发布 Compatibility Candidate 内的精确 APK。Stable 有两条互斥 owner 审批路径：常规路径必须在实体 Android 上测试同一 Candidate 字节，并同时提供 `physical_phone_accepted=true` 与精确 APK SHA-256；owner-operated 自用 waiver 路径必须提供 `physical_phone_accepted=false`、空 accepted hash 和精确短语 `I accept publishing this exact Stable Candidate without physical Android validation`。waiver 绝不冒充实体机验收，会发布 `android-validation.json` 审计资产，并在 immutable Release body 顶部加入中英文未验收警告。
+
+## 短期 Expo Dev debug artifact
+
+`.github/workflows/android-expo-dev.yml` 是独立开发分发入口，不是 Release channel。它只能手动触发，只接受受保护 `main` 的精确提交，没有 `contents: write`，仅上传 14 天 Actions artifact，不创建 tag、Draft、prerelease 或 Release。
+
+固定契约如下：
+
+| 属性 | Expo Dev artifact |
+| --- | --- |
+| Package | `dev.jczhang.lyntty.dev` |
+| Gradle variant | `Debug` |
+| App 环境 | `development` |
+| Debuggable | `true` |
+| JavaScript | 不内置 `assets/index.android.bundle`，必须连接 Metro |
+| Metro 端口 | `8081` |
+| ABI | `arm64-v8a`、`x86_64` |
+| Signer | 仓库内公开的开发 signer |
+| 分发 | 仅短期 Actions artifact |
+
+workflow 从 App package 读取 `versionName`，用 `930000 + GITHUB_RUN_NUMBER` 生成只属于开发包的单调 `versionCode`，并把源码 SHA 与 version code 写入 APK 文件名。`GITHUB_RUN_ATTEMPT > 1` 会被拒绝；失败后必须重新手动 dispatch，避免复用 version、APK、artifact 或 provenance 身份。上传前会验证 package、版本、debuggable、唯一 v2 signer、签名证书、ABI、standalone bundle 缺失、Metro 端口，以及 Gradle 执行期间没有 Node-family 进程。artifact 还包含 SHA-256、APK/runtime audit、provenance、严格 manifest、使用说明和 GitHub attestation。
+
+固定 signer 是有意公开的，只用于 `.dev` 包连续安装，不是 production 信任凭据。使用者必须校验绑定源码的 checksum 与 GitHub attestation，不能把该证书当作发布者认证。
+
+这里的“Expo Dev APK”指已签入 Expo 原生工程的 Debug variant，不安装可选 `expo-dev-client` 依赖或 Dev Launcher。App 通过普通 React Native Debug host 连接 Expo CLI Metro，具体命令见 [`docs/development.zh.md`](../development.zh.md)。
+
+该入口不能发布或更新 Version Preview、Stable、`compat-preview`、Compatibility BOM、Relay、CLI、Google Play、EAS Update 或 App 自更新 feed；现有 Preview candidate/promotion workflow 保持不变。
 
 ## 独立 Preview APK prerelease
 
