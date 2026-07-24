@@ -12,8 +12,8 @@ function makeSession(overrides: Record<string, unknown> = {}) {
 }
 
 describe('listPiRemoteSlashCommands', () => {
-  it('always exposes the Lyntty runtime command', () => {
-    expect(listPiRemoteSlashCommands(makeSession())).toEqual(['/lyntty']);
+  it('returns no commands when the runtime declares none', () => {
+    expect(listPiRemoteSlashCommands(makeSession())).toEqual([]);
   });
 
   it('includes extension commands, prompt templates, and skills', () => {
@@ -35,7 +35,6 @@ describe('listPiRemoteSlashCommands', () => {
     }));
 
     expect(commands).toEqual([
-      '/lyntty',
       '/review',
       '/ship',
       '/fallback',
@@ -50,7 +49,7 @@ describe('listPiRemoteSlashCommands', () => {
     const commands = listPiRemoteSlashCommands(makeSession({
       _extensionRunner: {
         getRegisteredCommands: () => [
-          { invocationName: 'lyntty' },
+          { invocationName: 'review' },
           { invocationName: '' },
           { invocationName: 'review' },
           { invocationName: '/review' },
@@ -58,7 +57,7 @@ describe('listPiRemoteSlashCommands', () => {
       },
     }));
 
-    expect(commands).toEqual(['/lyntty', '/review']);
+    expect(commands).toEqual(['/review']);
   });
 });
 
@@ -67,7 +66,7 @@ describe('getPiPluginFeatureSummary', () => {
     expect(getPiPluginFeatureSummary(makeSession({
       promptTemplates: [{ name: 'plan' }],
     }))).toEqual({
-      slashCommands: ['/lyntty', '/plan'],
+      slashCommands: ['/plan'],
       activeTools: ['read', 'bash'],
       configuredTools: ['read', 'bash', 'custom_tool'],
     });

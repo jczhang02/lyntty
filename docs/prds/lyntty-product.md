@@ -45,7 +45,7 @@ The user finds waiting, running, failed, and recent sessions in `Sessions Home`,
 Acceptance:
 
 - waiting sessions outrank ordinary recent sessions; running sessions stay near the top.
-- native `/lyntty` session, Android-created headless session, and recent session resume all use the same session/runtime model.
+- ordinary computer-running `pi` sessions, Android-created headless sessions, and recent session resumes all use the same session/runtime model.
 - Android-created sessions use the selected working directory by default; creating a temporary git worktree is an explicit user choice. Dirty worktrees are never auto-deleted.
 - Current product scope does not provide merge, push, or PR approval.
 
@@ -160,7 +160,7 @@ Acceptance:
 - Highest-value seam: end-to-end session control through public relay/node/client protocol, asserting observable behavior rather than implementation details.
 - The core acceptance test should drive Android -> relay -> `lynttyd` -> pi runtime -> event/evidence replay.
 - Tests should prove one active runtime per session through activation lock, lease heartbeat, stale state, and explicit takeover behavior.
-- Native pi continuation should be tested by enabling `/lyntty`, routing Android input to the same native runtime, and verifying both native and Android surfaces observe the same events.
+- Native pi continuation should be tested with the Lyntty Pi extension active, routing Android input to the same native runtime, and verifying both native and Android surfaces observe the same events.
 - Headless session path should be tested through pi SDK start/resume, sending new requests, redirecting active work, adding follow-up context, stopping runs, and persisted pi JSONL history.
 - Reconnect tests should cover REST backfill, WebSocket live stream, dedupe, `history_gap`, command idempotency, and node reconnect.
 - Event reducer tests should map raw events into session state, collapsed timeline groups, result details, and recovery state.
@@ -171,7 +171,7 @@ Acceptance:
 - Preview tests should cover jail realpath checks, token expiry, no native bridge, WebView-safe settings, and no durable relay artifact storage.
 - Worktree tests should cover git worktree creation, non-git fallback, dirty cleanup refusal, clean manual cleanup, and visible cleanup state.
 - Good tests assert external behavior: messages, events, state transitions, security boundaries, UI-visible evidence, and recovery instructions.
-- Prior art for testing and acceptance comes from recovered gate docs: Bun checks, protocol/client-core tests, Android build, Maestro emulator, tunnel smoke, native `/lyntty` real-task smoke, `git diff --check`, and issue graph checks.
+- Prior art for testing and acceptance comes from recovered gate docs: Bun checks, protocol/client-core tests, Android build, Maestro emulator, tunnel smoke, the legacy native `/lyntty` real-task smoke, `git diff --check`, and issue graph checks.
 
 ## Out of Scope
 

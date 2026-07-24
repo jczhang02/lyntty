@@ -45,7 +45,7 @@ Acceptance:
 Acceptance:
 
 - waiting sessions 排在普通 recent sessions 前面；running sessions 靠前。
-- native `/lyntty` session、Android-created headless session、recent session resume 都进入同一套 session/runtime model。
+- 普通电脑端运行的 `pi` session、Android-created headless session、recent session resume 都进入同一套 session/runtime model。
 - Android-created session 默认使用用户选择的 working directory；创建 temporary git worktree 必须由用户显式选择。Dirty worktrees 永不自动删除。
 - 当前产品范围不提供 merge、push 或 PR approve。
 
@@ -160,7 +160,7 @@ Acceptance:
 - 最高价值 seam：通过 public relay/node/client protocol 做 end-to-end session control，断言 observable behavior，不测 implementation details。
 - 核心 acceptance test 驱动 Android -> relay -> `lynttyd` -> pi runtime -> event/evidence replay。
 - 测试要证明 activation lock、lease heartbeat、stale state、explicit takeover 确保每个 session 一个 active runtime。
-- Native pi continuation 要测试启用 `/lyntty` 后 Android input 进入同一个 native runtime，且 native/Android surfaces 观察到同样 events。
+- Native pi continuation 要在 Lyntty Pi extension 已启用时测试 Android input 进入同一个 native runtime，且 native/Android surfaces 观察到同样 events。
 - Headless session path 要测试 pi SDK start/resume、发送新需求、打断改方向、追加说明、停止任务、persisted pi JSONL history。
 - Reconnect tests 覆盖 REST backfill、WebSocket live stream、dedupe、`history_gap`、command idempotency、node reconnect。
 - Event reducer tests 将 raw events 映射到 session state、collapsed timeline groups、result details 和 recovery state。
@@ -171,7 +171,7 @@ Acceptance:
 - Preview tests 覆盖 jail realpath checks、token expiry、no native bridge、WebView-safe settings、no durable relay artifact storage。
 - Worktree tests 覆盖 git worktree creation、non-git fallback、dirty cleanup refusal、clean manual cleanup、visible cleanup state。
 - 好测试断言外部行为：messages、events、state transitions、security boundaries、UI-visible evidence、recovery instructions。
-- Testing/acceptance prior art 来自恢复的 gate docs：Bun checks、protocol/client-core tests、Android build、Maestro emulator、tunnel smoke、native `/lyntty` real-task smoke、`git diff --check`、issue graph checks。
+- Testing/acceptance prior art 来自恢复的 gate docs：Bun checks、protocol/client-core tests、Android build、Maestro emulator、tunnel smoke、旧版 native `/lyntty` real-task smoke、`git diff --check`、issue graph checks。
 
 ## Out of Scope
 

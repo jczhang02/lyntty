@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
 
 const slashPolicy = {
-  supportedSlashCommands: ['/lyntty'],
+  supportedSlashCommands: ['/review'],
   localOnlySlashCommands: ['/model', '/settings'],
 };
 

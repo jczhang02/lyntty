@@ -1,7 +1,5 @@
 import type { AgentSession, AgentSessionRuntime } from '@earendil-works/pi-coding-agent';
 
-export const LYNTTY_REMOTE_COMMAND = '/lyntty';
-
 interface InternalCommand {
   invocationName?: string;
   name?: string;
@@ -40,7 +38,7 @@ function addCommand(commands: Set<string>, name: string | undefined): void {
 }
 
 export function listPiRemoteSlashCommands(session: AgentSession): string[] {
-  const commands = new Set<string>([LYNTTY_REMOTE_COMMAND]);
+  const commands = new Set<string>();
   const internalSession = session as unknown as SessionInternals;
 
   for (const command of internalSession._extensionRunner?.getRegisteredCommands?.() ?? []) {
