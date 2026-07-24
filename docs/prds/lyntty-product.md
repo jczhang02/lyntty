@@ -1,5 +1,7 @@
 # Lyntty: Android control layer for the `pi` coding agent
 
+Status: current product requirements
+
 Product frame: Lyntty is the Android control layer for the `pi` coding agent, similar to what Claude Code Remote is for Claude Code.
 
 Runtime path: the Android app connects through `relay` to the local computer/node running `lynttyd`; that node's `active runtime` advances the `pi` session. Repositories, tools, MCP servers, credentials, and canonical `pi` session JSONL stay on the node. Android does not hold the workspace or execute code.
@@ -17,12 +19,11 @@ Lyntty is a single-user, self-hosted, Android-first control layer for the `pi` c
 Core use path:
 
 1. `Sessions Home`: daily entry for needs attention, running, recent, failed, and completed sessions.
-2. `Session Remote`: main control page, shaped like a phone chat. The user sends requests to `pi`, reads replies, confirms actions, asks follow-ups, interrupts or stops tasks, and sees changes, run results, errors, previews, and next steps.
-   - `Review Evidence`: review mode inside `Session Remote`, not a standalone page and not PR review. It appears when a session finishes, fails, waits for confirmation, or the user opens it. It collects changed files, diff summary, test/check results, command summary, errors, event timeline, artifacts/previews, recovery state, and next actions. The user can ask a follow-up, ask `pi` to add tests or fix issues, open the workspace on the computer, or export evidence. Current scope does not include merge, push, or PR approval.
+2. `Session Remote`: main control page, shaped like a phone chat. The user sends requests to `pi`, reads replies, confirms actions, asks follow-ups, interrupts or stops tasks, and sees messages, tool activity, changed-file context, run results, errors, and next steps in one timeline. It does not introduce a separate evidence/debug replacement page. Current scope does not include merge, push, or PR approval.
 3. `Node Management`: manage paired computers, pairing, trust, heartbeat, roots, and diagnostics.
 4. `Settings / Recovery`: manage `relay` URL, owner/device binding, revocation, diagnostics, and recovery entry points.
 
-Current work should first prove one minimum viable path: pair Android with a local node, continue or create a `pi` session, show live progress, send new requests, add follow-up context, redirect active work, stop a run, show changes and run results, reconnect, and preserve one active runtime per session.
+The established minimum acceptance path pairs Android with a local node, continues or creates a `pi` session, shows live progress, sends new requests and follow-up context, redirects or stops active work, presents results, reconnects, and preserves one active runtime per session. Future product changes must keep this vertical slice working.
 
 ## User Stories
 
@@ -45,7 +46,7 @@ Acceptance:
 
 - waiting sessions outrank ordinary recent sessions; running sessions stay near the top.
 - native `/lyntty` session, Android-created headless session, and recent session resume all use the same session/runtime model.
-- Android-created git sessions default to temporary worktree; dirty worktrees are never auto-deleted.
+- Android-created sessions use the selected working directory by default; creating a temporary git worktree is an explicit user choice. Dirty worktrees are never auto-deleted.
 - Current product scope does not provide merge, push, or PR approval.
 
 ### 3. Supervise an active session
@@ -81,9 +82,9 @@ Acceptance:
 - Unsupported remote confirmations show “needs computer-side confirmation”.
 - phone-answerable confirmations or extension UI requests appear near the input box.
 
-### 6. Review what `pi` did
+### 6. Inspect what `pi` did
 
-The user opens `Review Evidence` to inspect changed files, diff summary, test/check results, command summary, errors, event timeline, artifacts/previews, recovery state, and next actions for the session.
+The user inspects changed-file context, test/check results, command summaries, errors, artifacts, recovery state, and next actions directly in the `Session Remote` timeline.
 
 Acceptance:
 
@@ -125,17 +126,17 @@ Acceptance:
 - active runtime is the process currently advancing a session. One session can have only one active runtime.
 - Use `relay` lease, runtime heartbeat, stale state, and explicit takeover to enforce activation lock.
 - Multiple authenticated surfaces can control the same active runtime.
-- Native pi extension connects only to local `lynttyd`; only `lynttyd` connects to `relay`.
+- Native Pi extension connects only to local `lynttyd`. `lynttyd` is the only node-side session bridge to `relay`; the separate operator-facing `lyntty remote` control-plane client may connect directly for explicit CLI commands.
 - `relay` and `lynttyd` are logically separate deployables. Local development may start both together.
 - `relay` routes events and commands, authenticates owner/device/node tokens, stores metadata/cache/queue, and does not become canonical history.
 - `pi` session JSONL remains canonical history.
 - `lynttyd` owns node-local event cache, per-session sequence allocation, root scanning, path completion, SDK runtime start/resume, activation lock participation, capacity, worktree management, and preview proxying.
-- Android main navigation only includes `Sessions Home`, `Session Remote`, `Node Management`, and `Settings / Recovery`. `Review Evidence` is a mode/panel inside `Session Remote`, not a standalone main navigation item.
+- Android product navigation is centered on `Sessions Home`, `Session Remote`, `Node Management`, and Settings/recovery entry points. Debug, service, diagnostics, and evidence pages do not replace these product surfaces.
 - `Sessions Home` is the daily entry. It shows sessions by useful state: needs attention, running, recent, completed/error.
 - `Node Management` is for paired computers, pairing, trust, heartbeat, roots, and diagnostics. It must not become the daily session inbox.
 - `Session Remote` uses a structured event feed, not a terminal mirror; it can look like chat, but must expose runtime state and evidence anchors.
 - input box follows pi semantics: idle sends a new request; running defaults to queued next-turn context; redirecting active work is explicit; stop is confirmed.
-- Slash command support probes runtime capability; local-only commands are marked, unknown commands may be sent raw as fallback.
+- Remote commands use the strict supported Pi-command contract. Local-only commands stay computer-side, and unknown or unsupported commands are rejected rather than sent raw.
 - Lyntty does not invent extra confirmation/risk gates. It surfaces pi/runtime confirmation requests where supported and reports computer-side confirmations where not supported.
 - The full event stream is preserved with collapse/filter/search/pin behavior for mobile usability.
 - Events carry `eventId`, `sessionId`, `runtimeId`, `nodeId`, `seq`, timestamp, type, source, redacted payload, and optional local-only payload reference.
@@ -144,15 +145,15 @@ Acceptance:
 - Auth flow is owner token once, then persistent revocable device token in encrypted Android storage.
 - Basic redaction happens before events leave node. This is self-host trusted-surface security, not zero-trust E2E.
 - Notifications use FCM for Android. Telegram, ntfy, Discord, and Web Push are not part of current product scope.
-- `Review Evidence` must at least include changed files, diff summary, test/check results, command summary, errors, event timeline, artifacts/previews, recovery state, and next actions.
-- File changes, artifact, static HTML preview, minimal live dev-server preview, and worktree cleanup state are required evidence surfaces.
+- `Session Remote` must present messages, tool activity, changed-file context, test/check results, command summaries, errors, recovery state, and next actions without becoming a PR manager or debug console.
+- File changes and supported artifact/preview metadata remain session content; service diagnostics and durable acceptance evidence stay in logs, developer tooling, or `docs/evidence/`.
 - Static/live previews must be jailed, read-only, tokenized, and WebView-safe with no native bridge.
-- New Android-created git sessions default to worktree-if-git; dirty worktrees are never auto-deleted.
+- Android-created sessions default to the selected working directory; temporary git worktrees are explicit opt-in, and dirty worktrees are never auto-deleted.
 - Node capacity defaults to 3 and full capacity creates visible queue state.
-- Preferred backend stack: Bun, Hono, WebSocket, SQLite WAL, JSONL, static/prepared SQL.
-- Preferred Android stack: React Native + Expo + TypeScript, HeroUI Native, Expo Router, TanStack Query, Expo SecureStore, Expo SQLite/AsyncStorage, Expo Notifications/FCM, WebView preview, Maestro E2E.
-- `apps/client/` is the main Android app workspace, built with Expo/React Native + HeroUI Native.
-- `packages/client-core/` stores UI-free behavior: session reducer, event grouping, reconnect/dedupe, Review Evidence summary, recovery state mapping, and command state machine. React Native UI consumes these states and does not implement protocol semantics directly.
+- Current backend stack: Bun, Fastify, Socket.IO, Prisma, PGlite by default with explicit PostgreSQL support, and canonical Pi JSONL on the node.
+- Current Android stack: React Native + Expo + TypeScript, Expo Router, Zustand, MMKV, Expo SecureStore, Expo Notifications/FCM, WebView preview, and Maestro E2E.
+- `packages/lyntty-app/` is the Android app workspace and owns mobile presentation, sync reducers, local storage, and Maestro selectors.
+- `packages/lyntty-wire/` owns shared session-protocol schemas and capabilities. App and CLI state transitions must consume those contracts rather than invent incompatible wire semantics.
 
 ## Testing Decisions
 
@@ -162,7 +163,7 @@ Acceptance:
 - Native pi continuation should be tested by enabling `/lyntty`, routing Android input to the same native runtime, and verifying both native and Android surfaces observe the same events.
 - Headless session path should be tested through pi SDK start/resume, sending new requests, redirecting active work, adding follow-up context, stopping runs, and persisted pi JSONL history.
 - Reconnect tests should cover REST backfill, WebSocket live stream, dedupe, `history_gap`, command idempotency, and node reconnect.
-- Event reducer tests should map raw events into session state, evidence summaries, collapsed feed groups, and detail drilldowns.
+- Event reducer tests should map raw events into session state, collapsed timeline groups, result details, and recovery state.
 - Android UI tests should use stable test IDs for Sessions Home, Node Management, Session Remote, input box, next steps, events/logs/commands/change/test details, recovery states, and settings.
 - Maestro emulator flows should prove login/pairing, stored-device restore, continue latest, new session, send new request, redirect active work, stop run, and evidence anchors.
 - Physical Android should be supported and documented. If unavailable, final evidence must explicitly record emulator pass plus physical-phone not-run reason.
@@ -199,6 +200,6 @@ Acceptance:
   - MindFS: structured tool/event cards and agent gateway ideas.
   - Litter: native mobile control and pairing patterns.
 - Lyntty may borrow mobile supervision and remote-control patterns, but it does not become a terminal mirror, generic web client, or broad multi-agent product.
-- Future compatibility: protocol and `packages/client-core/` should not hard-code one runtime class, but current product supports only `pi`. Codex/OpenCode adapter seams stay future extension boundaries and do not enter current scope, UI, or acceptance.
+- `packages/lyntty-wire/` may preserve protocol extensibility, but current product, UI, release, and acceptance support only `pi`; Codex/OpenCode adapters are not a current product seam.
 - Recovered source summary lives in `docs/recovered/previous-lyntty-decisions.md`.
-- Suggested initial engineering milestone: scaffold `relay` + `lynttyd` + pi extension stub + Expo/React Native Android shell; prove pair/login, native `/lyntty` session registration, Android new request/follow-up context/redirect active work, structured event feed, activation lock, reconnect, and evidence summary.
+- Current implementation and acceptance status live in the accepted architecture, package tests, release runbooks, and latest matching evidence rather than in the completed scaffold milestones.

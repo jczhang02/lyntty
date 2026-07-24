@@ -33,14 +33,14 @@ const sourcePages = [
   {
     source: "docs/roadmap.md",
     target: "roadmap.mdx",
-    title: "Lyntty Roadmap",
-    description: "Implementation roadmap for Lyntty.",
+    title: "Historical Migration Roadmap",
+    description: "Completed migration roadmap retained for Lyntty history.",
   },
   {
     source: "docs/roadmap.zh.md",
     target: "roadmap.zh.mdx",
-    title: "Lyntty Roadmap",
-    description: "Lyntty 的实现路线图。",
+    title: "历史迁移路线图",
+    description: "为 Lyntty 保留的已完成迁移路线图。",
   },
   {
     source: "docs/recovered/previous-lyntty-decisions.md",
@@ -121,7 +121,7 @@ const generatedPages = [
     target: "index.zh.mdx",
     title: "Lyntty 文档",
     description: "Lyntty 中文文档入口。",
-    body: `# Lyntty 文档\n\n这里是 Lyntty 文档的中文入口。\n\n## 中文文档\n\n- [产品 PRD](prds/lyntty-product)\n- [路线图](roadmap)\n- [历史决策](recovered/previous-lyntty-decisions)\n- [产品上下文](contexts/product)\n- [Issue 跟踪](agents/issue-tracker)\n- [分诊标签](agents/triage-labels)\n- [领域文档](agents/domain)\n`,
+    body: `# Lyntty 文档\n\n这里是 Lyntty 文档的中文入口。\n\n## 中文文档\n\n- [产品 PRD](prds/lyntty-product)\n- [历史迁移路线图](roadmap)\n- [历史决策](recovered/previous-lyntty-decisions)\n- [产品上下文](contexts/product)\n- [Issue 跟踪](agents/issue-tracker)\n- [分诊标签](agents/triage-labels)\n- [领域文档](agents/domain)\n`,
   },
 ];
 
@@ -132,6 +132,7 @@ const rootMeta = {
     "context-map",
     "---Product---",
     "prds/lyntty-product",
+    "---Historical---",
     "roadmap",
     "recovered/previous-lyntty-decisions",
     "---Domain---",
@@ -152,6 +153,7 @@ const zhMeta = {
     "context-map",
     "---产品---",
     "prds/lyntty-product",
+    "---历史记录---",
     "roadmap",
     "recovered/previous-lyntty-decisions",
     "---领域---",

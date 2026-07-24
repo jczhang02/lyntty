@@ -1,10 +1,10 @@
 # Lyntty delivery standardization
 
-Status: active Bun-only migration
-
-Current epic: `lyntty-6o0`
+Status: Bun-only migration completed; retained as the current delivery architecture and release acceptance plan
 
 Historical baseline: `docs/evidence/r62-standardization-docs.md`
+
+Completion baseline: `docs/evidence/r84-final-bun-integration.md` and the current release/deployment runbooks
 
 ## Objective
 
@@ -22,7 +22,7 @@ The supported components are independently versioned:
 ## Product and runtime invariants
 
 - `pi` is the only supported agent/runtime.
-- `lynttyd` is the computer-side authority and the only computer component that connects to Relay.
+- `lynttyd` is the computer-side session authority and the only node-side session bridge to Relay. The explicit operator-facing `lyntty remote` control-plane client may connect directly for CLI commands.
 - The Pi extension talks only to local `lynttyd`.
 - Phone control uses `phone -> relay -> lynttyd -> Pi extension -> pi.sendUserMessage()`.
 - Pi JSONL is canonical history; Relay stores encrypted sync state, queues, metadata, attachments, and caches.
@@ -59,9 +59,9 @@ The supported components are independently versioned:
 - Worktree-local `dev:up/check/verify/down` lifecycle with deterministic collision-free port blocks, isolated state/auth/PGlite, durable launch receipts, exact process-group ownership, and explicit `--android`. See `docs/development.md`.
 - Physical-phone `preview:test/status/logs/stop/reset` lifecycle with reviewed standalone APK reuse, local-LAN Relay, persistent isolated pairing, current source daemon, managed Pi launch, and ownership-safe cleanup. See `docs/development.md` and `docs/evidence/r85-preview-manual-test-harness.md`.
 - APK-only Android Preview prerelease with mandatory local Relay setup, exact-byte candidate/Promotion separation, dual-ABI audit, allowlisted physical validation, and Mole-style bilingual notes. See `docs/release/android-apk.md` and `docs/evidence/r86-preview-apk-prerelease.md`.
-- Protected `main`; implementation remains on `refactor/bun-migration` until final integration and protected PR review are complete.
+- Protected `main`; the Bun migration was integrated through protected review. New work remains on task branches/worktrees until its own protected PR review is complete.
 
-## Delivery phases and remaining external execution
+## Delivery guarantees and external acceptance
 
 ### 1. Reproducible artifacts
 
@@ -93,7 +93,7 @@ The supported components are independently versioned:
 - Run supported-platform artifact/service smoke tests.
 - Obtain zero-P0/P1 review and merge through the protected PR.
 
-Production Android signing and production Relay rollout remain explicit external gates. For the owner-operated self-use Stable line, macOS Developer ID/notarization and Windows Authenticode are explicitly not required; those archives remain in the five-platform matrix but must be disclosed as platform-unsigned and protected by exact hashes, manifests, signed BOM, provenance, and GitHub attestations.
+Production Android signing and each future production Relay rollout remain explicit external gates; the first owner-operated Stable release and Relay rollout are complete and recorded in current evidence. For the owner-operated self-use Stable line, macOS Developer ID/notarization and Windows Authenticode are explicitly not required; those archives remain in the five-platform matrix but must be disclosed as platform-unsigned and protected by exact hashes, manifests, signed BOM, provenance, and GitHub attestations.
 
 ## Verification
 

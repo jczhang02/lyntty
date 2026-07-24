@@ -1,6 +1,10 @@
-# Lyntty Fork Pi Plan
+# Historical Lyntty Fork Pi Plan
 
 日期：2026-06-30
+
+状态：已完成并 superseded 的 import 计划。本文保留旧 workspace、fork sequencing 和早期 UI 提案作为迁移依据，不是 accepted current architecture。
+
+当前架构以 `AGENTS.md`、`docs/contexts/product/CONTEXT.md` 与 `docs/architecture/pi-shared-control.md` 为准。
 
 ## 已压实决策
 

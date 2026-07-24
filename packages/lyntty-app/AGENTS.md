@@ -1,5 +1,7 @@
 # Lyntty App Agent Instructions
 
+The root `AGENTS.md` applies here. This guide adds App-specific deltas and cannot weaken root safety, permission, product, release, or verification rules.
+
 This package is the Expo/React Native mobile client. Android/release-style APK behavior is the primary acceptance target.
 
 ## Product surface
@@ -55,13 +57,19 @@ Unsupported slash commands need visible feedback and no retry loop. Do not pass 
 - Small unlabeled controls need accessibility labels and must not appear outside their valid state.
 - Release-style APK validation is required before claiming user-visible mobile fixes when practical.
 
-## Tests
+## Verification tiers
 
-Preferred checks:
+Use focused development checks while iterating:
 
 ```bash
 bun run --cwd packages/lyntty-app test
 bun run --cwd packages/lyntty-app typecheck
 ```
 
-Focused tests should cover pure helpers/reducers where possible before APK validation. For E2E, use `scripts/e2e/run-maestro.sh` and record artifacts under `docs/evidence/artifacts/...` with secrets redacted.
+Before a commit or claim about the App package, run the package claim gate, which also covers i18n lint, bundle tests, and Expo config introspection:
+
+```bash
+bun run ci:app
+```
+
+Focused tests should cover pure helpers/reducers where possible. A user-visible Android claim additionally requires the narrowest relevant release-style APK validation; `ci:app` does not build or exercise an APK. For E2E, use `scripts/e2e/run-maestro.sh`, assert the target Session Remote state rather than launch alone, and record redacted artifacts under `docs/evidence/artifacts/...`.

@@ -2,7 +2,11 @@
 
 Date: 2026-06-30
 
-Scope: Lyntty source in `/home/jc/dev/lyntty-lyntty-pi`, Pi SDK docs/types, and local Pi session directory shape.
+Status: historical upstream-gap research. Its “cannot prove today” and “required changes” sections describe the pre-implementation snapshot, not the current repository.
+
+Current implementation uses Pi `SessionManager.list/listAll`, canonical JSONL recovery, product discovery filtering, progressive history, and explicit `history_gap`. Read `AGENTS.md`, `docs/contexts/product/CONTEXT.md`, `docs/architecture/pi-shared-control.md`, and current CLI recovery code for present behavior. The original research remains below because its primitives and state model explain the implemented design.
+
+Scope: imported source in `/home/jc/dev/lyntty-lyntty-pi`, Pi SDK docs/types, and local Pi session directory shape.
 
 ## Executive conclusion
 

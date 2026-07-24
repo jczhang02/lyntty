@@ -1,5 +1,7 @@
 # Lyntty Relay Agent Instructions
 
+The root `AGENTS.md` applies here. This guide adds Relay-specific deltas and cannot weaken root safety, permission, product, release, or verification rules.
+
 This package is the self-hosted relay API/socket server. It routes encrypted sync/RPC traffic between mobile clients and `lynttyd`, but it is not canonical Pi history.
 
 ## Product boundary
@@ -35,13 +37,19 @@ This package is the self-hosted relay API/socket server. It routes encrypted syn
 - Access-key and artifact sockets are sensitive; keep resource scope checks explicit.
 - Relay errors returned to clients should be actionable but not leak secrets.
 
-## Tests
+## Verification tiers
 
-Preferred checks:
+Use focused development checks while iterating:
 
 ```bash
 bun run --cwd packages/lyntty-relay test
 bun run --cwd packages/lyntty-relay typecheck
 ```
 
-Focus tests for socket authorization, payload caps, idempotency, auth request lifecycle, artifact conflict handling, and presence races.
+Before a commit or claim about the Relay package, run the package claim gate, which also builds the Relay and exercises the compiled server smoke path:
+
+```bash
+bun run ci:relay
+```
+
+Focus tests for socket authorization, payload caps, idempotency, auth request lifecycle, artifact conflict handling, and presence races. Schema, protocol, or daemon-routing changes also require the affected Wire, CLI, and App gates; local unit tests alone do not prove the cross-layer path.

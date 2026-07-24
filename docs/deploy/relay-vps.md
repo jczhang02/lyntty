@@ -1,7 +1,8 @@
 # Relay VPS deployment runbook
 
 Date: 2026-07-06
-Status: deployed on `relay-hk` 2026-07-07; see `docs/evidence/r65-relay-vps-deploy.md`
+Status: signed Stable sequence 1 deployed and independently verified on 2026-07-22; see `docs/evidence/r104-stable-relay-production-deployment.md`
+Bootstrap history: `docs/evidence/r65-relay-vps-deploy.md`
 Related: `docs/standardization/PLAN.md`
 
 ## Purpose
@@ -17,7 +18,7 @@ The relay routes/authenticates/caches encrypted state. It does not own canonical
 ## Target topology
 
 ```text
-Android app / lynttyd
+Android app / lynttyd / operator `lyntty remote`
         |
         | HTTPS / WebSocket
         v
@@ -35,6 +36,7 @@ Docker Compose service lyntty-relay :3005
 
 Decisions:
 
+- Android and the explicit operator `lyntty remote` client may connect to Relay. Only `lynttyd` bridges node-side Pi sessions; the Pi extension remains local-only.
 - Cloudflare record starts **DNS-only** (gray cloud), not proxied.
 - Caddy terminates HTTPS directly and obtains Let’s Encrypt certificates.
 - VPS runs the prebuilt, runtime-free GHCR image; it does not clone the repository or build source.
@@ -297,9 +299,9 @@ Health endpoint expected shape:
 - [x] `relay.jczhang.cc` DNS resolves to VPS.
 - [x] Caddy obtains valid HTTPS certificate.
 - [x] `https://relay.jczhang.cc/health` returns healthy.
-- [ ] Protected deploy verifies the current immutable signed Stable BOM, image signature, provenance, SBOM, trust-root digest, running container digest, and exact `/v1/version` identity; the hardened workflow has not been run with production approvals yet.
+- [x] Protected deploy verified the immutable signed Stable BOM, image signature, provenance, SBOM, trust-root digest, running container digest, and exact `/v1/version` identity for Stable sequence 1; see `docs/evidence/r104-stable-relay-production-deployment.md`.
 - [x] `/opt/lyntty/data` persists across restart.
-- [ ] Protected deploy applies the signed BOM-selected digest and records its monotonic sequence; the previous manual tag deployment is bootstrap history, not formal acceptance.
+- [x] Protected deploy applied the signed BOM-selected digest and recorded Stable sequence 1; the previous manual tag deployment remains bootstrap history, not formal acceptance.
 - [ ] A higher-sequence signed rollback BOM has been deployed; not exercised yet because no formal predecessor release exists.
 - [x] Daily encrypted local backup exists.
 - [ ] Restore procedure has been run at least once on copied data or maintenance window.

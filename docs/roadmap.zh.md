@@ -1,8 +1,8 @@
-# Lyntty Roadmap（Lyntty-based）
+# Lyntty 历史迁移路线图
 
-状态：方向已确认。Lyntty 基于 Lyntty 开发，因为 Lyntty 是当前最符合目标气质的 OSS mobile vibe 软件：移动端远程控制、轻量同步、本机 agent 继续运行、手机做监督和输入。
+状态：2026-06-30 的迁移计划已完成。本文保留当时的 import 与 implementation order，其中的名称、workspace、UI 提案和缺口不再描述当前仓库。它是历史记录，不是当前 backlog 或 product contract。
 
-本文是实施路线图，不是日历计划。当前最高优先级不是立刻删除或重写，而是先完整理解 Lyntty 的产品与功能边界，尤其确认它为什么似乎不能发现历史 session，以及这个问题对 Lyntty 的影响。
+当前行为以 `AGENTS.md`、`docs/contexts/product/CONTEXT.md`、`docs/architecture/pi-shared-control.md`、现行 runbook、代码和测试为准。下方原始路线图正文仅保留为迁移决策依据。
 
 ## 已确认边界
 

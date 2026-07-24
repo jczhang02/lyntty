@@ -1,12 +1,15 @@
 # Lyntty CLI / Daemon Agent Instructions
 
+The root `AGENTS.md` applies here. This guide adds CLI/daemon-specific deltas and cannot weaken root safety, permission, product, release, or verification rules.
+
 This package contains the `lyntty` CLI, local `lynttyd`, Pi SDK runtime adapter, Pi extension installer/source generator, local-control bridge, `lyntty remote`, and `lyntty dev app-logs`.
 
 ## Product boundary
 
 - `pi` is the only supported agent/runtime.
 - Do not restore Claude, Codex, Gemini, OpenClaw, ACP, web-auth, or static-webapp command surfaces.
-- `lynttyd` alone connects to the Relay and owns node state, extension IPC, active-runtime policy, worktree RPCs, durable command delivery, and Relay bridging.
+- `lynttyd` is the only node-side session bridge to the Relay and owns node state, extension IPC, active-runtime policy, worktree RPCs, durable command delivery, and phone-to-Pi Relay bridging.
+- `lyntty remote` connects directly to the Relay as a separate operator-facing CLI control-plane client for explicit list/send/control commands. It is not a node runtime and must not replace `lynttyd` in the shared-control path.
 - The Pi extension is local-only. It identifies sessions, sends live events and heartbeats, polls commands, calls approved Pi APIs, and acknowledges outcomes. It must not connect to the Relay or own durable policy.
 - Formal releases compile `lyntty` and `lynttyd` with Bun. Do not add Node/npm/pnpm/npx/tsx execution paths or runtime fallbacks.
 
@@ -47,7 +50,9 @@ phone -> relay -> lynttyd -> local Pi extension -> pi.sendUserMessage()/ctx.abor
 - Keep token-bearing state files at `0600`, cap payloads/queues, and clear active state on shutdown.
 - Do not add generic machine-scope shell or filesystem RPCs. Worktree RPCs must stay narrow, validated, output-capped, and backed by `execFile('git', args)`.
 
-## Verification
+## Verification tiers
+
+Use isolated focused checks while iterating:
 
 ```bash
 bun run --filter lyntty-cli typecheck
@@ -55,4 +60,16 @@ HOME="$(mktemp -d)" LYNTTY_HOME_DIR="$(mktemp -d)" \
   bun run --filter lyntty-cli test
 ```
 
-Important focused coverage includes Pi extension events/install, Session Protocol mapping/history, ordinary-Pi shared control, daemon ownership/queueing, `ApiSessionClient`, `ApiMachineClient`, `lyntty remote`, and app-log receiver behavior.
+Before a commit or claim about the CLI package, run the package claim gate, which typechecks, builds the distributable package output, and runs unit tests:
+
+```bash
+bun run ci:cli
+```
+
+Changes to daemon lifecycle, Pi extension IPC, compiled executable behavior, local control, or process ownership additionally require the isolated integration gate. This gate compiles both `lyntty` and `lynttyd`, builds the standalone Relay, and exercises their integration:
+
+```bash
+bun run ci:daemon-integration
+```
+
+Important focused coverage includes Pi extension events/install, Session Protocol mapping/history, ordinary-Pi shared control, daemon ownership/queueing, `ApiSessionClient`, `ApiMachineClient`, `lyntty remote`, and app-log receiver behavior. Keep every integration run off the user's live `~/.pi`, `~/.lyntty`, and current Pi process.

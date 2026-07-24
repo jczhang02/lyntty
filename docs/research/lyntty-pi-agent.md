@@ -1,6 +1,10 @@
-# Lyntty -> Lyntty/Pi 调研记录
+# 历史 imported-base → Lyntty/Pi 调研记录
 
 日期：2026-06-30
+
+状态：historical pre-import snapshot。本文中的“当前状态”、M0–M3 缺口、旧 workspace 和 upstream agent-flavor 描述只反映调研时点，不能作为当前实现说明。
+
+当前行为以 `AGENTS.md`、`docs/contexts/product/CONTEXT.md`、`docs/architecture/pi-shared-control.md` 与当前代码/测试为准。当前仓库仅有 App、CLI、Relay、Wire 四个 workspace；Pi shared control、reconnect 和 session recovery 已在后续实现。原文保留用于解释 fork/import 决策。
 
 ## 结论
 
