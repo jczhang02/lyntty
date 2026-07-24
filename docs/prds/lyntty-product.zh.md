@@ -1,5 +1,7 @@
 # Lyntty：Android 上的 `pi` coding agent 控制层
 
+状态：当前产品需求
+
 产品定位：Android 上的 `pi` coding agent 控制层，类似 Claude Code Remote 之于 Claude Code。
 
 运行链路：Android app 通过 `relay` 连接到运行 `lynttyd` 的本地电脑 / node，由该 node 上的 `active runtime` 推进 `pi` session。repositories、tools、MCP servers、credentials 和 canonical `pi` session JSONL 都留在 node 上；Android 不持有 workspace、不执行代码。
@@ -17,12 +19,11 @@ Lyntty 是单用户、自托管、Android-first 的 `pi` coding agent 控制层�
 核心使用路径：
 
 1. `Sessions Home`：日常入口，展示 needs attention、running、recent、failed、completed sessions。
-2. `Session Remote`：主控制页，界面像手机 chat。用户在这里给 `pi` 发需求、看回复、确认操作、继续追问、打断或停止任务，并看到改动、运行结果、错误、预览和下一步。
-   - `Review Evidence`：`Session Remote` 内的复盘模式，不是独立页面，也不是 PR 审查。它在 session 结束、失败、等待确认或用户主动打开时出现，用来集中查看 changed files、diff summary、test/check results、command summary、errors、event timeline、artifacts/previews、recovery state 和 next actions。用户可以继续追问、要求 `pi` 补测或修正、在电脑打开 workspace，或导出 evidence；当前范围不提供 merge、push 或 PR approve。
+2. `Session Remote`：主控制页，界面像手机 chat。用户在这里给 `pi` 发需求、看回复、确认操作、继续追问、打断或停止任务，并在同一 timeline 中看到 messages、tool activity、changed-file context、运行结果、错误和下一步。产品不增加单独的 evidence/debug replacement page；当前范围不提供 merge、push 或 PR approve。
 3. `Node Management`：管理 paired computers、pairing、trust、heartbeat、roots、diagnostics。
 4. `Settings / Recovery`：管理 `relay` URL、owner/device binding、revocation、diagnostics 和恢复入口。
 
-当前开发先证明一条最小可用链路：Android 与 local node 配对；继续或创建 `pi` session；实时看到进展；能发新需求、追加说明、打断改方向、停止任务；看到改动和运行结果；断线后接回；确保每个 session 只有一个 active runtime。
+已经建立的最小验收链路包括：Android 与 local node 配对；继续或创建 `pi` session；实时看到进展；发送新需求和追加说明；打断改方向或停止任务；呈现结果；断线后接回；确保每个 session 只有一个 active runtime。后续产品修改必须保持这条 vertical slice 可用。
 
 ## User Stories
 
@@ -45,7 +46,7 @@ Acceptance:
 
 - waiting sessions 排在普通 recent sessions 前面；running sessions 靠前。
 - native `/lyntty` session、Android-created headless session、recent session resume 都进入同一套 session/runtime model。
-- Android-created git sessions 默认使用 temporary worktree；dirty worktrees 永不自动删除。
+- Android-created session 默认使用用户选择的 working directory；创建 temporary git worktree 必须由用户显式选择。Dirty worktrees 永不自动删除。
 - 当前产品范围不提供 merge、push 或 PR approve。
 
 ### 3. 监督 active session
@@ -81,9 +82,9 @@ Acceptance:
 - 不支持远程回答时显示 “needs computer-side confirmation”。
 - phone-answerable confirmations 或 extension UI requests 显示在 input box 附近。
 
-### 6. 复盘 `pi` 的结果
+### 6. 检查 `pi` 的结果
 
-用户在 `Review Evidence` 看本次 session 的 changed files、diff summary、test/check results、command summary、errors、event timeline、artifacts/previews、recovery state 和 next actions。
+用户直接在 `Session Remote` timeline 中查看 changed-file context、test/check results、command summaries、errors、artifacts、recovery state 和 next actions。
 
 Acceptance:
 
@@ -125,17 +126,17 @@ Acceptance:
 - active runtime 是当前推进 session 的进程。一个 session 只能有一个 active runtime。
 - 用 `relay` lease、runtime heartbeat、stale state 和 explicit takeover 实现 activation lock。
 - 多个 authenticated surfaces 可以控制同一个 active runtime。
-- Native pi extension 只连接本机 `lynttyd`；只有 `lynttyd` 连接 `relay`。
+- Native Pi extension 只连接本机 `lynttyd`。`lynttyd` 是连接 `relay` 的唯一 node-side session bridge；独立的 operator-facing `lyntty remote` control-plane client 可以为显式 CLI command 直接连接 relay。
 - `relay` 与 `lynttyd` 是逻辑上独立的 deployables；local development 可一起启动。
 - `relay` 路由 events/commands，验证 owner/device/node tokens，保存 metadata/cache/queue，不成为 canonical history。
 - `pi` session JSONL 保持 canonical history。
 - `lynttyd` 负责 node-local event cache、per-session sequence allocation、root scanning、path completion、SDK runtime start/resume、activation lock participation、capacity、worktree management、preview proxying。
-- Android 主导航只包含 `Sessions Home`、`Session Remote`、`Node Management` 和 `Settings / Recovery`。`Review Evidence` 是 `Session Remote` 内的 mode/panel，不是独立主导航项。
+- Android 产品导航以 `Sessions Home`、`Session Remote`、`Node Management` 和 Settings/recovery 入口为中心。Debug、service、diagnostics 与 evidence 页面不能替代这些产品 surface。
 - `Sessions Home` 是日常入口，按有用状态展示 sessions：needs attention、running、recent、completed/error。
 - `Node Management` 用于 paired computers、pairing、trust、heartbeat、roots、diagnostics，不做日常 session inbox。
 - `Session Remote` 使用 structured event feed，不是 terminal mirror；界面可以像 chat，但必须暴露 runtime state 和 evidence anchors。
 - input box 遵循 pi semantics：空闲时发送新需求；运行中默认排队为下一轮补充说明；打断改方向必须显式；停止需确认。
-- Slash command support 尽量探测 runtime capability；local-only commands 标记，unknown commands 可 raw fallback。
+- Remote commands 使用严格的受支持 Pi-command contract。Local-only commands 留在电脑端；unknown 或 unsupported commands 必须拒绝，不能 raw fallback。
 - Lyntty 不发明额外确认/风险门槛。只展示 pi/runtime 已支持的确认请求；不支持时报告 computer-side confirmation。
 - 完整 event stream 保留；移动端用 collapse/filter/search/pin 保持可用。
 - Events 包含 `eventId`、`sessionId`、`runtimeId`、`nodeId`、`seq`、timestamp、type、source、redacted payload、optional local-only payload reference。
@@ -144,15 +145,15 @@ Acceptance:
 - Auth flow 是 owner token 一次，之后 encrypted Android storage 中保存可 revoke device token。
 - Events 离开 node 前做 basic redaction。这是 self-host trusted-surface security，不是 zero-trust E2E。
 - Notifications 使用 Android FCM；Telegram、ntfy、Discord、Web Push 不属于当前产品范围。
-- `Review Evidence` 必须至少包含 changed files、diff summary、test/check results、command summary、errors、event timeline、artifacts/previews、recovery state 和 next actions。
-- 文件改动、artifact、static HTML preview、minimal live dev-server preview、worktree cleanup state 是必须做的 evidence surfaces。
+- `Session Remote` 必须呈现 messages、tool activity、changed-file context、test/check results、command summaries、errors、recovery state 和 next actions，但不能变成 PR manager 或 debug console。
+- File changes 和受支持的 artifact/preview metadata 仍是 session 内容；service diagnostics 与 durable acceptance evidence 留在 logs、developer tooling 或 `docs/evidence/`。
 - Static/live previews 必须 jailed、read-only、tokenized、WebView-safe 且无 native bridge。
-- Android-created git sessions 默认 worktree-if-git；dirty worktrees 永不自动删除。
+- Android-created session 默认使用用户选择的 working directory；temporary git worktree 是显式 opt-in，dirty worktrees 永不自动删除。
 - Node capacity 默认 3；capacity full 产生 visible queue state。
-- Preferred backend stack：Bun、Hono、WebSocket、SQLite WAL、JSONL、static/prepared SQL。
-- Preferred Android stack：React Native + Expo + TypeScript、HeroUI Native、Expo Router、TanStack Query、Expo SecureStore、Expo SQLite/AsyncStorage、Expo Notifications/FCM、WebView preview、Maestro E2E。
-- `apps/client/` 是主要 Android app 工作区，采用 Expo/React Native + HeroUI Native。
-- `packages/client-core/` 保存 UI-free behavior：session reducer、event grouping、reconnect/dedupe、Review Evidence summary、recovery state mapping 和 command state machine。React Native UI 只消费这些状态，不直接实现协议语义。
+- 当前 backend stack：Bun、Fastify、Socket.IO、Prisma、默认 PGlite 与显式 PostgreSQL support，以及 node 上的 canonical Pi JSONL。
+- 当前 Android stack：React Native + Expo + TypeScript、Expo Router、Zustand、MMKV、Expo SecureStore、Expo Notifications/FCM、WebView preview、Maestro E2E。
+- `packages/lyntty-app/` 是 Android app workspace，负责 mobile presentation、sync reducers、local storage 和 Maestro selectors。
+- `packages/lyntty-wire/` 负责 shared session-protocol schemas 与 capabilities。App 和 CLI state transitions 必须消费这些 contract，不能发明不兼容的 wire semantics。
 
 ## Testing Decisions
 
@@ -162,7 +163,7 @@ Acceptance:
 - Native pi continuation 要测试启用 `/lyntty` 后 Android input 进入同一个 native runtime，且 native/Android surfaces 观察到同样 events。
 - Headless session path 要测试 pi SDK start/resume、发送新需求、打断改方向、追加说明、停止任务、persisted pi JSONL history。
 - Reconnect tests 覆盖 REST backfill、WebSocket live stream、dedupe、`history_gap`、command idempotency、node reconnect。
-- Event reducer tests 将 raw events 映射到 session state、evidence summaries、collapsed feed groups、detail drilldowns。
+- Event reducer tests 将 raw events 映射到 session state、collapsed timeline groups、result details 和 recovery state。
 - Android UI tests 使用 stable test IDs 覆盖 Sessions Home、Node Management、Session Remote、输入框、next steps、events/logs/commands/改动/测试详情、recovery states、settings。
 - Maestro emulator flows 证明 login/pairing、stored-device restore、continue latest、new session、发送新需求、打断改方向、停止任务、evidence anchors。
 - Physical Android 应支持并记录。如不可用，final evidence 必须明确 emulator pass + physical-phone not-run reason。
@@ -199,6 +200,6 @@ Acceptance:
   - MindFS：structured tool/event cards、agent gateway ideas。
   - Litter：native mobile control、pairing patterns。
 - Lyntty 可以借鉴移动端监督和远程控制模式，但不做 terminal mirror、generic web client 或 broad multi-agent support。
-- Future compatibility：protocol 和 `packages/client-core/` 不应把实现写死到单一 runtime class，但当前产品只支持 `pi`。Codex/OpenCode adapter seams 只保留为未来扩展边界，不进入当前 scope、UI 或 acceptance。
+- `packages/lyntty-wire/` 可以保留 protocol extensibility，但当前产品、UI、release 与 acceptance 只支持 `pi`；Codex/OpenCode adapters 不是当前产品 seam。
 - 恢复来源摘要见 `docs/recovered/previous-lyntty-decisions.md`。
-- 建议 initial engineering milestone：scaffold `relay` + `lynttyd` + pi extension stub + Expo/React Native Android shell；证明 pair/login、native `/lyntty` session registration、Android 发送新需求/追加说明/打断改方向、structured event feed、activation lock、reconnect、evidence summary。
+- 当前 implementation 与 acceptance 状态以 accepted architecture、package tests、release runbooks 和最新 matching evidence 为准，而不是以已完成的 scaffold milestones 为准。

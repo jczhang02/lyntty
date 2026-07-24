@@ -4,13 +4,13 @@ Date: 2026-07-04
 
 ## Status
 
-Accepted design direction for ordinary computer-side `pi` session control in Lyntty.
+Accepted architecture with the core ordinary computer-side shared-control path implemented. Current code and tests remain implementation truth.
 
-Reference research: `docs/research/pi-remote-control-models.md`.
+Implementation evidence: `docs/evidence/r50-pi-shared-control.md`. Reference research: `docs/research/pi-remote-control-models.md`.
 
 ## Problem
 
-A phone message sent from `Session Remote` to an ordinary `pi` session already running on the computer can currently persist to `relay` and reach `lynttyd`, but it does not enter that computer-side Pi process. The existing extension path was one-way live event mirroring, not two-way control.
+At the time of this design, a phone message sent from `Session Remote` could persist to `relay` and reach `lynttyd` but did not enter an ordinary computer-side Pi process. The extension path was one-way live event mirroring. The implementation described in the status and final section closed that gap.
 
 The product requirement is stronger:
 
@@ -140,22 +140,23 @@ The Pi extension must not own:
 - multi-device conflict policy;
 - direct relay/network access.
 
-## First-version command whitelist
+## Current strict command contract
 
 Use a strict enum. Reject unknown command types. Do not pass raw slash commands or arbitrary strings through as privileged commands.
 
-Supported P0/P1 user-visible commands:
+Supported user-visible command shapes:
 
 ```ts
 type RemotePiCommand =
-  | { type: "send_user_message"; text: string }
-  | { type: "follow_up"; text: string }
-  | { type: "steer"; text: string }
+  | { type: "send_user_message"; text: string; images?: RemoteImage[] }
+  | { type: "follow_up"; text: string; images?: RemoteImage[] }
+  | { type: "steer"; text: string; images?: RemoteImage[] }
   | { type: "abort" }
   | { type: "compact"; instructions?: string }
   | { type: "reload" }
   | { type: "set_session_name"; name: string }
   | { type: "get_commands" }
+  | { type: "invoke_pi_command"; commandLine: string; deliverAs?: "followUp"; images?: RemoteImage[] }
   | { type: "set_label"; entryId: string; label?: string };
 ```
 
@@ -169,6 +170,7 @@ Mapping:
 - reload: `ctx.reload()`
 - rename: `pi.setSessionName(name)`
 - command list: `pi.getCommands()` as read-only metadata
+- allowlisted `/goal`, `/context`, and `/skill:*`: validated `invoke_pi_command` dispatch through the Pi command registry
 - label: `pi.setLabel(entryId, label)`
 
 `lynttyd` may also enqueue a local-only `internal_shutdown` maintenance command for Stop & Archive after the user confirms hiding a running ordinary Pi session. This command is not parsed from mobile text, is not surfaced as a slash command, requires the authenticated local Pi-extension channel, and `lynttyd` must wait for `session_shutdown`/mirror removal before reporting stop success to the app.
@@ -238,17 +240,14 @@ Rules:
 
 ## Source display
 
-Shared control must be transparent.
+Shared control must be transparent without changing the user's visible prompt text.
 
-- Mobile-originated user input should be labeled as from Lyntty in local Pi and mobile UI.
-- Computer-local user input should be distinguishable as computer/local input when displayed remotely.
-- No hidden “ghost input” from phone.
+- The Pi extension sends the visible mobile prompt unchanged; it does not add a source prefix.
+- When enabled, phone-origin context is injected separately as a hidden `lyntty-mobile-context` message so Pi can prefer concise phone-friendly replies.
+- The App merges the canonical Pi echo into the optimistic bubble by `localKey` and shows delivery/source presentation there; computer-origin user messages may carry a `Computer` label in the App.
+- No hidden “ghost input” or duplicate visible user bubble may appear.
 
-Default source label for extension-injected user messages:
-
-```text
-[lyntty]
-```
+This behavior is implemented and validated in `docs/evidence/r57-mobile-send-echo-merge.md`.
 
 ## UI behavior
 
@@ -279,12 +278,15 @@ Suggested simplified UI labels:
 - Stop/abort must record source and outcome.
 - Takeover must be explicit.
 
-## Open implementation work
+## Implementation status
 
-- Add durable command intent and delivery-state storage.
-- Add local `lynttyd` per-session delivery queues.
-- Extend Pi extension with command polling and ack.
-- Add app UI command-state rendering.
-- Normalize old `external_pi` metadata into `runtimeOwner/controlState`.
-- Replace output-only ordinary Pi session send path.
-- Add regression and E2E coverage for ordinary phone send into a running computer-side Pi session.
+The core path is implemented and recorded in `docs/evidence/r50-pi-shared-control.md`:
+
+- Durable command intent is implemented at the Relay message layer; `lynttyd` provides bounded per-session delivery queues and an accepted-command ledger.
+- The Pi extension polls the local authenticated command endpoint, invokes approved Pi APIs, and acknowledges outcomes.
+- Ordinary Pi sends route through shared control instead of the former output-only path.
+- Old `external_pi` metadata is normalized to `runtimeOwner` / `controlState` at read boundaries.
+- Extension-missing and stale states preserve queued intent and visible remediation without starting a duplicate SDK runtime.
+- Focused daemon, extension, App reducer, and real ordinary-Pi smoke coverage exercise the path.
+
+Richer delivery-state presentation and future command additions remain incremental product work. They must preserve this architecture and be verified through the real isolated phone/Relay/daemon/extension path appropriate to the claim.

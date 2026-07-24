@@ -1,8 +1,10 @@
-# Lyntty Mobile Shell
+# Historical Lyntty Mobile Shell Baseline
 
 Date: 2026-06-30
 
-Status: R5 design baseline for Lyntty-based mobile shell.
+Status: historical R5 design baseline. It records the migration-era shell and removed UI proposals; it is not current navigation or product policy. In particular, the former `Review Evidence` panel was removed and must not be restored as a product page.
+
+Current authority: `AGENTS.md`, `docs/contexts/product/CONTEXT.md`, the current App routes/components, and `docs/architecture/pi-shared-control.md`.
 
 ## Goal
 

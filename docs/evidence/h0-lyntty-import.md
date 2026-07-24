@@ -27,6 +27,10 @@ Copied into migration worktree:
 - `docs/architecture/lyntty-fork-pi-plan.md`
 - `docs/research/lyntty-upstream-lock.json`
 
+## Later disposition
+
+On 2026-07-23, `CONTEXT-MAP.lyntty.md` and `docs/contexts/product/CONTEXT.lyntty.md` were removed after verification that each remained byte-for-byte identical to its canonical `CONTEXT-MAP.md` or `docs/contexts/product/CONTEXT.md` counterpart and had no independent consumer. This does not change the import observation above; it records the later deduplication. Unique migration records such as `docs/roadmap.lyntty.md` and `docs/evidence/m0-m2.lyntty.md` remain preserved.
+
 ## Commands run
 
 ```bash

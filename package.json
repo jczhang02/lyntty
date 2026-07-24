@@ -12,7 +12,7 @@
     "ci:dev": "bun test scripts/dev.test.ts scripts/preview.test.ts",
     "ci:audit": "bun audit",
     "ci:fast": "bun run test:repo-hardening && bun run ci:audit && bun run ci:wire && bun run ci:cli && bun run ci:relay && bun run ci:app && bun run ci:dev && git diff --check",
-    "test:repo-hardening": "bun test scripts/workflow-hardening.test.mjs scripts/evidence-redaction.test.mjs scripts/relay-oci-sbom.test.ts scripts/release-agent-rules.test.mjs scripts/agent-guidance.test.mjs",
+    "test:repo-hardening": "bun test scripts/workflow-hardening.test.mjs scripts/evidence-redaction.test.mjs scripts/relay-oci-sbom.test.ts scripts/release-agent-rules.test.mjs scripts/agent-guidance.test.mjs scripts/docs-currentness.test.mjs",
     "release:bom": "bun ./scripts/release.ts",
     "mobile": "bun run --filter lyntty-app start",
     "android": "bun run --filter lyntty-app android",

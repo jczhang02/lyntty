@@ -1,6 +1,8 @@
-# Lyntty Roadmap
+# Imported historical Lyntty scaffold roadmap
 
-Status: PRD confirmed. This document converts the PRD into implementation order. It is not a calendar plan.
+Status: preserved pre-import snapshot from 2026-06-30. Its scaffold workspaces, milestones, and UI proposals are superseded and must not be used as current policy or implementation status.
+
+Current authority: `AGENTS.md`, `docs/contexts/product/CONTEXT.md`, and `docs/architecture/pi-shared-control.md`. The original roadmap body remains below for migration provenance.
 
 ## Roadmap principles
 

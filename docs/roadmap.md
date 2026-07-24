@@ -1,8 +1,8 @@
-# Lyntty Roadmap (Lyntty-based)
+# Historical Lyntty migration roadmap
 
-Status: direction confirmed. Lyntty will be built from Lyntty because Lyntty is the OSS mobile-vibe product closest to the target: mobile remote control, lightweight sync, local agents keep running, phone supervises and sends intent.
+Status: completed migration plan from 2026-06-30. This document preserves the import and implementation order, including names, workspaces, UI proposals, and gaps that no longer describe the current repository. It is historical, not a current backlog or product contract.
 
-This roadmap is implementation order, not a calendar plan. The immediate priority is not deletion or rewrite. First, explore Lyntty's full product and feature boundary, especially why Lyntty appears unable to discover historical sessions and what that means for Lyntty.
+For current behavior, read `AGENTS.md`, `docs/contexts/product/CONTEXT.md`, `docs/architecture/pi-shared-control.md`, current runbooks, code, and tests. The original roadmap body remains below as migration rationale.
 
 ## Confirmed boundaries
 

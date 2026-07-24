@@ -25,17 +25,21 @@ The phone is not a terminal mirror and not a remote desktop. It is a focused con
 - `relay` routes encrypted sync/RPC between mobile and node. It is not canonical history.
 - Mobile is Android-first. iOS may remain best-effort through Expo, but it is not the acceptance target.
 
-## Current roadmap
+## Current documentation
 
-See:
+Start with:
 
-- `docs/roadmap.md`
-- `docs/roadmap.zh.md`
-- `docs/research/lyntty-product-boundary.md`
-- `docs/research/lyntty-session-discovery.md`
-- `docs/release/compatibility-bom.md`
-- `docs/release/android-apk.md`
-- `docs/release/cli.md`
+- [`CONTEXT-MAP.md`](CONTEXT-MAP.md)
+- [`docs/contexts/product/CONTEXT.md`](docs/contexts/product/CONTEXT.md)
+- [`docs/architecture/pi-shared-control.md`](docs/architecture/pi-shared-control.md)
+- [`docs/development.md`](docs/development.md)
+- [`docs/release/compatibility-bom.md`](docs/release/compatibility-bom.md)
+- [`docs/release/android-apk.md`](docs/release/android-apk.md)
+- [`docs/release/cli.md`](docs/release/cli.md)
+
+## Historical migration records
+
+`docs/roadmap.md`, `docs/roadmap.zh.md`, and `docs/research/` preserve migration plans and research snapshots. They explain prior decisions but do not override current contexts, accepted architecture, code, or tests.
 
 ## Development
 
