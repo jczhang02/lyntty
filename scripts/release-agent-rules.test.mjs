@@ -93,6 +93,7 @@ test('release-flow separates channels, authority, and immutable state', async ()
     'Compatibility Preview',
     'APK-only Preview',
     'Expo Dev',
+    'native-signing',
     'Rollback',
     'Actions Artifact',
     'Release deletion',
@@ -106,13 +107,23 @@ test('release-flow separates channels, authority, and immutable state', async ()
   assert.match(skill, /explicit current-task authorization/i);
   assert.match(skill, /If classification finds pure Actions Artifact work, stop applying this skill/);
   assert.match(skill, /Expo Dev has no repository publication workflow/);
+  assert.match(skill, /Expo Dev.*creation.*fail closed|fail closed.*Expo Dev.*creation/is);
+  assert.match(skill, /native-signing-\*/i);
+  assert.match(skill, /native[- ]signing.*operational staging|operational staging.*native[- ]signing/is);
+  assert.match(skill, /native-signing.*must not.*curated|curated.*must not.*native-signing/is);
+  assert.match(skill, /originating publication (workflow|transaction).*completed successfully/is);
+  assert.match(skill, /no.*retry.*resume.*pending|no.*resume.*retry.*pending/is);
+  assert.match(skill, /curated.*audit\/retry|audit\/retry.*curated/is);
+  assert.match(skill, /metadata-bound.*audit\/retry|audit\/retry.*metadata-bound/is);
+  assert.match(skill, /scripts\/github-release\.ts/);
+  assert.match(skill, /android-preview-promote\.yml/);
   assert.match(skill, /Never run `gh release create`/);
   assert.doesNotMatch(skill, /^\s*gh release create\b/m);
   const deletionBlock = skill.match(/```bash\n(gh release delete[\s\S]*?)\n```/);
   assert.ok(deletionBlock, 'release-flow must contain one bounded Release deletion command');
   assert.equal(deletionBlock[1], 'gh release delete "$tag" --repo jczhang02/lyntty --yes');
   assert.doesNotMatch(deletionBlock[1], /--cleanup-tag/);
-  assert.match(skill, /Expo Dev.*creation, edit, deletion or cleanup, or audit/is);
+  assert.match(skill, /Expo Dev.*existing.*edit.*deletion.*audit/is);
   assert.match(skill, /explicitly authorizes deletion of each exact existing tag/i);
   assert.match(skill, /deletes the Release object and every attached asset/i);
   assert.match(skill, /--cleanup-tag.*separate explicit authorization|separate explicit authorization.*--cleanup-tag/is);
@@ -156,6 +167,13 @@ test('release-notes is explicit-only and fail-closed', async () => {
   assert.match(skill, /Preserve every workflow-mandated disclosure verbatim at the beginning of the body/);
   assert.match(skill, /Expo Dev.*first.*Metro.*8081.*cannot run standalone/is);
   assert.match(skill, /Rollback.*release-flow/is);
+  assert.match(skill, /native-signing-\*.*stop|stop.*native-signing-\*/is);
+  assert.match(skill, /version.*target.*mismatch.*stop|stop.*version.*target.*mismatch/is);
+  assert.match(skill, /originating publication (workflow|transaction).*completed successfully/is);
+  assert.match(skill, /no.*retry.*resume.*pending|no.*resume.*retry.*pending/is);
+  assert.match(skill, /metadata-bound.*audit\/retry|audit\/retry.*metadata-bound/is);
+  assert.match(skill, /scripts\/github-release\.ts/);
+  assert.match(skill, /android-preview-promote\.yml/);
   assert.match(skill, /asset.*id.*name.*size.*digest/is);
   assert.match(skill, /release ID.*tag.*target.*draft.*prerelease.*immutable.*latest/is);
 });

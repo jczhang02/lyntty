@@ -8,7 +8,8 @@ This package contains the `lyntty` CLI, local `lynttyd`, Pi SDK runtime adapter,
 
 - `pi` is the only supported agent/runtime.
 - Do not restore Claude, Codex, Gemini, OpenClaw, ACP, web-auth, or static-webapp command surfaces.
-- `lynttyd` alone connects to the Relay and owns node state, extension IPC, active-runtime policy, worktree RPCs, durable command delivery, and Relay bridging.
+- `lynttyd` is the only node-side session bridge to the Relay and owns node state, extension IPC, active-runtime policy, worktree RPCs, durable command delivery, and phone-to-Pi Relay bridging.
+- `lyntty remote` connects directly to the Relay as a separate operator-facing CLI control-plane client for explicit list/send/control commands. It is not a node runtime and must not replace `lynttyd` in the shared-control path.
 - The Pi extension is local-only. It identifies sessions, sends live events and heartbeats, polls commands, calls approved Pi APIs, and acknowledges outcomes. It must not connect to the Relay or own durable policy.
 - Formal releases compile `lyntty` and `lynttyd` with Bun. Do not add Node/npm/pnpm/npx/tsx execution paths or runtime fallbacks.
 

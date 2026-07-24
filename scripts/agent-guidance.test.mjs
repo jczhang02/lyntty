@@ -13,6 +13,7 @@ const guidePaths = {
   relay: new URL('../packages/lyntty-relay/AGENTS.md', import.meta.url),
   wire: new URL('../packages/lyntty-wire/AGENTS.md', import.meta.url),
   docs: new URL('../docs/AGENTS.md', import.meta.url),
+  docsSite: new URL('../docs/.site/AGENTS.md', import.meta.url),
 };
 
 async function readGuides() {
@@ -23,7 +24,7 @@ async function readGuides() {
 }
 
 test('root guide defines instruction hierarchy and evidence authority', async () => {
-  const { root, app, cli, relay, wire, docs } = await readGuides();
+  const { root, app, cli, relay, wire, docs, docsSite } = await readGuides();
 
   assert.match(root, /## Instruction hierarchy/);
   assert.match(root, /nearest nested `AGENTS\.md`/i);
@@ -34,7 +35,7 @@ test('root guide defines instruction hierarchy and evidence authority', async ()
   assert.match(root, /evidence.*point in time|point in time.*evidence/is);
   assert.match(root, /must not override.*current product|current product.*must not override/is);
 
-  for (const [name, guide] of Object.entries({ app, cli, relay, wire, docs })) {
+  for (const [name, guide] of Object.entries({ app, cli, relay, wire, docs, docsSite })) {
     assert.match(guide, /root `AGENTS\.md` applies/i, `${name} must inherit the root contract explicitly`);
     assert.match(guide, /must not weaken|cannot weaken/i, `${name} must not relax the root contract`);
   }
@@ -50,6 +51,27 @@ test('root guide has a Lyntty-specific product decision filter', async () => {
   assert.match(root, /Pi JSONL.*canonical/i);
   assert.match(root, /legacy.*debug.*main APK|main APK.*legacy.*debug/is);
   assert.match(root, /narrow.*ask|ask.*narrow/is);
+});
+
+test('runtime topology distinguishes the node bridge from operator control', async () => {
+  const { root, cli } = await readGuides();
+
+  assert.match(root, /only node-side session bridge.*`lynttyd`|`lynttyd`.*only node-side session bridge/is);
+  assert.match(root, /`lyntty remote`.*control-plane client.*relay/is);
+  assert.match(root, /Pi extension.*only.*local `lynttyd`/is);
+  assert.match(cli, /`lynttyd`.*node-side session bridge/is);
+  assert.match(cli, /`lyntty remote`.*direct.*Relay.*control-plane/is);
+  assert.doesNotMatch(root, /only `lynttyd` connects to the `relay`/i);
+  assert.doesNotMatch(cli, /`lynttyd` alone connects to the Relay/i);
+});
+
+test('Android package guidance distinguishes development, Preview, and production', async () => {
+  const { root } = await readGuides();
+
+  assert.match(root, /Expo Dev.*`dev\.jczhang\.lyntty\.dev`/is);
+  assert.match(root, /Preview.*`dev\.jczhang\.lyntty\.preview`/is);
+  assert.match(root, /production.*`dev\.jczhang\.lyntty`/is);
+  assert.doesNotMatch(root, /Non-production release-style APKs use package `dev\.jczhang\.lyntty\.dev`/);
 });
 
 test('verification guidance distinguishes development checks from claim gates', async () => {

@@ -1,6 +1,6 @@
 ---
 name: release-notes
-description: Draft and publish compact bilingual Lyntty notes for one existing Stable, Preview, or Expo Dev GitHub Release. User-only because editing a public Release is an external side effect and all title inputs must be explicit.
+description: Draft and publish compact bilingual Lyntty notes for one existing Stable, Preview, or Expo Dev product Release. Native-signing operational staging and Rollback are excluded. User-only because editing a public Release is an external side effect and all title inputs must be explicit.
 disable-model-invocation: true
 ---
 
@@ -23,13 +23,17 @@ Treat the values literally:
 - `emoji`: exactly one user-provided title emoji;
 - `channel-or-tag`: Stable, Compatibility Preview, APK-only Preview, Expo Dev, or one exact tag.
 
-When a channel rather than a tag is supplied, inspect the matching Releases and present the resolved exact tag before mutation. Never silently select a similarly named channel. If the input resolves to Rollback, stop and follow `release-flow`; Rollback uses an operational record, not this curated format.
+When a channel rather than a tag is supplied, inspect the matching Releases and present the resolved exact tag before mutation. Never silently select a similarly named channel. If the input resolves to Rollback, stop and follow `release-flow`; Rollback uses an operational record, not this curated format. If the exact tag matches `native-signing-*`, stop: its workflow-generated operational staging body is part of the verification contract and must not receive curated product notes.
 
 Invoking the skill authorizes the drafting workflow, not an automatic public edit. Show the exact title and complete body, then require an explicit publish or submit instruction for that draft and target unless the user's current request already provides equivalent specific authorization.
 
 ## Existing Release requirement
 
 Confirm that one exact Release already exists. If it is missing, wait for the authorized workflow or operator process. Never run `gh release create` or `gh release delete`; missing or poor notes are not a reason to create a competing Release or remove history.
+
+Prove that the originating publication workflow or transaction completed successfully and that no publication retry or Draft-resume path is pending. Curated title/body edits remove compatibility with every originating metadata-bound audit/retry path that requires the original metadata, including `scripts/github-release.ts` and APK Preview's `.github/workflows/android-preview-promote.yml`; record this consequence before asking for publish approval.
+
+Validate the literal user-supplied version against the resolved Release tag and the released App/product identity in its manifest, BOM, provenance, or source package as applicable. This check validates an input; it does not infer or replace it. If the version and target mismatch, or the match cannot be proven, stop before drafting.
 
 Before drafting:
 
@@ -120,7 +124,7 @@ Write the draft to a temporary file outside the repository unless durable eviden
 
 ## Publish an approved draft
 
-Immediately before editing, snapshot the release ID, tag, target, draft, prerelease, immutable, and Latest state, the direct tag ref, and every asset's ID, name, size, and digest. Save the exact existing title and body too.
+Immediately before editing, re-prove that the originating publication transaction completed successfully and no retry or Draft-resume path is pending. Snapshot the release ID, tag, target, draft, prerelease, immutable, and Latest state, the direct tag ref, and every asset's ID, name, size, and digest. Save the exact existing title and body too, and retain the recorded loss of every applicable metadata-bound audit/retry path.
 
 With explicit current-task authorization for the exact draft, run only:
 

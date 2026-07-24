@@ -1,6 +1,6 @@
 ---
 name: release-flow
-description: Lyntty release runbook for candidate, promotion, GitHub Release creation, edit, deletion, prerelease, rollback, and release-audit work across Stable, Preview, Expo Dev, and retained historical Releases. Use before any release-flavored task; pure Actions Artifact tasks are explicitly excluded.
+description: Lyntty release runbook for candidate, promotion, native-signing operational staging, GitHub Release creation, edit, deletion, prerelease, rollback, and release-audit work across Stable, Preview, existing Expo Dev, and retained historical Releases. Use before any release-flavored task; pure Actions Artifact tasks are explicitly excluded.
 ---
 
 # Lyntty Release Flow
@@ -14,6 +14,7 @@ Before acting, classify the request as one of these intents:
 - read-only release audit;
 - candidate build or validation;
 - promotion or publication;
+- native-signing operational staging or verification;
 - curated Release Notes or another existing-Release metadata edit;
 - exact historical Release deletion or cleanup;
 - rollback;
@@ -26,7 +27,8 @@ Loading this skill never authorizes an external side effect. Workflow dispatch, 
 Read the relevant runbook before changing state:
 
 - Stable and Compatibility Preview: `docs/release/compatibility-bom.md` and `docs/release/android-apk.md`;
-- APK-only Preview and Expo Dev: `docs/release/android-apk.md` plus the latest matching evidence under `docs/evidence/`;
+- APK-only Preview and existing Expo Dev: `docs/release/android-apk.md` plus the latest matching evidence under `docs/evidence/`;
+- native-signing operational staging: `docs/release/native-signing.md` and the two native-signing workflows;
 - rollback: `docs/release/compatibility-bom.md` and `.github/workflows/release-rollback.yml`.
 
 ## Distribution channels
@@ -36,10 +38,11 @@ Read the relevant runbook before changing state:
 | Stable Compatibility | `compat-v*` | Signed Compatibility BOM promotion, normal Release, GitHub Latest | Compact curated notes after preserving every mandatory disclosure |
 | Compatibility Preview | `compat-preview-*` | Signed Preview BOM promotion, prerelease, never Latest | Compact curated notes after preserving every mandatory disclosure |
 | APK-only Preview | `android-preview-v*` | Exact candidate promotion, prerelease, never Latest | Compact curated notes; preserve the physical-validation waiver when present |
-| Expo Dev durable prerelease | `android-expo-dev-v*` | Exceptional manual promotion of already verified Expo Dev Artifact bytes, prerelease, never Latest | Compact curated notes with the Metro limitation first |
+| Existing Expo Dev prerelease | `android-expo-dev-v*` | One previously authorized manual promotion; current policy has no repeatable publication path, so future creation fails closed | Existing Release may receive compact curated notes with the Metro limitation first |
+| Native-signing operational staging | `native-signing-*` | Workflow-produced immutable prerelease inputs for independent verification, never a product channel or Latest | Preserve the workflow-generated operational body; curated product notes are forbidden |
 | Rollback | workflow-defined Compatibility tag | New higher Stable BOM sequence, no artifact rebuild | Operational rollback record, not marketing notes |
 
-Stable Compatibility, Compatibility Preview, and APK-only Preview are different release paths. Never move assets, signers, packages, trust roots, tags, Relay images, Latest state, or self-update state between them.
+Stable Compatibility, Compatibility Preview, and APK-only Preview are different release paths. Never move assets, signers, packages, trust roots, tags, Relay images, Latest state, or self-update state between them. Native-signing staging is an operational trust input, not another product channel.
 
 ### Actions Artifact is not a Release
 
@@ -47,7 +50,7 @@ A pure Actions Artifact has no GitHub Release page and does not receive curated 
 
 If classification finds pure Actions Artifact work, stop applying this skill after recording the exclusion. Follow the relevant build or artifact runbook instead. Do not continue into Release preflight, publication, curated notes, or post-publication steps.
 
-This Release flow applies to Expo Dev only when the user explicitly scopes a durable GitHub prerelease creation, edit, deletion or cleanup, or audit. Expo Dev has no repository publication workflow: a durable prerelease is an exceptional operator-run promotion of already verified Artifact bytes, with its own explicit authorization, Draft review, invariant snapshot, post-publication audit, and durable evidence. The explicit `release-notes` skill can edit that existing prerelease but can never create it.
+This Release flow applies to Expo Dev only when the user explicitly scopes an existing prerelease edit, deletion, cleanup, or audit. Expo Dev has no repository publication workflow, and its runbook defines only the normal 14-day Artifact path. The one existing durable prerelease remains auditable, editable, and deletable under the protections here, but future Expo Dev Release creation must fail closed until a protected policy change adds a complete repeatable publication runbook or workflow. Historical evidence of the prior one-time promotion is not reusable publication authority. The explicit `release-notes` skill can edit an existing Expo Dev prerelease but can never create it.
 
 ## Release sequence
 
@@ -56,8 +59,8 @@ This Release flow applies to Expo Dev only when the user explicitly scopes a dur
 3. **Run the channel preflight**: use the exact checks and protected environment required by that channel. Do not substitute one channel's evidence for another.
 4. **Build once**: candidate workflows produce the bytes. Promotion and rollback must not rebuild or silently replace them.
 5. **Verify before publication**: bind source, hashes, manifests, provenance, attestations, signer or trust identities, release inventory, and required Android acceptance or waiver.
-6. **Publish only with current authority**: use the repository workflow for channels that have one. For an explicitly authorized Expo Dev durable prerelease, use the exceptional manual promotion described above; never claim that its Artifact workflow publishes. Never infer permission from a successful candidate, a prior publication, or this skill.
-7. **Apply curated notes separately**: only after the exact Release exists and only through the explicit `release-notes` skill.
+6. **Publish only with current authority**: use the repository workflow for channels that have one. Expo Dev Release creation has no current publication path and must stop; its Artifact workflow never publishes. Never infer permission from a successful candidate, a prior one-time publication, or this skill.
+7. **Apply curated notes separately**: only after the exact Release exists, the originating publication workflow or transaction completed successfully, and no publication retry or Draft-resume path remains pending. Use only the explicit `release-notes` skill. Record that replacing workflow-generated title/body removes compatibility with metadata-bound publication audit/retry paths that require the original body, including `scripts/github-release.ts` and APK Preview's `.github/workflows/android-preview-promote.yml`.
 8. **Audit after mutation**: re-read GitHub and compare every invariant. Record exact commands, artifacts, not-run reasons, and residual risk in the matching evidence when project policy requires it.
 
 A failure at any gate stops the sequence. Do not weaken a check, swap a candidate, recreate a Release, or repair an immutable object through a different channel.
@@ -68,7 +71,9 @@ Curated notes belong to `.agents/skills/release-notes/SKILL.md`. The user must e
 
 `/skill:release-notes <version> <CodeName> <emoji> <channel-or-tag>`
 
-Do not infer missing inputs. The notes skill edits an existing workflow-created or explicitly approved Release. It must never create a replacement Release.
+Do not infer missing inputs. The notes skill edits an existing workflow-created or explicitly approved product Release. It must never create a replacement Release. It must stop for `native-signing-*`, whose operational staging body is part of the verification contract rather than product marketing.
+
+Before handoff, prove the originating publication workflow or transaction completed successfully and that no retry or Draft-resume path is pending. Curated metadata breaks every originating metadata-bound audit/retry path that requires the original title/body, including `scripts/github-release.ts` and APK Preview's `.github/workflows/android-preview-promote.yml`; record that consequence rather than treating the edit as retry-safe.
 
 When a workflow or release policy requires a public warning, waiver, or unsigned-platform statement, preserve that workflow-mandated disclosure verbatim as a leading prefix. The compact body does not add optional Warning, Download, Integrity, signer, waiver, or device-validation sections of its own.
 
@@ -76,9 +81,9 @@ When a workflow or release policy requires a public warning, waiver, or unsigned
 
 Treat a metadata-only correction as a narrowly bounded publication:
 
-1. Resolve one exact existing Release and snapshot its release ID, tag, tag ref, assets, target, draft, prerelease, immutable, and Latest state.
+1. Resolve one exact existing Release, reject `native-signing-*`, prove its originating publication workflow or transaction completed successfully with no retry or Draft-resume path pending, and snapshot its release ID, tag, tag ref, assets, target, draft, prerelease, immutable, and Latest state.
 2. Store each asset's ID, name, size, and digest in the before snapshot.
-3. Render the complete proposed title and body. Obtain approval for that exact draft unless the user's current request already approves it with every required notes input.
+3. Render the complete proposed title and body. Obtain approval for that exact draft unless the user's current request already approves it with every required notes input. Record that the edit removes compatibility with every originating metadata-bound audit/retry path, including `scripts/github-release.ts` and APK Preview promotion.
 4. With explicit current-task authorization, run only `gh release edit <tag> --title ... --notes-file ...`.
 5. Never run `gh release create`, move or recreate the tag, upload or delete an asset, change target, toggle draft or prerelease, or alter Latest state to repair notes.
 6. Re-read the Release, tag ref, Latest endpoint, and asset inventory. Require exact equality for release ID, tag, target, draft, prerelease, immutable, Latest identity, and every asset tuple.

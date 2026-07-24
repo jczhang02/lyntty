@@ -16,7 +16,8 @@ Lyntty is a Happy-derived, Android-first, self-hosted mobile control product for
 Current product rules:
 
 - `pi` is the only supported agent/runtime in product scope.
-- `lynttyd` is the local node daemon and only `lynttyd` connects to the `relay`.
+- `lynttyd` is the local node daemon and the only node-side session bridge that connects local Pi runtimes to the `relay`.
+- The operator-facing `lyntty remote` command is a separate control-plane client that connects directly to the relay; it must not become a node runtime or bypass `lynttyd` for phone-to-Pi delivery.
 - The Pi extension talks only to local `lynttyd`; it must never connect directly to the public relay.
 - Android/release-style APK behavior is the primary client acceptance target. iOS is best-effort. Web/Tauri/Codium surfaces are legacy or development context unless the task explicitly says otherwise.
 - Do not restore Happy/Claude/Codex/Gemini/OpenClaw product surfaces, app navigation, copy, or defaults unless the task is explicitly about legacy compatibility tests.
@@ -27,7 +28,7 @@ Current product rules:
 For a feature whose product fit is not obvious, answer these questions before expanding scope:
 
 1. Does it directly improve Android control of local `pi` sessions or self-hosted Lyntty operation?
-2. Does it preserve `phone -> relay -> lynttyd -> Pi extension -> pi`, with only `lynttyd` connecting to the relay?
+2. Does it preserve `phone -> relay -> lynttyd -> Pi extension -> pi`, with `lynttyd` as the only node-side session bridge and `lyntty remote` limited to an explicit operator control-plane client?
 3. Does it preserve one `active runtime` per Pi session and keep Pi JSONL as canonical history?
 4. Does it keep legacy, debug, service, and evidence surfaces out of the main APK unless the task explicitly targets developer tooling?
 5. Can the behavior be verified in isolation through the relevant real Android, daemon, relay, or protocol path?
@@ -43,7 +44,6 @@ Read only what the task needs, using this order for current behavior and policy:
 3. Accepted architecture and runbooks, especially `docs/architecture/pi-shared-control.md` and the relevant files under `docs/release/`.
 4. Current schemas, code, tests, workflows, and package scripts for implementation truth.
 
-If `CONTEXT-MAP.md` references a missing older scaffold document, proceed silently with the closest current normative source.
 
 ## Historical and evidentiary sources
 
@@ -148,13 +148,13 @@ Do not run `lynttyd`, Pi mirror, or Pi extension tests against live `~/.lyntty` 
 - `packages/lyntty-relay` — self-hosted relay API, socket/RPC routing, auth, PGlite/Prisma storage, encrypted sync.
 - `packages/lyntty-wire` — shared session-protocol schemas and caps.
 
-The Bun workspace contains only these four packages. Pi remote-control commands and the development app-log receiver live in `packages/lyntty-cli`; do not recreate removed agent, app-logs, or Codium workspaces.
+The Bun workspace contains only these four packages. Pi remote-control commands and the development app-log receiver live in `packages/lyntty-cli`; `lyntty remote` is the explicit operator control-plane client described above. Do not recreate removed agent, app-logs, or Codium workspaces.
 
 Each package and `docs/` has a nested `AGENTS.md`. Read the nearest guide before editing that subtree; these guides contain local seams and claim gates rather than replacements for this root contract.
 
 ## Release agent workflow
 
-- Before any release-flavored task, load `.agents/skills/release-flow/SKILL.md`. This includes Compatibility or Preview candidates, promotion, GitHub Release creation, metadata edits, deletion, prerelease, rollback, and release audit. Pure Actions Artifact work, including the Android-only verification candidate and the normal 14-day Expo Dev artifact, is excluded: it is not a GitHub Release and does not use curated Release Notes.
+- Before any release-flavored task, load `.agents/skills/release-flow/SKILL.md`. This includes Compatibility or Preview candidates, promotion, native-signing operational staging, GitHub Release creation, metadata edits, deletion, prerelease, rollback, and release audit. Pure Actions Artifact work, including the Android-only verification candidate and the normal 14-day Expo Dev artifact, is excluded: it is not a GitHub Release and does not use curated Release Notes.
 - `.agents/skills/release-flow/SKILL.md` and `.agents/skills/release-notes/SKILL.md` are the canonical cross-agent sources. `CLAUDE.md` must remain a symlink to `AGENTS.md`; `.claude/skills/release-flow` and `.claude/skills/release-notes` must remain relative symlinks to their canonical `.agents/skills/` directories. Do not add copied rule bodies or `.pi` mirrors.
 - Curated notes are user-invoked only through `/skill:release-notes <version> <CodeName> <emoji> <channel-or-tag>`. The exact version, CodeName, emoji, and channel or tag must come from the user, never inference.
 - Loading either skill does not grant permission for a workflow dispatch, push, PR, tag creation or deletion, Release creation, edit, deletion or publication, rollback, or reaction. Every external operation still requires explicit current-task authorization for the exact object and operation, plus the repository Git rules above.
@@ -185,7 +185,7 @@ Bun is pinned by `.bun-version` and the root `packageManager`; project scripts a
 Android/E2E notes:
 
 - Use release-style APK validation for user-visible mobile behavior when practical.
-- Non-production release-style APKs use package `dev.jczhang.lyntty.dev` and are validation artifacts, not production-signed releases.
+- Expo Dev and ordinary development builds use `dev.jczhang.lyntty.dev`; release-style Preview builds use `dev.jczhang.lyntty.preview`; production builds use `dev.jczhang.lyntty`. Development and Preview packages are validation/distribution artifacts, not production-signed releases.
 - For local relay testing from Android emulator, use `http://10.0.2.2:<port>` and non-production cleartext support.
 - Disable Expo Updates in non-production release-style builds to avoid stale OTA bundles.
 - Maestro flows live under `e2e/maestro/`; avoid false positives by asserting target Session Remote state and distinct assistant tokens.
