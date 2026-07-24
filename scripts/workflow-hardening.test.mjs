@@ -1605,6 +1605,7 @@ test('dependency audit pins patched transitive releases', () => {
   const patchedVersions = {
     '@hono/node-server': '2.0.11',
     'fast-uri': '3.1.4',
+    'find-my-way': '9.7.0',
     'fast-xml-parser': '5.10.1',
     'hono': '4.12.27',
     'shell-quote': '1.9.0',
@@ -1614,6 +1615,7 @@ test('dependency audit pins patched transitive releases', () => {
     assert.match(bunLockText, new RegExp(`"${name.replace('/', '\\/')}": \\["${name.replace('/', '\\/')}@${version.replaceAll('.', '\\.')}"`));
   }
   assert.doesNotMatch(bunLockText, /shell-quote@1\.8\.4/);
+  assert.doesNotMatch(bunLockText, /find-my-way@9\.6\.0/);
 });
 
 test('required PR hygiene verifies lifecycle trust and release contracts', () => {
