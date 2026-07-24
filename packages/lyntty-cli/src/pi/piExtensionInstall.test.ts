@@ -71,11 +71,50 @@ describe('Pi extension installation', () => {
     const base = await root();
     const path = join(base, 'extension', 'index.ts');
     await mkdir(join(base, 'extension'), { recursive: true });
-    const previousSource = LYNTTY_PI_EXTENSION_SOURCE.replace('// lyntty-managed-pi-extension:v1\n', '');
+    const previousCommand = [
+      '  pi.registerCommand("lyntty", {',
+      '    description: "Alias for /remote",',
+      '    handler: async (args, ctx) => {',
+      '      const action = String(args || "").trim().toLowerCase();',
+      '      if (action === "off" || action === "remote off") {',
+      '        enabled = false;',
+      '        stopHeartbeat(ctx);',
+      '        stopCommandPolling(ctx);',
+      '        ctx.ui.notify("Lyntty remote sync disabled for this Pi process", "info");',
+      '        return;',
+      '      }',
+      '      if (action === "on" || action === "remote on") {',
+      '        if (bridgeLockedOff) {',
+      '          ctx.ui.notify("Lyntty remote bridge is owned by the managed runtime in this Pi process", "warning");',
+      '          return;',
+      '        }',
+      '        enabled = true;',
+      '        startCommandPolling(pi, ctx);',
+      '        send(ctx, { type: "command_list", commands: safePiCommands(pi) });',
+      '        send(ctx, { type: "session_start", reason: "lyntty-command" });',
+      '        ctx.ui.notify("Lyntty remote sync enabled", "info");',
+      '        return;',
+      '      }',
+      '      startHeartbeat(ctx);',
+      '      startCommandPolling(pi, ctx);',
+      '      const session = safeSessionSnapshot(ctx);',
+      '      if (!session?.piSessionId) {',
+      '        ctx.ui.notify(`Lyntty remote: ${lastStatus}`, "warning");',
+      '        return;',
+      '      }',
+      '      const ok = await postToDaemon("/pi-extension/status", { session });',
+      '      ctx.ui.notify(ok ? "Lyntty remote: connected" : `Lyntty remote: ${lastStatus}`, ok ? "info" : "warning");',
+      '    },',
+      '  });',
+    ].join('\n');
+    const previousSource = LYNTTY_PI_EXTENSION_SOURCE.replace(
+      '\n  pi.on("session_start"',
+      `\n${previousCommand}\n\n  pi.on("session_start"`,
+    );
     await writeFile(path, previousSource);
 
     const result = await installLynttyPiExtension({ extensionPath: path });
-    expect(result.previousSha256).toBe('83c4971409b1397b574a4a407370928f7731a2765c63923fd4a1189d890a4f19');
+    expect(result.previousSha256).toBe('27ccaac0d08ace0eb770681426701af91e7ac4852b2bf1443733f1b936ad1a56');
     expect(await readFile(path, 'utf8')).toBe(LYNTTY_PI_EXTENSION_SOURCE);
   });
 });

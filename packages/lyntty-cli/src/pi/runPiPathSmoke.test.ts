@@ -15,7 +15,7 @@ function deliverRemoteText(input: {
   const action = resolvePiRemoteAction({
     text: input.text,
     isStreaming: input.isStreaming,
-    supportedSlashCommands: ['/lyntty', '/review'],
+    supportedSlashCommands: ['/review'],
     localOnlySlashCommands: ['/model', '/settings', '/session', '/theme', '/help'],
   });
   return { delivered: true, action };

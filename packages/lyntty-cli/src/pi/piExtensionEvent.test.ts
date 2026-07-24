@@ -86,6 +86,7 @@ describe('Pi extension event bridge', () => {
       expect(first.changed).toBe(true);
       expect(second.changed).toBe(false);
       expect(source).toContain('pi.registerCommand("remote"');
+      expect(source).not.toContain('pi.registerCommand("lyntty"');
       expect(source).toContain('/pi-extension/event');
       expect(source).toContain('/pi-extension/commands');
       expect(source).toContain('/pi-extension/command-ack');
