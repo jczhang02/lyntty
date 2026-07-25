@@ -7,6 +7,7 @@ Lyntty is an Android-first, self-hosted control surface for local [`pi`](https:/
 ## Start here
 
 - [Getting started](./getting-started.md): install one compatible Stable set, deploy a `relay`, pair a node, and verify `Session Remote`.
+- [FAQ](./faq.md): check product scope, trust boundaries, build channels, platform support, and update behavior.
 - [Troubleshooting](./troubleshooting.md): resolve connection, daemon, Pi extension, history, APK, Metro, and version symptoms.
 - [Security policy](../SECURITY.md): use the private process for vulnerabilities and redact public reports.
 - [Privacy policy](../PRIVACY.md): understand what stays on the node and what a self-hosted `relay` handles.

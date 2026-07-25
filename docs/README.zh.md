@@ -7,6 +7,7 @@ Lyntty 是一个 Android-first、自托管的本地 [`pi`](https://github.com/ea
 ## 从这里开始
 
 - [开始使用](./getting-started.zh.md)：安装同一组兼容 Stable、部署 `relay`、配对节点并验证 `Session Remote`。
+- [常见问题](./faq.zh.md)：查阅产品范围、信任边界、构建通道、平台支持和更新行为。
 - [故障排查](./troubleshooting.zh.md)：处理连接、daemon、Pi extension、history、APK、Metro 和版本问题。
 - [安全政策](../SECURITY.zh.md)：漏洞使用私密流程，公开报告必须脱敏。
 - [隐私政策](../PRIVACY.zh.md)：了解哪些数据留在节点，以及自托管 `relay` 会处理什么。

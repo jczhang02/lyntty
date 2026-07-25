@@ -16,13 +16,19 @@
   <a href="https://jczhang02.github.io/lyntty/">Documentation</a> ·
   <a href="https://github.com/jczhang02/lyntty/releases/latest">Stable release</a> ·
   <a href="./docs/architecture/pi-shared-control.md">Architecture</a> ·
-  <a href="./docs/development.md">Development</a>
+  <a href="./docs/development.md">Development</a> ·
+  <a href="./docs/faq.md">FAQ</a>
 </p>
 
 Lyntty is an Android-first, self-hosted control surface for local `pi` sessions. You can leave the computer without leaving the real session: send another request, follow live work, inspect results, redirect the run, or stop it from your phone. The workspace, tools, credentials, MCP servers, and canonical Pi history remain on the paired node.
 
 > [!IMPORTANT]
 > Lyntty is currently an owner-operated, self-hosted project. There is no public `relay` service, Play Store listing, or unverified `curl | sh` bootstrap. Read the exact Stable Release notes and use App, CLI/`lynttyd`, `relay`, and Wire artifacts selected by the same signed Compatibility BOM.
+
+<p align="center">
+  <img src="./docs/assets/readme/preview-onboarding-emulator.png" alt="Lyntty onboarding on an isolated Android emulator" width="360" />
+</p>
+<p align="center"><sub>Current-source visual reference from an isolated Android emulator and a local Preview-style build. It is not a Stable artifact and is not physical-device acceptance evidence.</sub></p>
 
 ## Features
 
@@ -145,6 +151,9 @@ See [Isolated local development](./docs/development.md) for ownership checks, st
 ## Current documentation
 
 - [Documentation site](https://jczhang02.github.io/lyntty/)
+- [Getting started](./docs/getting-started.md) · [中文](./docs/getting-started.zh.md)
+- [FAQ](./docs/faq.md) · [中文](./docs/faq.zh.md)
+- [Troubleshooting](./docs/troubleshooting.md) · [中文](./docs/troubleshooting.zh.md)
 - [Security policy](./SECURITY.md) · [中文](./SECURITY.zh.md)
 - [Contributing](./CONTRIBUTING.md) · [中文](./CONTRIBUTING.zh.md)
 - [Product context](./docs/contexts/product/CONTEXT.md) · [中文](./docs/contexts/product/CONTEXT.zh.md)

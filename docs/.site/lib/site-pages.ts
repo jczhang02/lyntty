@@ -56,6 +56,19 @@ export const siteSections: SiteSection[] = [
           description: "安装同一组兼容 Stable、部署 relay 并配对节点。",
         },
       ),
+      pairedPage(
+        "faq",
+        {
+          source: "docs/faq.md",
+          title: "FAQ",
+          description: "Product scope, trust boundaries, build channels, and support answers.",
+        },
+        {
+          source: "docs/faq.zh.md",
+          title: "常见问题",
+          description: "产品范围、信任边界、构建通道和支持说明。",
+        },
+      ),
     ],
   },
   {

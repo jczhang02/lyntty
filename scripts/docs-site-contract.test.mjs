@@ -34,6 +34,7 @@ const siteContractPaths = {
 const requiredPairedSources = [
   ['docs/README.md', 'docs/README.zh.md'],
   ['docs/getting-started.md', 'docs/getting-started.zh.md'],
+  ['docs/faq.md', 'docs/faq.zh.md'],
   ['docs/troubleshooting.md', 'docs/troubleshooting.zh.md'],
   ['docs/prds/lyntty-product.md', 'docs/prds/lyntty-product.zh.md'],
   ['docs/contexts/product/CONTEXT.md', 'docs/contexts/product/CONTEXT.zh.md'],
@@ -96,7 +97,7 @@ test('site manifest publishes current user tasks before historical and agent rec
     assert.equal(page.locales.zh !== undefined, true, `${page.route} needs a Chinese source`);
   }
 
-  for (const route of ['getting-started', 'troubleshooting', 'release/android-apk']) {
+  for (const route of ['getting-started', 'faq', 'troubleshooting', 'release/android-apk']) {
     assert.equal(hasLocalizedRoute(route, 'en'), true);
     assert.equal(hasLocalizedRoute(route, 'zh'), true);
   }
@@ -116,8 +117,8 @@ test('locale params publish one page-level counterpart per route', () => {
   const english = staticParamsForLocale('en');
   const chinese = staticParamsForLocale('zh');
 
-  assert.equal(english.length, 20);
-  assert.equal(chinese.length, 20);
+  assert.equal(english.length, 21);
+  assert.equal(chinese.length, 21);
   assert.deepEqual(english, chinese);
 });
 
@@ -252,6 +253,45 @@ test('getting-started guides cover one safe owner-operated path', async () => {
     assert.doesNotMatch(document, /curl[^\n|]*\|\s*(?:sh|bash)/i);
     assert.doesNotMatch(document, /public relay|公共 relay.*(?:可用|提供)/i);
   }
+});
+
+test('FAQ answers product, trust, and support questions without broadening claims', async () => {
+  const [english, chinese] = await Promise.all([
+    read('docs/faq.md'),
+    read('docs/faq.zh.md'),
+  ]);
+
+  for (const document of [english, chinese]) {
+    assert.match(document, /hosted.*relay|托管.*relay/is);
+    assert.match(document, /same.*pi session|同一个.*pi session/is);
+    assert.match(document, /Compatibility BOM/);
+    assert.match(document, /Pi JSONL.*canonical/is);
+    assert.match(document, /Expo Dev.*(?:Metro.*8081|8081.*Metro)/is);
+    assert.match(document, /current APK-only Preview|当前 APK-only Preview/is);
+    assert.match(document, /Stable.*android-validation\.json/is);
+    assert.match(document, /APK-only Preview.*checksum.*audit.*provenance/is);
+    assert.match(document, /physical.*(?:acceptance|validation)|实体.*验收/is);
+    assert.match(document, /Windows.*service/is);
+    assert.match(document, /SECURITY(?:\.zh)?\.md/);
+    assert.doesNotMatch(document, /signing material|签名材料/is);
+    assert.doesNotMatch(document, /zero-trust design|零信任设计/is);
+  }
+});
+
+test('README visual is labeled as isolated non-release evidence', async () => {
+  const [readme, image] = await Promise.all([
+    read('README.md'),
+    readFile(new URL('../docs/assets/readme/preview-onboarding-emulator.png', import.meta.url)),
+  ]);
+
+  assert.match(readme, /docs\/assets\/readme\/preview-onboarding-emulator\.png/);
+  assert.match(readme, /isolated Android emulator/i);
+  assert.match(readme, /local Preview-style build/i);
+  assert.match(readme, /not (?:a )?Stable artifact/i);
+  assert.match(readme, /not physical-device acceptance evidence/i);
+  assert.equal(image.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])), true);
+  assert.equal(image.readUInt32BE(16), 1080);
+  assert.equal(image.readUInt32BE(20), 2400);
 });
 
 test('troubleshooting guides use symptoms and preserve remediation boundaries', async () => {
