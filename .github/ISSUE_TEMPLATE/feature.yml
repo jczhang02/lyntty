@@ -1,0 +1,61 @@
+name: Feature request
+description: Propose a focused improvement within the current Lyntty product boundary.
+title: "[Feature] "
+labels:
+  - enhancement
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Lyntty focuses on Android control of local `pi` sessions and self-hosted operation. Ordinary phone delivery follows `phone -> relay -> lynttyd -> Pi extension -> pi`. Do not include credentials, pairing URLs, auth headers, encryption keys, private code, or other sensitive material. Report vulnerabilities through [SECURITY.md](https://github.com/jczhang02/lyntty/blob/main/SECURITY.md).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the user problem and who encounters it.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Explain what should become easier or safer without prescribing a large implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Product surface
+      options:
+        - Sessions Home
+        - Session Remote
+        - Node Management
+        - Settings
+        - CLI / `lynttyd`
+        - relay operations
+        - Documentation or CI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Product-boundary check
+      description: If the request affects runtime or delivery, explain how it preserves one active runtime, canonical Pi JSONL, and the supported phone-to-Pi path. Otherwise enter N/A.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include a smaller documentation, workflow, or operating change if one could solve the problem.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues for the same request.
+          required: true
+        - label: I removed credentials, pairing URLs, auth headers, encryption keys, private code, and private logs.
+          required: true
+        - label: This request does not contain vulnerability details that belong in SECURITY.md's private reporting path.
+          required: true

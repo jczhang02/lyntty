@@ -59,4 +59,4 @@ You can stop using a relay, remove paired nodes, delete supported session record
 
 ## Changes and contact
 
-Material policy changes are published in the repository. Use the official Lyntty issue tracker for questions, but never include credentials, pairing URLs, auth headers, encryption keys, private code, or other secrets.
+Material policy changes are published in the repository. Use the official Lyntty issue tracker for non-sensitive questions. Vulnerabilities follow the private path in [`SECURITY.md`](./SECURITY.md). Never include credentials, complete pairing URLs, auth headers, encryption keys, signing material, private code, or other secrets in a public report.

@@ -145,6 +145,8 @@ See [Isolated local development](./docs/development.md) for ownership checks, st
 ## Current documentation
 
 - [Documentation site](https://jczhang02.github.io/lyntty/)
+- [Security policy](./SECURITY.md) · [中文](./SECURITY.zh.md)
+- [Contributing](./CONTRIBUTING.md) · [中文](./CONTRIBUTING.zh.md)
 - [Product context](./docs/contexts/product/CONTEXT.md) · [中文](./docs/contexts/product/CONTEXT.zh.md)
 - [Pi shared-control architecture](./docs/architecture/pi-shared-control.md)
 - [Development guide](./docs/development.md) · [中文](./docs/development.zh.md)
