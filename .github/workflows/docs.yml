@@ -36,6 +36,13 @@ jobs:
           bun-version: 1.3.14
       - name: Install docs toolchain
         run: bun install --frozen-lockfile
+      - name: Verify docs lifecycle-script trust
+        run: |
+          set -euo pipefail
+          untrusted="$(bun pm untrusted 2>&1)"
+          grep -Fq 'Found 0 untrusted dependencies with scripts.' <<< "$untrusted"
+      - name: Audit docs dependencies
+        run: bun run docs:audit
       - name: Check Fumadocs site
         run: bun run docs:check
       - name: Build Fumadocs site

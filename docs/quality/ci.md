@@ -1,6 +1,6 @@
 # Lyntty CI matrix
 
-Date: 2026-07-14
+Date: 2026-07-26
 Status: active Bun-only target
 
 ## Goals
@@ -17,16 +17,22 @@ Workflow: `.github/workflows/typecheck.yml`
 
 | Job | Command | Purpose |
 | --- | --- | --- |
-| `repo-hygiene` | frozen root/docs installs + `bun pm untrusted` + hardening/release tests + `docs:check` + `docs:build` + Git whitespace check | lifecycle trust, workflow/evidence/release contracts, complete docs links/anchors/locales/static export, and diff hygiene |
+| `repo-hygiene` | frozen root/docs installs + root/docs lifecycle trust + docs audit + hardening/release tests + `docs:check` + `docs:build` + Git whitespace check | lifecycle trust, docs dependency advisories, workflow/evidence/release contracts, complete docs links/anchors/locales/static export, and diff hygiene |
 | `wire` | `bun run ci:audit` + `bun run ci:wire` | dependency audit, shared protocol build and tests |
 | `cli` | `bun run ci:cli` | `lyntty`/`lynttyd` typecheck and tests |
 | `relay` | `bun run ci:relay` | Relay typecheck, compiled build, and tests |
 | `app` | `bun run ci:app` | Android app typecheck, i18n guard, tests, and Expo config inspection |
 | `dev-isolation` | `bun run ci:dev` | Real isolated Relay/daemon lifecycle, crash receipts, exact ownership, and fail-closed shutdown on Ubuntu and macOS |
 
-Every package job installs with `bun install --frozen-lockfile`. `repo-hygiene` also installs the independent `docs/.site` lockfile and runs the complete Fumadocs check and static build on every PR, even when no Markdown path changed. This keeps the existing required context authoritative for generated routes, locale counterparts, internal links, anchors, the Pages base path, and the global 404.
+Every package job installs with `bun install --frozen-lockfile`. `repo-hygiene` also installs the independent `docs/.site` lockfile, verifies its lifecycle trust and audit, and runs the complete Fumadocs check and static build on every PR, even when no Markdown path changed. The separate `wire` job runs the root dependency audit. This keeps the existing required contexts authoritative for both dependency graphs, generated routes, locale counterparts, internal links, anchors, the Pages base path, and the global 404.
 
 The separately required CLI artifact-smoke workflow runs all five supported target/host pairs on pull requests: Linux x64/arm64, macOS x64/arm64, and Windows x64. Actions are pinned to full commit SHAs. The workflows have `contents: read` and cancel stale runs.
+
+## Dependency and static-analysis maintenance
+
+Dependabot checks three bounded targets each week: root Bun dependencies, the independent docs Bun lockfile, and SHA-pinned GitHub Actions. Minor and patch updates are grouped per target, maintenance windows are staggered, and each target allows at most three open version-update PRs. Dependabot does not auto-merge. CODEOWNERS routes these files to the owner, while every merge remains subject to the normal required checks.
+
+`.github/workflows/codeql.yml` runs a SHA-pinned CodeQL JavaScript/TypeScript baseline on PRs, main pushes, a weekly schedule, and manual dispatch. It uses `build-mode: none`, does not replace package tests, and is non-required until the first external run is triaged. Any alerts need source-level review before the owner considers adding the CodeQL context to the main ruleset.
 
 ## Manual / release tiers
 
@@ -51,6 +57,7 @@ Compatibility-BOM publication, component tags, installers, optional native signi
 - `bun run ci:dev` — isolated development lifecycle and crash/ownership safety gate.
 - `bun install --frozen-lockfile` — prove the lockfile is complete.
 - `bun pm untrusted` — must report zero blocked lifecycle scripts.
+- `bun run --cwd docs/.site docs:audit` — audit the independent docs dependency graph.
 - `bun run --cwd docs/.site docs:check` — generate manifest-owned pages and typecheck the Fumadocs site.
 - `bun run --cwd docs/.site docs:build` — export the site and validate every localized page, raw Markdown file, internal link, anchor, base-path URL, and 404.
 

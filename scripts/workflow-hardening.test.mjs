@@ -1605,19 +1605,34 @@ test('native signature verification pins platform identities and attests exact a
   assert.match(nativeSigning, /bun install --frozen-lockfile/);
 });
 
-test('dependency audit pins patched transitive releases', () => {
+test('dependency audit pins patched transitive releases', async () => {
   const patchedVersions = {
     '@hono/node-server': '2.0.11',
+    'brace-expansion': '5.0.8',
     'fast-uri': '3.1.4',
     'find-my-way': '9.7.0',
     'fast-xml-parser': '5.10.1',
     'hono': '4.12.27',
     'shell-quote': '1.9.0',
+    'valibot': '1.4.2',
   };
   for (const [name, version] of Object.entries(patchedVersions)) {
     assert.equal(rootPackage.overrides[name], version);
     assert.match(bunLockText, new RegExp(`"${name.replace('/', '\\/')}": \\["${name.replace('/', '\\/')}@${version.replaceAll('.', '\\.')}"`));
   }
+  assert.equal(rootPackage.patchedDependencies['minimatch@3.1.5'], 'patches/minimatch@3.1.5.patch');
+  const minimatchPatch = await readFile(new URL('../patches/minimatch@3.1.5.patch', import.meta.url), 'utf8');
+  assert.match(minimatchPatch, /var \{ expand \} = require\('brace-expansion'\)/);
+  const braceExpansionVersions = [...bunLockText.matchAll(/brace-expansion@(\d+\.\d+\.\d+)/g)].map((match) => match[1]);
+  const valibotVersions = [...bunLockText.matchAll(/valibot@(\d+\.\d+\.\d+)/g)].map((match) => match[1]);
+  assert.deepEqual([...new Set(braceExpansionVersions)].sort(), ['5.0.8']);
+  assert.deepEqual([...new Set(valibotVersions)].sort(), ['1.4.2']);
+  const [legacyMinimatch, modernMinimatch] = await Promise.all([
+    import(new URL('../node_modules/.bun/minimatch@3.1.5/node_modules/minimatch/minimatch.js', import.meta.url)),
+    import(new URL('../node_modules/.bun/minimatch@10.2.5/node_modules/minimatch/dist/commonjs/index.js', import.meta.url)),
+  ]);
+  assert.equal(legacyMinimatch.default('file.ts', '*.{js,ts}'), true);
+  assert.equal(modernMinimatch.minimatch('file.ts', '*.{js,ts}'), true);
   assert.doesNotMatch(bunLockText, /shell-quote@1\.8\.4/);
   assert.doesNotMatch(bunLockText, /find-my-way@9\.6\.0/);
 });
@@ -1638,18 +1653,22 @@ test('required PR hygiene builds the complete docs site and watches every root s
   assert.equal(repoHygieneJob.if, undefined);
 
   const docsInstall = repoHygieneJob.steps.find((step) => step.name === 'Install docs toolchain');
+  const docsTrust = repoHygieneJob.steps.find((step) => step.name === 'Verify docs lifecycle-script trust');
   const docsBuild = repoHygieneJob.steps.find((step) => step.name === 'Check and build complete docs site');
   assert.deepEqual(docsInstall, {
     name: 'Install docs toolchain',
     'working-directory': 'docs/.site',
     run: 'bun install --frozen-lockfile',
   });
+  assert.equal(docsTrust['working-directory'], 'docs/.site');
+  assert.match(docsTrust.run, /bun pm untrusted/);
   assert.deepEqual(docsBuild, {
     name: 'Check and build complete docs site',
     'working-directory': 'docs/.site',
-    run: 'bun run docs:check\nbun run docs:build\n',
+    run: 'bun run docs:audit\nbun run docs:check\nbun run docs:build\n',
   });
-  assert.equal(repoHygieneJob.steps.indexOf(docsInstall) < repoHygieneJob.steps.indexOf(docsBuild), true);
+  assert.equal(repoHygieneJob.steps.indexOf(docsInstall) < repoHygieneJob.steps.indexOf(docsTrust), true);
+  assert.equal(repoHygieneJob.steps.indexOf(docsTrust) < repoHygieneJob.steps.indexOf(docsBuild), true);
   assert.equal(repoHygieneJob['continue-on-error'], undefined);
 
   assert.deepEqual(docsWorkflowConfig.on.push.branches, ['main']);
@@ -1659,6 +1678,7 @@ test('required PR hygiene builds the complete docs site and watches every root s
     assert.equal(deploymentPaths.includes(sourceGlob), true, `${sourceGlob} must trigger Pages deployment`);
   }
   const deployBuildSteps = docsWorkflowConfig.jobs.build.steps;
+  assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:audit'), true);
   assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:check'), true);
   assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:build'), true);
 });

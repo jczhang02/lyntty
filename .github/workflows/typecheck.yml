@@ -45,9 +45,16 @@ jobs:
       - name: Install docs toolchain
         working-directory: docs/.site
         run: bun install --frozen-lockfile
+      - name: Verify docs lifecycle-script trust
+        working-directory: docs/.site
+        run: |
+          set -euo pipefail
+          untrusted="$(bun pm untrusted 2>&1)"
+          grep -Fq 'Found 0 untrusted dependencies with scripts.' <<< "$untrusted"
       - name: Check and build complete docs site
         working-directory: docs/.site
         run: |
+          bun run docs:audit
           bun run docs:check
           bun run docs:build
       - name: Check whitespace
