@@ -27,6 +27,8 @@
 /scripts/preview-apk-allowlist.json @jczhang02
 /scripts/workflow-hardening.test.mjs @jczhang02
 /scripts/maintenance-baseline.test.mjs @jczhang02
+/scripts/ci-changed-paths.ts @jczhang02
+/scripts/ci-changed-paths.test.ts @jczhang02
 /packages/lyntty-app/android/app/build.gradle @jczhang02
 /packages/lyntty-app/android/app/lyntty-expo-dev.keystore @jczhang02
 /packages/lyntty-app/scripts/apk-audit.sh @jczhang02

@@ -28,6 +28,14 @@ Every package job installs with `bun install --frozen-lockfile`. `repo-hygiene` 
 
 The separately required CLI artifact-smoke workflow runs all five supported target/host pairs on pull requests: Linux x64/arm64, macOS x64/arm64, and Windows x64. Actions are pinned to full commit SHAs. The workflows have `contents: read` and cancel stale runs.
 
+## Docs-only PR short-circuit
+
+All 12 required context names still materialize on every pull request. Neither required workflow uses trigger-level `paths` filters, and no package or matrix job has a job-level condition. `Repo hygiene` always performs its complete root/docs installs, lifecycle checks, repository contracts, docs audit/check/build, and whitespace gate.
+
+The remaining required jobs run the same local classifier after checkout and Bun setup. Only additions or modifications to regular files in the explicit current-guide allowlist or `docs/assets/` image formats are docs-only. A code, workflow, lockfile, package, patch, security, release, deploy, evidence, architecture, or other unlisted path triggers the full gate. Empty diffs, invalid SHAs, Git errors, deletions, renames, type changes, pushes, and manual runs also fail-open to the full gate.
+
+For a verified docs-only pull request, package and artifact matrix jobs stay present and successful but skip expensive work at step-level. This preserves branch-protection identity while avoiding installs, builds, package tests, daemon integration, lifecycle exercises, and five-architecture artifact smoke that cannot validate the changed files.
+
 ## Dependency and static-analysis maintenance
 
 Dependabot checks three bounded targets each week: root Bun dependencies, the independent docs Bun lockfile, and SHA-pinned GitHub Actions. Minor and patch updates are grouped per target, maintenance windows are staggered, and each target allows at most three open version-update PRs. Dependabot does not auto-merge. CODEOWNERS routes these files to the owner, while every merge remains subject to the normal required checks.

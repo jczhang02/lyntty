@@ -19,6 +19,14 @@ bun run --cwd docs/.site docs:build
 
 `.github/workflows/docs.yml` 的自动部署只由 main 上的匹配 push 触发，同时保留 `workflow_dispatch` 手动部署。除 `docs/**` 外，它还监听站点 manifest 发布的根级 SECURITY、PRIVACY 和 CONTRIBUTING 双语文件。域名和 `/lyntty` base path 不变。
 
+## Docs-only PR 短路
+
+每个 PR 仍会生成全部十二个 required context。两个 required workflow 都不使用 trigger-level `paths` 过滤，package 和 matrix job 也没有 job-level 条件。`Repo hygiene` 永不短路，始终执行 root/docs install、lifecycle trust、仓库契约、docs audit/check/build 和 whitespace gate。
+
+其他 required job 在 checkout 与 Bun setup 后运行同一个纯本地分类器。只有显式当前指南 allowlist 或 `docs/assets/` 图片格式中普通文件的新增和修改才算 docs-only。代码、workflow、lockfile、package、patch、security、release、deploy、evidence、architecture 及任何未列出路径都会进入完整门禁。空 diff、无效 SHA、Git 错误、删除、重命名、类型变化、push 和手动运行同样 fail-open 到完整门禁。
+
+分类器确认 docs-only 后，package 与 artifact matrix job 仍会出现并成功结束，只在步骤级（step-level）跳过与变更无关的 install、build、package test、daemon integration、lifecycle exercise 和五架构 artifact smoke。这样既保留 branch protection 的 context 身份，也减少无效开销。
+
 ## 依赖维护与静态分析
 
 Dependabot 每周检查三个有限目标：根目录 Bun 依赖、独立 docs Bun lockfile，以及 SHA-pinned GitHub Actions。每个目标单独合并 minor/patch update，更新时间错开，允许打开的 version-update PR 不超过三个。Dependabot 不会自动合并；CODEOWNERS 会把这些文件路由给 owner，所有合并仍受普通 required checks 约束。
