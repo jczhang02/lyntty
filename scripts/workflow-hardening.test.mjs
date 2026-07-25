@@ -28,6 +28,7 @@ const androidGradlePath = new URL('../packages/lyntty-app/android/app/build.grad
 const maestroRunnerPath = new URL('./e2e/run-maestro.sh', import.meta.url);
 const codeownersPath = new URL('../.github/CODEOWNERS', import.meta.url);
 const typecheckWorkflowPath = new URL('../.github/workflows/typecheck.yml', import.meta.url);
+const docsWorkflowPath = new URL('../.github/workflows/docs.yml', import.meta.url);
 const cliSmokeWorkflowPath = new URL('../.github/workflows/cli-smoke-test.yml', import.meta.url);
 const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-artifact.ts', import.meta.url);
 const rootPackagePath = new URL('../package.json', import.meta.url);
@@ -62,6 +63,9 @@ const [relayDeploy, relayImage, androidRelease, androidExpoDev, androidPreviewCa
   readFile(previewBundleSmokePath, 'utf8'),
 ]);
 const rootPackage = JSON.parse(rootPackageText);
+const docsWorkflow = await readFile(docsWorkflowPath, 'utf8');
+const typecheckWorkflowConfig = Bun.YAML.parse(typecheckWorkflow);
+const docsWorkflowConfig = Bun.YAML.parse(docsWorkflow);
 const previewReleaseNotes = await readFile(previewReleaseNotesPath, 'utf8');
 const resolvedPreviewReleaseNotes = previewReleaseNotes
   .replaceAll('{{VERSION_NAME}}', '1.2.0')
@@ -1622,6 +1626,41 @@ test('required PR hygiene verifies lifecycle trust and release contracts', () =>
   assert.match(typecheckWorkflow, /bun pm untrusted/);
   assert.match(typecheckWorkflow, /Found 0 untrusted dependencies with scripts/);
   assert.match(typecheckWorkflow, /bun test scripts\/release\.test\.ts scripts\/github-release\.test\.ts scripts\/relay-oci-sbom\.test\.ts packages\/lyntty-cli\/scripts\/build-artifact\.test\.ts/);
+});
+
+test('required PR hygiene builds the complete docs site and watches every root source', () => {
+  assert.equal(typecheckWorkflowConfig.name, 'Lyntty CI');
+  assert.deepEqual(typecheckWorkflowConfig.on.pull_request, { branches: ['main'] });
+
+  const repoHygieneJob = typecheckWorkflowConfig.jobs['repo-hygiene'];
+  assert.ok(repoHygieneJob, 'repo-hygiene job must exist');
+  assert.equal(repoHygieneJob.name, 'Repo hygiene');
+  assert.equal(repoHygieneJob.if, undefined);
+
+  const docsInstall = repoHygieneJob.steps.find((step) => step.name === 'Install docs toolchain');
+  const docsBuild = repoHygieneJob.steps.find((step) => step.name === 'Check and build complete docs site');
+  assert.deepEqual(docsInstall, {
+    name: 'Install docs toolchain',
+    'working-directory': 'docs/.site',
+    run: 'bun install --frozen-lockfile',
+  });
+  assert.deepEqual(docsBuild, {
+    name: 'Check and build complete docs site',
+    'working-directory': 'docs/.site',
+    run: 'bun run docs:check\nbun run docs:build\n',
+  });
+  assert.equal(repoHygieneJob.steps.indexOf(docsInstall) < repoHygieneJob.steps.indexOf(docsBuild), true);
+  assert.equal(repoHygieneJob['continue-on-error'], undefined);
+
+  assert.deepEqual(docsWorkflowConfig.on.push.branches, ['main']);
+  assert.equal(docsWorkflowConfig.on.workflow_dispatch, null);
+  const deploymentPaths = docsWorkflowConfig.on.push.paths;
+  for (const sourceGlob of ['docs/**', 'CONTRIBUTING*.md', 'PRIVACY*.md', 'SECURITY*.md']) {
+    assert.equal(deploymentPaths.includes(sourceGlob), true, `${sourceGlob} must trigger Pages deployment`);
+  }
+  const deployBuildSteps = docsWorkflowConfig.jobs.build.steps;
+  assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:check'), true);
+  assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:build'), true);
 });
 
 test('supported CLI artifacts run on every release architecture in PR CI', () => {

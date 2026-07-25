@@ -17,14 +17,16 @@ Workflow: `.github/workflows/typecheck.yml`
 
 | Job | Command | Purpose |
 | --- | --- | --- |
-| `repo-hygiene` | frozen install + `bun pm untrusted` + hardening/release tests + Git whitespace check | lifecycle trust, workflow/evidence/release contracts, and diff hygiene |
+| `repo-hygiene` | frozen root/docs installs + `bun pm untrusted` + hardening/release tests + `docs:check` + `docs:build` + Git whitespace check | lifecycle trust, workflow/evidence/release contracts, complete docs links/anchors/locales/static export, and diff hygiene |
 | `wire` | `bun run ci:audit` + `bun run ci:wire` | dependency audit, shared protocol build and tests |
 | `cli` | `bun run ci:cli` | `lyntty`/`lynttyd` typecheck and tests |
 | `relay` | `bun run ci:relay` | Relay typecheck, compiled build, and tests |
 | `app` | `bun run ci:app` | Android app typecheck, i18n guard, tests, and Expo config inspection |
 | `dev-isolation` | `bun run ci:dev` | Real isolated Relay/daemon lifecycle, crash receipts, exact ownership, and fail-closed shutdown on Ubuntu and macOS |
 
-Every package job installs with `bun install --frozen-lockfile`. The separately required CLI artifact-smoke workflow runs all five supported target/host pairs on pull requests: Linux x64/arm64, macOS x64/arm64, and Windows x64. Actions are pinned to full commit SHAs. The workflows have `contents: read` and cancel stale runs.
+Every package job installs with `bun install --frozen-lockfile`. `repo-hygiene` also installs the independent `docs/.site` lockfile and runs the complete Fumadocs check and static build on every PR, even when no Markdown path changed. This keeps the existing required context authoritative for generated routes, locale counterparts, internal links, anchors, the Pages base path, and the global 404.
+
+The separately required CLI artifact-smoke workflow runs all five supported target/host pairs on pull requests: Linux x64/arm64, macOS x64/arm64, and Windows x64. Actions are pinned to full commit SHAs. The workflows have `contents: read` and cancel stale runs.
 
 ## Manual / release tiers
 
@@ -38,7 +40,7 @@ Every package job installs with `bun install --frozen-lockfile`. The separately 
 | `.github/workflows/release-rollback.yml` | manual | protected Stable rollback | Reuses retained immutable bytes in a new higher signed BOM; no component build runs. |
 | `.github/workflows/relay-deploy.yml` | manual | production deployment | Verifies the current signed Stable head plus image signature/provenance/SBOM, deploys its monotonic `@sha256:` image after backup/migrate/doctor, and remains separate from publication while sharing its Stable serialization lock. |
 | `.github/workflows/android-release.yml` | manual | Android candidate verification | Builds and audits the signed Stable APK under protected Android credentials, then uploads a short-lived artifact without publishing. |
-| `.github/workflows/docs.yml` | docs/main + manual | docs | Checks/builds the Fumadocs site and deploys Pages. |
+| `.github/workflows/docs.yml` | docs or published root-document changes on main + manual | docs | Checks/builds the Fumadocs site and deploys Pages. Root SECURITY, PRIVACY, and CONTRIBUTING language pairs are watched because the manifest publishes them. |
 
 Compatibility-BOM publication, component tags, installers, optional native signing, and release promotion are explicit protected workflows; they are never side effects of a normal main push. Stable is the only non-prerelease GitHub latest channel; Preview always uses its separate prerelease identity.
 
@@ -49,6 +51,8 @@ Compatibility-BOM publication, component tags, installers, optional native signi
 - `bun run ci:dev` — isolated development lifecycle and crash/ownership safety gate.
 - `bun install --frozen-lockfile` — prove the lockfile is complete.
 - `bun pm untrusted` — must report zero blocked lifecycle scripts.
+- `bun run --cwd docs/.site docs:check` — generate manifest-owned pages and typecheck the Fumadocs site.
+- `bun run --cwd docs/.site docs:build` — export the site and validate every localized page, raw Markdown file, internal link, anchor, base-path URL, and 404.
 
 ## Deferrals / rationale
 

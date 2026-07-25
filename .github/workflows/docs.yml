@@ -7,6 +7,9 @@ on:
       - "docs/**"
       - "AGENTS.md"
       - "CONTEXT-MAP.md"
+      - "CONTRIBUTING*.md"
+      - "PRIVACY*.md"
+      - "SECURITY*.md"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 

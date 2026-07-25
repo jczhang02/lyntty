@@ -42,6 +42,14 @@ jobs:
         run: |
           bun run test:repo-hardening
           bun test scripts/release.test.ts scripts/github-release.test.ts scripts/relay-oci-sbom.test.ts packages/lyntty-cli/scripts/build-artifact.test.ts
+      - name: Install docs toolchain
+        working-directory: docs/.site
+        run: bun install --frozen-lockfile
+      - name: Check and build complete docs site
+        working-directory: docs/.site
+        run: |
+          bun run docs:check
+          bun run docs:build
       - name: Check whitespace
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
