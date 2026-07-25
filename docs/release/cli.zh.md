@@ -6,4 +6,6 @@
 
 Stable Release 同时发布 `install.sh`、其 SHA sidecar、`stable-release-trust-roots.json`、签名 BOM 和五个平台 archive。首次安装必须先通过受保护 source 或独立审核渠道确认 installer/root hash，不能把未经验证的网络内容直接 pipe 给 shell。archive SHA-256 与内部 manifest SHA-256 必须来自已验证的签名 BOM。
 
+校验 `install.sh` 时，Linux 可以使用 `sha256sum`，原生 macOS 使用 `shasum -a 256`。两种路径都必须把实际 digest 与经过审核的 Release hash 逐字节比较，不要把 sidecar 或网络响应直接当作独立信任来源。
+
 首次 owner-operated 自用 Stable 会发布全部五个平台 archive，但 macOS/Windows executable 明确不做 Apple notarization 或 Authenticode。其完整性由精确 source commit、archive/manifest SHA-256、runtime-free self-check、GitHub attestations 和签名 Compatibility BOM 绑定；这不等于平台代码签名。macOS Gatekeeper 或 Windows SmartScreen 因此可能要求用户手动确认。未来若需要平台签名，再使用可选的 [`native-signing.zh.md`](./native-signing.zh.md) 流程。

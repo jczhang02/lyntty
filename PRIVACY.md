@@ -1,6 +1,8 @@
 # Lyntty Privacy Policy
 
-Last updated: 2026-07-16
+Last updated: 2026-07-25
+
+[简体中文](./PRIVACY.zh.md)
 
 ## Scope
 

@@ -1,11 +1,14 @@
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+
+import { absolutizeSiteMarkdownLinks } from "../lib/site-output.ts";
+import { sourcePageRecords } from "../lib/site-pages.ts";
 
 const CONTENT_ROOT = "content/docs";
 const OUTPUT_ROOT = "out";
 const SITE_URL = "https://jczhang02.github.io/lyntty";
 const DESCRIPTION =
-  "Lyntty is an Android-first, pi-first remote-control surface for local pi coding sessions.";
+  "Lyntty is an Android-first, self-hosted control surface for local pi sessions.";
 
 function listMdxFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -14,6 +17,26 @@ function listMdxFiles(directory) {
     if (entry.isFile() && entry.name.endsWith(".mdx")) return [path];
     return [];
   });
+}
+
+function removeGeneratedMarkdownOutputs(directory) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      removeGeneratedMarkdownOutputs(path);
+      continue;
+    }
+
+    if (
+      entry.isFile() &&
+      (entry.name.endsWith(".md") ||
+        entry.name === "llms.txt" ||
+        entry.name === "llms-full.txt" ||
+        entry.name === ".nojekyll")
+    ) {
+      rmSync(path);
+    }
+  }
 }
 
 function parseFrontmatter(content) {
@@ -44,14 +67,33 @@ function pageId(path) {
   return relativePath;
 }
 
-const pages = listMdxFiles(CONTENT_ROOT)
-  .map((path) => {
+removeGeneratedMarkdownOutputs(OUTPUT_ROOT);
+
+const pageById = new Map(
+  listMdxFiles(CONTENT_ROOT).map((path) => {
     const id = pageId(path);
-    const content = readFileSync(path, "utf8");
+    const content = absolutizeSiteMarkdownLinks(readFileSync(path, "utf8"), SITE_URL);
     const { data, body } = parseFrontmatter(content);
-    return { id, title: data.title ?? id, description: data.description ?? "", content, body };
-  })
-  .sort((left, right) => left.id.localeCompare(right.id));
+    return [id, { id, title: data.title ?? id, description: data.description ?? "", content, body }];
+  }),
+);
+
+function outputPageId(page) {
+  const id = page.target.replace(/\\/g, "/").replace(/\.mdx$/, "").replace(/\.zh$/, "");
+  return page.locale === "zh" ? `zh/${id}` : id;
+}
+
+const orderedIds = sourcePageRecords().map(outputPageId);
+
+const pages = orderedIds.map((id) => {
+  const page = pageById.get(id);
+  if (!page) throw new Error(`Missing generated Markdown page: ${id}`);
+  return page;
+});
+
+if (pageById.size !== pages.length) {
+  throw new Error(`Unexpected generated Markdown page count: ${pageById.size} != ${pages.length}`);
+}
 
 for (const page of pages) {
   const outputPath = join(OUTPUT_ROOT, `${page.id}.md`);

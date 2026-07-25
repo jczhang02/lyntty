@@ -11,25 +11,27 @@ import {
 
 import { getMDXComponents } from "@/mdx-components";
 import { baseOptions } from "@/lib/layout.shared";
+import { staticParamsForLocale } from "@/lib/site-pages";
 import { source } from "@/lib/source";
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>;
 };
 
-async function getEnglishPage(props: PageProps) {
+async function getChinesePage(props: PageProps) {
   const { slug = [] } = await props.params;
-  return source.getPage(slug, "en");
+  return source.getPage(slug, "zh");
 }
 
 export default async function Page(props: PageProps) {
-  const page = await getEnglishPage(props);
+  const page = await getChinesePage(props);
   if (!page) notFound();
 
   const MDX = page.data.body;
+  const route = page.slugs.join("/") || "index";
 
   return (
-    <DocsLayout {...baseOptions("en")} tree={source.getPageTree("en")}>
+    <DocsLayout {...baseOptions("zh", route)} tree={source.getPageTree("zh")}>
       <DocsPage toc={page.data.toc}>
         <DocsTitle>{page.data.title}</DocsTitle>
         <DocsDescription>{page.data.description}</DocsDescription>
@@ -42,12 +44,14 @@ export default async function Page(props: PageProps) {
 }
 
 export function generateStaticParams() {
-  return source.getPages("en").map((page) => ({ slug: page.slugs }));
+  return staticParamsForLocale("zh");
 }
 
 export async function generateMetadata(props: PageProps): Promise<Metadata> {
-  const page = await getEnglishPage(props);
+  const page = await getChinesePage(props);
   if (!page) notFound();
+
+  const englishUrl = page.url.startsWith("/zh") ? page.url.slice(3) || "/" : page.url;
 
   return {
     title: page.data.title,
@@ -55,8 +59,8 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
     alternates: {
       canonical: page.url,
       languages: {
-        en: page.url,
-        "zh-CN": page.url === "/" ? "/zh" : `/zh${page.url}`,
+        en: englishUrl,
+        "zh-CN": page.url,
       },
     },
   };

@@ -31,7 +31,19 @@ The formal Stable Release publishes `install.sh`, `install.sh.sha256`, `stable-r
 tag=compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1
 base="https://github.com/jczhang02/lyntty/releases/download/$tag"
 curl --proto '=https' --tlsv1.2 -fsSLO "$base/install.sh"
-printf '%s  install.sh\n' INSTALLER_SHA256_FROM_REVIEWED_RELEASE | sha256sum -c -
+installer_sha256=INSTALLER_SHA256_FROM_REVIEWED_RELEASE
+if command -v sha256sum >/dev/null 2>&1; then
+  actual_sha256=$(sha256sum install.sh | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+  actual_sha256=$(shasum -a 256 install.sh | awk '{print $1}')
+else
+  echo 'A SHA-256 tool is required' >&2
+  exit 1
+fi
+[ "$actual_sha256" = "$installer_sha256" ] || {
+  echo 'install.sh SHA-256 mismatch' >&2
+  exit 1
+}
 sh ./install.sh \
   --base-url "$base" \
   --version 1.2.0 \

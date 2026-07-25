@@ -6,7 +6,7 @@
   "scripts": {
     "docs:prepare": "bun scripts/prepare-fumadocs-pages.mjs",
     "docs:check": "bun run docs:prepare && bunx fumadocs-mdx source.config.ts && bunx tsc --noEmit",
-    "docs:build": "bun run docs:prepare && bunx next build && bun scripts/write-fumadocs-agent-files.mjs",
+    "docs:build": "bun run docs:prepare && bunx next build && bun scripts/write-fumadocs-agent-files.mjs && bun scripts/validate-static-output.mjs",
     "docs:preview": "bunx serve out"
   },
   "devDependencies": {
