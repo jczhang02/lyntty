@@ -334,12 +334,18 @@ test('workflow executes only the classifier stored in the PR base commit', async
     run(['git', 'switch', '-q', trustedBranch]);
     await mkdir(join(directory, 'packages/example'), { recursive: true });
     await writeFile(join(directory, 'packages/example/index.ts'), 'export {};\n', 'utf8');
+    await writeFile(join(directory, 'bunfig.toml'), 'preload = ["./preload.ts"]\n', 'utf8');
+    await writeFile(
+      join(directory, 'preload.ts'),
+      'import { writeFileSync } from "node:fs"; process.on("exit", () => writeFileSync(process.env.GITHUB_OUTPUT!, "run_full=false\\nreason=docs-only\\n"));\n',
+      'utf8',
+    );
     await writeFile(
       join(directory, 'scripts/ci-changed-paths.ts'),
       'await Bun.write(process.env.GITHUB_OUTPUT!, "run_full=false\\nreason=docs-only\\n");\n',
       'utf8',
     );
-    run(['git', 'add', 'packages/example/index.ts', 'scripts/ci-changed-paths.ts']);
+    run(['git', 'add', 'bunfig.toml', 'preload.ts', 'packages/example/index.ts', 'scripts/ci-changed-paths.ts']);
     run(['git', 'commit', '-qm', 'attempt classifier bypass']);
     const maliciousHead = run(['git', 'rev-parse', 'HEAD']);
     assert.deepEqual(await classify(trustedBase, maliciousHead), {
@@ -431,7 +437,9 @@ test('all twelve required contexts materialize before step-level short-circuitin
     assert.match(scope.run ?? '', /git show "\$LYNTTY_CI_BASE_SHA:scripts\/ci-changed-paths\.ts"/);
     assert.match(scope.run ?? '', /reason=trusted-classifier-unavailable/);
     assert.match(scope.run ?? '', /reason=trusted-classifier-invalid/);
-    assert.match(scope.run ?? '', /GITHUB_OUTPUT="\$classifier_output" bun "\$trusted_classifier"/);
+    assert.match(scope.run ?? '', /trusted_bunfig="\.git\/lyntty-ci-empty-bunfig\.toml"/);
+    assert.match(scope.run ?? '', /GITHUB_OUTPUT="\$classifier_output" bun --config="\$trusted_bunfig" --no-env-file --no-install "\$trusted_classifier"/);
+    assert.match(scope.run ?? '', /bun --config="\$trusted_bunfig" --no-env-file --no-install -e/);
     assert.match(scope.run ?? '', /TextDecoder\("utf-8", \{ fatal: true, ignoreBOM: true \}\)/);
     assert.match(scope.run ?? '', /byte > 0x7f/);
     assert.match(scope.run ?? '', /\^run_full=\(true\|false\)\$/);

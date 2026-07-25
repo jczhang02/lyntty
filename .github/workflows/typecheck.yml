@@ -97,11 +97,13 @@ jobs:
           else
             trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
             classifier_output=".git/lyntty-ci-changed-paths.base.output"
-            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            trusted_bunfig=".git/lyntty-ci-empty-bunfig.toml"
+            : > "$trusted_bunfig"
+            trap 'rm -f "$trusted_classifier" "$classifier_output" "$trusted_bunfig"' EXIT
             if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
               : > "$classifier_output"
-              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
-                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+              if GITHUB_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install -e '
                   const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
                   if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
                   let text;
@@ -160,11 +162,13 @@ jobs:
           else
             trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
             classifier_output=".git/lyntty-ci-changed-paths.base.output"
-            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            trusted_bunfig=".git/lyntty-ci-empty-bunfig.toml"
+            : > "$trusted_bunfig"
+            trap 'rm -f "$trusted_classifier" "$classifier_output" "$trusted_bunfig"' EXIT
             if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
               : > "$classifier_output"
-              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
-                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+              if GITHUB_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install -e '
                   const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
                   if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
                   let text;
@@ -223,11 +227,13 @@ jobs:
           else
             trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
             classifier_output=".git/lyntty-ci-changed-paths.base.output"
-            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            trusted_bunfig=".git/lyntty-ci-empty-bunfig.toml"
+            : > "$trusted_bunfig"
+            trap 'rm -f "$trusted_classifier" "$classifier_output" "$trusted_bunfig"' EXIT
             if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
               : > "$classifier_output"
-              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
-                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+              if GITHUB_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install -e '
                   const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
                   if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
                   let text;
@@ -283,11 +289,13 @@ jobs:
           else
             trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
             classifier_output=".git/lyntty-ci-changed-paths.base.output"
-            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            trusted_bunfig=".git/lyntty-ci-empty-bunfig.toml"
+            : > "$trusted_bunfig"
+            trap 'rm -f "$trusted_classifier" "$classifier_output" "$trusted_bunfig"' EXIT
             if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
               : > "$classifier_output"
-              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
-                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+              if GITHUB_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install -e '
                   const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
                   if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
                   let text;
@@ -347,11 +355,13 @@ jobs:
           else
             trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
             classifier_output=".git/lyntty-ci-changed-paths.base.output"
-            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            trusted_bunfig=".git/lyntty-ci-empty-bunfig.toml"
+            : > "$trusted_bunfig"
+            trap 'rm -f "$trusted_classifier" "$classifier_output" "$trusted_bunfig"' EXIT
             if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
               : > "$classifier_output"
-              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
-                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+              if GITHUB_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun --config="$trusted_bunfig" --no-env-file --no-install -e '
                   const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
                   if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
                   let text;
