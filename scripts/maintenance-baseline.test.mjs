@@ -92,14 +92,17 @@ test('CodeQL is a pinned non-required JavaScript and TypeScript baseline', async
   }
 });
 
-test('independent docs dependencies are audited and pinned to compatible fixes', async () => {
-  const [docsPackage, docsLock, rootPatch, docsPatch, typecheck, docsWorkflow] = await Promise.all([
+test('independent docs dependencies are audited with a static-export-only Sharp workaround', async () => {
+  const [docsPackage, docsLock, rootPatch, docsPatch, typecheck, docsWorkflow, nextConfig, english, chinese] = await Promise.all([
     read('docs/.site/package.json').then(JSON.parse),
     read('docs/.site/bun.lock'),
     read('patches/minimatch@3.1.5.patch'),
     read('docs/.site/patches/minimatch@3.1.5.patch'),
     readYaml('.github/workflows/typecheck.yml'),
     readYaml('.github/workflows/docs.yml'),
+    read('docs/.site/next.config.mjs'),
+    read('docs/quality/ci.md'),
+    read('docs/quality/ci.zh.md'),
   ]);
   assert.equal(docsPackage.devDependencies.next, '16.2.11');
   assert.deepEqual(docsPackage.overrides, {
@@ -112,6 +115,14 @@ test('independent docs dependencies are audited and pinned to compatible fixes',
   assert.equal(docsPackage.patchedDependencies['minimatch@3.1.5'], 'patches/minimatch@3.1.5.patch');
   assert.equal(docsPackage.scripts['docs:audit'], 'bun audit');
   assert.equal(docsPatch, rootPatch);
+  assert.match(nextConfig, /output: "export"/);
+  assert.match(nextConfig, /unoptimized: true/);
+  for (const document of [english, chinese]) {
+    assert.match(document, /Sharp.*0\.35\.3/is);
+    assert.match(document, /static export|静态导出/is);
+    assert.match(document, /outside.*(?:declared|range)|声明范围之外/is);
+    assert.match(document, /dynamic.*server|动态.*server/is);
+  }
 
   const expectedVersions = {
     ajv: ['8.18.0'],

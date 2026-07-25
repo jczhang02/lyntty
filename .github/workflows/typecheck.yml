@@ -87,7 +87,40 @@ jobs:
           LYNTTY_CI_EVENT_NAME: ${{ github.event_name }}
           LYNTTY_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           LYNTTY_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bun scripts/ci-changed-paths.ts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$LYNTTY_CI_EVENT_NAME" != "pull_request" ]]; then
+            printf 'run_full=true\nreason=non-pr-event\n' >> "$GITHUB_OUTPUT"
+          elif [[ ! "$LYNTTY_CI_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            printf 'run_full=true\nreason=invalid-sha\n' >> "$GITHUB_OUTPUT"
+          else
+            trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
+            classifier_output=".git/lyntty-ci-changed-paths.base.output"
+            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
+              : > "$classifier_output"
+              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+                  const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
+                  if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
+                  let text;
+                  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); } catch { process.exit(1); }
+                  const lines = text.split("\n");
+                  if (lines.length !== 3 || lines[2] !== "" || !/^run_full=(true|false)$/.test(lines[0]) || !/^reason=[a-z0-9-]+$/.test(lines[1])) process.exit(1);
+                  if ((lines[0] === "run_full=false") !== (lines[1] === "reason=docs-only")) process.exit(1);
+                '; then
+                  cat "$classifier_output" >> "$GITHUB_OUTPUT"
+                else
+                  printf 'run_full=true\nreason=trusted-classifier-invalid\n' >> "$GITHUB_OUTPUT"
+                fi
+              else
+                printf 'run_full=true\nreason=trusted-classifier-failed\n' >> "$GITHUB_OUTPUT"
+              fi
+            else
+              printf 'run_full=true\nreason=trusted-classifier-unavailable\n' >> "$GITHUB_OUTPUT"
+            fi
+          fi
       - name: Install dependencies
         if: steps.scope.outputs.run_full == 'true'
         run: bun install --frozen-lockfile
@@ -117,7 +150,40 @@ jobs:
           LYNTTY_CI_EVENT_NAME: ${{ github.event_name }}
           LYNTTY_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           LYNTTY_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bun scripts/ci-changed-paths.ts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$LYNTTY_CI_EVENT_NAME" != "pull_request" ]]; then
+            printf 'run_full=true\nreason=non-pr-event\n' >> "$GITHUB_OUTPUT"
+          elif [[ ! "$LYNTTY_CI_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            printf 'run_full=true\nreason=invalid-sha\n' >> "$GITHUB_OUTPUT"
+          else
+            trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
+            classifier_output=".git/lyntty-ci-changed-paths.base.output"
+            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
+              : > "$classifier_output"
+              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+                  const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
+                  if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
+                  let text;
+                  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); } catch { process.exit(1); }
+                  const lines = text.split("\n");
+                  if (lines.length !== 3 || lines[2] !== "" || !/^run_full=(true|false)$/.test(lines[0]) || !/^reason=[a-z0-9-]+$/.test(lines[1])) process.exit(1);
+                  if ((lines[0] === "run_full=false") !== (lines[1] === "reason=docs-only")) process.exit(1);
+                '; then
+                  cat "$classifier_output" >> "$GITHUB_OUTPUT"
+                else
+                  printf 'run_full=true\nreason=trusted-classifier-invalid\n' >> "$GITHUB_OUTPUT"
+                fi
+              else
+                printf 'run_full=true\nreason=trusted-classifier-failed\n' >> "$GITHUB_OUTPUT"
+              fi
+            else
+              printf 'run_full=true\nreason=trusted-classifier-unavailable\n' >> "$GITHUB_OUTPUT"
+            fi
+          fi
       - name: Install dependencies
         if: steps.scope.outputs.run_full == 'true'
         run: bun install --frozen-lockfile
@@ -147,7 +213,40 @@ jobs:
           LYNTTY_CI_EVENT_NAME: ${{ github.event_name }}
           LYNTTY_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           LYNTTY_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bun scripts/ci-changed-paths.ts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$LYNTTY_CI_EVENT_NAME" != "pull_request" ]]; then
+            printf 'run_full=true\nreason=non-pr-event\n' >> "$GITHUB_OUTPUT"
+          elif [[ ! "$LYNTTY_CI_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            printf 'run_full=true\nreason=invalid-sha\n' >> "$GITHUB_OUTPUT"
+          else
+            trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
+            classifier_output=".git/lyntty-ci-changed-paths.base.output"
+            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
+              : > "$classifier_output"
+              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+                  const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
+                  if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
+                  let text;
+                  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); } catch { process.exit(1); }
+                  const lines = text.split("\n");
+                  if (lines.length !== 3 || lines[2] !== "" || !/^run_full=(true|false)$/.test(lines[0]) || !/^reason=[a-z0-9-]+$/.test(lines[1])) process.exit(1);
+                  if ((lines[0] === "run_full=false") !== (lines[1] === "reason=docs-only")) process.exit(1);
+                '; then
+                  cat "$classifier_output" >> "$GITHUB_OUTPUT"
+                else
+                  printf 'run_full=true\nreason=trusted-classifier-invalid\n' >> "$GITHUB_OUTPUT"
+                fi
+              else
+                printf 'run_full=true\nreason=trusted-classifier-failed\n' >> "$GITHUB_OUTPUT"
+              fi
+            else
+              printf 'run_full=true\nreason=trusted-classifier-unavailable\n' >> "$GITHUB_OUTPUT"
+            fi
+          fi
       - name: Install dependencies
         if: steps.scope.outputs.run_full == 'true'
         run: bun install --frozen-lockfile
@@ -174,7 +273,40 @@ jobs:
           LYNTTY_CI_EVENT_NAME: ${{ github.event_name }}
           LYNTTY_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           LYNTTY_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bun scripts/ci-changed-paths.ts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$LYNTTY_CI_EVENT_NAME" != "pull_request" ]]; then
+            printf 'run_full=true\nreason=non-pr-event\n' >> "$GITHUB_OUTPUT"
+          elif [[ ! "$LYNTTY_CI_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            printf 'run_full=true\nreason=invalid-sha\n' >> "$GITHUB_OUTPUT"
+          else
+            trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
+            classifier_output=".git/lyntty-ci-changed-paths.base.output"
+            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
+              : > "$classifier_output"
+              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+                  const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
+                  if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
+                  let text;
+                  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); } catch { process.exit(1); }
+                  const lines = text.split("\n");
+                  if (lines.length !== 3 || lines[2] !== "" || !/^run_full=(true|false)$/.test(lines[0]) || !/^reason=[a-z0-9-]+$/.test(lines[1])) process.exit(1);
+                  if ((lines[0] === "run_full=false") !== (lines[1] === "reason=docs-only")) process.exit(1);
+                '; then
+                  cat "$classifier_output" >> "$GITHUB_OUTPUT"
+                else
+                  printf 'run_full=true\nreason=trusted-classifier-invalid\n' >> "$GITHUB_OUTPUT"
+                fi
+              else
+                printf 'run_full=true\nreason=trusted-classifier-failed\n' >> "$GITHUB_OUTPUT"
+              fi
+            else
+              printf 'run_full=true\nreason=trusted-classifier-unavailable\n' >> "$GITHUB_OUTPUT"
+            fi
+          fi
       - name: Install dependencies
         if: steps.scope.outputs.run_full == 'true'
         run: bun install --frozen-lockfile
@@ -205,7 +337,40 @@ jobs:
           LYNTTY_CI_EVENT_NAME: ${{ github.event_name }}
           LYNTTY_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           LYNTTY_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bun scripts/ci-changed-paths.ts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$LYNTTY_CI_EVENT_NAME" != "pull_request" ]]; then
+            printf 'run_full=true\nreason=non-pr-event\n' >> "$GITHUB_OUTPUT"
+          elif [[ ! "$LYNTTY_CI_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            printf 'run_full=true\nreason=invalid-sha\n' >> "$GITHUB_OUTPUT"
+          else
+            trusted_classifier=".git/lyntty-ci-changed-paths.base.ts"
+            classifier_output=".git/lyntty-ci-changed-paths.base.output"
+            trap 'rm -f "$trusted_classifier" "$classifier_output"' EXIT
+            if git show "$LYNTTY_CI_BASE_SHA:scripts/ci-changed-paths.ts" > "$trusted_classifier" 2>/dev/null; then
+              : > "$classifier_output"
+              if GITHUB_OUTPUT="$classifier_output" bun "$trusted_classifier"; then
+                if CLASSIFIER_OUTPUT="$classifier_output" bun -e '
+                  const bytes = new Uint8Array(await Bun.file(process.env.CLASSIFIER_OUTPUT).arrayBuffer());
+                  if (bytes.some((byte) => byte > 0x7f)) process.exit(1);
+                  let text;
+                  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); } catch { process.exit(1); }
+                  const lines = text.split("\n");
+                  if (lines.length !== 3 || lines[2] !== "" || !/^run_full=(true|false)$/.test(lines[0]) || !/^reason=[a-z0-9-]+$/.test(lines[1])) process.exit(1);
+                  if ((lines[0] === "run_full=false") !== (lines[1] === "reason=docs-only")) process.exit(1);
+                '; then
+                  cat "$classifier_output" >> "$GITHUB_OUTPUT"
+                else
+                  printf 'run_full=true\nreason=trusted-classifier-invalid\n' >> "$GITHUB_OUTPUT"
+                fi
+              else
+                printf 'run_full=true\nreason=trusted-classifier-failed\n' >> "$GITHUB_OUTPUT"
+              fi
+            else
+              printf 'run_full=true\nreason=trusted-classifier-unavailable\n' >> "$GITHUB_OUTPUT"
+            fi
+          fi
       - name: Install flock on macOS
         if: steps.scope.outputs.run_full == 'true' && runner.os == 'macOS'
         run: brew install flock

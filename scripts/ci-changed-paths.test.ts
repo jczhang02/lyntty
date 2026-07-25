@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 
 import {
@@ -17,6 +19,7 @@ type WorkflowStep = {
   with?: Record<string, string | number>;
   env?: Record<string, string>;
   run?: string;
+  shell?: string;
 };
 
 type WorkflowJob = {
@@ -202,6 +205,152 @@ describe('docs-only CI change classifier', () => {
   });
 });
 
+test('workflow executes only the classifier stored in the PR base commit', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'lyntty-trusted-ci-scope-'));
+  const run = (args: string[]) => {
+    const child = Bun.spawnSync(args, {
+      cwd: directory,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    assert.equal(
+      child.exitCode,
+      0,
+      `${args.join(' ')} failed: ${child.stderr.toString('utf8')}`,
+    );
+    return child.stdout.toString('utf8').trim();
+  };
+
+  try {
+    run(['git', 'init', '-q']);
+    run(['git', 'config', 'user.name', 'CI Scope Test']);
+    run(['git', 'config', 'user.email', 'ci-scope@example.invalid']);
+    await writeFile(join(directory, 'README.md'), '# Lyntty\n', 'utf8');
+    run(['git', 'add', 'README.md']);
+    run(['git', 'commit', '-qm', 'base without classifier']);
+    const baseWithoutClassifier = run(['git', 'rev-parse', 'HEAD']);
+
+    await mkdir(join(directory, 'scripts'));
+    await writeFile(
+      join(directory, 'scripts/ci-changed-paths.ts'),
+      await read('scripts/ci-changed-paths.ts'),
+      'utf8',
+    );
+    run(['git', 'add', 'scripts/ci-changed-paths.ts']);
+    run(['git', 'commit', '-qm', 'add trusted classifier']);
+    const trustedBase = run(['git', 'rev-parse', 'HEAD']);
+    const trustedBranch = run(['git', 'branch', '--show-current']);
+
+    await writeFile(join(directory, 'README.md'), '# Lyntty\n\nDocs update.\n', 'utf8');
+    run(['git', 'commit', '-qam', 'docs only']);
+    const docsHead = run(['git', 'rev-parse', 'HEAD']);
+
+    const workflow = await readYaml('.github/workflows/typecheck.yml');
+    const scopeScript = workflow.jobs.wire.steps.find((step) => step.id === 'scope')?.run;
+    assert.ok(scopeScript);
+    const scriptPath = join(directory, 'run-scope.sh');
+    await writeFile(scriptPath, scopeScript, 'utf8');
+
+    const classify = async (baseSha: string, headSha: string) => {
+      const outputPath = join(directory, `scope-${headSha}.output`);
+      await writeFile(outputPath, '', 'utf8');
+      const child = Bun.spawnSync(['bash', scriptPath], {
+        cwd: directory,
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: outputPath,
+          LYNTTY_CI_EVENT_NAME: 'pull_request',
+          LYNTTY_CI_BASE_SHA: baseSha,
+          LYNTTY_CI_HEAD_SHA: headSha,
+        },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      assert.equal(child.exitCode, 0, child.stderr.toString('utf8'));
+      return Object.fromEntries(
+        (await readFile(outputPath, 'utf8')).trim().split('\n').map((line) => line.split('=', 2)),
+      );
+    };
+
+    assert.deepEqual(await classify(baseWithoutClassifier, trustedBase), {
+      run_full: 'true',
+      reason: 'trusted-classifier-unavailable',
+    });
+    assert.deepEqual(await classify(trustedBase, docsHead), {
+      run_full: 'false',
+      reason: 'docs-only',
+    });
+
+    run(['git', 'switch', '-qc', 'invalid-classifier', baseWithoutClassifier]);
+    await mkdir(join(directory, 'scripts'));
+    await writeFile(join(directory, 'scripts/ci-changed-paths.ts'), '', 'utf8');
+    run(['git', 'add', 'scripts/ci-changed-paths.ts']);
+    run(['git', 'commit', '-qm', 'add empty classifier']);
+    const invalidBase = run(['git', 'rev-parse', 'HEAD']);
+    await writeFile(join(directory, 'README.md'), '# Lyntty\n\nInvalid classifier test.\n', 'utf8');
+    run(['git', 'commit', '-qam', 'docs with empty classifier']);
+    const invalidHead = run(['git', 'rev-parse', 'HEAD']);
+    assert.deepEqual(await classify(invalidBase, invalidHead), {
+      run_full: 'true',
+      reason: 'trusted-classifier-invalid',
+    });
+
+    run(['git', 'switch', '-qc', 'nul-classifier', baseWithoutClassifier]);
+    await mkdir(join(directory, 'scripts'));
+    await writeFile(
+      join(directory, 'scripts/ci-changed-paths.ts'),
+      'await Bun.write(process.env.GITHUB_OUTPUT!, Buffer.from("run_full=false\\0\\nreason=docs-only\\n"));\n',
+      'utf8',
+    );
+    run(['git', 'add', 'scripts/ci-changed-paths.ts']);
+    run(['git', 'commit', '-qm', 'add NUL-output classifier']);
+    const nulBase = run(['git', 'rev-parse', 'HEAD']);
+    await writeFile(join(directory, 'README.md'), '# Lyntty\n\nNUL classifier test.\n', 'utf8');
+    run(['git', 'commit', '-qam', 'docs with NUL classifier']);
+    const nulHead = run(['git', 'rev-parse', 'HEAD']);
+    assert.deepEqual(await classify(nulBase, nulHead), {
+      run_full: 'true',
+      reason: 'trusted-classifier-invalid',
+    });
+
+    run(['git', 'switch', '-qc', 'bom-classifier', baseWithoutClassifier]);
+    await mkdir(join(directory, 'scripts'));
+    await writeFile(
+      join(directory, 'scripts/ci-changed-paths.ts'),
+      'const body = Buffer.from("run_full=false\\nreason=docs-only\\n"); await Bun.write(process.env.GITHUB_OUTPUT!, new Uint8Array([0xef, 0xbb, 0xbf, ...body]));\n',
+      'utf8',
+    );
+    run(['git', 'add', 'scripts/ci-changed-paths.ts']);
+    run(['git', 'commit', '-qm', 'add BOM-output classifier']);
+    const bomBase = run(['git', 'rev-parse', 'HEAD']);
+    await writeFile(join(directory, 'README.md'), '# Lyntty\n\nBOM classifier test.\n', 'utf8');
+    run(['git', 'commit', '-qam', 'docs with BOM classifier']);
+    const bomHead = run(['git', 'rev-parse', 'HEAD']);
+    assert.deepEqual(await classify(bomBase, bomHead), {
+      run_full: 'true',
+      reason: 'trusted-classifier-invalid',
+    });
+
+    run(['git', 'switch', '-q', trustedBranch]);
+    await mkdir(join(directory, 'packages/example'), { recursive: true });
+    await writeFile(join(directory, 'packages/example/index.ts'), 'export {};\n', 'utf8');
+    await writeFile(
+      join(directory, 'scripts/ci-changed-paths.ts'),
+      'await Bun.write(process.env.GITHUB_OUTPUT!, "run_full=false\\nreason=docs-only\\n");\n',
+      'utf8',
+    );
+    run(['git', 'add', 'packages/example/index.ts', 'scripts/ci-changed-paths.ts']);
+    run(['git', 'commit', '-qm', 'attempt classifier bypass']);
+    const maliciousHead = run(['git', 'rev-parse', 'HEAD']);
+    assert.deepEqual(await classify(trustedBase, maliciousHead), {
+      run_full: 'true',
+      reason: 'full-path',
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test('all twelve required contexts materialize before step-level short-circuiting', async () => {
   const [typecheck, cliSmoke, packageJson, codeowners, english, chinese] = await Promise.all([
     readYaml('.github/workflows/typecheck.yml'),
@@ -278,7 +427,17 @@ test('all twelve required contexts materialize before step-level short-circuitin
       LYNTTY_CI_BASE_SHA: '${{ github.event.pull_request.base.sha }}',
       LYNTTY_CI_HEAD_SHA: '${{ github.event.pull_request.head.sha }}',
     });
-    assert.equal(scope.run, 'bun scripts/ci-changed-paths.ts');
+    assert.equal(scope.shell, 'bash');
+    assert.match(scope.run ?? '', /git show "\$LYNTTY_CI_BASE_SHA:scripts\/ci-changed-paths\.ts"/);
+    assert.match(scope.run ?? '', /reason=trusted-classifier-unavailable/);
+    assert.match(scope.run ?? '', /reason=trusted-classifier-invalid/);
+    assert.match(scope.run ?? '', /GITHUB_OUTPUT="\$classifier_output" bun "\$trusted_classifier"/);
+    assert.match(scope.run ?? '', /TextDecoder\("utf-8", \{ fatal: true, ignoreBOM: true \}\)/);
+    assert.match(scope.run ?? '', /byte > 0x7f/);
+    assert.match(scope.run ?? '', /\^run_full=\(true\|false\)\$/);
+    assert.match(scope.run ?? '', /run_full=false.*reason=docs-only/is);
+    assert.doesNotMatch(scope.run ?? '', /sed -n|\$\(cat/);
+    assert.doesNotMatch(scope.run ?? '', /bun scripts\/ci-changed-paths\.ts/);
     const scopeIndex = job.steps.indexOf(scope);
     assert.equal(scopeIndex > job.steps.indexOf(checkout), true);
     for (const step of job.steps.slice(scopeIndex + 1)) {
@@ -294,5 +453,7 @@ test('all twelve required contexts materialize before step-level short-circuitin
     assert.match(document, /12|十二/);
     assert.match(document, /step-level|步骤级/i);
     assert.match(document, /fail-open|完整门禁/i);
+    assert.match(document, /base commit|PR base/i);
+    assert.match(document, /never.*worktree|不.*工作树/is);
   }
 });

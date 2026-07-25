@@ -23,7 +23,7 @@ bun run --cwd docs/.site docs:build
 
 每个 PR 仍会生成全部十二个 required context。两个 required workflow 都不使用 trigger-level `paths` 过滤，package 和 matrix job 也没有 job-level 条件。`Repo hygiene` 永不短路，始终执行 root/docs install、lifecycle trust、仓库契约、docs audit/check/build 和 whitespace gate。
 
-其他 required job 在 checkout 与 Bun setup 后运行同一个纯本地分类器。只有显式当前指南 allowlist 或 `docs/assets/` 图片格式中普通文件的新增和修改才算 docs-only。代码、workflow、lockfile、package、patch、security、release、deploy、evidence、architecture 及任何未列出路径都会进入完整门禁。空 diff、无效 SHA、Git 错误、删除、重命名、类型变化、push 和手动运行同样 fail-open 到完整门禁。
+其他 required job 在 checkout 与 Bun setup 后，从精确 PR base commit 提取分类器，绝不执行 PR 工作树中的 classifier。可信 classifier 缺失、无效或执行失败时都会回到完整门禁；因此首次引入 classifier 的 PR 会跑完整门禁，后续 PR 才使用 base 中已审核的版本。只有显式当前指南 allowlist 或 `docs/assets/` 图片格式中普通文件的新增和修改才算 docs-only。代码、workflow、lockfile、package、patch、security、release、deploy、evidence、architecture 及任何未列出路径都会进入完整门禁。空 diff、无效 SHA、Git 错误、删除、重命名、类型变化、push 和手动运行同样 fail-open 到完整门禁。
 
 分类器确认 docs-only 后，package 与 artifact matrix job 仍会出现并成功结束，只在步骤级（step-level）跳过与变更无关的 install、build、package test、daemon integration、lifecycle exercise 和五架构 artifact smoke。这样既保留 branch protection 的 context 身份，也减少无效开销。
 
@@ -32,6 +32,8 @@ bun run --cwd docs/.site docs:build
 Dependabot 每周检查三个有限目标：根目录 Bun 依赖、独立 docs Bun lockfile，以及 SHA-pinned GitHub Actions。每个目标单独合并 minor/patch update，更新时间错开，允许打开的 version-update PR 不超过三个。Dependabot 不会自动合并；CODEOWNERS 会把这些文件路由给 owner，所有合并仍受普通 required checks 约束。
 
 `.github/workflows/codeql.yml` 在 PR、main push、每周 schedule 和手动 dispatch 上运行 SHA-pinned CodeQL JavaScript/TypeScript baseline。它使用 `build-mode: none`，不会替代 package test。在第一次外部运行完成 triage 和人工分流前，该 context 保持非 required；是否加入 main ruleset 需要后续单独决定。
+
+独立 docs lock 精确 override Sharp `0.35.3`，但 Next `16.2.11` 声明的是 `sharp: ^0.34.5`。这个版本在 Next 的声明范围之外，不代表通用兼容。Lyntty Docs 只在已经验证的 `output: "export"`、`images.unoptimized` 静态导出中接受该 workaround，并在每个 PR 重建全部 44 条 route；动态 Next server 不得复用这组版本。等 stable Next 原生支持无漏洞 Sharp 后，应删除 override。
 
 ## 本地命令
 

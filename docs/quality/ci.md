@@ -32,7 +32,7 @@ The separately required CLI artifact-smoke workflow runs all five supported targ
 
 All 12 required context names still materialize on every pull request. Neither required workflow uses trigger-level `paths` filters, and no package or matrix job has a job-level condition. `Repo hygiene` always performs its complete root/docs installs, lifecycle checks, repository contracts, docs audit/check/build, and whitespace gate.
 
-The remaining required jobs run the same local classifier after checkout and Bun setup. Only additions or modifications to regular files in the explicit current-guide allowlist or `docs/assets/` image formats are docs-only. A code, workflow, lockfile, package, patch, security, release, deploy, evidence, architecture, or other unlisted path triggers the full gate. Empty diffs, invalid SHAs, Git errors, deletions, renames, type changes, pushes, and manual runs also fail-open to the full gate.
+The remaining required jobs extract the classifier from the exact PR base commit after checkout and Bun setup; they never execute the PR worktree's classifier. A missing, invalid, or failing trusted classifier falls back to the full gate. The first PR that introduces the classifier therefore runs fully, while later PRs can use the base-reviewed version. Only additions or modifications to regular files in the explicit current-guide allowlist or `docs/assets/` image formats are docs-only. A code, workflow, lockfile, package, patch, security, release, deploy, evidence, architecture, or other unlisted path triggers the full gate. Empty diffs, invalid SHAs, Git errors, deletions, renames, type changes, pushes, and manual runs also fail-open to the full gate.
 
 For a verified docs-only pull request, package and artifact matrix jobs stay present and successful but skip expensive work at step-level. This preserves branch-protection identity while avoiding installs, builds, package tests, daemon integration, lifecycle exercises, and five-architecture artifact smoke that cannot validate the changed files.
 
@@ -41,6 +41,8 @@ For a verified docs-only pull request, package and artifact matrix jobs stay pre
 Dependabot checks three bounded targets each week: root Bun dependencies, the independent docs Bun lockfile, and SHA-pinned GitHub Actions. Minor and patch updates are grouped per target, maintenance windows are staggered, and each target allows at most three open version-update PRs. Dependabot does not auto-merge. CODEOWNERS routes these files to the owner, while every merge remains subject to the normal required checks.
 
 `.github/workflows/codeql.yml` runs a SHA-pinned CodeQL JavaScript/TypeScript baseline on PRs, main pushes, a weekly schedule, and manual dispatch. It uses `build-mode: none`, does not replace package tests, and is non-required until the first external run is triaged. Any alerts need source-level review before the owner considers adding the CodeQL context to the main ruleset.
+
+The independent docs lock uses an exact Sharp `0.35.3` security override even though Next `16.2.11` declares `sharp: ^0.34.5`. This is outside Next's declared dependency range and is not a general compatibility claim. Lyntty Docs accepts the workaround only for its verified `output: "export"`, `images.unoptimized` static export; every PR rebuilds all 44 routes. Do not reuse this pair for a dynamic Next server. Remove the override when a stable Next release natively supports a non-vulnerable Sharp version.
 
 ## Manual / release tiers
 
