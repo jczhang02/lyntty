@@ -21,6 +21,7 @@ describe('applyPiHistoryPageResult', () => {
             runtimeOwner: 'pi-extension',
             controlState: 'history_gap',
             piHasHistoryGap: true,
+            piHistoryGapSource: 'history_page',
             piRecoveryReason: 'cursor missing',
             piHistoryCursor: undefined,
             piHistoryHasMore: false,

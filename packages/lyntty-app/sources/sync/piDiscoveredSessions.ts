@@ -80,6 +80,7 @@ function buildPiMetadata(
         piFirstMessage: record.firstMessage,
         piRecoveryReason: record.reason,
         piHasHistoryGap: record.hasHistoryGap,
+        piHistoryGapSource: record.hasHistoryGap ? 'discovery' : undefined,
         ...(synthetic ? {
             piHistoryHasMore: (record.messageCount ?? 0) > 0,
             piHistoryTotalMessages: record.messageCount,
@@ -96,31 +97,49 @@ export function enrichSessionWithPiDiscovery(
     session: Omit<Session, 'presence'> & { presence?: Session['presence'] },
     record: PiMachineSessionRecord,
     machine: Machine,
+    preserveNewerRelayState = false,
 ): Omit<Session, 'presence'> & { presence?: Session['presence'] } {
     const discoveredMetadata = buildPiMetadata(record, machine, false);
     const active = record.state === 'active_runtime';
-    const hasPersistedHistoryGap = session.metadata?.piHasHistoryGap === true
-        || session.metadata?.controlState === 'history_gap';
-    const updatedAt = Math.max(session.updatedAt, resolvePiActivityTimestamp(record, session.updatedAt));
+    const hasPersistedHistoryGap = (session.metadata?.piHasHistoryGap === true
+        || session.metadata?.controlState === 'history_gap')
+        && session.metadata?.piHistoryGapSource !== 'discovery';
+    const hasHistoryGap = hasPersistedHistoryGap || discoveredMetadata.piHasHistoryGap === true;
+    const updatedAt = preserveNewerRelayState
+        ? session.updatedAt
+        : Math.max(session.updatedAt, resolvePiActivityTimestamp(record, session.updatedAt));
+    const mergedMetadata = {
+        ...(session.metadata ?? {}),
+        ...discoveredMetadata,
+        path: session.metadata?.path ?? discoveredMetadata.path,
+        homeDir: session.metadata?.homeDir ?? discoveredMetadata.homeDir,
+        lynttyHomeDir: session.metadata?.lynttyHomeDir ?? discoveredMetadata.lynttyHomeDir,
+        summary: session.metadata?.summary,
+        piHasHistoryGap: hasHistoryGap,
+        piHistoryGapSource: hasPersistedHistoryGap
+            ? session.metadata?.piHistoryGapSource
+            : discoveredMetadata.piHistoryGapSource,
+        piRecoveryReason: hasPersistedHistoryGap
+            ? session.metadata?.piRecoveryReason
+            : discoveredMetadata.piRecoveryReason,
+        controlState: hasHistoryGap ? 'history_gap' : discoveredMetadata.controlState,
+    };
+    if (preserveNewerRelayState) {
+        mergedMetadata.name = session.metadata?.name ?? mergedMetadata.name;
+        mergedMetadata.lifecycleState = session.metadata?.lifecycleState ?? mergedMetadata.lifecycleState;
+        mergedMetadata.lifecycleStateSince = session.metadata?.lifecycleStateSince ?? mergedMetadata.lifecycleStateSince;
+        mergedMetadata.runtimeOwner = session.metadata?.runtimeOwner ?? mergedMetadata.runtimeOwner;
+        mergedMetadata.controlState = session.metadata?.controlState === 'history_gap' && !hasPersistedHistoryGap
+            ? discoveredMetadata.controlState
+            : session.metadata?.controlState ?? mergedMetadata.controlState;
+    }
     return {
         ...session,
         updatedAt,
-        active: active ? true : session.active,
-        activeAt: active ? updatedAt : session.activeAt,
-        presence: active ? 'online' : session.presence,
-        metadata: {
-            ...(session.metadata ?? {}),
-            ...discoveredMetadata,
-            path: session.metadata?.path ?? discoveredMetadata.path,
-            homeDir: session.metadata?.homeDir ?? discoveredMetadata.homeDir,
-            lynttyHomeDir: session.metadata?.lynttyHomeDir ?? discoveredMetadata.lynttyHomeDir,
-            summary: session.metadata?.summary,
-            piHasHistoryGap: hasPersistedHistoryGap || discoveredMetadata.piHasHistoryGap,
-            piRecoveryReason: hasPersistedHistoryGap
-                ? session.metadata?.piRecoveryReason
-                : discoveredMetadata.piRecoveryReason,
-            controlState: hasPersistedHistoryGap ? 'history_gap' : discoveredMetadata.controlState,
-        },
+        active: preserveNewerRelayState ? session.active : active ? true : session.active,
+        activeAt: preserveNewerRelayState ? session.activeAt : active ? updatedAt : session.activeAt,
+        presence: preserveNewerRelayState ? session.presence : active ? 'online' : session.presence,
+        metadata: mergedMetadata,
     };
 }
 
@@ -153,6 +172,11 @@ export function createSyntheticPiSession(
 export function mergePiDiscoveredSessions(
     relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
     machineSessions: Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }>,
+    options: {
+        hiddenRelaySessionIds?: ReadonlySet<string>;
+        hiddenPiSessionKeys?: ReadonlySet<string>;
+        relaySeqAtDiscovery?: ReadonlyMap<string, number>;
+    } = {},
 ): Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }> {
     const merged = relaySessions.filter(shouldShowRelaySession);
     const byRelayId = new Map(merged.map((session, index) => [session.id, index]));
@@ -172,12 +196,23 @@ export function mergePiDiscoveredSessions(
                 continue;
             }
 
+            const piSessionKey = `${machine.id}:${record.piSessionId}`;
             const existingIndex = record.relaySessionId
-                ? byRelayId.get(record.relaySessionId)
-                : byPiId.get(`${machine.id}:${record.piSessionId}`);
+                ? byRelayId.get(record.relaySessionId) ?? byPiId.get(piSessionKey)
+                : byPiId.get(piSessionKey);
+            if (existingIndex === undefined
+                && ((record.relaySessionId && options.hiddenRelaySessionIds?.has(record.relaySessionId))
+                    || options.hiddenPiSessionKeys?.has(piSessionKey))) continue;
 
             if (existingIndex !== undefined) {
-                merged[existingIndex] = enrichSessionWithPiDiscovery(merged[existingIndex], record, machine);
+                const existing = merged[existingIndex];
+                const baselineSeq = options.relaySeqAtDiscovery?.get(piSessionKey);
+                merged[existingIndex] = enrichSessionWithPiDiscovery(
+                    existing,
+                    record,
+                    machine,
+                    baselineSeq !== undefined && existing.seq > baselineSeq,
+                );
                 continue;
             }
 

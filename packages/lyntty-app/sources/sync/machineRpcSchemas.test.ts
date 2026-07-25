@@ -30,7 +30,8 @@ describe('machine RPC response validation', () => {
             type: 'success',
             sessions: [completePiRecord],
             total: 1,
-        })).toMatchObject({ type: 'success', sessions: [completePiRecord] });
+            refreshing: true,
+        })).toMatchObject({ type: 'success', sessions: [completePiRecord], refreshing: true });
         expect(parseMachineRpcResult('worktree-list', worktreeListResultSchema)({
             success: true,
             worktrees: [{ path: '/repo/.dev/worktree/a', branch: 'a' }],
