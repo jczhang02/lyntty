@@ -8,6 +8,7 @@ This file is the shared repository contract for every coding agent. `CLAUDE.md` 
 - Before editing under `packages/` or `docs/`, read the nearest nested `AGENTS.md`; it adds path-specific deltas to this root contract.
 - A nested guide must not weaken root safety, permission, Git, product, release, or verification requirements. When guidance conflicts, stop and report the conflict instead of selecting the easier rule.
 - Keep shared rules here and local implementation details in the nearest nested guide. Do not copy a frozen root policy into package guides.
+- Public-fork exception: external fork contributors, including coding agents operating only in a contributor-owned fork, are exempt from maintainer-only Beads, mandatory worktrees, durable local-commit requirements, and owner OpenPGP/GPG signing. `CONTRIBUTING.md` governs that workflow. Product, safety, permission, isolation, secret-handling, and claim-verification rules still apply; the full maintainer policy resumes in a maintainer checkout or shared repository operation.
 
 ## Project identity
 

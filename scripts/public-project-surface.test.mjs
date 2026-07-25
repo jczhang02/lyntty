@@ -16,6 +16,7 @@ const paths = {
   bugForm: new URL('../.github/ISSUE_TEMPLATE/bug.yml', import.meta.url),
   featureForm: new URL('../.github/ISSUE_TEMPLATE/feature.yml', import.meta.url),
   securityContactForm: new URL('../.github/ISSUE_TEMPLATE/security-contact.yml', import.meta.url),
+  agents: new URL('../AGENTS.md', import.meta.url),
 };
 
 const PRIVATE_REPORT_URL = 'https://github.com/jczhang02/lyntty/security/advisories/new';
@@ -70,11 +71,12 @@ test('security policy provides one private, redaction-safe reporting path', asyn
 });
 
 test('contributing guides expose the supported repository workflow', async () => {
-  const [contributing, contributingZh, readme, pullRequestTemplate] = await Promise.all([
+  const [contributing, contributingZh, readme, pullRequestTemplate, agents] = await Promise.all([
     read(paths.contributing),
     read(paths.contributingZh),
     read(paths.readme),
     read(paths.pullRequestTemplate),
+    read(paths.agents),
   ]);
 
   for (const document of [contributing, contributingZh]) {
@@ -97,6 +99,8 @@ test('contributing guides expose the supported repository workflow', async () =>
   assert.match(contributing, /\[简体中文\]\(\.\/CONTRIBUTING\.zh\.md\)/);
   assert.match(contributingZh, /\[English\]\(\.\/CONTRIBUTING\.md\)/);
   assert.match(readme, /CONTRIBUTING\.md/);
+  assert.match(agents, /external fork.*(?:exempt|optional)/is);
+  assert.match(agents, /Beads.*worktree.*(?:OpenPGP|GPG)/is);
   assert.match(
     pullRequestTemplate,
     /https:\/\/github\.com\/jczhang02\/lyntty\/blob\/main\/SECURITY\.md/,
@@ -111,7 +115,7 @@ test('public security and contribution contracts stay in repository hardening ow
 
   assert.match(codeowners, /^\/SECURITY\*\.md @jczhang02$/m);
   assert.match(codeowners, /^\/CONTRIBUTING\*\.md @jczhang02$/m);
-  assert.match(codeowners, /^\/PRIVACY\.md @jczhang02$/m);
+  assert.match(codeowners, /^\/PRIVACY\*\.md @jczhang02$/m);
   assert.match(codeowners, /^\/\.github\/ISSUE_TEMPLATE\/ @jczhang02$/m);
   assert.match(codeowners, /^\/\.github\/PULL_REQUEST_TEMPLATE\.md @jczhang02$/m);
   assert.match(packageJson.scripts['test:repo-hardening'], /public-project-surface\.test\.mjs/);

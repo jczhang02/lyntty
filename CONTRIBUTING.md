@@ -27,7 +27,7 @@ Push the completed branch to your fork before opening a pull request:
 git push -u origin fix/short-topic
 ```
 
-A separate worktree is optional for external contributors. Maintainers and coding agents use `worktrees/<topic>/` because the repository contract requires isolation for their workflow. Read the root and nearest nested `AGENTS.md` when using a coding agent or working within the maintainer process.
+A separate worktree is optional for external contributors. Maintainers use `worktrees/<topic>/` because their repository workflow requires isolation. When a coding agent works only in your fork, the root `AGENTS.md` explicitly keeps maintainer-only Beads, worktree, local-commit, and owner-signing rules optional; its product, safety, permission, isolation, secret-handling, and verification rules still apply.
 
 Beads are optional for external contributors. Maintainers use them for work that spans sessions or needs durable handoff context.
 

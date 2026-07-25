@@ -255,6 +255,49 @@ test('getting-started guides cover one safe owner-operated path', async () => {
   }
 });
 
+test('Stable bootstrap pins one complete first-install transaction', async () => {
+  const [readme, cli, cliZh] = await Promise.all([
+    read('README.md'),
+    read('docs/release/cli.md'),
+    read('docs/release/cli.zh.md'),
+  ]);
+  const quickStart = readme.slice(
+    readme.indexOf('### Use a Stable release'),
+    readme.indexOf('### Run locally'),
+  );
+  assert.match(quickStart, /hash-pinned installer/i);
+  assert.match(quickStart, /lyntty daemon status/);
+  assert.match(quickStart, /lyntty doctor/);
+  assert.doesNotMatch(
+    quickStart,
+    /lyntty auth login\s+lyntty daemon install\s+lyntty remote install/,
+  );
+
+  const pinnedValues = [
+    'compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1',
+    'e6db6345bc2c0c22a180ff86d93df67486dbad9e694699ba74a8f4738272e85f',
+    'def81e7ccffac1915c5b792674876f0c24fb4b8df648da0f3d39e75e117b0608',
+    'df231effa7b3047fb7acdd400cff49434494012b8e17767aee72f1d7049a8bca',
+    'd74fb3508fad79c0705349788da12e1ba7e417953cf46d9e8afb4260b00bf43e',
+    'f665417d53d259da143a42589a7efc1374e61aeff6c26367a6974719c08d658f',
+    '9702e4f9c5220c549763fd796da747d92ad04d36d6af794dd1b75947b7822df9',
+    '29d6e6fc56eb0d7017c709bcc2de5fb48aaa97505c8eeec32aec72dca03a0091',
+    'd0e5f254356870e45d8ed032e42989532e3308e03395adc5b37bbc309b3ce751',
+    'bfdaf396ed1c26ed6275811221a406a00c7fc87e1be72c913afac23968f2658d',
+    'a6288f3839cbc59afe8aed63efa5ed1b4b50c28ef29e685b9ca8bcb1f3c13c05',
+    '5b48ef1cd3cd830cb99b765bfe47159f185803a9d18eaa793aa6cd12db801731',
+    'd29eaa68f21f6c85c0c61b90302191ba1e46f90c6018f7f8f1f8060726b78443',
+  ];
+  for (const document of [cli, cliZh]) {
+    for (const value of pinnedValues) assert.match(document, new RegExp(value));
+    assert.match(document, /stable-release-trust-roots\.json/);
+    assert.match(document, /--target "\$target"/);
+    assert.match(document, /installer.*(?:authentication|认证).*daemon.*(?:extension|扩展)/is);
+    assert.doesNotMatch(document, /INSTALLER_SHA256_FROM|ARCHIVE_SHA256_FROM|MANIFEST_SHA256_FROM/);
+    assert.doesNotMatch(document, /curl[^\n|]*\|\s*(?:sh|bash)/i);
+  }
+});
+
 test('FAQ answers product, trust, and support questions without broadening claims', async () => {
   const [english, chinese] = await Promise.all([
     read('docs/faq.md'),

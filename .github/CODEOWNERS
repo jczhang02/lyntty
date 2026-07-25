@@ -6,7 +6,7 @@
 /.github/PULL_REQUEST_TEMPLATE.md @jczhang02
 /SECURITY*.md @jczhang02
 /CONTRIBUTING*.md @jczhang02
-/PRIVACY.md @jczhang02
+/PRIVACY*.md @jczhang02
 /.dockerignore @jczhang02
 /Dockerfile @jczhang02
 /package.json @jczhang02

@@ -27,7 +27,7 @@ git switch -c fix/short-topic
 git push -u origin fix/short-topic
 ```
 
-外部贡献者可以选择是否使用独立 worktree。维护者和 coding agent 使用 `worktrees/<topic>/`，因为仓库契约要求其工作流保持隔离。使用 coding agent 或参与维护者流程时，请阅读根及目标目录最近的 `AGENTS.md`。
+外部贡献者可以选择是否使用独立 worktree。维护者使用 `worktrees/<topic>/`，因为其仓库流程要求隔离。Coding agent 只在你的 fork 中工作时，根 `AGENTS.md` 已明确把维护者专用的 Beads、worktree、本地提交和 owner 签名规则设为可选；产品、安全、权限、隔离、秘密处理和验证规则仍然适用。
 
 外部贡献者不要求使用 Beads。维护者只在工作跨会话或需要持久交接上下文时使用 Beads。
 
