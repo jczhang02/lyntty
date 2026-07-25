@@ -1658,7 +1658,7 @@ test('required PR hygiene builds the complete docs site and watches every root s
   assert.deepEqual(docsInstall, {
     name: 'Install docs toolchain',
     'working-directory': 'docs/.site',
-    run: 'bun install --frozen-lockfile',
+    run: 'bun install --frozen-lockfile --ignore-scripts',
   });
   assert.equal(docsTrust['working-directory'], 'docs/.site');
   assert.match(docsTrust.run, /bun pm untrusted/);
@@ -1677,10 +1677,37 @@ test('required PR hygiene builds the complete docs site and watches every root s
   for (const sourceGlob of ['docs/**', 'CONTRIBUTING*.md', 'PRIVACY*.md', 'SECURITY*.md']) {
     assert.equal(deploymentPaths.includes(sourceGlob), true, `${sourceGlob} must trigger Pages deployment`);
   }
+  assert.deepEqual(docsWorkflowConfig.permissions, {});
+  assert.deepEqual(docsWorkflowConfig.jobs.build.permissions, { contents: 'read' });
+  assert.deepEqual(docsWorkflowConfig.jobs.deploy.permissions, {
+    pages: 'write',
+    'id-token': 'write',
+  });
+
+  for (const [jobName, job] of Object.entries(docsWorkflowConfig.jobs)) {
+    if (jobName === 'deploy') continue;
+    assert.notEqual(job.permissions?.pages, 'write');
+    assert.notEqual(job.permissions?.['id-token'], 'write');
+  }
+
   const deployBuildSteps = docsWorkflowConfig.jobs.build.steps;
+  const docsInstallSteps = deployBuildSteps.filter((step) => /^bun install(?:\s|$)/.test(step.run ?? ''));
+  assert.equal(docsInstallSteps.length, 1);
+  assert.equal(docsInstallSteps.every((step) => step.run.includes('--ignore-scripts')), true);
   assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:audit'), true);
   assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:check'), true);
   assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:build'), true);
+  assert.equal(deployBuildSteps.some((step) => `${step.uses ?? ''}`.startsWith('actions/configure-pages@')), false);
+
+  const deployJob = docsWorkflowConfig.jobs.deploy;
+  assert.equal(deployJob.needs, 'build');
+  assert.deepEqual(deployJob.steps, [
+    { uses: 'actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b' },
+    {
+      id: 'deployment',
+      uses: 'actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e',
+    },
+  ]);
 });
 
 test('supported CLI artifacts run on every release architecture in PR CI', () => {

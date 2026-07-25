@@ -44,7 +44,7 @@ jobs:
           bun test scripts/release.test.ts scripts/github-release.test.ts scripts/relay-oci-sbom.test.ts packages/lyntty-cli/scripts/build-artifact.test.ts
       - name: Install docs toolchain
         working-directory: docs/.site
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
       - name: Verify docs lifecycle-script trust
         working-directory: docs/.site
         run: |
