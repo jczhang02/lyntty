@@ -129,6 +129,14 @@ Additional checks:
 - `97a0dfd6350adb31c6337c169d270bfe8c3c9938` — isolated classifier runtime
 - `f125bd76097a2aa69d9086ae5082b60d2fb60b5f` — isolated Pages deployment permissions
 
+## Unapplied GitHub settings manifest
+
+`docs/evidence/artifacts/r115-project-surface-hardening/github-settings-manifest.json` records the read-only GitHub state observed at `2026-07-25T21:11:42Z` and exact request/rollback bodies. It is explicitly marked `not-applied` and requires separate authorization for each selected change ID.
+
+The proposed changes set a bounded About description, the existing docs URL as homepage, an eight-topic discovery set, and `has_wiki=false`; they can also enable PVR, vulnerability alerts, and Dependabot security-update pull requests. The manifest keeps Pages domain/build mode, the signed linear 12-context main ruleset, merge methods, Issues/Projects/Discussions state, secret-scanning state, and all Releases/tags/assets unchanged.
+
+No command in that manifest was executed.
+
 ## Not run and residual risk
 
 - No push, pull request, merge, workflow dispatch, release mutation, or GitHub setting mutation occurred.
@@ -138,4 +146,4 @@ Additional checks:
 - `--ignore-scripts` blocks docs install lifecycle scripts, but the pinned docs packages still execute during the static build. Minimal job permissions, frozen locks, both audits, and a checkout-free deploy job reduce rather than eliminate dependency compromise risk.
 - Sharp `0.35.3` remains outside Next `16.2.11`'s declared `^0.34.5` range. The acceptance is limited to the verified static export with unoptimized images.
 - Context-name branch protection cannot distinguish a trusted workflow from a pull request that changes that workflow. Such workflow changes still require human review and the existing signed, linear main ruleset.
-- The GitHub settings manifest is a separate follow-up record. This evidence does not claim that PVR, About, topics, homepage, Wiki, or any other repository setting was changed.
+- The GitHub settings manifest is an unapplied proposal, not mutation evidence. This record does not claim that PVR, About, topics, homepage, Wiki, vulnerability alerts, Dependabot security updates, or any other repository setting was changed.

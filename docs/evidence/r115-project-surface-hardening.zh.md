@@ -129,6 +129,14 @@ PASS
 - `97a0dfd6350adb31c6337c169d270bfe8c3c9938` — classifier runtime 隔离
 - `f125bd76097a2aa69d9086ae5082b60d2fb60b5f` — Pages 部署权限隔离
 
+## 未应用的 GitHub settings manifest
+
+`docs/evidence/artifacts/r115-project-surface-hardening/github-settings-manifest.json` 记录了 `2026-07-25T21:11:42Z` 的只读 GitHub 状态，以及精确 request/rollback body。文件明确标记为 `not-applied`；以后即使要执行，也必须逐项取得对应 change ID 的授权。
+
+拟议变更包括：设置简短 About description、把现有文档站 URL 写入 homepage、加入八个检索 topic、关闭 Wiki；还可以分别启用 PVR、vulnerability alerts 与 Dependabot security-update PR。Pages 域名与 build mode、signed linear 12-context main ruleset、merge method、Issues/Projects/Discussions 状态、secret-scanning 状态，以及所有 Release/tag/asset 都保持不变。
+
+Manifest 中的命令均未执行。
+
 ## 未运行与剩余风险
 
 - 没有 push、创建 PR、merge、workflow dispatch、Release mutation 或 GitHub settings mutation。
@@ -138,4 +146,4 @@ PASS
 - `--ignore-scripts` 会阻止 docs 安装阶段的 lifecycle script，但固定版本的 docs packages 仍会在静态构建时执行。最小 job 权限、frozen lock、两套 audit 与 checkout-free deploy 能降低依赖失陷风险，不能把风险降为零。
 - Sharp `0.35.3` 仍超出 Next `16.2.11` 声明的 `^0.34.5` 范围。本次接受仅限已经验证的 `images.unoptimized` 静态导出。
 - 只按 context 名称保护分支时，GitHub 无法区分可信 workflow 与 PR 对 workflow 本身的修改。这类变更仍需人工 review，并受现有 signed、linear main ruleset 约束。
-- GitHub settings manifest 将作为下一项单独记录。本证据不声称 PVR、About、topics、homepage、Wiki 或其他仓库设置已经变更。
+- GitHub settings manifest 只是未应用的提案，不是 mutation evidence。本证据不声称 PVR、About、topics、homepage、Wiki、vulnerability alerts、Dependabot security updates 或其他仓库设置已经变更。
