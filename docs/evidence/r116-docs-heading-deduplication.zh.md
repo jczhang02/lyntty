@@ -111,9 +111,41 @@ development scripts: 36 pass, 0 fail
 
 第一次运行根级 `bun install --frozen-lockfile --ignore-scripts` 时，`expo-modules-core` 的 npm tarball 出现一次临时提取失败；一次有界重试成功。随后第一次 `ci:fast` 因生命周期脚本被有意关闭、生成的 Prisma client 不存在而失败。运行仓库可信的 `bun install --frozen-lockfile` postinstall 后生成 client，最终完整 `ci:fast` 通过。这些是环境准备失败，不是产品或文档测试失败。
 
-## 外部验证状态
+## 外部验证
 
-本证据记录生成时，follow-up 分支尚未 push 或 merge。Pull Request checks、合并后的 Pages deployment 和修复后的线上 URL 仍待验证；完成前不得关闭 `lyntty-2b4`。
+PR [#59](https://github.com/jczhang02/lyntty/pull/59) 针对 head `080f3ab2097db89b0933deaff027be451f92757c` 运行。15 项上报检查全部通过，包括 12 个 required context、Relay image verification、CodeQL workflow 和 code-scanning check `89770648079`。
+
+| Workflow | Run | 结果 |
+| --- | --- | --- |
+| Relay image verification | `30193409761` | success |
+| CLI Artifact Smoke Test | `30193409772` | success |
+| Lyntty CI | `30193409773` | success |
+| CodeQL baseline | `30193409775` | success |
+
+PR 于 `2026-07-26T07:56:14Z` squash-merge 为 `6e13f73029cb1385415f0b5b649dee3290ce0a4f`。GitHub 报告其签名有效且已验证；merge tree `f144e93a10c7a7b99ecfd72ff63c29a89a9ce99a` 与已审查 PR head tree 完全一致。
+
+合并后的运行也全部通过：
+
+| Workflow | Run | 结果 |
+| --- | --- | --- |
+| Lyntty CI | `30193688194` | success |
+| Deploy docs | `30193688200` | success |
+| CodeQL baseline | `30193688201` | success |
+
+Pages deployment `5608408027` 把精确 main SHA `6e13f73029cb1385415f0b5b649dee3290ce0a4f` 发布到未改变的地址 <https://jczhang02.github.io/lyntty/>。完整线上读取确认：
+
+- 42/42 条 HTML route 返回 200，只渲染一个预期 H1，并保留正确语言、canonical URL 和 `/lyntty/` base path；
+- 42/42 份 raw Markdown、`llms.txt` 和 `llms-full.txt` 与已验证本地导出逐字节一致；
+- 自定义未知 route 返回 404，并包含预期双语内容与 `noindex`；
+- 桌面首页及英文/中文移动端浏览器截图均清楚显示单一页面标题，导航和排版保持正常。
+
+| 线上画面 | SHA-256 |
+| --- | --- |
+| 桌面首页 | `2926cf957ef71c9fbe9b1d5269a27f915e6f50af3dd63a4e54b9900859c83be9` |
+| 英文移动端开始使用 | `b7319f0750f1c4234b6f348da6e436bd26894c9c456952ee849a695daac63771` |
+| 中文移动端开始使用 | `aa76bf11f765d1e99c9386e36525c4549bf9a7d940fb7b1a87355b161f6c8d6b` |
+
+最终线上 verifier 遇到一次临时 GitHub Pages 连接超时后，使用每个 URL 有界重试继续执行；最终通过覆盖了以上全部 route 与 artifact。
 
 没有修改 GitHub setting、Pages 域名、Release、tag、asset 或 required-context 配置。
 
