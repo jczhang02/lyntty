@@ -1,0 +1,29 @@
+{
+  "corpus": {
+    "jsonlFiles": 452,
+    "logicalBytes": 1240394694
+  },
+  "index": {
+    "version": 2,
+    "firstTailRows": 32,
+    "firstTailMilliseconds": 51.2,
+    "firstTailBytesRead": 10485760,
+    "fullBackgroundMilliseconds": 2240.1,
+    "fullBytesReadIncludingBootstrapAndHeadHashes": 1280502726,
+    "warmRestoreRows": 452,
+    "warmRestoreMilliseconds": 5.5,
+    "warmRestoreBytesRead": 0,
+    "singleAppendRefreshMilliseconds": 10.8,
+    "singleAppendBytesRead": 65699,
+    "persistedMode": "0600"
+  },
+  "releaseApkColdPath": {
+    "appInitToFirstPiRpcResponseObservedMilliseconds": 1602,
+    "appInitToFirstSessionsScreenshotMilliseconds": 1886,
+    "appInitToFullProgressiveDeliveryObservedMilliseconds": 5149,
+    "firstPiRpcEncryptedResponseBytes": 17188,
+    "piRpcResponsesThroughFullPagination": 7,
+    "initialSessionHttpRequests": 1,
+    "persistedIndexEntries": 452
+  }
+}

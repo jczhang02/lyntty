@@ -34,7 +34,7 @@ import { detectResumeSupport } from '@/resume/localRemoteAuth';
 import { encodeBase64, decodeBase64, decrypt } from '@/api/encryption';
 import { resolveActivePiSessionReuse, resolvePiActivationLock, shouldKeepWaitingForPiExtension } from './activationLock';
 import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
-import { discoverLocalPiSessions, discoverLocalPiSessionsPage, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
+import { createPiDiscoverySnapshotGeneration, discoverLocalPiSessions, discoverLocalPiSessionsPage, redactPiSessionForRelay, type PiSessionRecoveryRecord, type RegisteredPiSessionState } from '@/pi/runPiRecovery';
 import { mapPiSessionHistoryPageToEnvelopes, mapPiSessionHistoryToEnvelopes } from '@/pi/runPiHistory';
 import { readPiSessionEntries, startPiExternalMirror } from '@/pi/runPiExternalMirror';
 import { resolvePiRelaySessionTag } from '@/pi/piRelaySessionTag';
@@ -49,6 +49,7 @@ import { applyPiExtensionSequence } from './piExtensionSequence';
 import { claimPiExtensionInstance, isPiExtensionCommandOwner } from './piExtensionOwnership';
 import { bindPiRemoteInput, type PiRemoteImage } from '@/pi/piRemoteInput';
 import { resolvePiSessionDisplayName } from '@/pi/piSessionDisplayName';
+import { createPiSessionIndex, readPiSessionInfo, type PiSessionIndexListOptions } from '@/pi/piSessionIndex';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
 function shellescape(s: string): string {
@@ -86,68 +87,50 @@ export function choosePiSpawnDirectory(
   return expandHomeDirectory(directory, homeDir);
 }
 
-function firstSessionMessageText(entries: ReturnType<typeof readPiSessionEntries>): string | undefined {
-  for (const entry of entries) {
-    if (entry.type !== 'message') continue;
-    const message = entry.message as { content?: unknown } | undefined;
-    if (typeof message?.content === 'string') {
-      return message.content;
-    }
-    if (Array.isArray(message?.content)) {
-      const text = message.content
-        .map((part) => part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : '')
-        .filter(Boolean)
-        .join('\n');
-      if (text) return text;
-    }
-  }
+async function readPiSessionInfoFromFile(sessionId: string, sessionFile?: string): Promise<SessionInfo | undefined> {
+  if (!sessionFile) return undefined;
+  const info = await readPiSessionInfo(sessionFile);
+  if (info?.id === sessionId) return info;
+  logger.debug(`[DAEMON RUN] Failed exact Pi session file lookup for ${sessionFile}`);
   return undefined;
 }
 
-async function readPiSessionInfoFromFile(sessionId: string, sessionFile?: string): Promise<SessionInfo | undefined> {
-  if (!sessionFile) return undefined;
-  try {
-    const content = await fs.readFile(sessionFile, 'utf8');
-    const header = JSON.parse(content.split('\n').find((line) => line.trim().length > 0) ?? '{}') as { type?: string; id?: string; cwd?: string; timestamp?: string };
-    if (header.type !== 'session' || header.id !== sessionId) {
-      return undefined;
-    }
-    const stat = await fs.stat(sessionFile);
-    const entries = readPiSessionEntries(sessionFile);
-    const sessionInfoEntries = entries
-      .filter((entry) => entry.type === 'session_info')
-      .map((entry) => entry as { name?: unknown });
-    const name = [...sessionInfoEntries].reverse().find((entry) => typeof entry.name === 'string')?.name as string | undefined;
-    return {
-      path: sessionFile,
-      id: sessionId,
-      cwd: header.cwd ?? os.homedir(),
-      created: header.timestamp ? new Date(header.timestamp) : stat.birthtime,
-      modified: stat.mtime,
-      messageCount: entries.filter((entry) => entry.type === 'message').length,
-      firstMessage: firstSessionMessageText(entries) ?? '',
-      allMessagesText: '',
-      name,
-    } satisfies SessionInfo;
-  } catch (error) {
-    logger.debug(`[DAEMON RUN] Failed exact Pi session file lookup for ${sessionFile}: ${error instanceof Error ? error.message : error}`);
-    return undefined;
-  }
-}
+type PiSessionInfoLister = (options?: PiSessionIndexListOptions) => Promise<SessionInfo[]>;
+type PiSessionInfoFinder = (sessionId: string, options?: PiSessionIndexListOptions) => Promise<SessionInfo | undefined>;
 
-async function findPiSessionNearDirectory(sessionId: string, directory?: string, sessionFile?: string): Promise<SessionInfo | undefined> {
+async function findPiSessionNearDirectory(
+  sessionId: string,
+  directory?: string,
+  sessionFile?: string,
+  listSessions?: PiSessionInfoLister,
+  findSession?: PiSessionInfoFinder,
+): Promise<SessionInfo | undefined> {
   const exact = await readPiSessionInfoFromFile(sessionId, sessionFile);
-  if (exact) {
-    return exact;
-  }
+  if (exact) return exact;
+
   const expandedDirectory = directory ? expandHomeDirectory(directory) : undefined;
+  if (findSession) {
+    if (expandedDirectory) {
+      const scoped = await findSession(sessionId, { scope: 'cwd', cwd: expandedDirectory });
+      if (scoped) return scoped;
+    }
+    return findSession(sessionId, { scope: 'machine' });
+  }
+  if (listSessions) {
+    if (expandedDirectory) {
+      const scoped = await listSessions({ scope: 'cwd', cwd: expandedDirectory });
+      const matched = scoped.find((session) => session.id === sessionId);
+      if (matched) return matched;
+    }
+    const machineSessions = await listSessions({ scope: 'machine' });
+    return machineSessions.find((session) => session.id === sessionId);
+  }
+
   if (expandedDirectory) {
     try {
       const cwdSessions = await SessionManager.list(expandedDirectory);
       const matched = cwdSessions.find((session) => session.id === sessionId);
-      if (matched) {
-        return matched;
-      }
+      if (matched) return matched;
     } catch (error) {
       logger.debug(`[DAEMON RUN] Failed scoped Pi session lookup for ${expandedDirectory}: ${error instanceof Error ? error.message : error}`);
     }
@@ -416,6 +399,16 @@ export async function startDaemon(): Promise<void> {
 
     // Helper functions
     const getCurrentChildren = () => Array.from(pidToTrackedSession.values());
+    const piSessionIndex = await createPiSessionIndex({
+      indexFile: configuration.piSessionIndexFile,
+      onError: (error) => {
+        logger.debug(`[pi] Session index refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+      },
+    });
+    const piDiscoveryRuntimeNonce = randomUUID();
+    const listIndexedPiSessionInfos: PiSessionInfoLister = (options) => piSessionIndex.list(options);
+    const findIndexedPiSessionInfo: PiSessionInfoFinder = (sessionId, options) => piSessionIndex.find(sessionId, options);
+    void piSessionIndex.refresh();
     const piActivationLeases = new PiActivationLeaseRegistry();
     type ExternalPiActivationResolution =
       | { type: 'none' | 'released' }
@@ -537,7 +530,13 @@ export async function startDaemon(): Promise<void> {
       }
       const targetMachineId = machineId;
       if (sessionId) {
-        const localPiSession = await findPiSessionNearDirectory(sessionId, directory);
+        const localPiSession = await findPiSessionNearDirectory(
+          sessionId,
+          directory,
+          undefined,
+          listIndexedPiSessionInfos,
+          findIndexedPiSessionInfo,
+        );
         const resolvedDirectory = localPiSession?.cwd ?? expandHomeDirectory(directory);
         if (resolvedDirectory !== directory) {
           logger.debug(`[DAEMON RUN] Resolved Pi session spawn directory from ${directory} to ${resolvedDirectory}`);
@@ -958,25 +957,6 @@ export async function startDaemon(): Promise<void> {
         if (session.lynttySessionId === lynttySessionId) return session;
       }
       return sessionIdToFinishedSession.get(lynttySessionId);
-    };
-
-    const piDiscoveryCache = new Map<string, { expiresAt: number; sessions: SessionInfo[] }>();
-    const PI_DISCOVERY_CACHE_TTL_MS = 10_000;
-
-    const listCachedPiSessionInfos = async (options?: { cwd?: string; scope?: 'cwd' | 'machine' }): Promise<SessionInfo[]> => {
-      const scope = options?.scope ?? 'machine';
-      const cacheKey = `${scope}:${options?.cwd ?? ''}`;
-      const nowMs = Date.now();
-      const cached = piDiscoveryCache.get(cacheKey);
-      if (cached && cached.expiresAt > nowMs) {
-        return cached.sessions;
-      }
-
-      const sessions = scope === 'machine' || !options?.cwd
-        ? await SessionManager.listAll()
-        : await SessionManager.list(options.cwd);
-      piDiscoveryCache.set(cacheKey, { expiresAt: nowMs + PI_DISCOVERY_CACHE_TTL_MS, sessions });
-      return sessions;
     };
 
     type ExternalPiMirrorState = {
@@ -1414,25 +1394,98 @@ export async function startDaemon(): Promise<void> {
       return [...trackedRegistrations, ...mirrorRegistrations];
     };
 
-    const listPiSessions = async (options?: { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }) => {
-      const activePiSessionIds = getCurrentChildren()
+    const getActivePiSessionIds = (): string[] => {
+      const ids = getCurrentChildren()
         .map((tracked) => tracked.lynttySessionMetadataFromLocalWebhook?.piSessionId)
         .filter((id): id is string => typeof id === 'string' && id.length > 0);
       const nowMs = Date.now();
       for (const [key, mirror] of externalPiMirrors.entries()) {
         if (nowMs - mirror.lastExtensionSeenAt > EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS) continue;
         const piSessionId = key.slice(key.indexOf(':') + 1);
-        if (piSessionId) activePiSessionIds.push(piSessionId);
+        if (piSessionId) ids.push(piSessionId);
       }
+      for (const [key, signaledAt] of recentPiExtensionSignals.entries()) {
+        if (Date.now() - signaledAt > EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS) continue;
+        const piSessionId = key.slice(key.indexOf(':') + 1);
+        if (piSessionId) ids.push(piSessionId);
+      }
+      return [...new Set(ids)];
+    };
 
+    const isPiSessionActive = (sessionId: string): boolean => {
+      if (getCurrentChildren().some((tracked) => (
+        tracked.lynttySessionMetadataFromLocalWebhook?.piSessionId === sessionId
+      ))) return true;
+      const nowMs = Date.now();
+      for (const [key, mirror] of externalPiMirrors.entries()) {
+        if (nowMs - mirror.lastExtensionSeenAt > EXTERNAL_PI_MIRROR_ACTIVE_WINDOW_MS) continue;
+        if (key.slice(key.indexOf(':') + 1) === sessionId) return true;
+      }
+      return hasRecentPiExtensionSignal(machineId, sessionId);
+    };
+
+    const listPiSessions = async (options?: { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }) => {
+      let activePiSessionIds = getActivePiSessionIds();
+
+      const scope = options?.scope ?? 'machine';
+      const registeredSessions = getRegisteredPiSessions();
+      let indexSnapshot = await piSessionIndex.snapshot({ cwd: options?.cwd, scope });
+      const activePiSessionIdSet = new Set(activePiSessionIds);
+      const registeredByPiSessionId = new Map(
+        registeredSessions.map((session) => [session.piSessionId, session]),
+      );
+      const verifiedGapCounts = new Map<string, number>();
+      let validatedGapCandidate = false;
+      for (const session of indexSnapshot.sessions) {
+        const registered = registeredByPiSessionId.get(session.id);
+        if (!registered
+          || activePiSessionIdSet.has(session.id)
+          || indexSnapshot.incompleteSessionIds.has(session.id)
+          || session.messageCount >= registered.importedMessageCount) continue;
+        validatedGapCandidate = true;
+        const current = await piSessionIndex.find(session.id, { cwd: options?.cwd, scope });
+        if (current && current.messageCount < registered.importedMessageCount) {
+          verifiedGapCounts.set(session.id, current.messageCount);
+        }
+      }
+      if (validatedGapCandidate) {
+        indexSnapshot = await piSessionIndex.snapshot({ cwd: options?.cwd, scope });
+        const currentById = new Map(indexSnapshot.sessions.map((session) => [session.id, session]));
+        for (const [sessionId, verifiedCount] of verifiedGapCounts) {
+          if (indexSnapshot.incompleteSessionIds.has(sessionId)
+            || currentById.get(sessionId)?.messageCount !== verifiedCount) {
+            verifiedGapCounts.delete(sessionId);
+          }
+        }
+      }
+      activePiSessionIds = getActivePiSessionIds();
+      const snapshotGeneration = createPiDiscoverySnapshotGeneration({
+        runtimeNonce: piDiscoveryRuntimeNonce,
+        indexGeneration: indexSnapshot.generation,
+        scope,
+        cwd: options?.cwd,
+        activePiSessionIds: [...new Set(activePiSessionIds)].sort(),
+        registered: registeredSessions
+          .map((session) => ({
+            piSessionId: session.piSessionId,
+            relaySessionId: session.relaySessionId,
+            importedMessageCount: session.importedMessageCount,
+            relayAvailable: session.relayAvailable,
+          }))
+          .sort((a, b) => a.piSessionId.localeCompare(b.piSessionId)),
+      });
       const page = await discoverLocalPiSessionsPage({
         cwd: options?.cwd,
-        scope: options?.scope ?? 'machine',
-        registeredSessions: getRegisteredPiSessions(),
+        scope,
+        registeredSessions,
         activePiSessionIds,
         limit: options?.limit,
         cursor: options?.cursor,
-        listSessions: () => listCachedPiSessionInfos(options),
+        snapshotGeneration,
+        listSessions: async () => indexSnapshot.sessions,
+        isSessionSummaryComplete: (sessionId) => !indexSnapshot.incompleteSessionIds.has(sessionId),
+        isSessionHistoryGapVerified: (sessionId) => verifiedGapCounts.has(sessionId),
+        isSessionActive: isPiSessionActive,
       });
 
       return {
@@ -1441,6 +1494,7 @@ export async function startDaemon(): Promise<void> {
           .sort((a, b) => Number(b.state === 'active_runtime') - Number(a.state === 'active_runtime')),
         nextCursor: page.nextCursor,
         total: page.total,
+        refreshing: indexSnapshot.refreshing,
       };
     };
 
@@ -1548,9 +1602,11 @@ export async function startDaemon(): Promise<void> {
       requestShutdown: () => requestShutdown('lyntty-cli'),
       onLynttySessionWebhook,
       onPiExtensionEvent: async (payload) => {
-        if (payload.extensionInstanceId) {
-          recentPiExtensionSignals.set(`${machineId}:${payload.session.piSessionId}`, Date.now());
-        }
+        // Any authenticated extension event proves the runtime was recently
+        // alive. Keep this conservative signal even for legacy extensions that
+        // cannot participate in instance ownership yet: discovery must not
+        // manufacture history_gap while their mirror is still being created.
+        recentPiExtensionSignals.set(`${machineId}:${payload.session.piSessionId}`, Date.now());
         if (onPiExtensionEventHandler) {
           return enqueuePiExtensionEvent(payload);
         }
@@ -1637,7 +1693,13 @@ export async function startDaemon(): Promise<void> {
         return { type: 'success' as const, sessionId: existing.sessionId, sent: 0 };
       }
 
-      const local = await findPiSessionNearDirectory(piSessionId, options.directory, options.sessionFile);
+      const local = await findPiSessionNearDirectory(
+        piSessionId,
+        options.directory,
+        options.sessionFile,
+        listIndexedPiSessionInfos,
+        findIndexedPiSessionInfo,
+      );
       if (!local && !options.sessionFile) {
         logger.warn('[pi] Requested session was not found on this node', { piSessionId });
         return { type: 'error' as const, errorMessage: 'This Pi session was not found on this node.' };

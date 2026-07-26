@@ -98,6 +98,24 @@ Rules:
 - queued mobile sends flush once runtime is ready;
 - relay-only Pi ids without a real local Pi session record are not product-visible sessions; skip them from session discovery and keep only dev-log/evidence traces.
 
+## Session discovery retrieval
+
+Pi JSONL remains canonical. `lynttyd` may maintain a private, rebuildable summary index under `LYNTTY_HOME_DIR`, but the index is never canonical history and is never uploaded to the `relay`.
+
+Retrieval rules:
+
+- restore the persisted summary immediately and revalidate it stale-while-revalidate;
+- coalesce concurrent refreshes into one scan;
+- fingerprint each JSONL, verify append continuity with a bounded head hash, and resume parsing from the persisted byte offset;
+- rebuild a file after truncation, replacement, parser-version change, corrupt index data, or a failed append-continuity check;
+- when no snapshot exists, publish a bounded newest-session prefix first, then scan complete files with low concurrency and cooperative event-loop yields;
+- mark bounded-prefix summaries incomplete: their message count is a lower bound and must never authoritatively create `history_gap` or suppress a later backfill decision;
+- before inferring a discovery gap from a cached complete count, revalidate that exact file fingerprint; never infer one from an active runtime's write/import race;
+- cap retained JSON-line bytes so one large message or tool payload cannot monopolize memory;
+- bind every discovery cursor to the immutable index generation and a per-daemon-runtime nonce, and reject continuation after either changes.
+
+Sessions Home performs one bounded initial relay attempt, publishes relay rows without waiting for Pi discovery, and merges each Pi page as it arrives. A failed or warming machine keeps its previous rows. Rows are pruned only after a successful end-of-snapshot page. Transport retries are per-machine and finite. Explicit App, socket, or machine lifecycle signals request a generation-stamped full refresh, cancel obsolete pending pages, and preserve socket machine mutations that race an HTTP snapshot. Relay/settings/message/send work is bound to the active account generation; reset aborts bounded settings/message/history waits and late work cannot mutate the replacement runtime. Discovery gaps are provisional and clearable after verified recovery; `pi-history-page` gaps remain authoritative. Unknown deletions are hidden immediately and promoted to account-scoped Pi tombstones if identity arrives later.
+
 ### Extension missing or stale
 
 Default behavior:
