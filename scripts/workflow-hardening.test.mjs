@@ -28,6 +28,7 @@ const androidGradlePath = new URL('../packages/lyntty-app/android/app/build.grad
 const maestroRunnerPath = new URL('./e2e/run-maestro.sh', import.meta.url);
 const codeownersPath = new URL('../.github/CODEOWNERS', import.meta.url);
 const typecheckWorkflowPath = new URL('../.github/workflows/typecheck.yml', import.meta.url);
+const docsWorkflowPath = new URL('../.github/workflows/docs.yml', import.meta.url);
 const cliSmokeWorkflowPath = new URL('../.github/workflows/cli-smoke-test.yml', import.meta.url);
 const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-artifact.ts', import.meta.url);
 const rootPackagePath = new URL('../package.json', import.meta.url);
@@ -62,6 +63,9 @@ const [relayDeploy, relayImage, androidRelease, androidExpoDev, androidPreviewCa
   readFile(previewBundleSmokePath, 'utf8'),
 ]);
 const rootPackage = JSON.parse(rootPackageText);
+const docsWorkflow = await readFile(docsWorkflowPath, 'utf8');
+const typecheckWorkflowConfig = Bun.YAML.parse(typecheckWorkflow);
+const docsWorkflowConfig = Bun.YAML.parse(docsWorkflow);
 const previewReleaseNotes = await readFile(previewReleaseNotesPath, 'utf8');
 const resolvedPreviewReleaseNotes = previewReleaseNotes
   .replaceAll('{{VERSION_NAME}}', '1.2.0')
@@ -123,7 +127,7 @@ test('repository keeps the current launcher icon and rejects obsolete neon brand
     const digest = createHash('sha256').update(blob.stdout).digest('hex');
     assert.notEqual(digest, obsoleteNeonIconSha256, `obsolete neon icon remains tracked at ${path}`);
   }
-});
+}, 30_000);
 
 test('relay deploy resolves only a signed stable BOM to an immutable image', () => {
   assert.match(relayDeploy, /environment: production-relay/);
@@ -1601,19 +1605,34 @@ test('native signature verification pins platform identities and attests exact a
   assert.match(nativeSigning, /bun install --frozen-lockfile/);
 });
 
-test('dependency audit pins patched transitive releases', () => {
+test('dependency audit pins patched transitive releases', async () => {
   const patchedVersions = {
     '@hono/node-server': '2.0.11',
+    'brace-expansion': '5.0.8',
     'fast-uri': '3.1.4',
     'find-my-way': '9.7.0',
     'fast-xml-parser': '5.10.1',
     'hono': '4.12.27',
     'shell-quote': '1.9.0',
+    'valibot': '1.4.2',
   };
   for (const [name, version] of Object.entries(patchedVersions)) {
     assert.equal(rootPackage.overrides[name], version);
     assert.match(bunLockText, new RegExp(`"${name.replace('/', '\\/')}": \\["${name.replace('/', '\\/')}@${version.replaceAll('.', '\\.')}"`));
   }
+  assert.equal(rootPackage.patchedDependencies['minimatch@3.1.5'], 'patches/minimatch@3.1.5.patch');
+  const minimatchPatch = await readFile(new URL('../patches/minimatch@3.1.5.patch', import.meta.url), 'utf8');
+  assert.match(minimatchPatch, /var \{ expand \} = require\('brace-expansion'\)/);
+  const braceExpansionVersions = [...bunLockText.matchAll(/brace-expansion@(\d+\.\d+\.\d+)/g)].map((match) => match[1]);
+  const valibotVersions = [...bunLockText.matchAll(/valibot@(\d+\.\d+\.\d+)/g)].map((match) => match[1]);
+  assert.deepEqual([...new Set(braceExpansionVersions)].sort(), ['5.0.8']);
+  assert.deepEqual([...new Set(valibotVersions)].sort(), ['1.4.2']);
+  const [legacyMinimatch, modernMinimatch] = await Promise.all([
+    import(new URL('../node_modules/.bun/minimatch@3.1.5/node_modules/minimatch/minimatch.js', import.meta.url)),
+    import(new URL('../node_modules/.bun/minimatch@10.2.5/node_modules/minimatch/dist/commonjs/index.js', import.meta.url)),
+  ]);
+  assert.equal(legacyMinimatch.default('file.ts', '*.{js,ts}'), true);
+  assert.equal(modernMinimatch.minimatch('file.ts', '*.{js,ts}'), true);
   assert.doesNotMatch(bunLockText, /shell-quote@1\.8\.4/);
   assert.doesNotMatch(bunLockText, /find-my-way@9\.6\.0/);
 });
@@ -1622,6 +1641,73 @@ test('required PR hygiene verifies lifecycle trust and release contracts', () =>
   assert.match(typecheckWorkflow, /bun pm untrusted/);
   assert.match(typecheckWorkflow, /Found 0 untrusted dependencies with scripts/);
   assert.match(typecheckWorkflow, /bun test scripts\/release\.test\.ts scripts\/github-release\.test\.ts scripts\/relay-oci-sbom\.test\.ts packages\/lyntty-cli\/scripts\/build-artifact\.test\.ts/);
+});
+
+test('required PR hygiene builds the complete docs site and watches every root source', () => {
+  assert.equal(typecheckWorkflowConfig.name, 'Lyntty CI');
+  assert.deepEqual(typecheckWorkflowConfig.on.pull_request, { branches: ['main'] });
+
+  const repoHygieneJob = typecheckWorkflowConfig.jobs['repo-hygiene'];
+  assert.ok(repoHygieneJob, 'repo-hygiene job must exist');
+  assert.equal(repoHygieneJob.name, 'Repo hygiene');
+  assert.equal(repoHygieneJob.if, undefined);
+
+  const docsInstall = repoHygieneJob.steps.find((step) => step.name === 'Install docs toolchain');
+  const docsTrust = repoHygieneJob.steps.find((step) => step.name === 'Verify docs lifecycle-script trust');
+  const docsBuild = repoHygieneJob.steps.find((step) => step.name === 'Check and build complete docs site');
+  assert.deepEqual(docsInstall, {
+    name: 'Install docs toolchain',
+    'working-directory': 'docs/.site',
+    run: 'bun install --frozen-lockfile --ignore-scripts',
+  });
+  assert.equal(docsTrust['working-directory'], 'docs/.site');
+  assert.match(docsTrust.run, /bun pm untrusted/);
+  assert.deepEqual(docsBuild, {
+    name: 'Check and build complete docs site',
+    'working-directory': 'docs/.site',
+    run: 'bun run docs:audit\nbun run docs:check\nbun run docs:build\n',
+  });
+  assert.equal(repoHygieneJob.steps.indexOf(docsInstall) < repoHygieneJob.steps.indexOf(docsTrust), true);
+  assert.equal(repoHygieneJob.steps.indexOf(docsTrust) < repoHygieneJob.steps.indexOf(docsBuild), true);
+  assert.equal(repoHygieneJob['continue-on-error'], undefined);
+
+  assert.deepEqual(docsWorkflowConfig.on.push.branches, ['main']);
+  assert.equal(docsWorkflowConfig.on.workflow_dispatch, null);
+  const deploymentPaths = docsWorkflowConfig.on.push.paths;
+  for (const sourceGlob of ['docs/**', 'CONTRIBUTING*.md', 'PRIVACY*.md', 'SECURITY*.md']) {
+    assert.equal(deploymentPaths.includes(sourceGlob), true, `${sourceGlob} must trigger Pages deployment`);
+  }
+  assert.deepEqual(docsWorkflowConfig.permissions, {});
+  assert.deepEqual(docsWorkflowConfig.jobs.build.permissions, { contents: 'read' });
+  assert.deepEqual(docsWorkflowConfig.jobs.deploy.permissions, {
+    pages: 'write',
+    'id-token': 'write',
+  });
+
+  for (const [jobName, job] of Object.entries(docsWorkflowConfig.jobs)) {
+    if (jobName === 'deploy') continue;
+    assert.notEqual(job.permissions?.pages, 'write');
+    assert.notEqual(job.permissions?.['id-token'], 'write');
+  }
+
+  const deployBuildSteps = docsWorkflowConfig.jobs.build.steps;
+  const docsInstallSteps = deployBuildSteps.filter((step) => /^bun install(?:\s|$)/.test(step.run ?? ''));
+  assert.equal(docsInstallSteps.length, 1);
+  assert.equal(docsInstallSteps.every((step) => step.run.includes('--ignore-scripts')), true);
+  assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:audit'), true);
+  assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:check'), true);
+  assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:build'), true);
+  assert.equal(deployBuildSteps.some((step) => `${step.uses ?? ''}`.startsWith('actions/configure-pages@')), false);
+
+  const deployJob = docsWorkflowConfig.jobs.deploy;
+  assert.equal(deployJob.needs, 'build');
+  assert.deepEqual(deployJob.steps, [
+    { uses: 'actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b' },
+    {
+      id: 'deployment',
+      uses: 'actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e',
+    },
+  ]);
 });
 
 test('supported CLI artifacts run on every release architecture in PR CI', () => {

@@ -60,9 +60,25 @@
   --color-fd-ring: #d97757;
 }
 
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
 body {
   font-family: var(--font-body);
   letter-spacing: -0.006em;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  text-wrap: balance;
+}
+
+.prose p,
+.prose li {
+  text-wrap: pretty;
 }
 
 h1,

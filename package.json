@@ -12,7 +12,7 @@
     "ci:dev": "bun test scripts/dev.test.ts scripts/preview.test.ts",
     "ci:audit": "bun audit",
     "ci:fast": "bun run test:repo-hardening && bun run ci:audit && bun run ci:wire && bun run ci:cli && bun run ci:relay && bun run ci:app && bun run ci:dev && git diff --check",
-    "test:repo-hardening": "bun test scripts/workflow-hardening.test.mjs scripts/evidence-redaction.test.mjs scripts/relay-oci-sbom.test.ts scripts/release-agent-rules.test.mjs scripts/agent-guidance.test.mjs scripts/docs-currentness.test.mjs",
+    "test:repo-hardening": "bun test scripts/workflow-hardening.test.mjs scripts/evidence-redaction.test.mjs scripts/relay-oci-sbom.test.ts scripts/release-agent-rules.test.mjs scripts/agent-guidance.test.mjs scripts/docs-currentness.test.mjs scripts/public-project-surface.test.mjs scripts/docs-site-contract.test.mjs scripts/maintenance-baseline.test.mjs scripts/ci-changed-paths.test.ts",
     "release:bom": "bun ./scripts/release.ts",
     "mobile": "bun run --filter lyntty-app start",
     "android": "bun run --filter lyntty-app android",
@@ -46,6 +46,7 @@
     "parse-path": "7.0.3",
     "@types/parse-path": "7.0.3",
     "@hono/node-server": "2.0.11",
+    "brace-expansion": "5.0.8",
     "defu": "6.1.5",
     "@prisma/config>effect": "3.20.0",
     "@electric-sql/pglite": "0.3.15",
@@ -63,7 +64,8 @@
     "react-devtools-core>ws": "7.5.11",
     "engine.io>ws": "8.21.0",
     "engine.io-client>ws": "8.21.0",
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "valibot": "1.4.2"
   },
   "trustedDependencies": [
     "@more-tech/react-native-libsodium",
@@ -85,6 +87,7 @@
     "react-native-reanimated@4.5.1": "patches/react-native-reanimated@4.5.1.patch",
     "react-native-worklets@0.10.2": "patches/react-native-worklets@0.10.2.patch",
     "@react-native/gradle-plugin@0.83.1": "patches/@react-native%2Fgradle-plugin@0.83.1.patch",
-    "@shopify/react-native-skia@2.5.5": "patches/@shopify%2Freact-native-skia@2.5.5.patch"
+    "@shopify/react-native-skia@2.5.5": "patches/@shopify%2Freact-native-skia@2.5.5.patch",
+    "minimatch@3.1.5": "patches/minimatch@3.1.5.patch"
   }
 }

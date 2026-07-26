@@ -1,10 +1,20 @@
-# Release trust, compatibility, and production promotion require owner review.
+# Release trust, compatibility, and production promotion route to owner review.
 /.github/CODEOWNERS @jczhang02
+/.github/dependabot.yml @jczhang02
 /.github/workflows/ @jczhang02
+/.github/ISSUE_TEMPLATE/ @jczhang02
+/.github/PULL_REQUEST_TEMPLATE.md @jczhang02
+/SECURITY*.md @jczhang02
+/CONTRIBUTING*.md @jczhang02
+/PRIVACY*.md @jczhang02
 /.dockerignore @jczhang02
 /Dockerfile @jczhang02
 /package.json @jczhang02
 /bun.lock @jczhang02
+/patches/ @jczhang02
+/docs/.site/package.json @jczhang02
+/docs/.site/bun.lock @jczhang02
+/docs/.site/patches/ @jczhang02
 /config/native-signing/ @jczhang02
 /config/release-trust-roots/ @jczhang02
 /packages/*/package.json @jczhang02
@@ -16,6 +26,9 @@
 /scripts/preview.ts @jczhang02
 /scripts/preview-apk-allowlist.json @jczhang02
 /scripts/workflow-hardening.test.mjs @jczhang02
+/scripts/maintenance-baseline.test.mjs @jczhang02
+/scripts/ci-changed-paths.ts @jczhang02
+/scripts/ci-changed-paths.test.ts @jczhang02
 /packages/lyntty-app/android/app/build.gradle @jczhang02
 /packages/lyntty-app/android/app/lyntty-expo-dev.keystore @jczhang02
 /packages/lyntty-app/scripts/apk-audit.sh @jczhang02

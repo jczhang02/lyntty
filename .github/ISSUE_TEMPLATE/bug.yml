@@ -1,0 +1,87 @@
+name: Bug report
+description: Report a reproducible Lyntty defect without including private data.
+title: "[Bug] "
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security vulnerabilities follow [SECURITY.md](https://github.com/jczhang02/lyntty/blob/main/SECURITY.md), not this form. Before submitting, remove credentials, complete pairing URLs, auth headers, encryption keys, private code, and private command output.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Android App
+        - CLI / `lynttyd`
+        - Pi extension
+        - relay
+        - Wire protocol
+        - Documentation or CI
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Build or release channel
+      options:
+        - Current Stable Compatibility Release
+        - Preview prerelease
+        - Expo Dev or development build
+        - Source checkout
+        - Unknown
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Exact versions
+      description: Include the App, CLI/lynttyd, relay, and Wire versions or release tag when known.
+      placeholder: "App 1.2.0; CLI 1.2.0; relay 1.2.0; Wire 0.2.0"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Use the smallest sanitized sequence that reproduces the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Android version/device or emulator, node OS/architecture, and self-hosted relay topology. Do not include hostnames or addresses that should remain private.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Redact auth material, private paths, source code, command output, account identifiers, and network details before attaching evidence.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues and confirmed this is not a known duplicate.
+          required: true
+        - label: I removed credentials, pairing URLs, auth headers, encryption keys, signing material, private code, and private logs.
+          required: true
+        - label: This report does not contain vulnerability details or other information that belongs in SECURITY.md's private process.
+          required: true

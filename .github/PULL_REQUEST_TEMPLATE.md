@@ -22,6 +22,8 @@ Run affected checks and mark not-run items with reason.
 
 ## Risk / omissions
 
+Security-sensitive reports must follow [`SECURITY.md`](https://github.com/jczhang02/lyntty/blob/main/SECURITY.md) and stay out of public pull requests.
+
 - 
 
 ## Out-of-scope changes
