@@ -1,0 +1,36 @@
+R116 isolation and remote audit
+timestamp_utc=2026-07-26T20:58:27Z
+worktree=/home/jc/dev/lyntty/worktrees/session-sync-reliability
+branch=fix/session-sync-reliability
+head=d2da0c579f46a4a81e8157fc4dc8fb9984d14df2
+
+[worktree]
+worktree /home/jc/dev/lyntty
+HEAD 4043171d3b6e89ef32a5a7a3c56d5c7b7ab9b40c
+branch refs/heads/main
+
+worktree /home/jc/dev/lyntty/worktrees/bun-migration
+HEAD 4ccff1ef8f200de3a06ef7600e1b9208003e4ba1
+branch refs/heads/refactor/bun-migration
+
+worktree /home/jc/dev/lyntty/worktrees/dependency-advisories-2
+HEAD f56703fc8c241bf8b1bfc7ee584240d96c3bdce2
+branch refs/heads/fix/dependency-advisories-2
+
+
+[remote branch containing HEAD]
+
+[origin exact task branch]
+
+[open PR exact head]
+[]
+
+[live daemon read-only baseline]
+ActiveState=active
+MainPID=2891
+
+[installed unit PATH includes /opt/bin?]
+no
+
+[live append checkpoint entry id]
+3c3f1042

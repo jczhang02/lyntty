@@ -1,0 +1,105 @@
+R116 focused TDD transcript
+worktree=/home/jc/dev/lyntty/worktrees/session-sync-reliability
+branch=fix/session-sync-reliability
+base=4fb97d048cc353591f629b0ea26013528c4d3998
+
+[RED — startup/coverage module absent]
+$ cd packages/lyntty-cli && bun test src/pi/piHistoryCoverage.test.ts
+error: Cannot find module './piHistoryCoverage' from '.../src/pi/piHistoryCoverage.test.ts'
+0 pass
+1 fail
+1 error
+
+[GREEN — startup, restart, migration, and cursor selection]
+$ cd packages/lyntty-cli && bun test src/pi/piHistoryCoverage.test.ts
+19 pass
+0 fail
+42 expect() calls
+
+Covered assertions include:
+- 51 entries bootstrap only u2..u51, append checkpoint u51, cursor u2
+- page before u2 returns u1 and then hasMore=false
+- restart with checkpoint u51 replays only u52 and preserves cursor u2
+- completed history remains complete
+- missing checkpoint/cursor fails closed
+- 500-entry no-checkpoint migration remains a 50-entry tail
+- stale/arbitrary cursors are no-ops
+- only an explicitly virgin managed runtime may bootstrap without a cursor
+- exactly 50 entries complete without a cursor; 51 preserve u2
+- abandoned-branch cursors remain valid from complete JSONL entries
+- pending late-ACK coverage is adopted/recommitted without accepting stale cursors
+- managed fallback polling remains paused through agent_end reconciliation
+
+[RED — App history_gap erased the retry cursor]
+$ cd packages/lyntty-app && bun test sources/sync/piHistoryPage.test.ts
+Expected piHistoryCursor: "old-cursor"
+Received piHistoryCursor: undefined
+1 pass
+1 fail
+
+[GREEN — App preserves authoritative retry cursor and rejects delayed regressions]
+$ cd packages/lyntty-app && bun test sources/sync/piHistoryPage.test.ts
+3 pass
+0 fail
+3 expect() calls
+
+[RED — no-checkpoint agent_end bounded reconciliation]
+$ cd packages/lyntty-cli && bun test src/pi/reconcilePiHistory.test.ts
+Expected sendSessionProtocolMessage not to have been called
+Received number of calls: 1
+5 pass
+1 fail
+
+[GREEN — reconciliation can start inclusively at the immutable bounded anchor]
+$ cd packages/lyntty-cli && bun test src/pi/reconcilePiHistory.test.ts
+8 pass
+0 fail
+27 expect() calls
+
+[RED — missing bounded anchor silently fell back to full replay]
+$ cd packages/lyntty-cli && bun test src/pi/reconcilePiHistory.test.ts
+Expected startEntryMissing: true
+Received: undefined
+19 pass
+1 fail across the focused coverage/reconciliation run
+
+[GREEN — missing after/start entries fail closed]
+$ cd packages/lyntty-cli && bun test src/pi/reconcilePiHistory.test.ts
+8 pass
+0 fail
+27 expect() calls
+
+[RED — byte trimming orphaned an oversized tool result]
+$ cd packages/lyntty-cli && bun test src/pi/runPiHistory.test.ts
+Expected every tool-call-end to have a same-page tool-call-start
+Received: false
+9 pass
+1 fail
+
+[GREEN — assistant/tool-result boundaries remain atomic and reachable]
+$ cd packages/lyntty-cli && bun test src/pi/runPiHistory.test.ts
+10 pass
+0 fail
+38 expect() calls
+
+[GREEN — bounded metadata failure releases its lock]
+$ cd packages/lyntty-cli && bun test src/api/apiSession.test.ts
+38 pass
+0 fail
+120 expect() calls
+
+The metadata regressions prove both default and history-specific updates are
+bounded, then queue a history commit behind a simulated lost ACK and confirm it
+succeeds on the same ApiSessionClient. A pending history transition also handles
+the separate case where Relay committed and broadcast the update but its ACK was
+lost; unrelated stale cursors cannot adopt that transition.
+
+[GREEN — final focused race and recovery verification]
+- managed live entry ids are marked Relay-confirmed only after flush, avoiding a second canonical turn
+- fallback mirror polling stays paused until managed reconciliation settles
+- managed page RPCs capture a per-session context; rebind closes and drains the old generation before replacing it
+- healthy rebind clears the old session's history_gap state
+- full JSONL entries preserve abandoned-branch cursors during takeover
+- 200-part oversized assistant history preserves tool-call-start/tool-call-end atomicity
+
+Independent final result: VERIFIED_NO_P0_P1_P2

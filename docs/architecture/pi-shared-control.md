@@ -59,7 +59,8 @@ type ControlState =
   | "queued"
   | "waiting_extension"
   | "takeover_required"
-  | "computer_offline";
+  | "computer_offline"
+  | "history_gap";
 ```
 
 ## Control paths
@@ -116,6 +117,19 @@ User-visible states/actions:
 - `Take over on this node` only as explicit user action.
 
 Existing running Pi processes need `/reload` or restart after extension updates.
+
+## History bootstrap and recovery
+
+Pi JSONL is canonical, but opening `Session Remote` must not wait for a full JSONL import. Lyntty bootstraps a bounded latest tail (currently 50 renderable entries) and exposes older history through progressive paging.
+
+Two coordinates have different meanings and must not be conflated:
+
+- the local **append checkpoint** is the newest canonical JSONL entry whose forward replay has been confirmed by `relay`;
+- Relay metadata's `piHistoryCursor` is the oldest confirmed/renderable entry and therefore the authoritative lower bound for the next older page.
+
+The append checkpoint is not proof that every earlier JSONL entry is already in Relay. On restart, `lynttyd` replays only entries after that checkpoint and preserves the progressive cursor. When no checkpoint exists during an upgrade, startup still reconciles only the bounded tail; an immutable tail anchor bounds later `agent_end` recovery even after progressive paging moves or clears its own cursor. Older entries remain reachable through paging. A completed progressive history (`piHistoryHasMore: false`) stays complete across restart. Ordinary mirrors and managed Pi runtimes use the same rule and derive coordinates from the complete JSONL entry sequence, not only the currently selected Pi branch.
+
+Page RPCs may load only the current authoritative cursor. Stale or arbitrary cursors are safe no-ops, and the App rejects delayed responses whose requested cursor or metadata version is no longer current. Cursor metadata advances only after canonical envelopes and the Relay metadata update are confirmed; that metadata acknowledgement is time-bounded so a failed attempt releases the page queue without changing the local cursor. Assistant tool-call entries and their dependent tool results remain an atomic pagination boundary. A cursor, append checkpoint, or bounded recovery anchor that no longer exists in canonical JSONL produces explicit `history_gap`; reconciliation failures preserve the last confirmed cursor for diagnosis and later repair rather than silently skipping it or falling back to full replay.
 
 ## Thin extension boundary
 

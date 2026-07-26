@@ -14,7 +14,7 @@ Verified implementation commits:
 
 ## Result
 
-Two independent regressions were reproduced and fixed in an isolated worktree without touching the live daemon, Pi extension, Relay data, Pi JSONL, history watermark, tmux panes, or active sessions.
+Two independent regressions were reproduced and fixed in an isolated worktree without touching the live daemon, Pi extension, Relay data, Pi JSONL, legacy on-disk history checkpoint, tmux panes, or active sessions.
 
 1. Durable Pi history could stop while presence remained healthy. Randomized re-encryption retried a deterministic `session:<envelope.id>` Relay `localId` with different ciphertext, received HTTP 409, and left the outbox head permanently blocking later messages.
 2. Sessions Home could show generic Pi names. The Linux user-service PATH omitted `/opt/bin`, executable detection was incorrectly used as a JSONL-discovery capability, and older Relay rows lacked the identity needed to merge and persist canonical local titles.
@@ -25,9 +25,9 @@ Two independent regressions were reproduced and fixed in an isolated worktree wi
 - Restart reconciliation inventories and decrypts Relay messages, compares canonical logical digests, and binds status only to the exact `session:<envelope.id>` Relay `localId`.
 - Relay acknowledgements are applied per item. Missing acknowledgements remain queued.
 - A genuine localId/content collision remains a strict structured HTTP 409. The CLI quarantines the conflicting item, reports `history_gap`, and continues sending later items instead of creating head-of-line blocking.
-- Canonical mapping now processes the complete JSONL sequence before selecting post-watermark or newly appended groups, preserving assistant/tool-result turn identity across slice boundaries.
+- Canonical mapping now processes the complete JSONL sequence before selecting post-append-checkpoint or newly appended groups, preserving assistant/tool-result turn identity across slice boundaries.
 - Each JSONL entry is capped once as a canonical envelope group. Full replay and history pagination therefore never reuse one localId for differently truncated content.
-- Durable watermarks advance only through the continuously Relay-confirmed canonical entry prefix. Startup, `agent_end`, external mirroring, and history pagination all fail closed on conflicts or unconfirmed content.
+- The legacy-named local history file stores an append checkpoint: it advances only through continuously Relay-confirmed forward entries and is not proof that every older JSONL entry has already been imported. Older coverage is tracked independently by Relay metadata's progressive `piHistoryCursor`; conflicts or unconfirmed content fail closed with `history_gap`.
 
 ## Discovery and name fix
 
