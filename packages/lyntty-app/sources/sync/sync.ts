@@ -39,7 +39,8 @@ import { encryptBlob } from '@/encryption/blob';
 import { readFileBytes } from '@/utils/readFileBytes';
 import { Modal } from '@/modal';
 import { t } from '@/text';
-import { mergePiDiscoveredSessions } from './piDiscoveredSessions';
+import { mergePiDiscoveredSessions, shouldFetchPiSessionDiscovery } from './piDiscoveredSessions';
+import { findPiSessionNameBackfills, persistPiSessionNameBackfills } from './piSessionNamePersistence';
 import { canControlSession } from './sessionControlPolicy';
 import { applyPiHistoryPageResult, type PiHistoryPageResult } from './piHistoryPage';
 import { listPiSessionsResultSchema, parseMachineRpcResult } from './machineRpcSchemas';
@@ -113,6 +114,7 @@ class Sync {
     private pushTokenSync: InvalidateSync;
     private nativeUpdateSync: InvalidateSync;
     private piSessionsFetchInFlight: Promise<Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }>> | null = null;
+    private piSessionNameBackfillInFlight: Promise<void> | null = null;
     private activityAccumulator: ActivityUpdateAccumulator;
     private pendingSettings: Partial<Settings> = loadPendingSettings();
     private appState: AppStateStatus = AppState.currentState;
@@ -198,6 +200,7 @@ class Sync {
         this.pendingSettings = {};
         savePendingSettings(this.pendingSettings);
         this.piSessionsFetchInFlight = null;
+        this.piSessionNameBackfillInFlight = null;
         this.clearBackgroundSendWatchdog();
         void this.cancelBackgroundSendTimeoutNotification();
         this.backgroundSendStartedAt = null;
@@ -849,6 +852,70 @@ class Sync {
     // Private
     //
 
+    private persistCanonicalPiSessionNames = async (
+        relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
+        mergedSessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
+    ): Promise<void> => {
+        const candidates = findPiSessionNameBackfills(relaySessions, mergedSessions);
+        if (candidates.length === 0) return;
+        const result = await persistPiSessionNameBackfills(candidates, {
+            encryptMetadata: async (sessionId, metadata) => {
+                const sessionEncryption = this.encryption.getSessionEncryption(sessionId);
+                if (!sessionEncryption) throw new Error('Session encryption is unavailable');
+                return sessionEncryption.encryptMetadata(metadata);
+            },
+            decryptMetadata: async (sessionId, version, ciphertext) => {
+                const sessionEncryption = this.encryption.getSessionEncryption(sessionId);
+                if (!sessionEncryption) return null;
+                return sessionEncryption.decryptMetadata(version, ciphertext);
+            },
+            updateMetadata: async ({ sessionId, metadata, expectedVersion }) => {
+                const response = await apiSocket.emitWithAck<{
+                    result: 'success' | 'version-mismatch' | 'error';
+                    version?: number;
+                    metadata?: string;
+                    message?: string;
+                }>('update-metadata', {
+                    sid: sessionId,
+                    metadata,
+                    expectedVersion,
+                }, 10_000);
+                if (
+                    (response.result === 'success' || response.result === 'version-mismatch')
+                    && typeof response.version === 'number'
+                    && typeof response.metadata === 'string'
+                ) {
+                    return {
+                        result: response.result,
+                        version: response.version,
+                        metadata: response.metadata,
+                    };
+                }
+                return { result: 'error', message: response.message };
+            },
+        });
+        if (result.failed > 0) {
+            console.warn(`Failed to persist ${result.failed}/${candidates.length} canonical Pi session name(s)`);
+        }
+    };
+
+    private queueCanonicalPiSessionNamePersistence = (
+        relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
+        mergedSessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
+    ): void => {
+        if (this.piSessionNameBackfillInFlight) return;
+        const pending = this.persistCanonicalPiSessionNames(relaySessions, mergedSessions)
+            .catch((error) => {
+                console.warn('Failed to persist canonical Pi session names', error);
+            })
+            .finally(() => {
+                if (this.piSessionNameBackfillInFlight === pending) {
+                    this.piSessionNameBackfillInFlight = null;
+                }
+            });
+        this.piSessionNameBackfillInFlight = pending;
+    };
+
     private fetchMachinePiSessions = async (): Promise<Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }>> => {
         if (this.piSessionsFetchInFlight) {
             return this.piSessionsFetchInFlight;
@@ -856,8 +923,7 @@ class Sync {
 
         const request = (async () => {
             const machines = Object.values(storage.getState().machines)
-                .filter(machine => machine.metadata?.cliAvailability?.pi !== false)
-                .filter(machine => machine.active);
+                .filter(shouldFetchPiSessionDiscovery);
 
             const pageSize = 100;
             const maxRecordsPerMachine = 5000;
@@ -1000,6 +1066,7 @@ class Sync {
         // Apply to storage. This is a full server/discovery snapshot, so remove
         // stale rows from a previous account, server, or deleted relay state.
         this.applySessions(sessionsWithPiHistory, { replace: true });
+        this.queueCanonicalPiSessionNamePersistence(decryptedSessions, sessionsWithPiHistory);
         // Canonical relay sessions may appear after startup. Reconcile after
         // every full snapshot so their synthetic sends cannot be stranded.
         this.reconcileSyntheticOutbox();

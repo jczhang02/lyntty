@@ -110,6 +110,7 @@ export type TodoItem = z.infer<typeof TodoItemSchema>;
 
 export interface Session {
     id: string,
+    tag?: string,
     seq: number,
     createdAt: number,
     updatedAt: number,
@@ -177,6 +178,9 @@ export const MachineMetadataSchema = z.object({
         gemini: z.boolean().optional(),
         openclaw: z.boolean().optional(),
     }).optional(),
+    piSessionDiscovery: z.object({
+        available: z.boolean(),
+    }).optional(),
     resumeSupport: z.object({
         rpcAvailable: z.boolean(),
         requiresSameMachine: z.boolean(),
@@ -204,6 +208,7 @@ export interface PiMachineSessionRecord {
     state: PiRecoveryState;
     piSessionId: string;
     relaySessionId?: string;
+    relaySessionTag?: string;
     path?: string;
     cwd?: string;
     name?: string;

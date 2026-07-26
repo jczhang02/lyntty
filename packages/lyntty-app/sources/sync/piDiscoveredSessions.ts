@@ -1,5 +1,24 @@
 import type { Machine, PiMachineSessionRecord, Session } from './storageTypes';
 
+const GENERIC_PI_SESSION_TITLES = new Set([
+    'pi',
+    'pi session',
+    '(no messages)',
+    'no messages',
+]);
+
+export function normalizeCanonicalPiSessionTitle(value?: string | null): string | undefined {
+    const candidate = value?.trim();
+    if (!candidate || GENERIC_PI_SESSION_TITLES.has(candidate.toLocaleLowerCase())) {
+        return undefined;
+    }
+    return candidate;
+}
+
+export function shouldFetchPiSessionDiscovery(machine: Machine): boolean {
+    return machine.active && machine.metadata?.piSessionDiscovery?.available !== false;
+}
+
 export function getSyntheticPiSessionId(machineId: string, piSessionId: string): string {
     return `pi-local:${machineId}:${piSessionId}`;
 }
@@ -33,8 +52,13 @@ function shouldShowRelaySession(session: Omit<Session, 'presence'> & { presence?
     return true;
 }
 
+function resolveCanonicalPiSessionTitle(record: PiMachineSessionRecord): string | undefined {
+    return normalizeCanonicalPiSessionTitle(record.name)
+        ?? normalizeCanonicalPiSessionTitle(record.firstMessage);
+}
+
 function resolvePiSessionTitle(record: PiMachineSessionRecord, fallback: string): string {
-    return record.name?.trim() || record.firstMessage?.trim() || fallback;
+    return resolveCanonicalPiSessionTitle(record) ?? fallback;
 }
 
 function resolvePiRuntimeOwner(record: PiMachineSessionRecord): string {
@@ -111,6 +135,9 @@ export function enrichSessionWithPiDiscovery(
         metadata: {
             ...(session.metadata ?? {}),
             ...discoveredMetadata,
+            name: resolveCanonicalPiSessionTitle(record)
+                ?? session.metadata?.name
+                ?? discoveredMetadata.name,
             path: session.metadata?.path ?? discoveredMetadata.path,
             homeDir: session.metadata?.homeDir ?? discoveredMetadata.homeDir,
             lynttyHomeDir: session.metadata?.lynttyHomeDir ?? discoveredMetadata.lynttyHomeDir,
@@ -156,6 +183,9 @@ export function mergePiDiscoveredSessions(
 ): Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }> {
     const merged = relaySessions.filter(shouldShowRelaySession);
     const byRelayId = new Map(merged.map((session, index) => [session.id, index]));
+    const byRelayTag = new Map(merged.flatMap((session, index) => (
+        session.tag ? [[session.tag, index] as const] : []
+    )));
     const byPiId = new Map<string, number>();
 
     merged.forEach((session, index) => {
@@ -172,9 +202,13 @@ export function mergePiDiscoveredSessions(
                 continue;
             }
 
-            const existingIndex = record.relaySessionId
+            const existingIndex = (record.relaySessionId
                 ? byRelayId.get(record.relaySessionId)
-                : byPiId.get(`${machine.id}:${record.piSessionId}`);
+                : undefined)
+                ?? (record.relaySessionTag
+                    ? byRelayTag.get(record.relaySessionTag)
+                    : undefined)
+                ?? byPiId.get(`${machine.id}:${record.piSessionId}`);
 
             if (existingIndex !== undefined) {
                 merged[existingIndex] = enrichSessionWithPiDiscovery(merged[existingIndex], record, machine);

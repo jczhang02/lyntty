@@ -15,6 +15,7 @@ describe('MachineMetadataSchema', () => {
         const parsed = MachineMetadataSchema.parse({
             ...baseMetadata,
             cliAvailability: { pi: true, detectedAt: 1 },
+            piSessionDiscovery: { available: true },
             resumeSupport: {
                 rpcAvailable: true,
                 requiresSameMachine: true,
@@ -25,11 +26,12 @@ describe('MachineMetadataSchema', () => {
         });
 
         expect(parsed.cliAvailability).toEqual({ pi: true, detectedAt: 1 });
+        expect(parsed.piSessionDiscovery).toEqual({ available: true });
         expect(parsed.resumeSupport?.remoteAuthenticated).toBe(true);
     });
 
     it('keeps older machine metadata readable during the compatibility window', () => {
-        expect(() => MachineMetadataSchema.parse({
+        const parsed = MachineMetadataSchema.parse({
             ...baseMetadata,
             cliAvailability: {
                 pi: true,
@@ -46,6 +48,8 @@ describe('MachineMetadataSchema', () => {
                 lynttyAgentAuthenticated: true,
                 detectedAt: 2,
             },
-        })).not.toThrow();
+        });
+
+        expect(parsed.piSessionDiscovery).toBeUndefined();
     });
 });

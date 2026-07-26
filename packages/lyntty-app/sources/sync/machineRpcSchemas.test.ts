@@ -12,6 +12,7 @@ import {
 const completePiRecord = {
     state: 'discovered_local' as const,
     piSessionId: 'pi-1',
+    relaySessionTag: 'pi:stable-tag',
     messageCount: 1,
     needsRegistration: true,
     needsBackfill: true,
@@ -26,11 +27,15 @@ describe('machine RPC response validation', () => {
             sessionId: 'relay-1',
         })).toEqual({ type: 'success', sessionId: 'relay-1' });
 
-        expect(parseMachineRpcResult('list-pi-sessions', listPiSessionsResultSchema)({
+        const discovered = parseMachineRpcResult('list-pi-sessions', listPiSessionsResultSchema)({
             type: 'success',
             sessions: [completePiRecord],
             total: 1,
-        })).toMatchObject({ type: 'success', sessions: [completePiRecord] });
+        });
+        expect(discovered).toMatchObject({ type: 'success', sessions: [completePiRecord] });
+        if (discovered.type === 'success') {
+            expect(discovered.sessions[0]?.relaySessionTag).toBe('pi:stable-tag');
+        }
         expect(parseMachineRpcResult('worktree-list', worktreeListResultSchema)({
             success: true,
             worktrees: [{ path: '/repo/.dev/worktree/a', branch: 'a' }],
