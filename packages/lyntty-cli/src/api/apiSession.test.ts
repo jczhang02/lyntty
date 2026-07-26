@@ -187,6 +187,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
             off: mock(),
             emit: mock(),
             emitWithAck: mock(async () => ({ result: 'error' })),
+            timeout: mock(() => mockSocket),
             volatile: {
                 emit: mock()
             },
@@ -208,6 +209,62 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect(mockSocket.on).toHaveBeenCalledWith('disconnect', expect.any(Function));
         expect(mockSocket.on).toHaveBeenCalledWith('update', expect.any(Function));
         expect(mockSocket.connect).toHaveBeenCalledTimes(1);
+    });
+
+    it('bounds every metadata commit and releases the metadata lock for history retry', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        mockSocket.emitWithAck.mockResolvedValue({ result: 'error' });
+
+        await expect(client.updateMetadataAndAwait(
+            (metadata) => ({ ...metadata, name: 'first attempt' }),
+        )).rejects.toThrow('Metadata update did not complete within 10000ms');
+
+        const recoveredMetadata = { ...session.metadata, name: 'recovered' };
+        mockSocket.emitWithAck.mockResolvedValue({
+            result: 'success',
+            metadata: encryptContent(session, recoveredMetadata),
+            version: 1,
+        });
+        await client.updateMetadataAndAwait(
+            (metadata) => ({ ...metadata, name: 'recovered' }),
+            { timeoutMs: 100 },
+        );
+
+        expect(mockSocket.timeout).toHaveBeenCalled();
+        expect(client.getMetadata()?.name).toBe('recovered');
+    });
+
+    it('releases a queued history commit after a prior metadata ACK is lost', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        let rejectLostAck: ((error: Error) => void) | undefined;
+        mockSocket.emitWithAck.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+            rejectLostAck = reject;
+        }));
+
+        const lostAckUpdate = client.updateMetadataAndAwait(
+            (metadata) => ({ ...metadata, name: 'lost ack' }),
+            { timeoutMs: 100 },
+        );
+        for (let attempt = 0; attempt < 10 && !rejectLostAck; attempt++) {
+            await Promise.resolve();
+        }
+
+        const recoveredMetadata = { ...session.metadata, name: 'history recovered' };
+        mockSocket.emitWithAck.mockResolvedValueOnce({
+            result: 'success',
+            metadata: encryptContent(session, recoveredMetadata),
+            version: 1,
+        });
+        const historyUpdate = client.updateMetadataAndAwait(
+            (metadata) => ({ ...metadata, name: 'history recovered' }),
+            { timeoutMs: 100 },
+        );
+
+        rejectLostAck?.(new Error('operation has timed out'));
+
+        await expect(lostAckUpdate).rejects.toThrow('Metadata update did not complete within 100ms');
+        await expect(historyUpdate).resolves.toBeUndefined();
+        expect(client.getMetadata()?.name).toBe('history recovered');
     });
 
     it('retries after initial socket connection error', async () => {

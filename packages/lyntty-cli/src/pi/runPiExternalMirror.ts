@@ -137,6 +137,15 @@ export class PiExternalMirror {
     this.markCurrentEntriesDeliveredSince(Number.NEGATIVE_INFINITY);
   }
 
+  markEntryIdsDelivered(entryIds: Iterable<string>): void {
+    const deliveredIds = new Set(entryIds);
+    this.pendingEntries = this.pendingEntries.filter((entry) => !deliveredIds.has(entry.id));
+    for (const entryId of deliveredIds) {
+      this.knownEntryIds.add(entryId);
+      this.relayConfirmedEntryIds.add(entryId);
+    }
+  }
+
   markCurrentEntriesDeliveredSince(cutoffTimeMs: number, options: { includeAssistantMessages?: boolean } = {}): void {
     const entries = readPiSessionEntries(this.sessionFile);
     const deliveredIds = new Set(entries
@@ -295,7 +304,7 @@ export function startPiExternalMirror(options: {
   isManagedRuntimeActive?: () => boolean;
   onHistoryGap?: (reason: string) => void | Promise<void>;
   pollMs?: number;
-}): { stop: () => Promise<void>; isEntryRelayConfirmed: (entryId: string) => boolean; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void; markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => void; capAssistantTextDeliveryWindow: (untilTimeMs: number) => void } | null {
+}): { stop: () => Promise<void>; isEntryRelayConfirmed: (entryId: string) => boolean; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markEntryIdsDelivered: (entryIds: Iterable<string>) => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void; markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => void; capAssistantTextDeliveryWindow: (untilTimeMs: number) => void } | null {
   if (!options.sessionFile) {
     return null;
   }
@@ -373,6 +382,7 @@ export function startPiExternalMirror(options: {
     isEntryRelayConfirmed: (entryId: string) => mirror.isEntryRelayConfirmed(entryId),
     markCurrentEntriesKnown: () => mirror.markCurrentEntriesKnown(),
     markCurrentEntriesDelivered: () => mirror.markCurrentEntriesDelivered(),
+    markEntryIdsDelivered: (entryIds: Iterable<string>) => mirror.markEntryIdsDelivered(entryIds),
     markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options),
     markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => mirror.markUserTextDeliveredSince(text, cutoffTimeMs),
     markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => mirror.markAssistantTextDeliveredSince(text, cutoffTimeMs, untilTimeMs),

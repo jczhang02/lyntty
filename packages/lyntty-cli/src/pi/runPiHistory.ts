@@ -46,13 +46,13 @@ export function analyzePiHistoryEnvelopeGroups(
   missing: SessionEnvelope[];
   matching: SessionEnvelope[];
   conflicting: SessionEnvelope[];
-  contiguousWatermarkEntryId?: string;
+  contiguousAppendCheckpointEntryId?: string;
 } {
   const result: {
     missing: SessionEnvelope[];
     matching: SessionEnvelope[];
     conflicting: SessionEnvelope[];
-    contiguousWatermarkEntryId?: string;
+    contiguousAppendCheckpointEntryId?: string;
   } = {
     missing: [],
     matching: [],
@@ -74,7 +74,7 @@ export function analyzePiHistoryEnvelopeGroups(
       }
     }
     if (prefixIsMatching && groupIsMatching) {
-      result.contiguousWatermarkEntryId = group.entryId;
+      result.contiguousAppendCheckpointEntryId = group.entryId;
     } else {
       prefixIsMatching = false;
     }
@@ -423,7 +423,7 @@ export function mapPiSessionHistoryToEnvelopeGroups(entries: SessionEntry[]): Pi
   return groups.map((group) => ({
     ...group,
     // A JSONL entry is the durable idempotency unit. Cap it independently so
-    // full replay, post-watermark replay, and history pages always encrypt the
+    // full replay, post-checkpoint replay, and history pages always encrypt the
     // same content under session:<envelope.id>.
     envelopes: capHistoryEnvelopes(group.envelopes, MAX_CANONICAL_HISTORY_ENTRY_BYTES),
   }));
@@ -435,6 +435,7 @@ export function mapPiSessionHistoryToEnvelopes(entries: SessionEntry[]): Session
 
 export type PiHistoryPage = {
   envelopes: SessionEnvelope[];
+  startEntryId?: string;
   nextCursor?: string;
   hasMore: boolean;
   totalMessages: number;
@@ -486,6 +487,38 @@ function fallbackHistoryEnvelope(envelopes: SessionEnvelope[], maxBytes: number)
       time: first.time,
     })];
   }
+  let keptText = false;
+  const structural = envelopes.flatMap((envelope): SessionEnvelope[] => {
+    if (envelope.ev.t === 'text') {
+      if (keptText) return [];
+      keptText = true;
+      return [{
+        ...envelope,
+        ev: {
+          ...envelope.ev,
+          text: truncateTextToBytes(envelope.ev.text, Math.max(256, Math.floor(maxBytes / 4))),
+        },
+      }];
+    }
+    if (envelope.ev.t === 'tool-call-start') {
+      return [{
+        ...envelope,
+        ev: { ...envelope.ev, args: { truncated: true } },
+      }];
+    }
+    if (
+      envelope.ev.t === 'turn-start'
+      || envelope.ev.t === 'tool-call-end'
+      || envelope.ev.t === 'turn-end'
+    ) {
+      return [{ ...envelope, ev: { ...envelope.ev } }];
+    }
+    return [];
+  });
+  if (structural.length > 0 && byteLength(JSON.stringify(structural)) <= maxBytes) {
+    return structural;
+  }
+
   const turn = first.turn ?? `${first.id}-turn`;
   return [
     createEnvelope('agent', { t: 'turn-start' }, { id: `${first.id}-truncated-start`, turn, time: first.time }),
@@ -608,13 +641,39 @@ export function mapPiSessionHistoryPageToEnvelopes(
   ));
   let envelopes = pageEnvelopes();
   while (pageEntries.length > 1 && byteLength(JSON.stringify(envelopes)) > maxBytes) {
-    pageEntries = pageEntries.slice(1);
-    start++;
+    const firstEntry = pageEntries[0];
+    let removeCount = 1;
+    if (
+      firstEntry?.type === 'message'
+      && messageRole(firstEntry.message) === 'assistant'
+    ) {
+      while (removeCount < pageEntries.length) {
+        const candidate = pageEntries[removeCount];
+        if (
+          candidate.type !== 'message'
+          || messageRole(candidate.message) !== 'toolResult'
+          || candidate.parentId !== firstEntry.id
+        ) {
+          break;
+        }
+        removeCount++;
+      }
+    }
+    // A parent assistant entry and its tool results are one renderable turn
+    // boundary. If that atomic boundary is the whole remaining page, keep it
+    // together even when its independently canonical-capped entries exceed the
+    // page target; dropping either side would create an unreachable orphan.
+    if (removeCount === pageEntries.length) {
+      break;
+    }
+    pageEntries = pageEntries.slice(removeCount);
+    start += removeCount;
     envelopes = pageEnvelopes();
   }
 
   return {
     envelopes,
+    startEntryId: pageEntries[0]?.id,
     nextCursor: start > 0 ? pageEntries[0]?.id : undefined,
     hasMore: start > 0,
     totalMessages: renderableEntries.length,

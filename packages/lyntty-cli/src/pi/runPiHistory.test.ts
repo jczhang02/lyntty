@@ -204,6 +204,64 @@ describe('mapPiSessionHistoryToEnvelopes', () => {
     ))).toBe(true);
   });
 
+  it('keeps an oversized assistant and its tool result on the same page boundary', () => {
+    const entries = [
+      {
+        type: 'message',
+        id: 'a1',
+        parentId: 'u0',
+        timestamp: '2026-07-01T09:00:01.000Z',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'toolCall', id: 'call-1', name: 'read', arguments: { path: 'large.txt' } },
+            ...Array.from({ length: 200 }, (_, index) => ({
+              type: 'text',
+              text: `${'x'.repeat(20_000)}${index}`,
+            })),
+          ],
+        },
+      },
+      {
+        type: 'message',
+        id: 't1',
+        parentId: 'a1',
+        timestamp: '2026-07-01T09:00:02.000Z',
+        message: {
+          role: 'toolResult',
+          toolCallId: 'call-1',
+          toolName: 'read',
+          content: 'y'.repeat(20_000),
+          isError: false,
+        },
+      },
+      ...Array.from({ length: 49 }, (_, index) => ({
+        type: 'message',
+        id: `u${index + 1}`,
+        parentId: index === 0 ? 't1' : `u${index}`,
+        timestamp: `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`,
+        message: { role: 'user', content: `later ${index + 1}` },
+      })),
+    ] as any[];
+
+    const tail = mapPiSessionHistoryPageToEnvelopes(entries, { limit: 50, maxBytes: 256_000 });
+    const tailStarts = new Set(tail.envelopes.flatMap((envelope) => (
+      envelope.ev.t === 'tool-call-start' ? [envelope.ev.call] : []
+    )));
+    const tailEnds = tail.envelopes.flatMap((envelope) => (
+      envelope.ev.t === 'tool-call-end' ? [envelope.ev.call] : []
+    ));
+    expect(tailEnds.every((call) => tailStarts.has(call))).toBe(true);
+
+    const older = mapPiSessionHistoryPageToEnvelopes(entries, {
+      beforeEntryId: tail.nextCursor,
+      limit: 50,
+      maxBytes: 256_000,
+    });
+    expect(older.envelopes.map((envelope) => envelope.ev.t)).toContain('tool-call-start');
+    expect(older.envelopes.map((envelope) => envelope.ev.t)).toContain('tool-call-end');
+  });
+
   it('paginates historical Pi messages from the tail with an older cursor', () => {
     const entries = Array.from({ length: 5 }, (_, index) => ({
       type: 'message',
@@ -280,6 +338,6 @@ describe('mapPiSessionHistoryToEnvelopes', () => {
 
     expect(result.missing.map((envelope) => envelope.id)).toEqual([groups[2].envelopes[0].id]);
     expect(result.conflicting.map((envelope) => envelope.id)).toEqual([groups[1].envelopes[0].id]);
-    expect(result.contiguousWatermarkEntryId).toBe('u1');
+    expect(result.contiguousAppendCheckpointEntryId).toBe('u1');
   });
 });

@@ -139,6 +139,24 @@ describe('PiExternalMirror', () => {
     }
   });
 
+  it('marks only explicitly live-delivered entry ids as Relay confirmed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'startup history');
+      const second = userEntry('u2', 'live turn');
+      writeJsonl(file, [header, first, second]);
+      const mirror = new PiExternalMirror(file, [first], () => undefined, 2_000);
+
+      mirror.markEntryIdsDelivered(['u2']);
+
+      expect(mirror.isEntryRelayConfirmed('u1')).toBe(false);
+      expect(mirror.isEntryRelayConfirmed('u2')).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('mirrors new JSONL entries only after a quiet window', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {

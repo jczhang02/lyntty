@@ -15,7 +15,7 @@ function envelopeId(entryId: string): string {
 }
 
 describe('reconcilePiCanonicalHistory', () => {
-  it('sends missing entries after a true conflict and keeps a contiguous watermark', async () => {
+  it('sends missing entries after a true conflict and keeps a contiguous append checkpoint', async () => {
     const statuses = new Map<string, SessionProtocolEnvelopeStatus>([
       [envelopeId('u1'), 'matching'],
       [envelopeId('u2'), 'conflict'],
@@ -40,7 +40,7 @@ describe('reconcilePiCanonicalHistory', () => {
     expect(sent).toEqual([envelopeId('u3')]);
     expect(result.conflicting.map((envelope) => envelope.id)).toEqual([envelopeId('u2')]);
     expect(result.missing).toEqual([]);
-    expect(result.contiguousWatermarkEntryId).toBe('u1');
+    expect(result.contiguousAppendCheckpointEntryId).toBe('u1');
   });
 
   it('reconciles restart replay from Relay inventory without re-encrypting', async () => {
@@ -62,10 +62,34 @@ describe('reconcilePiCanonicalHistory', () => {
 
     expect(client.sendSessionProtocolMessage).not.toHaveBeenCalled();
     expect(client.flushConfirmed).not.toHaveBeenCalled();
-    expect(result.contiguousWatermarkEntryId).toBe('u3');
+    expect(result.contiguousAppendCheckpointEntryId).toBe('u3');
   });
 
-  it('maps a post-watermark tool result with full canonical turn context', async () => {
+  it('does not duplicate managed live entries marked Relay-confirmed after flush', async () => {
+    const client = {
+      syncExistingSessionProtocolEnvelopeIds: mock(async () => undefined),
+      getSessionProtocolEnvelopeStatus: () => 'missing' as const,
+      sendSessionProtocolMessage: mock(),
+      flushConfirmed: mock(async () => undefined),
+    };
+
+    const result = await reconcilePiCanonicalHistory({
+      entries,
+      afterEntryId: 'u1',
+      client,
+      isEntryRelayConfirmed: (entryId) => entryId === 'u2' || entryId === 'u3',
+    });
+
+    expect(client.sendSessionProtocolMessage).not.toHaveBeenCalled();
+    expect(client.syncExistingSessionProtocolEnvelopeIds).not.toHaveBeenCalled();
+    expect(result.matching.map((envelope) => envelope.id)).toEqual([
+      envelopeId('u2'),
+      envelopeId('u3'),
+    ]);
+    expect(result.contiguousAppendCheckpointEntryId).toBe('u3');
+  });
+
+  it('maps a post-checkpoint tool result with full canonical turn context', async () => {
     const toolEntries = [
       {
         type: 'message',
@@ -106,7 +130,51 @@ describe('reconcilePiCanonicalHistory', () => {
       'pi-history-t1-tool-end',
       'pi-history-t1-end',
     ]);
-    expect(result.contiguousWatermarkEntryId).toBe('t1');
+    expect(result.contiguousAppendCheckpointEntryId).toBe('t1');
+  });
+
+  it('reconciles a bounded progressive tail when no append checkpoint exists yet', async () => {
+    const statuses = new Map<string, SessionProtocolEnvelopeStatus>([
+      [envelopeId('u2'), 'matching'],
+      [envelopeId('u3'), 'matching'],
+    ]);
+    const client = {
+      syncExistingSessionProtocolEnvelopeIds: mock(async () => undefined),
+      getSessionProtocolEnvelopeStatus: (envelope: { id: string }) => statuses.get(envelope.id) ?? 'missing',
+      sendSessionProtocolMessage: mock(),
+      flushConfirmed: mock(async () => undefined),
+    };
+
+    const result = await reconcilePiCanonicalHistory({
+      entries,
+      startAtEntryId: 'u2',
+      client,
+      isEntryRelayConfirmed: () => false,
+    });
+
+    expect(result.matching.map((envelope) => envelope.id)).toEqual([envelopeId('u2'), envelopeId('u3')]);
+    expect(client.sendSessionProtocolMessage).not.toHaveBeenCalled();
+    expect(result.contiguousAppendCheckpointEntryId).toBe('u3');
+  });
+
+  it('fails closed instead of replaying all history when a bounded start entry is missing', async () => {
+    const client = {
+      syncExistingSessionProtocolEnvelopeIds: mock(async () => undefined),
+      getSessionProtocolEnvelopeStatus: () => 'missing' as const,
+      sendSessionProtocolMessage: mock(),
+      flushConfirmed: mock(async () => undefined),
+    };
+
+    const result = await reconcilePiCanonicalHistory({
+      entries,
+      startAtEntryId: 'missing',
+      client,
+      isEntryRelayConfirmed: () => false,
+    });
+
+    expect(result.startEntryMissing).toBe(true);
+    expect(result.sent).toBe(0);
+    expect(client.sendSessionProtocolMessage).not.toHaveBeenCalled();
   });
 
   it('reports a post-inventory conflict while still confirming later envelopes', async () => {
@@ -133,7 +201,7 @@ describe('reconcilePiCanonicalHistory', () => {
     expect(sent).toEqual(entries.map((entry) => envelopeId(entry.id)));
     expect(result.conflicting.map((envelope) => envelope.id)).toEqual([envelopeId('u1')]);
     expect(result.missing).toEqual([]);
-    expect(result.contiguousWatermarkEntryId).toBeUndefined();
+    expect(result.contiguousAppendCheckpointEntryId).toBeUndefined();
   });
 });
 

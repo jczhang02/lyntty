@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events'
 import { io, Socket } from 'socket.io-client'
 import { AgentState, ClientToServerEvents, FileEventMessage, FileEventMessageSchema, Metadata, ServerToClientEvents, Session, Update, UserMessage, UserMessageSchema } from './types'
 import { decodeBase64, decryptBlob, decrypt, encodeBase64, encrypt, encryptBlob } from './encryption';
-import { backoff } from '@/utils/time';
+import { backoff, delay } from '@/utils/time';
 import { configuration } from '@/configuration';
 import { createHash, randomUUID } from 'node:crypto';
 import { AsyncLock } from '@/utils/lock';
@@ -931,11 +931,26 @@ export class ApiSessionClient extends EventEmitter {
         this.skipMessagesThroughSeq = Math.max(0, Math.min(this.initialServerSeq, relaySeq));
     }
 
-    async updateMetadataAndAwait(handler: (metadata: Metadata) => Metadata) {
+    async updateMetadataAndAwait(
+        handler: (metadata: Metadata) => Metadata,
+        options?: { timeoutMs?: number },
+    ) {
+        const timeoutMs = Math.max(1, options?.timeoutMs ?? 10_000);
+        // Metadata ACKs are always bounded. Fire-and-forget callers share this
+        // lock with history commits, so one lost ACK must never hold the lock
+        // forever and strand every later cursor update.
+        const deadline = Date.now() + timeoutMs;
         await this.metadataLock.inLock(async () => {
-            await backoff(async () => {
+            const updateOnce = async () => {
                 let updated = handler(this.metadata!); // Weird state if metadata is null - should never happen but here we are
-                const answer = await this.socket.emitWithAck('update-metadata', { sid: this.sessionId, expectedVersion: this.metadataVersion, metadata: encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, updated)) });
+                const payload = { sid: this.sessionId, expectedVersion: this.metadataVersion, metadata: encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, updated)) };
+                const remainingMs = deadline - Date.now();
+                if (remainingMs <= 0) {
+                    throw new Error('Metadata update deadline exceeded');
+                }
+                const answer = await this.socket
+                    .timeout(Math.max(1, Math.min(5_000, remainingMs)))
+                    .emitWithAck('update-metadata', payload);
                 if (answer.result === 'success') {
                     this.metadata = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(answer.metadata));
                     this.metadataVersion = answer.version;
@@ -948,12 +963,33 @@ export class ApiSessionClient extends EventEmitter {
                 } else if (answer.result === 'error') {
                     throw new Error('Metadata update was rejected by relay');
                 }
+            };
+
+            const maxAttempts = Math.max(1, Math.ceil(timeoutMs / 250));
+            let lastError: unknown;
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                try {
+                    await updateOnce();
+                    return;
+                } catch (error) {
+                    lastError = error;
+                    const remainingMs = deadline - Date.now();
+                    if (attempt === maxAttempts - 1 || remainingMs <= 0) {
+                        break;
+                    }
+                    await delay(Math.min(250, remainingMs));
+                }
+            }
+            throw new Error(`Metadata update did not complete within ${timeoutMs}ms`, {
+                cause: lastError,
             });
         });
     }
 
     updateMetadata(handler: (metadata: Metadata) => Metadata) {
-        void this.updateMetadataAndAwait(handler);
+        void this.updateMetadataAndAwait(handler).catch((error) => {
+            logger.debug('[API] Metadata update deferred after bounded retries', error);
+        });
     }
 
     /**

@@ -72,6 +72,7 @@ export async function reconcilePiHistoryEnvelopes(options: {
 export async function reconcilePiCanonicalHistory(options: {
   entries: SessionEntry[];
   afterEntryId?: string;
+  startAtEntryId?: string;
   client: PiHistoryReconciliationClient;
   isEntryRelayConfirmed: (entryId: string) => boolean;
   allowRelayConfirmedEntries?: boolean;
@@ -79,7 +80,9 @@ export async function reconcilePiCanonicalHistory(options: {
   missing: SessionEnvelope[];
   matching: SessionEnvelope[];
   conflicting: SessionEnvelope[];
-  contiguousWatermarkEntryId?: string;
+  contiguousAppendCheckpointEntryId?: string;
+  afterEntryMissing: boolean;
+  startEntryMissing: boolean;
   sent: number;
   outboxConflictLocalIds: string[];
 }> {
@@ -87,9 +90,18 @@ export async function reconcilePiCanonicalHistory(options: {
   const afterEntryIndex = options.afterEntryId
     ? canonicalGroups.findIndex((group) => group.entryId === options.afterEntryId)
     : -1;
-  const groups = options.afterEntryId && afterEntryIndex >= 0
-    ? canonicalGroups.slice(afterEntryIndex + 1)
-    : canonicalGroups;
+  const startAtEntryIndex = options.startAtEntryId
+    ? canonicalGroups.findIndex((group) => group.entryId === options.startAtEntryId)
+    : -1;
+  const afterEntryMissing = !!options.afterEntryId && afterEntryIndex < 0;
+  const startEntryMissing = !!options.startAtEntryId && startAtEntryIndex < 0;
+  const groups = afterEntryMissing || startEntryMissing
+    ? []
+    : options.afterEntryId
+      ? canonicalGroups.slice(afterEntryIndex + 1)
+      : options.startAtEntryId
+        ? canonicalGroups.slice(startAtEntryIndex)
+        : canonicalGroups;
   const allowRelayConfirmedEntries = options.allowRelayConfirmedEntries !== false;
   const relayConfirmedEnvelopeIds = new Set(groups.flatMap((group) => (
     allowRelayConfirmedEntries && options.isEntryRelayConfirmed(group.entryId)
@@ -130,6 +142,8 @@ export async function reconcilePiCanonicalHistory(options: {
 
   return {
     ...analyzePiHistoryEnvelopeGroups(groups, getStatus),
+    afterEntryMissing,
+    startEntryMissing,
     sent: initial.missing.length,
     outboxConflictLocalIds,
   };

@@ -24,7 +24,7 @@ class Configuration {
   public readonly sessionsFile: string
   public readonly piCommandLedgerDir: string
   public readonly piCommandBoundaryDir: string
-  public readonly piHistoryWatermarkDir: string
+  public readonly piHistoryAppendCheckpointDir: string
   public readonly currentCliVersion: string
 
   public readonly isExperimentalEnabled: boolean
@@ -53,7 +53,8 @@ class Configuration {
     this.sessionsFile = join(this.lynttyHomeDir, 'sessions.json')
     this.piCommandLedgerDir = join(this.lynttyHomeDir, 'pi-command-ledger')
     this.piCommandBoundaryDir = join(this.lynttyHomeDir, 'pi-command-boundary')
-    this.piHistoryWatermarkDir = join(this.lynttyHomeDir, 'pi-history-watermark')
+    // Keep the legacy directory name so upgrades reuse existing checkpoints.
+    this.piHistoryAppendCheckpointDir = join(this.lynttyHomeDir, 'pi-history-watermark')
 
     // The relay URL is the only persisted network endpoint used by the CLI.
     // Settings are read sync here (avoid circular import with persistence.ts).

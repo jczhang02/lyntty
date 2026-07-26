@@ -10,7 +10,7 @@ import {
 import { ApiClient } from '@/api/api';
 import type { ApiSessionClient } from '@/api/apiSession';
 import { encodeBase64 } from '@/api/encryption';
-import { Credentials, persistPiCommandBoundary, persistPiCommandOutcome, readPersistedPiCommandBoundary, readPersistedPiCommandOutcomes, readSettings } from '@/persistence';
+import { Credentials, persistPiCommandBoundary, persistPiCommandOutcome, persistPiHistoryAppendCheckpoint, readPersistedPiCommandBoundary, readPersistedPiCommandOutcomes, readPersistedPiHistoryAppendCheckpoint, readSettings } from '@/persistence';
 import { createSessionMetadata } from '@/utils/createSessionMetadata';
 import { initialMachineMetadata } from '@/daemon/run';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
@@ -20,7 +20,8 @@ import { logger } from '@/ui/logger';
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
 import { bindPiSessionExtensions, getPiPluginFeatureSummary, listPiRemoteSlashCommands } from './runPiFeatures';
 import { mapPiSessionHistoryPageToEnvelopes } from './runPiHistory';
-import { reconcilePiHistoryEnvelopes } from './reconcilePiHistory';
+import { planPiHistoryStartup, resolvePendingPiHistoryCoverage, selectPiHistoryPageRequest, shouldPauseManagedHistoryMirror, type PiProgressiveHistoryCoverage } from './piHistoryCoverage';
+import { reconcilePiCanonicalHistory, reconcilePiHistoryEnvelopes } from './reconcilePiHistory';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 import { startPiExternalMirror } from './runPiExternalMirror';
 import { createPiRuntimeRelayIdentity } from './piRuntimeRelayIdentity';
@@ -145,7 +146,73 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   }
   session.skipMessagesThrough(commandBoundary);
 
-  await notifyDaemonSessionStarted(response.id, metadata, {
+  const startupHistoryEntries = piRuntime.session.sessionManager.getEntries();
+  const startupHistoryPage = mapPiSessionHistoryPageToEnvelopes(
+    startupHistoryEntries,
+    { limit: PI_HISTORY_PAGE_MESSAGE_LIMIT },
+  );
+  const appendCheckpoint = readPersistedPiHistoryAppendCheckpoint(piRuntime.session.sessionId);
+  const startupHistoryPlan = planPiHistoryStartup({
+    entries: startupHistoryEntries,
+    latestPage: startupHistoryPage,
+    appendCheckpointEntryId: appendCheckpoint,
+    relayHistoryCursor: response.metadata.piHistoryCursor,
+    relayHistoryHasMore: response.metadata.piHistoryHasMore,
+    // A newly created managed Relay session intentionally starts with
+    // hasMore=true and no cursor. Existing sessions with messages must never
+    // use that shape to hide a missing progressive cursor.
+    allowUninitializedProgressiveHistory: response.seq === 0,
+  });
+  const progressiveHistoryCoverage: PiProgressiveHistoryCoverage = startupHistoryPlan.progressiveCoverage;
+  let startupHistoryGapReason: string | null = startupHistoryPlan.appendCheckpointMissing
+    ? 'persisted Pi history append checkpoint is missing from local JSONL'
+    : startupHistoryPlan.progressiveCursorMissing
+      ? 'persisted Pi progressive history cursor is missing from local JSONL'
+      : null;
+  let startupHistoryConfirmed = startupHistoryPlan.replayEnvelopes.length === 0;
+  if (!startupHistoryConfirmed) {
+    try {
+      const reconciliation = await reconcilePiHistoryEnvelopes({
+        envelopes: startupHistoryPlan.replayEnvelopes,
+        client: session,
+      });
+      startupHistoryConfirmed = (
+        reconciliation.conflicting.length === 0
+        && reconciliation.missing.length === 0
+        && reconciliation.outboxConflictLocalIds.length === 0
+      );
+      if (!startupHistoryConfirmed) {
+        startupHistoryGapReason ??= 'relay contains divergent or unconfirmed canonical Pi history envelopes';
+      }
+    } catch (error) {
+      startupHistoryGapReason ??= 'relay history inventory unavailable; canonical replay deferred';
+      logger.warn('[pi] Managed history startup reconciliation deferred', {
+        piSessionId: piRuntime.session.sessionId,
+        error,
+      });
+    }
+  }
+  if (
+    startupHistoryConfirmed
+    && !startupHistoryGapReason
+    && startupHistoryPlan.nextAppendCheckpointEntryId
+  ) {
+    persistPiHistoryAppendCheckpoint(
+      piRuntime.session.sessionId,
+      startupHistoryPlan.nextAppendCheckpointEntryId,
+    );
+  }
+
+  const synchronizedMetadata = {
+    ...metadata,
+    controlState: startupHistoryGapReason ? 'history_gap' as const : metadata.controlState,
+    piHasHistoryGap: startupHistoryGapReason ? true : metadata.piHasHistoryGap,
+    piRecoveryReason: startupHistoryGapReason ?? metadata.piRecoveryReason,
+    piHistoryCursor: progressiveHistoryCoverage.cursor,
+    piHistoryHasMore: progressiveHistoryCoverage.hasMore,
+    piHistoryTotalMessages: startupHistoryPage.totalMessages,
+  };
+  await notifyDaemonSessionStarted(response.id, synchronizedMetadata, {
       encryptionKey: encodeBase64(response.encryptionKey),
       encryptionVariant: response.encryptionVariant,
       seq: response.seq,
@@ -154,22 +221,123 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     });
   await session.updateMetadataAndAwait((currentMetadata) => ({
     ...currentMetadata,
-    name: reconcilePiSessionDisplayName(currentMetadata.name, metadata.name),
-  }));
+    name: reconcilePiSessionDisplayName(currentMetadata.name, synchronizedMetadata.name),
+    controlState: startupHistoryGapReason ? 'history_gap' : currentMetadata.controlState,
+    piHasHistoryGap: startupHistoryGapReason ? true : currentMetadata.piHasHistoryGap,
+    piRecoveryReason: startupHistoryGapReason ?? currentMetadata.piRecoveryReason,
+    piHistoryCursor: progressiveHistoryCoverage.cursor,
+    piHistoryHasMore: progressiveHistoryCoverage.hasMore,
+    piHistoryTotalMessages: startupHistoryPage.totalMessages,
+  }), { timeoutMs: 10_000 });
 
   let thinking = false;
-  const piSessionProtocol = new PiSessionProtocolMapper();
+  let piSessionProtocol = new PiSessionProtocolMapper();
   const sendPiEnvelopes = (envelopes: ReturnType<PiSessionProtocolMapper['mapEvent']>) => {
     for (const envelope of envelopes) {
       session.sendSessionProtocolMessage(envelope);
     }
   };
-  let piHistoryPageChain: Promise<void> = Promise.resolve();
-  const sendPiHistoryPage = (beforeEntryId?: string) => {
-    const request = piHistoryPageChain.then(async () => {
+  type ManagedPiHistoryPageContext = {
+    sessionManager: AgentSessionRuntime['session']['sessionManager'];
+    coverage: PiProgressiveHistoryCoverage;
+    pendingCoverage: PiProgressiveHistoryCoverage | null;
+    chain: Promise<void>;
+    accepting: boolean;
+  };
+  let managedHistoryPageContext: ManagedPiHistoryPageContext = {
+    sessionManager: piRuntime.session.sessionManager,
+    coverage: progressiveHistoryCoverage,
+    pendingCoverage: null,
+    chain: Promise.resolve(),
+    accepting: true,
+  };
+  const commitProgressiveHistoryCoverage = async (
+    context: ManagedPiHistoryPageContext,
+    coverage: PiProgressiveHistoryCoverage,
+    totalMessages?: number,
+  ): Promise<void> => {
+    context.pendingCoverage = coverage;
+    try {
+      await session.updateMetadataAndAwait((currentMetadata) => ({
+        ...currentMetadata,
+        piHistoryCursor: coverage.cursor,
+        piHistoryHasMore: coverage.hasMore,
+        piHistoryTotalMessages: totalMessages ?? currentMetadata.piHistoryTotalMessages,
+      }), { timeoutMs: 10_000 });
+    } catch (error) {
+      const synchronizedMetadata = session.getMetadata();
+      if (
+        synchronizedMetadata?.piHistoryCursor !== coverage.cursor
+        || synchronizedMetadata?.piHistoryHasMore !== coverage.hasMore
+      ) {
+        throw error;
+      }
+    }
+    context.coverage = coverage;
+    context.pendingCoverage = null;
+  };
+  const sendPiHistoryPage = (
+    context: ManagedPiHistoryPageContext,
+    requestedCursor?: string,
+  ) => {
+    if (!context.accepting) {
+      const currentPage = mapPiSessionHistoryPageToEnvelopes(
+        context.sessionManager.getEntries(),
+        { limit: 1 },
+      );
+      return Promise.resolve({
+        type: 'success' as const,
+        sent: 0,
+        nextCursor: context.coverage.cursor,
+        hasMore: context.coverage.hasMore,
+        totalMessages: currentPage.totalMessages,
+      });
+    }
+    const request = context.chain.then(async () => {
+    const currentEntries = context.sessionManager.getEntries();
+    const synchronizedHistoryMetadata = session.getMetadata();
+    const pendingResolution = resolvePendingPiHistoryCoverage({
+      confirmed: context.coverage,
+      pending: context.pendingCoverage,
+      synchronized: synchronizedHistoryMetadata?.piHistoryHasMore === undefined
+        ? undefined
+        : {
+            cursor: synchronizedHistoryMetadata.piHistoryCursor,
+            hasMore: synchronizedHistoryMetadata.piHistoryHasMore,
+          },
+      requestedCursor,
+    });
+    context.coverage = pendingResolution.confirmed;
+    context.pendingCoverage = pendingResolution.pending;
+    if (context.pendingCoverage && pendingResolution.retryPendingCommit) {
+      const pendingCoverage = context.pendingCoverage;
+      await commitProgressiveHistoryCoverage(context, pendingCoverage);
+      const currentPage = mapPiSessionHistoryPageToEnvelopes(currentEntries, { limit: 1 });
+      return {
+        type: 'success' as const,
+        sent: 0,
+        nextCursor: pendingCoverage.cursor,
+        hasMore: pendingCoverage.hasMore,
+        totalMessages: currentPage.totalMessages,
+      };
+    }
+    const pageRequest = selectPiHistoryPageRequest(
+      context.coverage,
+      requestedCursor,
+    );
+    if (pageRequest.type === 'noop') {
+      const currentPage = mapPiSessionHistoryPageToEnvelopes(currentEntries, { limit: 1 });
+      return {
+        type: 'success' as const,
+        sent: 0,
+        nextCursor: pageRequest.nextCursor,
+        hasMore: pageRequest.hasMore,
+        totalMessages: currentPage.totalMessages,
+      };
+    }
     const page = mapPiSessionHistoryPageToEnvelopes(
-      piRuntime.session.sessionManager.getBranch(),
-      { beforeEntryId, limit: PI_HISTORY_PAGE_MESSAGE_LIMIT },
+      currentEntries,
+      { beforeEntryId: pageRequest.beforeEntryId, limit: PI_HISTORY_PAGE_MESSAGE_LIMIT },
     );
     const historyGap = page.historyGap;
     if (historyGap) {
@@ -178,12 +346,14 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
         controlState: 'history_gap',
         piHasHistoryGap: true,
         piRecoveryReason: historyGap.reason,
-        piHistoryHasMore: false,
-      }));
+        piHistoryCursor: context.coverage.cursor,
+        piHistoryHasMore: context.coverage.hasMore,
+      }), { timeoutMs: 10_000 });
       return {
         type: 'history_gap' as const,
         ...page.historyGap,
-        hasMore: false,
+        nextCursor: context.coverage.cursor,
+        hasMore: context.coverage.hasMore,
         totalMessages: page.totalMessages,
       };
     }
@@ -202,8 +372,9 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
         controlState: 'history_gap',
         piHasHistoryGap: true,
         piRecoveryReason: reason,
-        piHistoryHasMore: false,
-      }));
+        piHistoryCursor: context.coverage.cursor,
+        piHistoryHasMore: context.coverage.hasMore,
+      }), { timeoutMs: 10_000 });
       return {
         type: 'history_gap' as const,
         code: 'history_gap' as const,
@@ -211,25 +382,29 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
           ?? reconciliation.missing[0]?.id
           ?? reconciliation.outboxConflictLocalIds[0],
         reason,
-        hasMore: false,
+        nextCursor: context.coverage.cursor,
+        hasMore: context.coverage.hasMore,
         totalMessages: page.totalMessages,
       };
     }
-    await session.updateMetadataAndAwait((currentMetadata) => ({
-      ...currentMetadata,
-      piHistoryCursor: page.nextCursor,
-      piHistoryHasMore: page.hasMore,
-      piHistoryTotalMessages: page.totalMessages,
-    }));
+    const nextProgressiveHistoryCoverage = {
+      cursor: page.nextCursor,
+      hasMore: page.hasMore,
+    };
+    await commitProgressiveHistoryCoverage(
+      context,
+      nextProgressiveHistoryCoverage,
+      page.totalMessages,
+    );
     return {
       type: 'success' as const,
       sent: reconciliation.sent,
-      nextCursor: page.nextCursor,
-      hasMore: page.hasMore,
+      nextCursor: nextProgressiveHistoryCoverage.cursor,
+      hasMore: nextProgressiveHistoryCoverage.hasMore,
       totalMessages: page.totalMessages,
     };
     });
-    piHistoryPageChain = request.then(() => undefined, () => undefined);
+    context.chain = request.then(() => undefined, () => undefined);
     return request;
   };
   const recordExternalHistoryGap = async (reason: string) => {
@@ -238,15 +413,106 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       controlState: 'history_gap',
       piHasHistoryGap: true,
       piRecoveryReason: reason,
-    }));
+    }), { timeoutMs: 10_000 });
   };
+  let managedHistoryReconciliationPending = 0;
   let externalMirror = startPiExternalMirror({
     sessionFile: piRuntime.session.sessionManager.getSessionFile(),
     initialEntries: piRuntime.session.sessionManager.getEntries(),
     session: () => session,
     onHistoryGap: recordExternalHistoryGap,
-    isManagedRuntimeActive: () => thinking || piRuntime.session.isStreaming,
+    isManagedRuntimeActive: () => shouldPauseManagedHistoryMirror({
+      thinking,
+      streaming: piRuntime.session.isStreaming,
+      pendingReconciliations: managedHistoryReconciliationPending,
+    }),
   });
+  const createManagedHistoryContext = (
+    runtimeSession: AgentSessionRuntime['session'],
+    mirror: ReturnType<typeof startPiExternalMirror>,
+    boundedReplayStartEntryId: string | undefined,
+    baselineEntryIds: Iterable<string>,
+  ) => ({
+    piSessionId: runtimeSession.sessionId,
+    sessionManager: runtimeSession.sessionManager,
+    mirror,
+    boundedReplayStartEntryId,
+    liveBaselineEntryIds: new Set(baselineEntryIds),
+    liveRelayConfirmedEntryIds: new Set<string>(),
+  });
+  let managedHistoryContext = createManagedHistoryContext(
+    piRuntime.session,
+    externalMirror,
+    startupHistoryPlan.boundedReplayStartEntryId,
+    startupHistoryEntries.map((entry) => entry.id),
+  );
+  type ManagedHistoryContext = typeof managedHistoryContext;
+  const reconcileManagedCanonicalHistory = async (context: ManagedHistoryContext): Promise<void> => {
+    const entries = context.sessionManager.getEntries();
+    const latestEntryId = entries.at(-1)?.id;
+    if (!latestEntryId) {
+      context.mirror?.markCurrentEntriesKnown();
+      return;
+    }
+    try {
+      await session.flushConfirmed();
+      const liveDeliveredEntryIds = entries
+        .filter((entry) => !context.liveBaselineEntryIds.has(entry.id))
+        .map((entry) => entry.id);
+      context.mirror?.markEntryIdsDelivered(liveDeliveredEntryIds);
+      for (const entryId of liveDeliveredEntryIds) {
+        context.liveRelayConfirmedEntryIds.add(entryId);
+      }
+      context.liveBaselineEntryIds = new Set(entries.map((entry) => entry.id));
+      const currentAppendCheckpoint = readPersistedPiHistoryAppendCheckpoint(context.piSessionId);
+      const appendCheckpointIndex = currentAppendCheckpoint
+        ? entries.findIndex((entry) => entry.id === currentAppendCheckpoint)
+        : -1;
+      const appendCheckpointMissing = !!currentAppendCheckpoint && appendCheckpointIndex < 0;
+      const reconciliation = await reconcilePiCanonicalHistory({
+        entries,
+        afterEntryId: appendCheckpointIndex >= 0 && currentAppendCheckpoint
+          ? currentAppendCheckpoint
+          : undefined,
+        startAtEntryId: appendCheckpointIndex < 0
+          ? context.boundedReplayStartEntryId
+          : undefined,
+        client: session,
+        isEntryRelayConfirmed: (entryId) => (
+          context.liveRelayConfirmedEntryIds.has(entryId)
+          || context.mirror?.isEntryRelayConfirmed(entryId) === true
+        ),
+      });
+      const hasCanonicalGap = appendCheckpointMissing
+        || reconciliation.afterEntryMissing
+        || reconciliation.startEntryMissing
+        || reconciliation.conflicting.length > 0
+        || reconciliation.missing.length > 0
+        || reconciliation.outboxConflictLocalIds.length > 0;
+      if (!appendCheckpointMissing && reconciliation.contiguousAppendCheckpointEntryId) {
+        persistPiHistoryAppendCheckpoint(
+          context.piSessionId,
+          reconciliation.contiguousAppendCheckpointEntryId,
+        );
+      }
+      if (hasCanonicalGap) {
+        const reason = appendCheckpointMissing
+          ? 'persisted Pi history append checkpoint is missing from local JSONL'
+          : reconciliation.startEntryMissing
+            ? 'bounded Pi history replay start is missing from local JSONL'
+            : 'relay contains divergent or unconfirmed canonical Pi history envelopes';
+        await recordExternalHistoryGap(reason);
+        return;
+      }
+      context.mirror?.markCurrentEntriesKnown();
+    } catch (error) {
+      logger.warn('[pi] Managed canonical history remains pending; append checkpoint not advanced', {
+        piSessionId: context.piSessionId,
+        error,
+      });
+    }
+  };
+  let managedHistoryReconciliationChain: Promise<void> = Promise.resolve();
   const completionNotifications = new PiCompletionNotificationTracker();
   const sendCompletionPush = () => {
     try {
@@ -260,8 +526,20 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     completionNotifications.markAgentStart();
   };
   const handleAgentEnd = () => {
+    managedHistoryReconciliationPending++;
     thinking = false;
-    externalMirror?.markCurrentEntriesKnown();
+    const historyContext = managedHistoryContext;
+    const reconcileHistory = async () => {
+      try {
+        await reconcileManagedCanonicalHistory(historyContext);
+      } finally {
+        managedHistoryReconciliationPending--;
+      }
+    };
+    managedHistoryReconciliationChain = managedHistoryReconciliationChain.then(
+      reconcileHistory,
+      reconcileHistory,
+    );
     session.sendSessionEvent({ type: 'ready' });
     if (completionNotifications.consumeAgentEnd()) {
       sendCompletionPush();
@@ -287,25 +565,101 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
   piRuntime.setRebindSession(async (nextSession) => {
     unsubscribe();
     completionNotifications.reset();
+    const previousPageContext = managedHistoryPageContext;
+    previousPageContext.accepting = false;
+    await previousPageContext.chain;
+    await managedHistoryReconciliationChain;
     await externalMirror?.stop();
+
+    const nextHistoryEntries = nextSession.sessionManager.getEntries();
+    const nextHistoryPage = mapPiSessionHistoryPageToEnvelopes(
+      nextHistoryEntries,
+      { limit: PI_HISTORY_PAGE_MESSAGE_LIMIT },
+    );
+    const nextAppendCheckpoint = readPersistedPiHistoryAppendCheckpoint(nextSession.sessionId);
+    const nextHistoryPlan = planPiHistoryStartup({
+      entries: nextHistoryEntries,
+      latestPage: nextHistoryPage,
+      appendCheckpointEntryId: nextAppendCheckpoint,
+    });
+    let nextHistoryGapReason: string | null = nextHistoryPlan.appendCheckpointMissing
+      ? 'persisted Pi history append checkpoint is missing from local JSONL'
+      : null;
+    let nextHistoryConfirmed = nextHistoryPlan.replayEnvelopes.length === 0;
+    if (!nextHistoryConfirmed) {
+      try {
+        const reconciliation = await reconcilePiHistoryEnvelopes({
+          envelopes: nextHistoryPlan.replayEnvelopes,
+          client: session,
+        });
+        nextHistoryConfirmed = (
+          reconciliation.conflicting.length === 0
+          && reconciliation.missing.length === 0
+          && reconciliation.outboxConflictLocalIds.length === 0
+        );
+        if (!nextHistoryConfirmed) {
+          nextHistoryGapReason ??= 'relay contains divergent or unconfirmed canonical Pi history envelopes';
+        }
+      } catch (error) {
+        nextHistoryGapReason ??= 'relay history inventory unavailable; canonical replay deferred';
+        logger.warn('[pi] Rebound managed history reconciliation deferred', {
+          piSessionId: nextSession.sessionId,
+          error,
+        });
+      }
+    }
+    if (
+      nextHistoryConfirmed
+      && !nextHistoryGapReason
+      && nextHistoryPlan.nextAppendCheckpointEntryId
+    ) {
+      persistPiHistoryAppendCheckpoint(
+        nextSession.sessionId,
+        nextHistoryPlan.nextAppendCheckpointEntryId,
+      );
+    }
     externalMirror = startPiExternalMirror({
       sessionFile: nextSession.sessionManager.getSessionFile(),
       initialEntries: nextSession.sessionManager.getEntries(),
       session: () => session,
       onHistoryGap: recordExternalHistoryGap,
-      isManagedRuntimeActive: () => thinking || nextSession.isStreaming,
+      isManagedRuntimeActive: () => shouldPauseManagedHistoryMirror({
+        thinking,
+        streaming: nextSession.isStreaming,
+        pendingReconciliations: managedHistoryReconciliationPending,
+      }),
     });
+    managedHistoryContext = createManagedHistoryContext(
+      nextSession,
+      externalMirror,
+      nextHistoryPlan.boundedReplayStartEntryId,
+      nextHistoryEntries.map((entry) => entry.id),
+    );
+    managedHistoryPageContext = {
+      sessionManager: nextSession.sessionManager,
+      coverage: nextHistoryPlan.progressiveCoverage,
+      pendingCoverage: null,
+      chain: Promise.resolve(),
+      accepting: true,
+    };
+    piSessionProtocol = new PiSessionProtocolMapper();
     await bindPiSessionExtensions(piRuntime, {
       onShutdown: () => shutdownRequested?.(),
       onError: (error) => logger.debug('[pi] Extension error', error),
     });
     const nextSlashCommands = listPiRemoteSlashCommands(nextSession);
-    session.updateMetadata((currentMetadata) => ({
+    await session.updateMetadataAndAwait((currentMetadata) => ({
       ...currentMetadata,
       piSessionId: nextSession.sessionId,
       name: getPiSessionDisplayName(nextSession),
       slashCommands: nextSlashCommands,
-    }));
+      controlState: nextHistoryGapReason ? 'history_gap' : 'ready',
+      piHasHistoryGap: nextHistoryGapReason ? true : false,
+      piRecoveryReason: nextHistoryGapReason ?? undefined,
+      piHistoryCursor: managedHistoryPageContext.coverage.cursor,
+      piHistoryHasMore: managedHistoryPageContext.coverage.hasMore,
+      piHistoryTotalMessages: nextHistoryPage.totalMessages,
+    }), { timeoutMs: 10_000 });
     unsubscribe = nextSession.subscribe((event) => {
       if (event.type === 'agent_start') handleAgentStart();
       if (event.type === 'agent_end') {
@@ -333,7 +687,8 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       ? params as Record<string, unknown>
       : {};
     const beforeEntryId = typeof record.beforeEntryId === 'string' ? record.beforeEntryId : undefined;
-    return sendPiHistoryPage(beforeEntryId);
+    const pageContext = managedHistoryPageContext;
+    return sendPiHistoryPage(pageContext, beforeEntryId);
   });
 
   session.sendSessionEvent({ type: 'ready' });

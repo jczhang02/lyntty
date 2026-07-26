@@ -1638,15 +1638,37 @@ class Sync {
                     && canControlSession(currentSession.metadata)
                 ) {
                     const fromSeq = this.sessionLastSeq.get(sessionId) ?? 0;
+                    const requestedCursor = currentSession.metadata.piHistoryCursor;
+                    const requestedMetadataVersion = currentSession.metadataVersion;
                     const result = await apiSocket.sessionRPC<PiHistoryPageResult, { beforeEntryId?: string }>(
                         sessionId,
                         'pi-history-page',
-                        currentSession.metadata.piHistoryCursor ? { beforeEntryId: currentSession.metadata.piHistoryCursor } : {},
+                        requestedCursor ? { beforeEntryId: requestedCursor } : {},
                     );
                     const latestSession = storage.getState().sessions[sessionId] ?? currentSession;
+                    const latestMetadata = latestSession.metadata ?? currentSession.metadata!;
+                    if (
+                        latestSession.metadataVersion !== requestedMetadataVersion
+                        || latestMetadata.piHistoryCursor !== requestedCursor
+                    ) {
+                        // Another client or socket update advanced coverage while
+                        // this RPC was in flight. Fetch any newly confirmed
+                        // messages, but never let the delayed response regress
+                        // the newer cursor or pagination state.
+                        await this.fetchForwardSince(sessionId, encryption, fromSeq);
+                        storage.getState().applyOlderMessagesPagination(sessionId, {
+                            hasMore: latestMetadata.piHistoryHasMore === true
+                                || (this.sessionOldestSeq.get(sessionId) ?? 0) > 1,
+                        });
+                        return;
+                    }
                     storage.getState().applySessions([{
                         ...latestSession,
-                        metadata: applyPiHistoryPageResult(latestSession.metadata ?? currentSession.metadata!, result),
+                        metadata: applyPiHistoryPageResult(
+                            latestMetadata,
+                            result,
+                            { expectedCursor: requestedCursor },
+                        ),
                     }]);
                     if (result.type === 'history_gap') {
                         historyGapReason = `history_gap: ${result.reason}`;
