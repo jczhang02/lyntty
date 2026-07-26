@@ -68,7 +68,7 @@ describe("isStandaloneEntrypoint", () => {
     it('reports independent Relay, schema, and Wire build identity', () => {
         expect(relayBuildInfo()).toMatchObject({
             component: 'lyntty-relay',
-            version: '1.2.0',
+            version: '1.2.1',
             relaySchema: 1,
             minimumRelaySchema: 1,
             wire: { protocolMajor: 1, protocolMinor: 1 },
