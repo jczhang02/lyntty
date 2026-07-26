@@ -18,6 +18,7 @@ import {
   resolveContainedPath,
   resolveExistingContainedPath,
   resolveMarkdownSourcePath,
+  splitLeadingMarkdownH1,
 } from '../docs/.site/lib/site-output.ts';
 
 const repositoryRoot = new URL('../', import.meta.url);
@@ -171,6 +172,29 @@ test('site output rejects lexical, encoded, and symlink traversal', async () => 
       rm(root, { force: true, recursive: true }),
       rm(outside, { force: true, recursive: true }),
     ]);
+  }
+});
+
+test('published Markdown H1 extraction preserves the exact body boundary', () => {
+  assert.deepEqual(
+    splitLeadingMarkdownH1('\uFEFF# Document title\r\n\r\n    indented code\r\n', 'fixture'),
+    { heading: 'Document title', body: '    indented code\r\n' },
+  );
+  assert.deepEqual(splitLeadingMarkdownH1('# EOF title', 'fixture'), {
+    heading: 'EOF title',
+    body: '',
+  });
+  assert.deepEqual(splitLeadingMarkdownH1('#\tTabbed title\nbody\n', 'fixture'), {
+    heading: 'Tabbed title',
+    body: 'body\n',
+  });
+  assert.deepEqual(splitLeadingMarkdownH1('# \u00a0Unicode space\u00a0 \nbody\n', 'fixture'), {
+    heading: '\u00a0Unicode space\u00a0',
+    body: 'body\n',
+  });
+
+  for (const malformed of ['#\nParagraph\n', '#   \n', '## Wrong level\n', ' # Indented\n']) {
+    assert.throws(() => splitLeadingMarkdownH1(malformed, 'fixture'), /non-empty H1/);
   }
 });
 

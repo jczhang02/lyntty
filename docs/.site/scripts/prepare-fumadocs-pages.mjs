@@ -12,6 +12,7 @@ import {
   resolveContainedPath,
   resolveExistingContainedPath,
   resolveMarkdownSourcePath,
+  splitLeadingMarkdownH1,
 } from "../lib/site-output.ts";
 import {
   navigationForLocale,
@@ -29,14 +30,15 @@ function jsonString(value) {
   return JSON.stringify(value);
 }
 
-function withFrontmatter({ title, description, body }) {
+function withFrontmatter({ title, description, sourceHeading, body }) {
   return [
     "---",
     `title: ${jsonString(title)}`,
     `description: ${jsonString(description)}`,
+    `sourceHeading: ${jsonString(sourceHeading)}`,
     "---",
     "",
-    body.trimStart(),
+    body,
   ].join("\n");
 }
 
@@ -105,11 +107,14 @@ for (const page of sourcePages) {
     throw new Error(`Missing Fumadocs source: ${page.source}`);
   }
   const sourcePath = resolveExistingContainedPath(REPO_ROOT, page.source, "Fumadocs source");
-
-  const body = normalizeCodeFenceLanguages(
-    rewriteMarkdownLinks(readFileSync(sourcePath, "utf8"), page),
+  const source = readFileSync(sourcePath, "utf8");
+  const { heading: sourceHeading, body: sourceBody } = splitLeadingMarkdownH1(
+    source,
+    page.source,
   );
-  writePage(page.target, withFrontmatter({ ...page, body }));
+  const body = normalizeCodeFenceLanguages(rewriteMarkdownLinks(sourceBody, page));
+
+  writePage(page.target, withFrontmatter({ ...page, sourceHeading, body }));
 }
 
 writePage(

@@ -7,10 +7,15 @@ import {
 } from "node:fs";
 import { extname, join, relative, resolve, sep } from "node:path";
 
-import { resolveContainedPath } from "../lib/site-output.ts";
+import {
+  resolveContainedPath,
+  resolveExistingContainedPath,
+  splitLeadingMarkdownH1,
+} from "../lib/site-output.ts";
 import { sourcePageRecords } from "../lib/site-pages.ts";
 
 const OUTPUT_ROOT = realpathSync(resolve("out"));
+const REPO_ROOT = realpathSync(resolve("../.."));
 const SITE_ORIGIN = "https://jczhang02.github.io";
 const BASE_PATH = "/lyntty";
 const SITE_URL = `${SITE_ORIGIN}${BASE_PATH}`;
@@ -80,6 +85,21 @@ function idsFromHtml(html) {
   return new Set(
     [...html.matchAll(/\b(?:id|name)=(['"])(.*?)\1/gi)].map((match) => decodeHtml(match[2])),
   );
+}
+
+function renderedElementCount(html, element) {
+  const renderedMarkup = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(script|style|template)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+  return [...renderedMarkup.matchAll(new RegExp(`<${element}(?=[\\s/>])`, "gi"))].length;
+}
+
+function publishedMarkdownDocument(markdown, label) {
+  try {
+    return splitLeadingMarkdownH1(markdown, label);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : `${label} has an invalid leading H1`);
+  }
 }
 
 function markdownDestinations(markdown) {
@@ -175,6 +195,7 @@ function validateInternalHref(href, documentUrl, sourceLabel) {
 const pages = sourcePageRecords();
 const expectedHtml = new Set(pages.map(htmlPathForPage));
 const expectedMarkdown = new Set(pages.map(markdownPathForPage));
+const expectedLlmsFullSections = [];
 
 for (const path of [...expectedHtml, ...expectedMarkdown]) {
   if (!existsSync(path) || !lstatSync(path).isFile()) {
@@ -201,6 +222,32 @@ for (const page of pages) {
   if (!html.includes(`<link rel="canonical" href="${pageUrl(page)}"/>`)) {
     fail(`wrong or missing canonical URL on ${outputRelative(htmlPath)}`);
   }
+
+  const renderedH1Count = renderedElementCount(html, "h1");
+  if (renderedH1Count !== 1) {
+    fail(`expected one rendered H1 on ${outputRelative(htmlPath)}, found ${renderedH1Count}`);
+  }
+
+  const markdownPath = markdownPathForPage(page);
+  const markdown = readFileSync(markdownPath, "utf8");
+  const markdownBody = markdown.match(/^---\n[\s\S]*?\n---\n\n([\s\S]*)$/)?.[1];
+  if (markdownBody === undefined) {
+    fail(`raw Markdown has invalid frontmatter: ${outputRelative(markdownPath)}`);
+  }
+
+  const rawDocument = publishedMarkdownDocument(markdownBody, outputRelative(markdownPath));
+  const sourcePath = resolveExistingContainedPath(REPO_ROOT, page.source, "published source");
+  const sourceDocument = publishedMarkdownDocument(readFileSync(sourcePath, "utf8"), page.source);
+  if (rawDocument.heading !== sourceDocument.heading) {
+    fail(
+      `raw Markdown changed the source H1: ${outputRelative(markdownPath)} ` +
+        `(${JSON.stringify(rawDocument.heading)} != ${JSON.stringify(sourceDocument.heading)})`,
+    );
+  }
+
+  expectedLlmsFullSections.push(
+    [`# ${page.title}`, "", rawDocument.body.trimEnd()].join("\n"),
+  );
 }
 
 const notFoundPath = resolveContainedPath(OUTPUT_ROOT, "404.html", "404 page");
@@ -244,6 +291,11 @@ const llmsPath = resolveContainedPath(OUTPUT_ROOT, "llms.txt", "llms index");
 const llmsFullPath = resolveContainedPath(OUTPUT_ROOT, "llms-full.txt", "llms full index");
 for (const path of [llmsPath, llmsFullPath]) {
   if (!existsSync(path)) fail(`missing ${outputRelative(path)}`);
+}
+const llmsFull = readFileSync(llmsFullPath, "utf8");
+const expectedLlmsFull = `${expectedLlmsFullSections.join("\n\n---\n\n")}\n`;
+if (llmsFull !== expectedLlmsFull) {
+  fail("llms-full.txt does not exactly match the ordered published page bodies");
 }
 for (const href of markdownDestinations(readFileSync(llmsPath, "utf8"))) {
   validateInternalHref(href, `${SITE_URL}/llms.txt`, "llms.txt");
