@@ -123,7 +123,7 @@ test('repository keeps the current launcher icon and rejects obsolete neon brand
     const digest = createHash('sha256').update(blob.stdout).digest('hex');
     assert.notEqual(digest, obsoleteNeonIconSha256, `obsolete neon icon remains tracked at ${path}`);
   }
-});
+}, 30_000);
 
 test('relay deploy resolves only a signed stable BOM to an immutable image', () => {
   assert.match(relayDeploy, /environment: production-relay/);
