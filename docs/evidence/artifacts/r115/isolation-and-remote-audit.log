@@ -1,0 +1,79 @@
+R115 isolation and remote-side-effect audit
+timestamp_utc=2026-07-26T19:08:51Z
+
+$ pwd; git branch --show-current; git status --short --untracked-files=no; git worktree list
+/home/jc/dev/lyntty/worktrees/session-sync-reliability
+fix/session-sync-reliability
+/home/jc/dev/lyntty                                          4043171 [main]
+/home/jc/dev/lyntty/worktrees/bun-migration                  4ccff1e [refactor/bun-migration]
+/home/jc/dev/lyntty/worktrees/dependency-advisories-2        f56703f [fix/dependency-advisories-2]
+/home/jc/dev/lyntty/worktrees/dev-ownership-race             15b94be [fix/dev-ownership-race]
+/home/jc/dev/lyntty/worktrees/docs-heading-dedup             9a8ad99 [docs/r116-live-evidence]
+/home/jc/dev/lyntty/worktrees/expo-dev-apk-channel           e3e6d69 [feat/expo-dev-apk-channel]
+/home/jc/dev/lyntty/worktrees/hono-security                  a3dddb4 [fix/hono-security-advisories]
+/home/jc/dev/lyntty/worktrees/preview-apk-release            092150e [feat/preview-apk-release]
+/home/jc/dev/lyntty/worktrees/preview-candidate-audit        2f72bd9 [fix/preview-candidate-audit]
+/home/jc/dev/lyntty/worktrees/preview-candidate-evidence     2e4722e [release/preview-apk-candidate]
+/home/jc/dev/lyntty/worktrees/preview-candidate-metro        e2e2da0 [fix/preview-candidate-metro]
+/home/jc/dev/lyntty/worktrees/preview-manual-test            46ad16b [feat/preview-manual-test]
+/home/jc/dev/lyntty/worktrees/preview-release-validation     4735165 (detached HEAD)
+/home/jc/dev/lyntty/worktrees/preview-replacement-audit      ef08535 (detached HEAD)
+/home/jc/dev/lyntty/worktrees/preview-replacement-evidence   ef08535 [release/preview-replacement-evidence]
+/home/jc/dev/lyntty/worktrees/preview-replacement-prep       3a3c3dc [release/preview-replacement-prep]
+/home/jc/dev/lyntty/worktrees/preview-unverified-policy      e14192c [fix/preview-promotion-draft-tag]
+/home/jc/dev/lyntty/worktrees/project-surface-hardening      54e094c [docs/project-surface-hardening]
+/home/jc/dev/lyntty/worktrees/readme-refresh                 af42416 [docs/readme-refresh]
+/home/jc/dev/lyntty/worktrees/relay-env-canonicalization     fb6a534 [fix/relay-env-canonicalization]
+/home/jc/dev/lyntty/worktrees/relay-image-subphase           6db91e6 [fix/relay-image-subphase]
+/home/jc/dev/lyntty/worktrees/relay-legacy-image             4d71877 [fix/relay-legacy-image]
+/home/jc/dev/lyntty/worktrees/relay-legacy-secret            3f526eb [fix/relay-legacy-secret]
+/home/jc/dev/lyntty/worktrees/relay-preflight-phase          2f4ddcf [fix/relay-preflight-phase]
+/home/jc/dev/lyntty/worktrees/relay-prior-identity           73d75de [fix/relay-prior-identity]
+/home/jc/dev/lyntty/worktrees/relay-production-evidence      d8252db [docs/relay-production-evidence]
+/home/jc/dev/lyntty/worktrees/relay-rendered-reason          0bd9eb1 [fix/relay-rendered-reason]
+/home/jc/dev/lyntty/worktrees/relay-tag-classification       f27169f [fix/relay-tag-classification]
+/home/jc/dev/lyntty/worktrees/relay-tag-drift-repair         06233ad [fix/relay-tag-drift-repair]
+/home/jc/dev/lyntty/worktrees/relay-tag-syntax               728de5a [fix/relay-tag-syntax]
+/home/jc/dev/lyntty/worktrees/release-agent-rules            39374c6 [feat/release-agent-rules]
+/home/jc/dev/lyntty/worktrees/release-read-newline           6de3b5b [fix/release-read-newline]
+/home/jc/dev/lyntty/worktrees/remove-obsolete-icons          e61037a [fix/remove-obsolete-icons]
+/home/jc/dev/lyntty/worktrees/session-retrieval-latency      4c4866e [fix/session-retrieval-latency]
+/home/jc/dev/lyntty/worktrees/session-sync-reliability       31e1c51 [fix/session-sync-reliability]
+/home/jc/dev/lyntty/worktrees/shell-quote-security           dc363b7 [fix/shell-quote-1.9.0]
+/home/jc/dev/lyntty/worktrees/stable-1.2.1                   6eeb7bd [release/stable-1.2.1]
+/home/jc/dev/lyntty/worktrees/stable-candidate-shell-scope   cf84145 [fix/stable-candidate-shell-scope]
+/home/jc/dev/lyntty/worktrees/stable-owner-validation-waiver 6ee0ba5 [fix/stable-owner-validation-waiver]
+/home/jc/dev/lyntty/worktrees/stable-promotion-bootstrap     0601ab0 [fix/stable-promotion-bootstrap]
+/home/jc/dev/lyntty/worktrees/stable-relay-sbom              63ac7f7 [fix/stable-relay-multiarch-sbom]
+/home/jc/dev/lyntty/worktrees/stable-release-hardening       4ee4aec [fix/stable-release-hardening]
+/home/jc/dev/lyntty/worktrees/stable-self-use                808b93a [fix/stable-self-use-release]
+
+$ git rev-list --merges 2d33abc..HEAD
+
+$ git ls-remote --heads origin refs/heads/fix/session-sync-reliability
+
+$ gh pr list --head fix/session-sync-reliability --state all --json number,state,url
+[]
+
+$ systemctl --user show lynttyd --property=MainPID,ActiveState,ExecMainStartTimestamp
+ActiveState=active
+MainPID=2891
+ExecMainStartTimestamp=Thu 2026-07-23 08:34:45 CST
+
+$ grep PATH ~/.config/systemd/user/lynttyd.service
+Environment="PATH=/home/jc/.local/bin:/home/jc/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+$ sha256sum live service, global extension, and diagnosed watermark
+892b39269cf4b0ca799450b668775e7a358b693acd0ee3a52227a5f30c213b84  /home/jc/.config/systemd/user/lynttyd.service
+27ccaac0d08ace0eb770681426701af91e7ac4852b2bf1443733f1b936ad1a56  /home/jc/.pi/agent/extensions/lyntty/index.ts
+3e7dea21248698275b59b01e729c77729a28b73203f5091ce8631a48b985e4a1  /home/jc/.lyntty/pi-history-watermark/57774b4e27acd4d7a0022817bb3d921dd48a99c7bd1489958245beb26ba705d1.json
+
+$ diagnosed watermark content
+{
+  version: 1,
+  entryId: "3c3f1042",
+}
+
+Observed baseline from diagnosis: daemon PID 2891; service PATH omitted /opt/bin; watermark entryId 3c3f1042.
+Current read-only audit matches all three. No live restart/reinstall/reload/reconciliation command was run.
+RESULT=PASS

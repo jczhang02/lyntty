@@ -49,6 +49,12 @@ A fresh audit discovered two newly published transitive advisories while final v
 
 ## Verification
 
+Durable artifacts:
+
+- `docs/evidence/artifacts/r115/final-verification.log` — complete frozen install, trust audit, `ci:fast`, diff check, and four GPG signature outputs against commit `31e1c51`;
+- `docs/evidence/artifacts/r115/tdd-red-green.log` — retained red/green failure and success excerpts for the final canonical-mapping and generic-title regressions;
+- `docs/evidence/artifacts/r115/isolation-and-remote-audit.log` — worktree/branch, no merge commits, no remote branch, no PR, and read-only live baseline comparison.
+
 Passed in `/home/jc/dev/lyntty/worktrees/session-sync-reliability`:
 
 ```text
@@ -71,7 +77,7 @@ bun -e "const m = require('./node_modules/.bun/minimatch@3.1.5/node_modules/mini
 git diff --check                         # pass
 ```
 
-Two independent final reviews found no remaining P0/P1/P2 sync blocker. A targeted follow-up verifier confirmed that the generic-title P2 was resolved and introduced no new P0/P1/P2 issue.
+Two independent final reviews found no remaining P0/P1/P2 sync blocker. A targeted follow-up verifier confirmed that the generic-title P2 was resolved and introduced no new P0/P1/P2 issue. The regression transcript records failing assertions before each final fix and green focused suites afterwards.
 
 ### Release-style Android artifact
 
@@ -100,6 +106,6 @@ version: 1.2.0 (1)
 ## Not run and residual risk
 
 - The APK was not installed and Maestro was not run because the connected emulator already contains Preview state; this evidence does not claim device interaction or physical-phone validation.
-- No live daemon restart, systemd reinstall, Pi extension reload, live Relay repair, live watermark update, or production deployment was performed. Those actions still require explicit approval.
+- No live daemon restart, systemd reinstall, Pi extension reload, live Relay repair, live watermark update, or production deployment was performed. A final read-only audit still found daemon PID `2891`, the original service PATH without `/opt/bin`, and watermark entry `3c3f1042`. Those actions still require explicit approval.
 - Live recovery of the diagnosed stale session remains unverified until the user authorizes deployment and reconciliation.
 - Low residual hardening opportunities remain: reject unstructured non-Lyntty HTTP 409 responses before quarantine; reject malformed timestamp-less JSONL records instead of using a runtime timestamp; add a cold-start App integration test for name persistence; and bound the separate machine-RPC discovery call client-side.

@@ -1,0 +1,36 @@
+R115 TDD red/green transcript excerpts
+Captured from the interactive isolated-worktree test runs before implementation edits.
+
+RED 1 — canonical history must not change across page/watermark slices
+$ (cd packages/lyntty-cli && bun test src/pi/runPiHistory.test.ts src/pi/reconcilePiHistory.test.ts)
+(fail) mapPiSessionHistoryToEnvelopes > keeps paged envelope content identical to the canonical full-history mapping
+Expected: true
+Received: false
+(fail) reconcilePiCanonicalHistory > maps a post-watermark tool result with full canonical turn context
+Expected matching ids: pi-history-t1-tool-end, pi-history-t1-end
+Received additional slice-local ids: pi-history-a1-start, pi-history-a1-tool-start-0
+12 pass, 2 fail
+
+GREEN 1 — full-context mapping plus deterministic per-entry caps
+$ (cd packages/lyntty-cli && bun test src/pi/runPiHistory.test.ts src/pi/reconcilePiHistory.test.ts src/pi/runPiExternalMirror.test.ts)
+40 pass, 0 fail
+
+RED 2 — generic SessionManager names must not overwrite Relay names
+$ (cd packages/lyntty-cli && bun test src/pi/piSessionDisplayName.test.ts)
+(fail) resolvePiSessionDisplayName: expected first prompt, received (no messages)
+(fail) reconcilePiSessionDisplayName: expected Existing title, received (no messages)
+1 pass, 2 fail
+
+$ (cd packages/lyntty-app && bun test sources/sync/piDiscoveredSessions.test.ts sources/sync/piSessionNamePersistence.test.ts)
+(fail) Pi session name persistence: (NO MESSAGES) was selected as a persistence candidate
+(fail) mergePiDiscoveredSessions: expected Useful relay title, received (no messages)
+16 pass, 2 fail
+
+GREEN 2 — case-insensitive sentinel normalization at CLI/App boundaries
+$ (cd packages/lyntty-cli && bun test src/pi/piSessionDisplayName.test.ts src/pi/runPiRecovery.test.ts)
+21 pass, 0 fail
+
+$ (cd packages/lyntty-app && bun test sources/sync/piDiscoveredSessions.test.ts sources/sync/piSessionNamePersistence.test.ts)
+18 pass, 0 fail
+
+RESULT=TESTS_FAILED_BEFORE_FIX_AND_PASSED_AFTER_FIX
