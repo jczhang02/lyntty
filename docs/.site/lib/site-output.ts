@@ -58,6 +58,24 @@ export function resolveMarkdownSourcePath(source: string, candidate: string): st
   return resolvedSource;
 }
 
+export function splitLeadingMarkdownH1(
+  markdown: string,
+  label: string,
+): { heading: string; body: string } {
+  const normalized = markdown.startsWith("\uFEFF") ? markdown.slice(1) : markdown;
+  const match = normalized.match(/^#[ \t]+([^\r\n]*?)[ \t]*(?:\r?\n|$)/);
+  const heading = match?.[1] ?? "";
+  if (!match || heading.trim() === "") {
+    throw new Error(`${label} must start with a non-empty H1`);
+  }
+
+  let body = normalized.slice(match[0].length);
+  const separator = body.match(/^[ \t]*\r?\n/);
+  if (separator) body = body.slice(separator[0].length);
+
+  return { heading, body };
+}
+
 export function absolutizeSiteMarkdownLinks(markdown: string, siteUrl: string): string {
   const baseUrl = siteUrl.replace(/\/$/, "");
   return markdown
