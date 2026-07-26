@@ -6,9 +6,13 @@
 
 Bead：`lyntty-pf1`
 
-最终实现 HEAD：`f125bd76097a2aa69d9086ae5082b60d2fb60b5f`
+完整本地验证 HEAD：`f125bd76097a2aa69d9086ae5082b60d2fb60b5f`
 
-最终实现 tree：`ec1f901a4fdaa86ab5e10b79682fcc4ef3ed8275`
+完整本地验证 tree：`ec1f901a4fdaa86ab5e10b79682fcc4ef3ed8275`
+
+外部 CodeQL 修复 HEAD：`db66daed935d5b8e3fb54b36f462b48f6d36488c`
+
+外部 CodeQL 修复 tree：`4d58a284fce9a46df060d5b54c41a606cb46c572`
 
 ## 结果
 
@@ -109,10 +113,12 @@ PASS
 
 - Ruby Psych 成功解析 20 个 GitHub YAML 文件。
 - `git diff --check` 通过，worktree clean。
-- 十个实现 commit 均由 OpenPGP key `BABC6A51B0F43016329922DE1F863CBFD6EDCA6B` 验证为 `Good signature`。
+- 最初十个实现 commit 与后续 CodeQL 修复均由 OpenPGP key `BABC6A51B0F43016329922DE1F863CBFD6EDCA6B` 验证为 `Good signature`；evidence 与 Bead commit 另行验证。
 - 独立需求 verifier 返回 `PASS`。
 - 最终 classifier runtime review 在恶意 preload、dotenv 与 auto-install 反证后返回 `PASS`。
 - 后续 Pages review 找到 build 权限过宽问题；拆分 build/deploy、加入 `--ignore-scripts` 与严格有序步骤回归后，聚焦复核返回 `PASS`。
+
+PR #53 提供了第一次真实外部 CodeQL triage。首次 workflow job 通过，但 code-scanning check run `89760134574` 正确报告了一个 high severity `Incomplete URL substring sanitization`：`scripts/public-project-surface.test.mjs` 使用字符串 `includes()` 检查 advisory URL。Commit `db66daed935d5b8e3fb54b36f462b48f6d36488c` 改为解析 Markdown link destination，并通过 `Set.has()` 比较精确 target；回归测试会拒绝带攻击者 host 前缀的地址。本地 hardening 增至 83 passed、0 failed。第二次 PR 运行的十二个 required context、Relay image verification、CodeQL workflow run `30189821411` 和 code-scanning check run `89761099173` 均通过。
 
 本机没有 `actionlint`。YAML 解析与仓库内 workflow contracts 均通过，但本证据不声称运行过 `actionlint`。
 
@@ -128,6 +134,7 @@ PASS
 - `9dfbe588785fa3a61d2ee0c0a40abc0b360bbf2a` — 公共信任缺口修正
 - `97a0dfd6350adb31c6337c169d270bfe8c3c9938` — classifier runtime 隔离
 - `f125bd76097a2aa69d9086ae5082b60d2fb60b5f` — Pages 部署权限隔离
+- `db66daed935d5b8e3fb54b36f462b48f6d36488c` — 外部 CodeQL triage 后的精确 security-link target 回归
 
 ## 未应用的 GitHub settings manifest
 
@@ -139,8 +146,8 @@ Manifest 中的命令均未执行。
 
 ## 未运行与剩余风险
 
-- 没有 push、创建 PR、merge、workflow dispatch、Release mutation 或 GitHub settings mutation。
-- 本分支尚未运行真实 PR Actions、Dependabot、CodeQL 或 Pages deploy。CodeQL 会保持 non-required，直到外部结果经过人工 triage。
+- PR #53 已 push 并创建，用于外部门禁验证。本次 evidence 更新时尚未 merge；没有手动 workflow dispatch、Release mutation 或 GitHub settings mutation。
+- 真实 PR Actions 与 CodeQL 已在修复 HEAD `db66daed935d5b8e3fb54b36f462b48f6d36488c` 上运行，并在修复首次告警后通过。即使这次 triage 成功，CodeQL 仍保持 non-required baseline。Dependabot 与 Pages deploy 当时尚未运行。
 - 只读检查时，GitHub Private Vulnerability Reporting 仍为关闭状态。因此 SECURITY 保留不含细节的公开联系 fallback；目前没有可公开的安全邮箱。
 - 未运行 APK、Maestro、实体设备验收、live Pi-extension 安装、生产 Relay 部署、Stable E2E 或完整 Session Remote 验证。本轮没有修改产品 runtime code。
 - `--ignore-scripts` 会阻止 docs 安装阶段的 lifecycle script，但固定版本的 docs packages 仍会在静态构建时执行。最小 job 权限、frozen lock、两套 audit 与 checkout-free deploy 能降低依赖失陷风险，不能把风险降为零。

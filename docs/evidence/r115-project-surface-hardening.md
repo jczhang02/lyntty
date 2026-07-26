@@ -6,9 +6,13 @@ Branch: `docs/project-surface-hardening`
 
 Bead: `lyntty-pf1`
 
-Final implementation HEAD: `f125bd76097a2aa69d9086ae5082b60d2fb60b5f`
+Full local validation HEAD: `f125bd76097a2aa69d9086ae5082b60d2fb60b5f`
 
-Final implementation tree: `ec1f901a4fdaa86ab5e10b79682fcc4ef3ed8275`
+Full local validation tree: `ec1f901a4fdaa86ab5e10b79682fcc4ef3ed8275`
+
+External CodeQL remediation HEAD: `db66daed935d5b8e3fb54b36f462b48f6d36488c`
+
+External CodeQL remediation tree: `4d58a284fce9a46df060d5b54c41a606cb46c572`
 
 ## Result
 
@@ -109,10 +113,12 @@ Additional checks:
 
 - 20 GitHub YAML files parsed successfully with Ruby Psych.
 - `git diff --check` passed and the worktree was clean.
-- All 10 implementation commits reported `Good signature` from OpenPGP key `BABC6A51B0F43016329922DE1F863CBFD6EDCA6B`.
+- The original 10 implementation commits and the later CodeQL remediation reported `Good signature` from OpenPGP key `BABC6A51B0F43016329922DE1F863CBFD6EDCA6B`; evidence and Bead commits were verified separately.
 - Independent verification of requirements returned `PASS`.
 - The final classifier runtime review returned `PASS` after malicious preload, dotenv, and auto-install probes.
 - A later Pages review found over-broad build permissions; the build/deploy split, `--ignore-scripts`, and strict ordered-step regression closed that finding, and focused re-review returned `PASS`.
+
+PR #53 supplied the first real external CodeQL triage. The initial workflow job passed, but code-scanning check run `89760134574` correctly reported one high-severity `Incomplete URL substring sanitization` alert in `scripts/public-project-surface.test.mjs`: the test used string `includes()` to check an advisory URL. Commit `db66daed935d5b8e3fb54b36f462b48f6d36488c` parses Markdown link destinations and compares exact targets through `Set.has()`, with a regression that rejects an attacker-host prefix. Local hardening increased to 83 passed, 0 failed. The second PR run passed all 12 required contexts, Relay image verification, CodeQL workflow run `30189821411`, and code-scanning check run `89761099173`.
 
 `actionlint` was not installed locally. YAML parsing and repository workflow contracts passed, but this record does not claim an `actionlint` run.
 
@@ -128,6 +134,7 @@ Additional checks:
 - `9dfbe588785fa3a61d2ee0c0a40abc0b360bbf2a` — public trust remediation
 - `97a0dfd6350adb31c6337c169d270bfe8c3c9938` — isolated classifier runtime
 - `f125bd76097a2aa69d9086ae5082b60d2fb60b5f` — isolated Pages deployment permissions
+- `db66daed935d5b8e3fb54b36f462b48f6d36488c` — exact security-link target regression after external CodeQL triage
 
 ## Unapplied GitHub settings manifest
 
@@ -139,8 +146,8 @@ No command in that manifest was executed.
 
 ## Not run and residual risk
 
-- No push, pull request, merge, workflow dispatch, release mutation, or GitHub setting mutation occurred.
-- Real pull-request Actions, Dependabot, CodeQL, and Pages deployment have not run for this branch. CodeQL remains deliberately non-required until external results are reviewed.
+- PR #53 was pushed and opened for external validation. At the time of this evidence update it was not merged; no manual workflow dispatch, release mutation, or GitHub setting mutation occurred.
+- Real pull-request Actions and CodeQL ran on remediation HEAD `db66daed935d5b8e3fb54b36f462b48f6d36488c` and passed after the initial alert was fixed. CodeQL remains a non-required baseline despite this successful triage. Dependabot and Pages deployment had not yet run.
 - GitHub Private Vulnerability Reporting was still disabled at the read-only check. SECURITY therefore keeps the detail-free public contact fallback. No public security mailbox exists.
 - APK, Maestro, physical-device acceptance, live Pi-extension installation, production Relay deployment, Stable end-to-end behavior, and complete Session Remote behavior were not run; this work did not change product runtime code.
 - `--ignore-scripts` blocks docs install lifecycle scripts, but the pinned docs packages still execute during the static build. Minimal job permissions, frozen locks, both audits, and a checkout-free deploy job reduce rather than eliminate dependency compromise risk.
