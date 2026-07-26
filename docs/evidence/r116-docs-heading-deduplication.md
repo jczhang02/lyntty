@@ -111,9 +111,41 @@ The captures and raw logs remain temporary local artifacts and contain no accoun
 
 The first root `bun install --frozen-lockfile --ignore-scripts` attempt hit one transient npm tarball extraction failure for `expo-modules-core`; one bounded retry succeeded. A first `ci:fast` then failed because lifecycle scripts had intentionally been disabled and the generated Prisma client was absent. Running the repository's trusted `bun install --frozen-lockfile` postinstall generated the client; the complete final `ci:fast` passed. These were setup failures, not product or docs test failures.
 
-## External validation status
+## External validation
 
-The follow-up branch has not yet been pushed or merged at this point in the evidence record. Pull-request checks, the post-merge Pages deployment, and the fixed live URLs remain pending and must be recorded before closing `lyntty-2b4`.
+PR [#59](https://github.com/jczhang02/lyntty/pull/59) ran against head `080f3ab2097db89b0933deaff027be451f92757c`. All 15 reported checks passed, including the 12 required contexts, Relay image verification, the CodeQL workflow, and code-scanning check `89770648079`.
+
+| Workflow | Run | Result |
+| --- | --- | --- |
+| Relay image verification | `30193409761` | success |
+| CLI Artifact Smoke Test | `30193409772` | success |
+| Lyntty CI | `30193409773` | success |
+| CodeQL baseline | `30193409775` | success |
+
+The PR was squash-merged as `6e13f73029cb1385415f0b5b649dee3290ce0a4f` at `2026-07-26T07:56:14Z`. GitHub reports a valid verified signature, and the merge tree `f144e93a10c7a7b99ecfd72ff63c29a89a9ce99a` exactly matches the reviewed PR head tree.
+
+Post-merge runs also passed:
+
+| Workflow | Run | Result |
+| --- | --- | --- |
+| Lyntty CI | `30193688194` | success |
+| Deploy docs | `30193688200` | success |
+| CodeQL baseline | `30193688201` | success |
+
+Pages deployment `5608408027` published exact main SHA `6e13f73029cb1385415f0b5b649dee3290ce0a4f` to the unchanged URL <https://jczhang02.github.io/lyntty/>. A complete live read verified:
+
+- 42/42 HTML routes returned 200, rendered one expected H1, and retained the expected language, canonical URL, and `/lyntty/` base path;
+- 42/42 raw Markdown pages, `llms.txt`, and `llms-full.txt` byte-matched the validated local export;
+- the custom unknown route returned 404 with the expected bilingual content and `noindex`;
+- desktop home and mobile English/Chinese browser captures visibly showed one page title with intact navigation and typography.
+
+| Live view | SHA-256 |
+| --- | --- |
+| Desktop home | `2926cf957ef71c9fbe9b1d5269a27f915e6f50af3dd63a4e54b9900859c83be9` |
+| Mobile English getting started | `b7319f0750f1c4234b6f348da6e436bd26894c9c456952ee849a695daac63771` |
+| Mobile Chinese getting started | `aa76bf11f765d1e99c9386e36525c4549bf9a7d940fb7b1a87355b161f6c8d6b` |
+
+The final live verifier resumed with bounded per-URL retries after one transient GitHub Pages connection timeout. The completed pass covered every route and artifact above.
 
 No GitHub setting, Pages domain, Release, tag, asset, or required-context configuration was changed.
 
