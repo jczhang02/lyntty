@@ -32,7 +32,7 @@ phone -> relay -> lynttyd -> local Pi extension -> pi
 
 ## 截图能证明 Android Release 验收吗？
 
-不能。模拟器画面和文档截图只是视觉参考，不是实体 Android 验收，也不是 Stable artifact 验证。Stable 验收状态写在精确 Release 正文和 `android-validation.json` 中；当前 APK-only Preview 应查阅 prerelease 正文、checksum、audit 和 provenance。同一 UI 在模拟器中可用，也不会把 waiver 变成实体设备验收。
+不能。模拟器画面和文档截图只是视觉参考，不是实体 Android 验收，也不是 Stable artifact 验证。Stable 的实体机验收是可选项；`android-validation.json` 会记录精确 APK 是否在实体手机上通过验收，而 Release 正文没有警告并不代表已经验收。当前 APK-only Preview 应查阅 prerelease 正文、checksum、audit 和 provenance；它的独立 waiver 策略保持不变。
 
 ## 哪些桌面平台受支持？
 

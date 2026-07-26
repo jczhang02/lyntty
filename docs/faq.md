@@ -32,7 +32,7 @@ The current Android APK-only Preview is separate from a signed Compatibility Pre
 
 ## Does a screenshot prove Android release acceptance?
 
-No. Emulator captures and documentation screenshots are visual references, not physical Android acceptance or Stable artifact validation. Stable acceptance is disclosed in the exact Release notes and `android-validation.json`. For the current APK-only Preview, use its prerelease notes, checksum, audits, and provenance instead. A waiver remains a waiver even when the same UI works in an emulator.
+No. Emulator captures and documentation screenshots are visual references, not physical Android acceptance or Stable artifact validation. Physical validation is optional for Stable; `android-validation.json` records whether the exact APK was accepted on a physical phone, and the absence of a Release-body warning does not imply acceptance. For the current APK-only Preview, use its prerelease notes, checksum, audits, and provenance instead. Its separate waiver policy remains unchanged.
 
 ## Which desktop platforms are supported?
 

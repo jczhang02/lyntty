@@ -1,6 +1,6 @@
 # Compatibility BOM（中文同步说明）
 
-> 同步状态（2026-07-21）：canonical bytes、签名、sequence、兼容窗口和 channel 隔离见英文版 [`compatibility-bom.md`](./compatibility-bom.md)，当前以英文版为准。
+> 同步状态（2026-07-26）：canonical bytes、签名、sequence、兼容窗口和 channel 隔离见英文版 [`compatibility-bom.md`](./compatibility-bom.md)，当前以英文版为准。
 
 BOM、签名与 predecessor digest 都绑定带末尾 LF 的精确 canonical 文件字节；Stable/Preview 的 key、public key、URL、package、image 与 replay state 必须隔离。
 
@@ -18,7 +18,7 @@ BOM、签名与 predecessor digest 都绑定带末尾 LF 的精确 canonical 文
 
 Relay Candidate 对同一 multiarch OCI layout 的 amd64/arm64 manifest 分别运行 Syft，并生成 hash-reference 两个平台 SPDX document 的 SPDX 2.3 index；不能把只扫描 host 架构的 SBOM 冒充 multiarch coverage。
 
-Promotion 与 rollback 统一调用 `scripts/github-release.ts`：绑定单一 Release ID 和 asset ID，逐项验证 API digest 与下载字节，不删除、不替换资产；发布边界再次检查 GitHub `main`，用 non-force Git push 原子创建精确 direct tag（中断重试只接受同一 tag/commit），再通过一个完整 Release-ID `PATCH` 发布。Stable 常规路径仍要求精确 Candidate APK 的实体 Android 验收及其 SHA-256。owner-operated 自用发布可改用互斥的 `owner-waiver-unverified`：实体验收保持 false、accepted hash 必须为空、dispatch 必须包含精确确认短语；immutable Release 顶部会披露未做实体机验收，并发布经 checksums/attestation 绑定的 `android-validation.json`。
+Promotion 与 rollback 统一调用 `scripts/github-release.ts`：绑定单一 Release ID 和 asset ID，逐项验证 API digest 与下载字节，不删除、不替换资产；发布边界再次检查 GitHub `main`，用 non-force Git push 原子创建精确 direct tag（中断重试只接受同一 tag/commit），再通过一个完整 Release-ID `PATCH` 发布。Stable 的实体 Android 验收是可选项：`physical_phone_accepted=true` 时必须提供与精确 Candidate APK 一致的 SHA-256；为 false 时 accepted hash 必须为空，不再要求 waiver 短语，也不在 Release 正文添加未验收警告。经 checksums/attestation 绑定的 schema-2 `android-validation.json` 仍记录所选模式和精确 APK digest；source、signer、BOM、受保护 environment、channel head 与资产完整性门禁保持不变。
 
 Stable 由 owner 显式审批；无需独立 reviewer，也不要求 Apple/Windows 生产证书。Release body 必须披露 macOS/Windows archive 未做平台代码签名，不能把 BOM 签名或 GitHub attestation 描述成平台签名。
 
