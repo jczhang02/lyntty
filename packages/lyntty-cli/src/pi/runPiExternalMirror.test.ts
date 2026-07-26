@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, mock, spyOn, jest } from 'bun:test';
 import type { SessionEntry, SessionHeader } from '@earendil-works/pi-coding-agent';
 
+import { SessionOutboxConflictError } from '@/api/apiSession';
 import { PiExternalMirror, readPiSessionEntriesFromOffset, startPiExternalMirror } from './runPiExternalMirror';
 
 function writeJsonl(path: string, entries: Array<SessionHeader | SessionEntry>): void {
@@ -116,6 +117,28 @@ describe('PiExternalMirror', () => {
     }
   });
 
+  it('tracks relay-confirmed entries separately from initially known and quarantined entries', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'already present');
+      const second = userEntry('u2', 'quarantined');
+      writeJsonl(file, [header, first]);
+      const mirror = new PiExternalMirror(file, [first], () => false, 2_000);
+
+      expect(mirror.isEntryRelayConfirmed('u1')).toBe(false);
+      mirror.markUserTextDeliveredSince('already present', 0);
+      expect(mirror.isEntryRelayConfirmed('u1')).toBe(true);
+
+      appendJsonl(file, second);
+      await mirror.tick(1_000);
+      await mirror.tick(3_100);
+      expect(mirror.isEntryRelayConfirmed('u2')).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('mirrors new JSONL entries only after a quiet window', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
     try {
@@ -195,6 +218,52 @@ describe('PiExternalMirror', () => {
         ev: { t: 'text', text: 'external mobile-visible line' },
       });
       expect(flush).toHaveBeenCalledTimes(1);
+      mirror?.stop();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('maps appended tool results with their canonical full-history turn context', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(0);
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const assistant = {
+        type: 'message',
+        id: 'a1',
+        parentId: 'u1',
+        timestamp: '2026-07-02T00:00:01.000Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'toolCall', id: 'call-1', name: 'read', arguments: { path: 'a.ts' } }],
+        },
+      } as any;
+      const toolResult = {
+        type: 'message',
+        id: 't1',
+        parentId: 'a1',
+        timestamp: '2026-07-02T00:00:02.000Z',
+        message: { role: 'toolResult', toolCallId: 'call-1', toolName: 'read', content: 'ok' },
+      } as any;
+      writeJsonl(file, [header, assistant]);
+      const sendSessionProtocolMessage = mock();
+      const mirror = startPiExternalMirror({
+        sessionFile: file,
+        initialEntries: [assistant],
+        session: () => ({ sendSessionProtocolMessage, flush: mock().mockResolvedValue(undefined) }) as any,
+        pollMs: 100,
+      });
+
+      appendJsonl(file, toolResult);
+      await jest.advanceTimersByTime(100);
+      await jest.advanceTimersByTime(2_200);
+
+      expect(sendSessionProtocolMessage.mock.calls.map((call) => call[0])).toMatchObject([
+        { id: 'pi-history-t1-tool-end', turn: 'pi-history-turn-a1' },
+        { id: 'pi-history-t1-end', turn: 'pi-history-turn-a1' },
+      ]);
       mirror?.stop();
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -351,6 +420,48 @@ describe('PiExternalMirror', () => {
       await mirror.tick(3_200);
       expect(sent).toHaveLength(1);
       expect(sent[0].map((entry) => entry.id)).toEqual(['u2']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('records a history gap and releases pending entries after a terminal localId conflict', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(0);
+    const dir = mkdtempSync(join(tmpdir(), 'lyntty-pi-mirror-'));
+    try {
+      const file = join(dir, 'session.jsonl');
+      const first = userEntry('u1', 'hello');
+      writeJsonl(file, [header, first]);
+      const sendSessionProtocolMessage = mock();
+      const flush = mock()
+        .mockRejectedValueOnce(new SessionOutboxConflictError(['session:pi-history-u2-user']))
+        .mockResolvedValue(undefined);
+      const onHistoryGap = mock();
+      const mirror = startPiExternalMirror({
+        sessionFile: file,
+        initialEntries: [first],
+        session: () => ({ sendSessionProtocolMessage, flush }) as any,
+        onHistoryGap,
+        pollMs: 100,
+      });
+
+      appendJsonl(file, userEntry('u2', 'conflicting'));
+      await jest.advanceTimersByTime(100);
+      await jest.advanceTimersByTime(2_200);
+
+      expect(onHistoryGap).toHaveBeenCalledWith(expect.stringContaining('localId content conflict'));
+      expect(sendSessionProtocolMessage).toHaveBeenCalledTimes(1);
+
+      appendJsonl(file, userEntry('u3', 'later'));
+      await jest.advanceTimersByTime(100);
+      await jest.advanceTimersByTime(2_200);
+
+      expect(sendSessionProtocolMessage).toHaveBeenCalledTimes(2);
+      expect(sendSessionProtocolMessage.mock.calls[1][0]).toMatchObject({
+        id: 'pi-history-u3-user',
+      });
+      await mirror?.stop();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

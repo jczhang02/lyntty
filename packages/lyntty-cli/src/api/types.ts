@@ -111,6 +111,9 @@ export const MachineMetadataSchema = z.object({
     pi: z.boolean(),
     detectedAt: z.number(),
   }).optional(),
+  piSessionDiscovery: z.object({
+    available: z.boolean(),
+  }).optional(),
   resumeSupport: z.object({
     rpcAvailable: z.boolean(),
     requiresSameMachine: z.boolean(),

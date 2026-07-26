@@ -3,9 +3,9 @@ import { EventEmitter } from 'node:events'
 import { io, Socket } from 'socket.io-client'
 import { AgentState, ClientToServerEvents, FileEventMessage, FileEventMessageSchema, Metadata, ServerToClientEvents, Session, Update, UserMessage, UserMessageSchema } from './types'
 import { decodeBase64, decryptBlob, decrypt, encodeBase64, encrypt, encryptBlob } from './encryption';
-import { backoff, delay } from '@/utils/time';
+import { backoff } from '@/utils/time';
 import { configuration } from '@/configuration';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { AsyncLock } from '@/utils/lock';
 import { deriveKey } from '@/utils/deriveKey';
 import { RpcHandlerManager } from './rpc/RpcHandlerManager';
@@ -56,6 +56,66 @@ export type LocalImageAttachment = {
 type PendingRemoteInputEvent =
     | { type: 'user'; message: UserMessage }
     | { type: 'file'; message: FileEventMessage };
+
+type PendingOutboxMessage = {
+    content: string;
+    localId: string;
+    logicalDigest: string;
+};
+
+export type SessionProtocolEnvelopeStatus = 'missing' | 'matching' | 'conflict';
+
+export class SessionOutboxConflictError extends Error {
+    readonly localIds: string[];
+
+    constructor(localIds: string[]) {
+        super(`Relay localId content conflict: ${localIds.join(', ')}`);
+        this.name = 'SessionOutboxConflictError';
+        this.localIds = localIds;
+    }
+}
+
+function canonicalizeForDigest(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map(canonicalizeForDigest);
+    }
+    if (!value || typeof value !== 'object') {
+        return value;
+    }
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(value).sort()) {
+        const child = (value as Record<string, unknown>)[key];
+        if (child !== undefined) {
+            result[key] = canonicalizeForDigest(child);
+        }
+    }
+    return result;
+}
+
+function logicalMessageValue(message: unknown): unknown {
+    if (message && typeof message === 'object' && (message as { role?: unknown }).role === 'session') {
+        return {
+            role: 'session',
+            content: (message as { content?: unknown }).content,
+        };
+    }
+    return message;
+}
+
+function logicalMessageDigest(message: unknown): string {
+    const canonical = JSON.stringify(canonicalizeForDigest(logicalMessageValue(message)));
+    return createHash('sha256').update(canonical ?? 'null').digest('base64url');
+}
+
+function relayConflictLocalId(error: unknown): string | null {
+    if (!error || typeof error !== 'object') return null;
+    const response = (error as { response?: unknown }).response;
+    if (!response || typeof response !== 'object' || (response as { status?: unknown }).status !== 409) return null;
+    const data = (response as { data?: unknown }).data;
+    if (!data || typeof data !== 'object') return '';
+    const localId = (data as { localId?: unknown }).localId;
+    return typeof localId === 'string' && localId.length > 0 ? localId : '';
+}
 
 function escapeMultipartValue(value: string): string {
     return value.replaceAll('\r', '').replaceAll('\n', '').replaceAll('"', '%22');
@@ -126,9 +186,10 @@ export class ApiSessionClient extends EventEmitter {
     // Receive cursor is independent from lastSeq because posting our own outbox
     // can advance the server sequence before the initial relay replay completes.
     private receiveSeq = 0;
-    private pendingOutbox: Array<{ content: string; localId: string }> = [];
-    private readonly knownSessionProtocolEnvelopeIds = new Set<string>();
+    private pendingOutbox: PendingOutboxMessage[] = [];
+    private readonly knownRelayMessageDigests = new Map<string, string>();
     private knownSessionProtocolCoveredThrough: number | null = null;
+    private readonly pendingOutboxConflicts = new Set<string>();
     private readonly sendSync: InvalidateSync;
     private readonly receiveSync: InvalidateSync;
 
@@ -471,11 +532,14 @@ export class ApiSessionClient extends EventEmitter {
         };
     }
 
-    private rememberSessionProtocolEnvelope(message: unknown): void {
+    private rememberRelayMessage(message: unknown, relayLocalId?: string | null): void {
+        const digest = logicalMessageDigest(message);
+        if (relayLocalId) {
+            this.knownRelayMessageDigests.set(relayLocalId, digest);
+        }
         if (!message || typeof message !== 'object' || (message as { role?: unknown }).role !== 'session') return;
         const envelope = (message as { content?: unknown }).content;
         if (envelope && typeof envelope === 'object' && typeof (envelope as { id?: unknown }).id === 'string') {
-            this.knownSessionProtocolEnvelopeIds.add((envelope as { id: string }).id);
             const time = (envelope as { time?: unknown }).time;
             if (typeof time === 'number' && Number.isFinite(time)) {
                 this.knownSessionProtocolCoveredThrough = Math.max(this.knownSessionProtocolCoveredThrough ?? 0, time);
@@ -484,7 +548,7 @@ export class ApiSessionClient extends EventEmitter {
     }
 
     private routeIncomingMessage(message: unknown, relayLocalId?: string) {
-        this.rememberSessionProtocolEnvelope(message);
+        this.rememberRelayMessage(message, relayLocalId);
         const userResult = UserMessageSchema.safeParse(message);
         if (userResult.success) {
             const userMessage = relayLocalId && !userResult.data.localKey
@@ -544,7 +608,7 @@ export class ApiSessionClient extends EventEmitter {
                 try {
                     const body = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(message.content.c));
                     if (skipThroughSeq !== null && message.seq <= skipThroughSeq) {
-                        this.rememberSessionProtocolEnvelope(body);
+                        this.rememberRelayMessage(body, message.localId ?? message.id);
                         continue;
                     }
                     this.routeIncomingMessage(body, message.localId ?? message.id);
@@ -579,6 +643,56 @@ export class ApiSessionClient extends EventEmitter {
 
     private static readonly MAX_OUTBOX_BATCH_SIZE = 50;
 
+    private removePendingOutboxLocalIds(localIds: ReadonlySet<string>): void {
+        if (localIds.size === 0) return;
+        this.pendingOutbox = this.pendingOutbox.filter((message) => !localIds.has(message.localId));
+    }
+
+    private recordOutboxConflict(localId: string): void {
+        this.pendingOutboxConflicts.add(localId);
+    }
+
+    private async reconcileOutboxConflict(batch: PendingOutboxMessage[], hintedLocalId: string): Promise<void> {
+        try {
+            await this.syncExistingSessionProtocolEnvelopeIds();
+        } catch (error) {
+            const quarantined = new Set(
+                hintedLocalId
+                    ? batch.filter((message) => message.localId === hintedLocalId).map((message) => message.localId)
+                    : batch.map((message) => message.localId),
+            );
+            for (const localId of quarantined) this.recordOutboxConflict(localId);
+            this.removePendingOutboxLocalIds(quarantined);
+            logger.debug('[API] Could not inventory a relay localId conflict; quarantined affected outbox items', {
+                sessionId: this.sessionId,
+                conflictCount: quarantined.size,
+                error,
+            });
+            return;
+        }
+
+        const reconciled = new Set<string>();
+        for (const message of batch) {
+            const persistedDigest = this.knownRelayMessageDigests.get(message.localId);
+            if (!persistedDigest) continue;
+            reconciled.add(message.localId);
+            if (persistedDigest !== message.logicalDigest) {
+                this.recordOutboxConflict(message.localId);
+            }
+        }
+
+        if (reconciled.size === 0) {
+            const candidates = hintedLocalId
+                ? batch.filter((message) => message.localId === hintedLocalId)
+                : batch;
+            for (const message of candidates) {
+                reconciled.add(message.localId);
+                this.recordOutboxConflict(message.localId);
+            }
+        }
+        this.removePendingOutboxLocalIds(reconciled);
+    }
+
     private async flushOutbox() {
         // Preserve enqueue order across batches. Historical backfills and
         // session-protocol streams rely on relay seq matching the original
@@ -588,31 +702,64 @@ export class ApiSessionClient extends EventEmitter {
             const batchSize = Math.min(this.pendingOutbox.length, ApiSessionClient.MAX_OUTBOX_BATCH_SIZE);
             const batch = this.pendingOutbox.slice(0, batchSize);
 
-            const response = await axios.post<V3PostSessionMessagesResponse>(
-                `${configuration.serverUrl}/v3/sessions/${encodeURIComponent(this.sessionId)}/messages`,
-                {
-                    messages: batch
-                },
-                {
-                    headers: this.authHeaders(),
-                    timeout: 60000
-                }
-            );
+            let response;
+            try {
+                response = await axios.post<V3PostSessionMessagesResponse>(
+                    `${configuration.serverUrl}/v3/sessions/${encodeURIComponent(this.sessionId)}/messages`,
+                    {
+                        messages: batch.map(({ content, localId }) => ({ content, localId }))
+                    },
+                    {
+                        headers: this.authHeaders(),
+                        timeout: 60000
+                    }
+                );
+            } catch (error) {
+                const conflictLocalId = relayConflictLocalId(error);
+                if (conflictLocalId === null) throw error;
+                await this.reconcileOutboxConflict(batch, conflictLocalId);
+                continue;
+            }
 
             const messages = Array.isArray(response.data.messages) ? response.data.messages : [];
             const maxSeq = messages.reduce((acc, message) => (
                 message.seq > acc ? message.seq : acc
             ), this.lastSeq);
             this.lastSeq = maxSeq;
-            this.pendingOutbox.splice(0, batch.length);
+            const batchLocalIds = new Set(batch.map((message) => message.localId));
+            const acknowledgedLocalIds = new Set(messages.flatMap((message) => (
+                message.localId && batchLocalIds.has(message.localId) ? [message.localId] : []
+            )));
+            for (const message of batch) {
+                if (!acknowledgedLocalIds.has(message.localId)) continue;
+                this.knownRelayMessageDigests.set(message.localId, message.logicalDigest);
+            }
+            this.removePendingOutboxLocalIds(acknowledgedLocalIds);
+            if (acknowledgedLocalIds.size !== batchLocalIds.size) {
+                throw new Error(`Relay did not acknowledge ${batchLocalIds.size - acknowledgedLocalIds.size} session outbox message(s)`);
+            }
         }
     }
 
     private enqueueMessage(content: unknown, invalidate: boolean = true, localId: string = randomUUID()) {
+        const digest = logicalMessageDigest(content);
+        const persistedDigest = this.knownRelayMessageDigests.get(localId);
+        if (persistedDigest) {
+            if (persistedDigest !== digest) this.recordOutboxConflict(localId);
+            if (invalidate) this.sendSync.invalidate();
+            return;
+        }
+        const pending = this.pendingOutbox.find((message) => message.localId === localId);
+        if (pending) {
+            if (pending.logicalDigest !== digest) this.recordOutboxConflict(localId);
+            if (invalidate) this.sendSync.invalidate();
+            return;
+        }
         const encrypted = encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, content));
         this.pendingOutbox.push({
             content: encrypted,
-            localId
+            localId,
+            logicalDigest: digest,
         });
         if (invalidate) {
             this.sendSync.invalidate();
@@ -658,8 +805,9 @@ export class ApiSessionClient extends EventEmitter {
                     maxSeq = Math.max(maxSeq, message.seq);
                     if (message.content?.t !== 'encrypted') continue;
                     try {
-                        this.rememberSessionProtocolEnvelope(
+                        this.rememberRelayMessage(
                             decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(message.content.c)),
+                            message.localId ?? message.id,
                         );
                     } catch (error) {
                         logger.debug('[API] Failed to inventory encrypted relay message', {
@@ -690,7 +838,14 @@ export class ApiSessionClient extends EventEmitter {
     }
 
     hasSessionProtocolEnvelope(envelopeId: string): boolean {
-        return this.knownSessionProtocolEnvelopeIds.has(envelopeId);
+        return this.knownRelayMessageDigests.has(`session:${envelopeId}`);
+    }
+
+    getSessionProtocolEnvelopeStatus(envelope: SessionEnvelope): SessionProtocolEnvelopeStatus {
+        const knownDigest = this.knownRelayMessageDigests.get(`session:${envelope.id}`);
+        if (!knownDigest) return 'missing';
+        const intendedDigest = logicalMessageDigest({ role: 'session', content: envelope });
+        return knownDigest === intendedDigest ? 'matching' : 'conflict';
     }
 
     getSessionProtocolCoveredThrough(): number | null {
@@ -844,16 +999,18 @@ export class ApiSessionClient extends EventEmitter {
             if (!completed || this.pendingOutbox.length > 0) {
                 throw new Error(`Session outbox was not acknowledged within ${timeoutMs}ms`);
             }
+            if (this.pendingOutboxConflicts.size > 0) {
+                const localIds = [...this.pendingOutboxConflicts].sort();
+                this.pendingOutboxConflicts.clear();
+                throw new SessionOutboxConflictError(localIds);
+            }
         } finally {
             if (timeout) clearTimeout(timeout);
         }
     }
 
     async flush(): Promise<void> {
-        await Promise.race([
-            this.sendSync.invalidateAndAwait(),
-            delay(10000)
-        ]);
+        await this.flushConfirmed();
         if (!this.socket.connected) {
             return;
         }

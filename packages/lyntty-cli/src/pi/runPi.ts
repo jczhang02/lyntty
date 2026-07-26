@@ -20,12 +20,13 @@ import { logger } from '@/ui/logger';
 import { PiCommandLedger, resolvePiRemoteAction } from './runPiControl';
 import { bindPiSessionExtensions, getPiPluginFeatureSummary, listPiRemoteSlashCommands } from './runPiFeatures';
 import { mapPiSessionHistoryPageToEnvelopes } from './runPiHistory';
+import { reconcilePiHistoryEnvelopes } from './reconcilePiHistory';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 import { startPiExternalMirror } from './runPiExternalMirror';
 import { createPiRuntimeRelayIdentity } from './piRuntimeRelayIdentity';
 import { PiCompletionNotificationTracker, sendPiDoneNotification } from './piCompletionNotifications';
 import { bindPiRemoteInput } from './piRemoteInput';
-import { resolvePiSessionDisplayName } from './piSessionDisplayName';
+import { reconcilePiSessionDisplayName, resolvePiSessionDisplayName } from './piSessionDisplayName';
 
 export interface RunPiOptions {
   credentials: Credentials;
@@ -151,6 +152,10 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       metadataVersion: response.metadataVersion,
       agentStateVersion: response.agentStateVersion,
     });
+  await session.updateMetadataAndAwait((currentMetadata) => ({
+    ...currentMetadata,
+    name: reconcilePiSessionDisplayName(currentMetadata.name, metadata.name),
+  }));
 
   let thinking = false;
   const piSessionProtocol = new PiSessionProtocolMapper();
@@ -182,15 +187,34 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
         totalMessages: page.totalMessages,
       };
     }
-    await session.flushConfirmed();
-    await session.syncExistingSessionProtocolEnvelopeIds();
-    const unsentEnvelopes = page.envelopes.filter(
-      (envelope) => !session.hasSessionProtocolEnvelope(envelope.id),
-    );
-    for (const envelope of unsentEnvelopes) {
-      session.sendSessionProtocolMessage(envelope);
+    const reconciliation = await reconcilePiHistoryEnvelopes({
+      envelopes: page.envelopes,
+      client: session,
+    });
+    if (
+      reconciliation.conflicting.length > 0
+      || reconciliation.missing.length > 0
+      || reconciliation.outboxConflictLocalIds.length > 0
+    ) {
+      const reason = 'relay contains divergent or unconfirmed canonical Pi history envelopes';
+      await session.updateMetadataAndAwait((currentMetadata) => ({
+        ...currentMetadata,
+        controlState: 'history_gap',
+        piHasHistoryGap: true,
+        piRecoveryReason: reason,
+        piHistoryHasMore: false,
+      }));
+      return {
+        type: 'history_gap' as const,
+        code: 'history_gap' as const,
+        missingCursor: reconciliation.conflicting[0]?.id
+          ?? reconciliation.missing[0]?.id
+          ?? reconciliation.outboxConflictLocalIds[0],
+        reason,
+        hasMore: false,
+        totalMessages: page.totalMessages,
+      };
     }
-    if (unsentEnvelopes.length > 0) await session.flushConfirmed();
     await session.updateMetadataAndAwait((currentMetadata) => ({
       ...currentMetadata,
       piHistoryCursor: page.nextCursor,
@@ -199,7 +223,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     }));
     return {
       type: 'success' as const,
-      sent: unsentEnvelopes.length,
+      sent: reconciliation.sent,
       nextCursor: page.nextCursor,
       hasMore: page.hasMore,
       totalMessages: page.totalMessages,
@@ -208,10 +232,19 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
     piHistoryPageChain = request.then(() => undefined, () => undefined);
     return request;
   };
+  const recordExternalHistoryGap = async (reason: string) => {
+    await session.updateMetadataAndAwait((currentMetadata) => ({
+      ...currentMetadata,
+      controlState: 'history_gap',
+      piHasHistoryGap: true,
+      piRecoveryReason: reason,
+    }));
+  };
   let externalMirror = startPiExternalMirror({
     sessionFile: piRuntime.session.sessionManager.getSessionFile(),
     initialEntries: piRuntime.session.sessionManager.getEntries(),
     session: () => session,
+    onHistoryGap: recordExternalHistoryGap,
     isManagedRuntimeActive: () => thinking || piRuntime.session.isStreaming,
   });
   const completionNotifications = new PiCompletionNotificationTracker();
@@ -259,6 +292,7 @@ export async function runPi(opts: RunPiOptions): Promise<void> {
       sessionFile: nextSession.sessionManager.getSessionFile(),
       initialEntries: nextSession.sessionManager.getEntries(),
       session: () => session,
+      onHistoryGap: recordExternalHistoryGap,
       isManagedRuntimeActive: () => thinking || nextSession.isStreaming,
     });
     await bindPiSessionExtensions(piRuntime, {

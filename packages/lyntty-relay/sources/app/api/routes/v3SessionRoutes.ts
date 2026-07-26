@@ -48,6 +48,20 @@ function isUniqueConstraintError(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
 
+class LocalIdContentConflictError extends Error {
+    constructor(readonly localId: string) {
+        super(`localId content conflict: ${localId}`);
+    }
+}
+
+function localIdContentConflict(localId: string) {
+    return {
+        error: 'localId content conflict',
+        code: 'LOCAL_ID_CONTENT_CONFLICT',
+        localId,
+    };
+}
+
 function toResponseMessage(message: SelectedMessage) {
     return {
         id: message.id,
@@ -157,7 +171,7 @@ export function v3SessionRoutes(app: Fastify) {
         for (const message of messages) {
             const existing = firstMessageByLocalId.get(message.localId);
             if (existing && existing.content !== message.content) {
-                return reply.code(409).send({ error: 'localId content conflict' });
+                return reply.code(409).send(localIdContentConflict(message.localId));
             }
             if (!existing) {
                 firstMessageByLocalId.set(message.localId, message);
@@ -190,7 +204,7 @@ export function v3SessionRoutes(app: Fastify) {
                     const expectedContent = contentByLocalId.get(message.localId);
                     const existingContent = message.content as { t?: unknown; c?: unknown };
                     if (expectedContent !== undefined && existingContent?.c !== expectedContent) {
-                        throw new Error(`localId content conflict: ${message.localId}`);
+                        throw new LocalIdContentConflictError(message.localId);
                     }
                     existingByLocalId.set(message.localId, message);
                 }
@@ -252,8 +266,8 @@ export function v3SessionRoutes(app: Fastify) {
                 txResult = await createOrFetchMessages();
                 break;
             } catch (error) {
-                if (error instanceof Error && error.message.startsWith('localId content conflict:')) {
-                    return reply.code(409).send({ error: 'localId content conflict' });
+                if (error instanceof LocalIdContentConflictError) {
+                    return reply.code(409).send(localIdContentConflict(error.localId));
                 }
                 if (!isUniqueConstraintError(error) || attempt === 2) {
                     throw error;
