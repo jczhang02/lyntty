@@ -35,10 +35,26 @@ function formText(form) {
   return JSON.stringify(form);
 }
 
+function markdownLinkTargets(document) {
+  return new Set(
+    [...document.matchAll(/\[[^\]\r\n]*\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g)].map(
+      (match) => match[1],
+    ),
+  );
+}
+
 function assertUniqueFieldIds(form) {
   const ids = form.body.flatMap((field) => (field.id ? [field.id] : []));
   assert.equal(new Set(ids).size, ids.length, `${form.name} field ids must be unique`);
 }
+
+test('security policy URL checks require an exact Markdown link target', () => {
+  const misleadingTarget = `https://attacker.invalid/${PRIVATE_REPORT_URL}`;
+  const links = markdownLinkTargets(`[Report privately](${misleadingTarget})`);
+
+  assert.equal(links.has(PRIVATE_REPORT_URL), false);
+  assert.equal(links.has(misleadingTarget), true);
+});
 
 test('security policy provides one private, redaction-safe reporting path', async () => {
   const [security, securityZh, privacy, readme] = await Promise.all([
@@ -58,8 +74,9 @@ test('security policy provides one private, redaction-safe reporting path', asyn
     assert.match(document, /auth(?:entication)? header|认证请求头/i);
     assert.match(document, /signing key|签名密钥/i);
     assert.match(document, /private code|私有代码/i);
-    assert.equal(document.includes(PRIVATE_REPORT_URL), true);
-    assert.equal(document.includes(SECURITY_CONTACT_URL), true);
+    const linkTargets = markdownLinkTargets(document);
+    assert.equal(linkTargets.has(PRIVATE_REPORT_URL), true);
+    assert.equal(linkTargets.has(SECURITY_CONTACT_URL), true);
     assert.match(document, /if.*(?:available|unavailable)|如果.*(?:可用|不可用)/is);
     assert.doesNotMatch(document, /report.*secret.*public issue|在公开 issue.*(?:提交|报告).*秘密/is);
   }
