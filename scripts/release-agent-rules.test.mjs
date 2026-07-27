@@ -56,6 +56,8 @@ test('release guidance has one canonical cross-agent source', async () => {
   assert.match(agentGuide, /CLAUDE\.md/);
   assert.match(agentGuide, /does not grant permission/i);
   assert.match(agentGuide, /Pure Actions Artifact work[\s\S]*is excluded/);
+  assert.match(agentGuide, /proactively invoke.*release-notes/is);
+  assert.match(agentGuide, /infer.*CodeName.*emoji/is);
 });
 
 test('gitignore exposes only the shared release guidance', () => {
@@ -136,15 +138,47 @@ test('release-flow separates channels, authority, and immutable state', async ()
   assert.match(skill, /tag.*assets.*target.*draft.*prerelease.*immutable.*latest/is);
   assert.match(skill, /Metro.*8081.*cannot run standalone/is);
   assert.match(skill, /Rollback.*must not use.*CodeName/is);
+  assert.match(skill, /invoke.*release-notes.*proactively/is);
+  assert.match(skill, /infer.*CodeName.*emoji/is);
 });
 
-test('release-notes is explicit-only and fail-closed', async () => {
+test('release-notes infers creative metadata while public edits stay fail-closed', async () => {
   const skill = await readFile(releaseNotesPath, 'utf8');
   assert.match(skill, /^---\nname: release-notes\ndescription:/);
-  assert.match(skill, /disable-model-invocation:\s*true/);
-  assert.match(skill, /\/skill:release-notes <version> <CodeName> <emoji> <channel-or-tag>/);
-  assert.match(skill, /must not infer.*version.*CodeName.*emoji.*channel/is);
+  assert.doesNotMatch(skill, /disable-model-invocation:\s*true/);
+  assert.match(skill, /agent may invoke.*proactively/is);
+  assert.match(skill, /explicit.*override.*inferred/is);
+  assert.match(skill, /infer.*CodeName.*dominant.*user-visible.*theme/is);
+  assert.match(skill, /infer.*emoji.*semantic.*theme/is);
+  assert.match(skill, /fallback.*channel/is);
+  assert.match(skill, /exactly one.*Release target/is);
+  assert.match(skill, /ambiguous.*target.*stop/is);
+  assert.match(skill, /inference rationale.*outside.*public body/is);
   assert.match(skill, /V<version> <CodeName> <emoji>/);
+
+  const invocationBlock = skill.match(
+    /## Invocation and inference contract\n([\s\S]*?)\n## Existing Release requirement/,
+  )?.[1];
+  assert.ok(invocationBlock, 'release-notes must define one invocation and inference contract');
+  assert.match(invocationBlock, /Proactive invocation authorizes only read-only investigation and drafting\./);
+  assert.match(
+    invocationBlock,
+    /Editing the public Release still requires an explicit publish or submit instruction for that exact draft and target/,
+  );
+  assert.doesNotMatch(invocationBlock, /Proactive invocation authorizes (?:a|the) public edit/i);
+  assert.match(
+    invocationBlock,
+    /CodeName.*neutral.*descriptive.*must not claim.*performance.*security.*reliability/is,
+  );
+  for (const fallback of [
+    'Stable Compatibility: `Stable Compatibility 🧭`',
+    'Compatibility Preview: `Compatibility Preview 🧪`',
+    'APK-only Preview: `APK Preview 📱`',
+    'Expo Dev: `Expo Dev 🔌`',
+  ]) {
+    assert.match(invocationBlock, new RegExp(fallback.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+
   const publishBlock = skill.match(/```bash\n(gh release edit[\s\S]*?)\n```/);
   assert.ok(publishBlock, 'release-notes must contain one bounded edit command');
   assert.equal(publishBlock[1], [
@@ -165,6 +199,8 @@ test('release-notes is explicit-only and fail-closed', async () => {
   assert.doesNotMatch(skill, /—/);
   assert.match(skill, /same number.*same order/is);
   assert.match(skill, /Preserve every workflow-mandated disclosure verbatim at the beginning of the body/);
+  assert.match(skill, /APK-only Preview owner-waiver physical-Android disclosure/);
+  assert.match(skill, /required Stable platform-unsigned disclosure for macOS and Windows archives/);
   assert.match(skill, /Expo Dev.*first.*Metro.*8081.*cannot run standalone/is);
   assert.match(skill, /Rollback.*release-flow/is);
   assert.match(skill, /native-signing-\*.*stop|stop.*native-signing-\*/is);

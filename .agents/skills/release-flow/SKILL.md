@@ -50,7 +50,7 @@ A pure Actions Artifact has no GitHub Release page and does not receive curated 
 
 If classification finds pure Actions Artifact work, stop applying this skill after recording the exclusion. Follow the relevant build or artifact runbook instead. Do not continue into Release preflight, publication, curated notes, or post-publication steps.
 
-This Release flow applies to Expo Dev only when the user explicitly scopes an existing prerelease edit, deletion, cleanup, or audit. Expo Dev has no repository publication workflow, and its runbook defines only the normal 14-day Artifact path. The one existing durable prerelease remains auditable, editable, and deletable under the protections here, but future Expo Dev Release creation must fail closed until a protected policy change adds a complete repeatable publication runbook or workflow. Historical evidence of the prior one-time promotion is not reusable publication authority. The explicit `release-notes` skill can edit an existing Expo Dev prerelease but can never create it.
+This Release flow applies to Expo Dev only when the user explicitly scopes an existing prerelease edit, deletion, cleanup, or audit. Expo Dev has no repository publication workflow, and its runbook defines only the normal 14-day Artifact path. The one existing durable prerelease remains auditable, editable, and deletable under the protections here, but future Expo Dev Release creation must fail closed until a protected policy change adds a complete repeatable publication runbook or workflow. Historical evidence of the prior one-time promotion is not reusable publication authority. The `release-notes` skill can edit an existing Expo Dev prerelease but can never create it.
 
 ## Release sequence
 
@@ -60,18 +60,18 @@ This Release flow applies to Expo Dev only when the user explicitly scopes an ex
 4. **Build once**: candidate workflows produce the bytes. Promotion and rollback must not rebuild or silently replace them.
 5. **Verify before publication**: bind source, hashes, manifests, provenance, attestations, signer or trust identities, release inventory, and any claimed Android acceptance to the exact APK.
 6. **Publish only with current authority**: use the repository workflow for channels that have one. Expo Dev Release creation has no current publication path and must stop; its Artifact workflow never publishes. Never infer permission from a successful candidate, a prior one-time publication, or this skill.
-7. **Apply curated notes separately**: only after the exact Release exists, the originating publication workflow or transaction completed successfully, and no publication retry or Draft-resume path remains pending. Use only the explicit `release-notes` skill. Record that replacing workflow-generated title/body removes compatibility with metadata-bound publication audit/retry paths that require the original body, including `scripts/github-release.ts` and APK Preview's `.github/workflows/android-preview-promote.yml`.
+7. **Apply curated notes separately**: only after the exact Release exists, the originating publication workflow or transaction completed successfully, and no publication retry or Draft-resume path remains pending. Invoke `release-notes` proactively to prepare the exact draft; it may infer CodeName and emoji from verified release context. Record that replacing workflow-generated title/body removes compatibility with metadata-bound publication audit/retry paths that require the original body, including `scripts/github-release.ts` and APK Preview's `.github/workflows/android-preview-promote.yml`.
 8. **Audit after mutation**: re-read GitHub and compare every invariant. Record exact commands, artifacts, not-run reasons, and residual risk in the matching evidence when project policy requires it.
 
 A failure at any gate stops the sequence. Do not weaken a check, swap a candidate, recreate a Release, or repair an immutable object through a different channel.
 
 ## Curated notes handoff
 
-Curated notes belong to `.agents/skills/release-notes/SKILL.md`. The user must explicitly invoke:
+Curated notes belong to `.agents/skills/release-notes/SKILL.md`. The agent may invoke `release-notes` proactively after resolving exactly one existing product Release. Explicit values remain supported through:
 
 `/skill:release-notes <version> <CodeName> <emoji> <channel-or-tag>`
 
-Do not infer missing inputs. The notes skill edits an existing workflow-created or explicitly approved product Release. It must never create a replacement Release. It must stop for `native-signing-*`, whose operational staging body is part of the verification contract rather than product marketing.
+The notes skill may infer CodeName and emoji from the dominant verified user-visible release theme and use its documented channel fallback when no theme dominates. User-provided values override inference. An ambiguous Release target still fails closed, and drafting never authorizes a public edit. The notes skill must never create a replacement Release and must stop for `native-signing-*`, whose operational staging body is part of the verification contract rather than product marketing.
 
 Before handoff, prove the originating publication workflow or transaction completed successfully and that no retry or Draft-resume path is pending. Curated metadata breaks every originating metadata-bound audit/retry path that requires the original title/body, including `scripts/github-release.ts` and APK Preview's `.github/workflows/android-preview-promote.yml`; record that consequence rather than treating the edit as retry-safe.
 
@@ -83,7 +83,7 @@ Treat a metadata-only correction as a narrowly bounded publication:
 
 1. Resolve one exact existing Release, reject `native-signing-*`, prove its originating publication workflow or transaction completed successfully with no retry or Draft-resume path pending, and snapshot its release ID, tag, tag ref, assets, target, draft, prerelease, immutable, and Latest state.
 2. Store each asset's ID, name, size, and digest in the before snapshot.
-3. Render the complete proposed title and body. Obtain approval for that exact draft unless the user's current request already approves it with every required notes input. Record that the edit removes compatibility with every originating metadata-bound audit/retry path, including `scripts/github-release.ts` and APK Preview promotion.
+3. Render the complete proposed title and body, including any inferred title values and their rationale outside the public body. Obtain approval for that exact draft and target unless the user's current request already grants equivalent specific publication authority. Record that the edit removes compatibility with every originating metadata-bound audit/retry path, including `scripts/github-release.ts` and APK Preview promotion.
 4. With explicit current-task authorization, run only `gh release edit <tag> --title ... --notes-file ...`.
 5. Never run `gh release create`, move or recreate the tag, upload or delete an asset, change target, toggle draft or prerelease, or alter Latest state to repair notes.
 6. Re-read the Release, tag ref, Latest endpoint, and asset inventory. Require exact equality for release ID, tag, target, draft, prerelease, immutable, Latest identity, and every asset tuple.

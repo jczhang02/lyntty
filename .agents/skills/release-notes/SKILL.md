@@ -1,31 +1,35 @@
 ---
 name: release-notes
-description: Draft and publish compact bilingual Lyntty notes for one existing Stable, Preview, or Expo Dev product Release. Native-signing operational staging and Rollback are excluded. User-only because editing a public Release is an external side effect and all title inputs must be explicit.
-disable-model-invocation: true
+description: Draft and publish compact bilingual Lyntty notes for one existing Stable, Preview, or Expo Dev product Release. May be invoked proactively during release work and may infer title metadata from verified release context. Native-signing operational staging and Rollback are excluded.
 ---
 
 # Lyntty Release Notes
 
 This skill owns curated public notes after the exact GitHub Release already exists. It can edit that Release's title and body only. It cannot create or delete a Release or mutate its tag, assets, target, channel, or publication state. Release deletion belongs to `release-flow` and requires separate exact-tag authority.
 
-## Invocation contract
+## Invocation and inference contract
 
-The only supported interface is:
+The agent may invoke this skill proactively when one release task reaches curated-notes preparation, or when the user asks to draft, improve, or publish Release Notes. Explicit invocation remains supported:
 
 `/skill:release-notes <version> <CodeName> <emoji> <channel-or-tag>`
 
-All four inputs are required. The agent must not infer the version, CodeName, emoji, or channel/tag from commits, package files, a current title, the latest Release, or prior conversation defaults. If any input is absent or ambiguous, ask for it and stop before drafting or editing.
+Every argument is optional when verified release context supplies it. An explicit user value always overrides an inferred value. Resolve inputs as follows:
 
-Treat the values literally:
+- `version`: use the explicit version, or derive it from the one exact resolved Release and verify it against the released product identity;
+- `channel-or-tag`: use the explicit channel/tag, or resolve it only when the current task and live state identify exactly one existing Release target;
+- `CodeName`: preserve an explicit value; otherwise infer the CodeName from the dominant verified user-visible theme in the released commit range and evidence. Use one to three concise English Title Case words, led by the highest-impact changelog item rather than internal hardening. An inferred CodeName must stay neutral and descriptive; it must not claim unverified performance, security, reliability, completeness, or platform support;
+- `emoji`: preserve an explicit value; otherwise infer the emoji by semantic match to that same theme. Choose the first applicable category: trust/security `🛡️`, speed/performance `⚡`, sync/history/reliability/control `🧭`, connection/discovery `🔗`, mobile/UI `📱`, or developer/Metro `🔌`.
 
-- `version`: the public product version used in `V<version>`;
-- `CodeName`: exact user-provided casing and spacing;
-- `emoji`: exactly one user-provided title emoji;
-- `channel-or-tag`: Stable, Compatibility Preview, APK-only Preview, Expo Dev, or one exact tag.
+If no dominant theme exists or equally important themes would make the title arbitrary, use the fallback for the resolved channel instead of asking for a creative preference:
 
-When a channel rather than a tag is supplied, inspect the matching Releases and present the resolved exact tag before mutation. Never silently select a similarly named channel. If the input resolves to Rollback, stop and follow `release-flow`; Rollback uses an operational record, not this curated format. If the exact tag matches `native-signing-*`, stop: its workflow-generated operational staging body is part of the verification contract and must not receive curated product notes.
+- Stable Compatibility: `Stable Compatibility 🧭`;
+- Compatibility Preview: `Compatibility Preview 🧪`;
+- APK-only Preview: `APK Preview 📱`;
+- Expo Dev: `Expo Dev 🔌`.
 
-Invoking the skill authorizes the drafting workflow, not an automatic public edit. Show the exact title and complete body, then require an explicit publish or submit instruction for that draft and target unless the user's current request already provides equivalent specific authorization.
+When a channel rather than a tag is supplied or inferred, inspect matching Releases and present the resolved exact tag before mutation. If the Release target is ambiguous, stop and ask for the exact channel or tag; never choose among multiple live Releases by recency alone. If the target resolves to Rollback, stop and follow `release-flow`; Rollback uses an operational record, not this curated format. If the exact tag matches `native-signing-*`, stop: its workflow-generated operational staging body is part of the verification contract and must not receive curated product notes.
+
+Before asking for publication approval, show the resolved target, title inputs, inference rationale outside the public body, exact title, and complete body. Proactive invocation authorizes only read-only investigation and drafting. Editing the public Release still requires an explicit publish or submit instruction for that exact draft and target unless the user's current request already provides equivalent specific authorization.
 
 ## Existing Release requirement
 
@@ -33,7 +37,7 @@ Confirm that one exact Release already exists. If it is missing, wait for the au
 
 Prove that the originating publication workflow or transaction completed successfully and that no publication retry or Draft-resume path is pending. Curated title/body edits remove compatibility with every originating metadata-bound audit/retry path that requires the original metadata, including `scripts/github-release.ts` and APK Preview's `.github/workflows/android-preview-promote.yml`; record this consequence before asking for publish approval.
 
-Validate the literal user-supplied version against the resolved Release tag and the released App/product identity in its manifest, BOM, provenance, or source package as applicable. This check validates an input; it does not infer or replace it. If the version and target mismatch, or the match cannot be proven, stop before drafting.
+Validate the explicit or inferred version against the resolved Release tag and the released App/product identity in its manifest, BOM, provenance, or source package as applicable. If the version and target mismatch, or the match cannot be proven, stop before drafting.
 
 Before drafting:
 
@@ -42,8 +46,9 @@ Before drafting:
 3. Read the latest Stable body as a live visual reference, but follow this skill when an older body conflicts with the current compact policy.
 4. Review the complete release commit range and commit bodies, not only subjects.
 5. Identify user-visible behavior changes, constraints, removed behavior, issue reporters, and PR contributors.
-6. Verify every command or product concept mentioned still exists at the released source commit.
-7. Identify any mandatory disclosure that release policy requires the public body to retain.
+6. Select or infer the CodeName and emoji from the highest-impact verified user-visible theme, recording the source and fallback decision outside the public body.
+7. Verify every command or product concept mentioned still exists at the released source commit.
+8. Identify any mandatory disclosure that release policy requires the public body to retain.
 
 Do not use internal test counts, provenance detail, signer identity, checksums, waiver mechanics, or physical-device status as ordinary changelog material. A mandatory public disclosure is the sole exception and stays in its required prefix.
 
@@ -53,7 +58,7 @@ The title is exactly:
 
 `V<version> <CodeName> <emoji>`
 
-Use capital `V`. Version, CodeName, and emoji appear only in the Release title. The body heading is only `Lyntty`.
+Use capital `V`. Preserve explicit title values; otherwise use the inference contract above. The emoji must be exactly one visible grapheme. Version, CodeName, and emoji appear only in the Release title. The body heading is only `Lyntty`.
 
 ## Body template
 
@@ -109,7 +114,8 @@ Do not shorten, soften, translate again, or move a required disclosure below the
 
 Before showing the draft, verify mechanically or by direct inspection:
 
-- title exactly matches `V<version> <CodeName> <emoji>`;
+- title exactly matches `V<version> <CodeName> <emoji>` and contains exactly one title emoji grapheme;
+- explicit values were preserved, and every inferred value has an evidence-backed inference rationale outside the public body;
 - logo URL contains the exact released source commit;
 - h1 is only `Lyntty`;
 - section order is logo, `Changelog`, `更新日志`, `Thanks` after any mandatory prefix;
