@@ -50,8 +50,10 @@ import { encryptBlob } from '@/encryption/blob';
 import { readFileBytes } from '@/utils/readFileBytes';
 import { Modal } from '@/modal';
 import { t } from '@/text';
+import { shouldFetchPiSessionDiscovery } from './piDiscoveredSessions';
 import { fetchPiSessionPages, PiSessionIndexRefreshingError } from './piSessionDiscoveryFetch';
 import { PiSessionListSnapshot } from './piSessionListSnapshot';
+import { findPiSessionNameBackfills, persistPiSessionNameBackfills } from './piSessionNamePersistence';
 import {
     resolvePiSessionRetryDelay,
     shouldRefreshPiSessionsForMachineTransition,
@@ -157,6 +159,13 @@ class Sync {
     private pushTokenSync: InvalidateSync;
     private nativeUpdateSync: InvalidateSync;
     private sessionListSnapshot: PiSessionListSnapshot;
+    private piSessionNameBackfillRelaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }> = [];
+    private piSessionNameBackfillPending: {
+        context: SyncRuntimeContext;
+        relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>;
+        mergedSessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>;
+    } | null = null;
+    private piSessionNameBackfillInFlight: Promise<void> | null = null;
     private activityAccumulator: ActivityUpdateAccumulator;
     private pendingSettings: Partial<Settings> = loadPendingSettings();
     private appState: AppStateStatus = AppState.currentState;
@@ -186,6 +195,10 @@ class Sync {
             (machineId) => storage.getState().machines[machineId],
             (sessions) => {
                 this.applySessions(sessions, { replace: true });
+                this.queueCanonicalPiSessionNamePersistence(
+                    this.piSessionNameBackfillRelaySessions,
+                    sessions,
+                );
                 if (sessions.length > 0) storage.getState().applyReady();
             },
             (identity) => this.persistPiSessionTombstone(identity),
@@ -282,6 +295,9 @@ class Sync {
         this.pendingSettings = {};
         savePendingSettings(this.pendingSettings);
         this.sessionListSnapshot.reset();
+        this.piSessionNameBackfillRelaySessions = [];
+        this.piSessionNameBackfillPending = null;
+        this.piSessionNameBackfillInFlight = null;
         this.sessionSnapshotGeneration += 1;
         this.updateProcessingChain = Promise.resolve();
         this.resolveRelayInitialAttempt?.();
@@ -1008,6 +1024,108 @@ class Sync {
     // Private
     //
 
+    private persistCanonicalPiSessionNames = async (
+        context: SyncRuntimeContext,
+        relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
+        mergedSessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
+    ): Promise<void> => {
+        if (!this.isRuntimeContextCurrent(context)) return;
+        const candidates = findPiSessionNameBackfills(relaySessions, mergedSessions);
+        if (candidates.length === 0) return;
+        const result = await persistPiSessionNameBackfills(candidates, {
+            encryptMetadata: async (sessionId, metadata) => {
+                if (!this.isRuntimeContextCurrent(context)) {
+                    throw new Error('Pi session name persistence was superseded');
+                }
+                const sessionEncryption = context.encryption.getSessionEncryption(sessionId);
+                if (!sessionEncryption) throw new Error('Session encryption is unavailable');
+                const encrypted = await sessionEncryption.encryptMetadata(metadata);
+                if (!this.isRuntimeContextCurrent(context)) {
+                    throw new Error('Pi session name persistence was superseded');
+                }
+                return encrypted;
+            },
+            decryptMetadata: async (sessionId, version, ciphertext) => {
+                if (!this.isRuntimeContextCurrent(context)) return null;
+                const sessionEncryption = context.encryption.getSessionEncryption(sessionId);
+                if (!sessionEncryption) return null;
+                const metadata = await sessionEncryption.decryptMetadata(version, ciphertext);
+                return this.isRuntimeContextCurrent(context) ? metadata : null;
+            },
+            updateMetadata: async ({ sessionId, metadata, expectedVersion }) => {
+                if (!this.isRuntimeContextCurrent(context)) {
+                    return { result: 'error' };
+                }
+                const response = await apiSocket.emitWithAck<{
+                    result: 'success' | 'version-mismatch' | 'error';
+                    version?: number;
+                    metadata?: string;
+                    message?: string;
+                }>('update-metadata', {
+                    sid: sessionId,
+                    metadata,
+                    expectedVersion,
+                }, 10_000);
+                if (!this.isRuntimeContextCurrent(context)) {
+                    return { result: 'error' };
+                }
+                if (
+                    (response.result === 'success' || response.result === 'version-mismatch')
+                    && typeof response.version === 'number'
+                    && typeof response.metadata === 'string'
+                ) {
+                    return {
+                        result: response.result,
+                        version: response.version,
+                        metadata: response.metadata,
+                    };
+                }
+                return { result: 'error', message: response.message };
+            },
+        });
+        if (result.failed > 0 && this.isRuntimeContextCurrent(context)) {
+            console.warn(`Failed to persist ${result.failed}/${candidates.length} canonical Pi session name(s)`);
+        }
+    };
+
+    private startCanonicalPiSessionNamePersistence = (): void => {
+        if (this.piSessionNameBackfillInFlight || !this.piSessionNameBackfillPending) return;
+        const task = (async () => {
+            while (this.piSessionNameBackfillPending) {
+                const job = this.piSessionNameBackfillPending;
+                this.piSessionNameBackfillPending = null;
+                if (!this.isRuntimeContextCurrent(job.context)) continue;
+                await this.persistCanonicalPiSessionNames(
+                    job.context,
+                    job.relaySessions,
+                    job.mergedSessions,
+                );
+            }
+        })().catch((error) => {
+            console.warn('Failed to persist canonical Pi session names', error);
+        });
+        this.piSessionNameBackfillInFlight = task;
+        void task.finally(() => {
+            if (this.piSessionNameBackfillInFlight === task) {
+                this.piSessionNameBackfillInFlight = null;
+            }
+            if (this.piSessionNameBackfillPending) {
+                this.startCanonicalPiSessionNamePersistence();
+            }
+        });
+    };
+
+    private queueCanonicalPiSessionNamePersistence = (
+        relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
+        mergedSessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
+    ): void => {
+        const context = this.captureRuntimeContext();
+        if (!this.isRuntimeContextCurrent(context)
+            || findPiSessionNameBackfills(relaySessions, mergedSessions).length === 0) return;
+        this.piSessionNameBackfillPending = { context, relaySessions, mergedSessions };
+        this.startCanonicalPiSessionNamePersistence();
+    };
+
     private piSessionTombstoneScope = (): string => `${getServerUrl()}#${this.serverID}`;
 
     private restorePiSessionTombstonesForAccount = (): void => {
@@ -1018,13 +1136,19 @@ class Sync {
     }
 
     private persistPiSessionTombstone = (
-        identity: { relaySessionId: string; machineId?: string; piSessionId?: string },
+        identity: {
+            relaySessionId: string;
+            relaySessionTag?: string;
+            machineId?: string;
+            piSessionId?: string;
+        },
         serverId = this.piSessionTombstoneScope(),
     ): void => {
-        if (!identity.machineId || !identity.piSessionId) return;
+        if (!identity.relaySessionTag && (!identity.machineId || !identity.piSessionId)) return;
         this.piSessionTombstones = addPiSessionTombstone(this.piSessionTombstones, {
             serverId,
             relaySessionId: identity.relaySessionId,
+            relaySessionTag: identity.relaySessionTag,
             machineId: identity.machineId,
             piSessionId: identity.piSessionId,
             deletedAt: Date.now(),
@@ -1079,7 +1203,7 @@ class Sync {
         ]);
         const retryOnly = !hasRequestedFullRefresh && retryMachineIds.size > 0;
         const machines = Object.values(storage.getState().machines)
-            .filter(machine => machine.metadata?.cliAvailability?.pi !== false)
+            .filter(shouldFetchPiSessionDiscovery)
             .filter(machine => !retryOnly || retryMachineIds.has(machine.id));
         const refreshId = this.sessionListSnapshot.beginMachineRefresh(machines, !retryOnly);
         const failures: string[] = [];
@@ -1290,6 +1414,10 @@ class Sync {
         // A logout/server reset can finish while decryption is in flight. Never
         // let that obsolete account snapshot write into the new sync generation.
         if (generation !== this.sessionSnapshotGeneration || encryption !== this.encryption) return;
+        // Keep the raw Relay view as the optimistic-concurrency baseline for
+        // canonical Pi title persistence. Progressive discovery snapshots merge
+        // synchronously and queue only the newest resulting backfill work.
+        this.piSessionNameBackfillRelaySessions = decryptedSessions;
         // Publish the relay snapshot immediately. Existing Pi discovery rows stay
         // present until their own progressive refresh finishes.
         this.sessionListSnapshot.commitRelaySnapshot(decryptedSessions, requestStartIds);
@@ -1933,6 +2061,8 @@ class Sync {
                     && canControlSession(currentSession.metadata)
                 ) {
                     const fromSeq = this.sessionLastSeq.get(sessionId) ?? 0;
+                    const requestedCursor = currentSession.metadata.piHistoryCursor;
+                    const requestedMetadataVersion = currentSession.metadataVersion;
                     const controller = new AbortController();
                     this.readAbortControllers.add(controller);
                     let result: PiHistoryPageResult;
@@ -1940,17 +2070,42 @@ class Sync {
                         result = await apiSocket.sessionRPC<PiHistoryPageResult, { beforeEntryId?: string }>(
                             sessionId,
                             'pi-history-page',
-                            currentSession.metadata.piHistoryCursor ? { beforeEntryId: currentSession.metadata.piHistoryCursor } : {},
+                            requestedCursor ? { beforeEntryId: requestedCursor } : {},
                             { timeoutMs: 15_000, signal: controller.signal },
                         );
                     } finally {
                         this.readAbortControllers.delete(controller);
                     }
                     if (!this.isRuntimeContextCurrent(context)) return;
-                    const latestSession = storage.getState().sessions[sessionId] ?? currentSession;
+                    // A delete received while the RPC was in flight is
+                    // authoritative. Never use the request-time row as a
+                    // fallback or recreate it through a delayed response.
+                    const latestSession = storage.getState().sessions[sessionId];
+                    const latestMetadata = latestSession?.metadata;
+                    if (!latestSession || !latestMetadata) return;
+                    if (
+                        latestSession.metadataVersion !== requestedMetadataVersion
+                        || latestMetadata.piHistoryCursor !== requestedCursor
+                    ) {
+                        // Another client or socket update advanced coverage while
+                        // this RPC was in flight. Fetch any newly confirmed
+                        // messages, but never let the delayed response regress
+                        // the newer cursor or pagination state.
+                        await this.fetchForwardSince(sessionId, encryption, fromSeq, context);
+                        if (!this.isRuntimeContextCurrent(context)) return;
+                        storage.getState().applyOlderMessagesPagination(sessionId, {
+                            hasMore: latestMetadata.piHistoryHasMore === true
+                                || (this.sessionOldestSeq.get(sessionId) ?? 0) > 1,
+                        });
+                        return;
+                    }
                     storage.getState().applySessions([{
                         ...latestSession,
-                        metadata: applyPiHistoryPageResult(latestSession.metadata ?? currentSession.metadata!, result),
+                        metadata: applyPiHistoryPageResult(
+                            latestMetadata,
+                            result,
+                            { expectedCursor: requestedCursor },
+                        ),
                     }]);
                     if (result.type === 'history_gap') {
                         historyGapReason = `history_gap: ${result.reason}`;
@@ -2191,17 +2346,21 @@ class Sync {
             const sessionId = updateData.body.sid;
             const deletedSession = storage.getState().sessions[sessionId];
             const discoveredIdentity = this.sessionListSnapshot.findPiIdentityByRelaySessionId(sessionId);
+            const relaySessionTag = deletedSession?.tag ?? discoveredIdentity?.relaySessionTag;
             const machineId = deletedSession?.metadata?.machineId ?? discoveredIdentity?.machineId;
             const piSessionId = deletedSession?.metadata?.piSessionId ?? discoveredIdentity?.piSessionId;
             const isPiSession = deletedSession?.metadata?.flavor === 'pi'
+                || relaySessionTag?.startsWith('pi:') === true
                 || Boolean(machineId && piSessionId);
-            this.sessionListSnapshot.hideDeletedSession({
+            const deletedIdentity = {
                 relaySessionId: sessionId,
+                ...(relaySessionTag ? { relaySessionTag } : {}),
                 machineId,
                 piSessionId,
-            });
+            };
+            this.sessionListSnapshot.hideDeletedSession(deletedIdentity);
             if (isPiSession) {
-                this.persistPiSessionTombstone({ relaySessionId: sessionId, machineId, piSessionId }, context.tombstoneScope);
+                this.persistPiSessionTombstone(deletedIdentity, context.tombstoneScope);
             }
 
             // Remove session from storage

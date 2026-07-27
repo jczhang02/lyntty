@@ -4,6 +4,7 @@ import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 import { LaunchAgentServiceManager, renderLaunchAgentPlist } from './launchd';
+import { buildDaemonRuntimePath } from './index';
 import { SystemdUserServiceManager, renderSystemdUserUnit } from './systemd';
 import type { DaemonServiceConfig, ServiceCommandResult, ServiceCommandRunner } from './types';
 
@@ -46,6 +47,12 @@ function recordingRunner(
 }
 
 describe('systemd user service', () => {
+  it('includes the standard /opt executable directory in the Linux daemon PATH', () => {
+    const runtimePath = buildDaemonRuntimePath('linux', '/home/user');
+
+    expect(runtimePath.split(':')).toContain('/opt/bin');
+  });
+
   it('renders a direct standalone daemon command and fixed service environment', async () => {
     const { config } = await testConfig('linux');
     const unit = renderSystemdUserUnit(config);

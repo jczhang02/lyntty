@@ -42,9 +42,10 @@ function resolveSystemctl(): string {
   throw new Error('systemctl was not found; a systemd user session is required');
 }
 
-function runtimePath(platform: NodeJS.Platform, homeDir: string): string {
+export function buildDaemonRuntimePath(platform: NodeJS.Platform, homeDir: string): string {
   const paths = [join(homeDir, '.local', 'bin'), join(homeDir, '.cargo', 'bin')];
   if (platform === 'darwin') paths.push('/opt/homebrew/bin');
+  if (platform === 'linux') paths.push('/opt/bin');
   paths.push('/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin');
   return paths.join(':');
 }
@@ -103,7 +104,7 @@ export function createDaemonServiceManager(options: ServiceManagerOptions = {}):
     homeDir,
     lynttyHomeDir: configuration.lynttyHomeDir,
     servicePath,
-    runtimePath: runtimePath(platform, homeDir),
+    runtimePath: buildDaemonRuntimePath(platform, homeDir),
     uid,
   };
 

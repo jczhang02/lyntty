@@ -101,6 +101,7 @@ export function savePendingSyntheticOutbox(outbox: Map<string, PersistedSyntheti
 export type PersistedPiSessionTombstone = {
     serverId: string;
     relaySessionId: string;
+    relaySessionTag?: string;
     machineId?: string;
     piSessionId?: string;
     deletedAt: number;
@@ -120,6 +121,7 @@ export function parsePiSessionTombstones(raw: string | undefined): PersistedPiSe
                 || typeof candidate.relaySessionId !== 'string'
                 || typeof candidate.deletedAt !== 'number'
                 || !Number.isFinite(candidate.deletedAt)
+                || (candidate.relaySessionTag !== undefined && typeof candidate.relaySessionTag !== 'string')
                 || (candidate.machineId !== undefined && typeof candidate.machineId !== 'string')
                 || (candidate.piSessionId !== undefined && typeof candidate.piSessionId !== 'string')) return [];
             return [candidate as PersistedPiSessionTombstone];
@@ -137,6 +139,8 @@ export function addPiSessionTombstone(
     const deduplicated = current.filter((entry) => !(
         entry.serverId === tombstone.serverId
         && (entry.relaySessionId === tombstone.relaySessionId
+            || (Boolean(tombstone.relaySessionTag)
+                && entry.relaySessionTag === tombstone.relaySessionTag)
             || (Boolean(tombstone.machineId && tombstone.piSessionId)
                 && entry.machineId === tombstone.machineId
                 && entry.piSessionId === tombstone.piSessionId))

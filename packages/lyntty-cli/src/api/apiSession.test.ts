@@ -161,6 +161,17 @@ describe('ApiSessionClient v3 messages API migration', () => {
         mockAxiosGet.mockReset();
         mockAxiosPost.mockReset();
         mockAxiosPut.mockReset();
+        mockAxiosPost.mockImplementation(async (_url: string, payload: { messages?: Array<{ localId: string }> }) => ({
+            data: {
+                messages: (payload.messages ?? []).map((message, index) => ({
+                    id: `default-message-${index + 1}`,
+                    seq: index + 1,
+                    localId: message.localId,
+                    createdAt: index + 1,
+                    updatedAt: index + 1,
+                })),
+            },
+        }));
         mockShouldReconnect.mockReturnValue(true);
         socketHandlers = {};
         session = makeSession();
@@ -176,6 +187,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
             off: mock(),
             emit: mock(),
             emitWithAck: mock(async () => ({ result: 'error' })),
+            timeout: mock(() => mockSocket),
             volatile: {
                 emit: mock()
             },
@@ -197,6 +209,62 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect(mockSocket.on).toHaveBeenCalledWith('disconnect', expect.any(Function));
         expect(mockSocket.on).toHaveBeenCalledWith('update', expect.any(Function));
         expect(mockSocket.connect).toHaveBeenCalledTimes(1);
+    });
+
+    it('bounds every metadata commit and releases the metadata lock for history retry', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        mockSocket.emitWithAck.mockResolvedValue({ result: 'error' });
+
+        await expect(client.updateMetadataAndAwait(
+            (metadata) => ({ ...metadata, name: 'first attempt' }),
+        )).rejects.toThrow('Metadata update did not complete within 10000ms');
+
+        const recoveredMetadata = { ...session.metadata, name: 'recovered' };
+        mockSocket.emitWithAck.mockResolvedValue({
+            result: 'success',
+            metadata: encryptContent(session, recoveredMetadata),
+            version: 1,
+        });
+        await client.updateMetadataAndAwait(
+            (metadata) => ({ ...metadata, name: 'recovered' }),
+            { timeoutMs: 100 },
+        );
+
+        expect(mockSocket.timeout).toHaveBeenCalled();
+        expect(client.getMetadata()?.name).toBe('recovered');
+    });
+
+    it('releases a queued history commit after a prior metadata ACK is lost', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        let rejectLostAck: ((error: Error) => void) | undefined;
+        mockSocket.emitWithAck.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+            rejectLostAck = reject;
+        }));
+
+        const lostAckUpdate = client.updateMetadataAndAwait(
+            (metadata) => ({ ...metadata, name: 'lost ack' }),
+            { timeoutMs: 100 },
+        );
+        for (let attempt = 0; attempt < 10 && !rejectLostAck; attempt++) {
+            await Promise.resolve();
+        }
+
+        const recoveredMetadata = { ...session.metadata, name: 'history recovered' };
+        mockSocket.emitWithAck.mockResolvedValueOnce({
+            result: 'success',
+            metadata: encryptContent(session, recoveredMetadata),
+            version: 1,
+        });
+        const historyUpdate = client.updateMetadataAndAwait(
+            (metadata) => ({ ...metadata, name: 'history recovered' }),
+            { timeoutMs: 100 },
+        );
+
+        rejectLostAck?.(new Error('operation has timed out'));
+
+        await expect(lostAckUpdate).rejects.toThrow('Metadata update did not complete within 100ms');
+        await expect(historyUpdate).resolves.toBeUndefined();
+        expect(client.getMetadata()?.name).toBe('history recovered');
     });
 
     it('retries after initial socket connection error', async () => {
@@ -223,6 +291,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         (client as any).pendingOutbox = Array.from({ length: 120 }, (_value, index) => ({
             content: `encrypted-${index + 1}`,
             localId: `local-${index + 1}`,
+            logicalDigest: `digest-${index + 1}`,
         }));
         let nextSeq = 1;
         mockAxiosPost.mockImplementation(async (_url: string, payload: { messages: Array<{ localId: string }> }) => ({
@@ -522,7 +591,9 @@ describe('ApiSessionClient v3 messages API migration', () => {
 
         expect(onUserMessage).toHaveBeenCalledTimes(1);
         expect(onUserMessage).toHaveBeenCalledWith({ ...newMessage, localKey: 'new-key' });
-        expect(client.hasSessionProtocolEnvelope('existing-envelope')).toBe(true);
+        // Legacy/non-deterministic localIds contribute time coverage but must
+        // not prove the canonical `session:<envelope.id>` identity.
+        expect(client.hasSessionProtocolEnvelope('existing-envelope')).toBe(false);
         expect(client.getSessionProtocolCoveredThrough()).toBe(1);
     });
 
@@ -906,11 +977,11 @@ describe('ApiSessionClient v3 messages API migration', () => {
         const client = new ApiSessionClient('fake-token', session);
         (client as any).lastSeq = 10;
 
-        mockAxiosPost.mockResolvedValueOnce({
+        mockAxiosPost.mockImplementationOnce(async (_url: string, payload: { messages: Array<{ localId: string }> }) => ({
             data: {
-                messages: [{ id: 'msg-9', seq: 9, localId: 'l9', createdAt: 9, updatedAt: 9 }]
+                messages: [{ id: 'msg-9', seq: 9, localId: payload.messages[0].localId, createdAt: 9, updatedAt: 9 }]
             }
-        });
+        }));
 
         client.sendSessionEvent({ type: 'ready' }, 'older');
         await waitForCheck(() => {
@@ -918,11 +989,11 @@ describe('ApiSessionClient v3 messages API migration', () => {
         });
         expect((client as any).lastSeq).toBe(10);
 
-        mockAxiosPost.mockResolvedValueOnce({
+        mockAxiosPost.mockImplementationOnce(async (_url: string, payload: { messages: Array<{ localId: string }> }) => ({
             data: {
-                messages: [{ id: 'msg-11', seq: 11, localId: 'l11', createdAt: 11, updatedAt: 11 }]
+                messages: [{ id: 'msg-11', seq: 11, localId: payload.messages[0].localId, createdAt: 11, updatedAt: 11 }]
             }
-        });
+        }));
 
         client.sendSessionEvent({ type: 'ready' }, 'newer');
         await waitForCheck(() => {
@@ -931,7 +1002,7 @@ describe('ApiSessionClient v3 messages API migration', () => {
         expect((client as any).lastSeq).toBe(11);
     });
 
-    it('flushOutbox tolerates missing response.data.messages and keeps lastSeq unchanged', async () => {
+    it('keeps unconfirmed outbox messages when the relay response omits acknowledgements', async () => {
         const client = new ApiSessionClient('fake-token', session);
         (client as any).lastSeq = 7;
 
@@ -939,13 +1010,15 @@ describe('ApiSessionClient v3 messages API migration', () => {
             data: {}
         });
 
-        client.sendSessionEvent({ type: 'ready' }, 'no-messages-field');
-        await waitForCheck(() => {
-            expect(mockAxiosPost).toHaveBeenCalledTimes(1);
-        });
+        (client as any).enqueueMessage({
+            role: 'agent',
+            content: { id: 'no-messages-field', type: 'event', data: { type: 'ready' } },
+        }, false, 'no-messages-field');
+
+        await expect((client as any).flushOutbox()).rejects.toThrow('did not acknowledge');
 
         expect((client as any).lastSeq).toBe(7);
-        expect((client as any).pendingOutbox).toHaveLength(0);
+        expect((client as any).pendingOutbox).toHaveLength(1);
     });
 
     it('triggers receive catch-up fetch on socket reconnect', async () => {
@@ -978,6 +1051,273 @@ describe('ApiSessionClient v3 messages API migration', () => {
         const secondLocalId = (second as any).pendingOutbox[0].localId;
         expect(firstLocalId).toBe('session:stable-entry');
         expect(secondLocalId).toBe(firstLocalId);
+    });
+
+    it('reuses one encrypted outbox item when the same logical envelope is queued twice', () => {
+        const client = new ApiSessionClient('fake-token', session);
+        const envelope = { id: 'stable-entry', role: 'agent', time: 1, turn: 'turn-1', ev: { t: 'text', text: 'hello' } } as const;
+
+        (client as any).enqueueSessionProtocolEnvelope(envelope, false);
+        const firstCiphertext = (client as any).pendingOutbox[0].content;
+        (client as any).enqueueSessionProtocolEnvelope(envelope, false);
+
+        expect((client as any).pendingOutbox).toHaveLength(1);
+        expect((client as any).pendingOutbox[0].content).toBe(firstCiphertext);
+    });
+
+    it('reuses ciphertext after a response-loss retry in the same process', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        (client as any).enqueueSessionProtocolEnvelope({
+            id: 'response-loss-entry',
+            role: 'user',
+            time: 1,
+            ev: { t: 'text', text: 'retry me' },
+        }, false);
+        mockAxiosPost.mockRejectedValueOnce(new Error('response lost after persistence'));
+
+        await expect((client as any).flushOutbox()).rejects.toThrow('response lost');
+        const firstCiphertext = mockAxiosPost.mock.calls[0][1].messages[0].content;
+        mockAxiosPost.mockImplementationOnce(async (_url: string, payload: { messages: Array<{ localId: string }> }) => ({
+            data: {
+                messages: payload.messages.map((message) => ({
+                    id: 'relay-message-1',
+                    seq: 1,
+                    localId: message.localId,
+                    createdAt: 1,
+                    updatedAt: 1,
+                })),
+            },
+        }));
+
+        await (client as any).flushOutbox();
+
+        expect(mockAxiosPost.mock.calls[1][1].messages[0].content).toBe(firstCiphertext);
+        expect((client as any).pendingOutbox).toHaveLength(0);
+    });
+
+    it('reconciles a persisted 50-message prefix after restart and sends the remaining suffix', async () => {
+        const persistedClient = new ApiSessionClient('fake-token', session);
+        const restartedClient = new ApiSessionClient('fake-token', session);
+        const envelopes = Array.from({ length: 51 }, (_value, index) => ({
+            id: `restart-entry-${index + 1}`,
+            role: 'user' as const,
+            time: index + 1,
+            ev: { t: 'text' as const, text: `message ${index + 1}` },
+        }));
+        for (const envelope of envelopes) {
+            (persistedClient as any).enqueueSessionProtocolEnvelope(envelope, false);
+            (restartedClient as any).enqueueSessionProtocolEnvelope(envelope, false);
+        }
+        const persistedPrefix = (persistedClient as any).pendingOutbox.slice(0, 50);
+        expect((restartedClient as any).pendingOutbox[0].content).not.toBe(persistedPrefix[0].content);
+
+        mockAxiosPost
+            .mockRejectedValueOnce({
+                response: {
+                    status: 409,
+                    data: {
+                        code: 'LOCAL_ID_CONTENT_CONFLICT',
+                        localId: 'session:restart-entry-1',
+                    },
+                },
+            })
+            .mockImplementationOnce(async (_url: string, payload: { messages: Array<{ localId: string }> }) => ({
+                data: {
+                    messages: payload.messages.map((message) => ({
+                        id: 'relay-message-51',
+                        seq: 51,
+                        localId: message.localId,
+                        createdAt: 51,
+                        updatedAt: 51,
+                    })),
+                },
+            }));
+        mockAxiosGet.mockResolvedValueOnce({
+            data: {
+                messages: persistedPrefix.map((message: { content: string; localId: string }, index: number) => ({
+                    id: `relay-message-${index + 1}`,
+                    seq: index + 1,
+                    localId: message.localId,
+                    content: { t: 'encrypted', c: message.content },
+                    createdAt: index + 1,
+                    updatedAt: index + 1,
+                })),
+                hasMore: false,
+            },
+        });
+
+        await (restartedClient as any).flushOutbox();
+
+        expect(mockAxiosPost).toHaveBeenCalledTimes(2);
+        expect(mockAxiosPost.mock.calls[1][1].messages.map((message: { localId: string }) => message.localId)).toEqual([
+            'session:restart-entry-51',
+        ]);
+        expect((restartedClient as any).pendingOutbox).toHaveLength(0);
+        await expect(restartedClient.flushConfirmed(100)).resolves.toBeUndefined();
+    });
+
+    it('reconciles randomized ciphertext after the relay persisted the same logical envelope', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        const envelope = { id: 'persisted-entry', role: 'agent', time: 1, turn: 'turn-1', ev: { t: 'text', text: 'hello' } } as const;
+        const persistedContent = {
+            role: 'session',
+            content: envelope,
+            meta: { sentFrom: 'cli' },
+        };
+        (client as any).enqueueSessionProtocolEnvelope(envelope, false);
+
+        mockAxiosPost.mockRejectedValueOnce({
+            response: {
+                status: 409,
+                data: {
+                    code: 'LOCAL_ID_CONTENT_CONFLICT',
+                    localId: 'session:persisted-entry',
+                },
+            },
+        });
+        mockAxiosGet.mockResolvedValueOnce({
+            data: {
+                messages: [{
+                    id: 'relay-message-1',
+                    seq: 1,
+                    localId: 'session:persisted-entry',
+                    content: { t: 'encrypted', c: encryptContent(session, persistedContent) },
+                    createdAt: 1,
+                    updatedAt: 1,
+                }],
+                hasMore: false,
+            },
+        });
+
+        await (client as any).flushOutbox();
+
+        expect((client as any).pendingOutbox).toHaveLength(0);
+        await expect(client.flushConfirmed(100)).resolves.toBeUndefined();
+    });
+
+    it('quarantines a true localId conflict and still sends later messages', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        const conflicting = { id: 'conflict-entry', role: 'agent', time: 1, turn: 'turn-1', ev: { t: 'text', text: 'new text' } } as const;
+        const later = { id: 'later-entry', role: 'agent', time: 2, turn: 'turn-2', ev: { t: 'text', text: 'later text' } } as const;
+        (client as any).enqueueSessionProtocolEnvelope(conflicting, false);
+        (client as any).enqueueSessionProtocolEnvelope(later, false);
+
+        mockAxiosPost
+            .mockRejectedValueOnce({
+                response: {
+                    status: 409,
+                    data: {
+                        code: 'LOCAL_ID_CONTENT_CONFLICT',
+                        localId: 'session:conflict-entry',
+                    },
+                },
+            })
+            .mockImplementationOnce(async (_url: string, payload: { messages: Array<{ localId: string }> }) => ({
+                data: {
+                    messages: payload.messages.map((message, index) => ({
+                        id: `relay-message-${index + 2}`,
+                        seq: index + 2,
+                        localId: message.localId,
+                        createdAt: index + 2,
+                        updatedAt: index + 2,
+                    })),
+                },
+            }));
+        mockAxiosGet.mockResolvedValueOnce({
+            data: {
+                messages: [{
+                    id: 'relay-message-1',
+                    seq: 1,
+                    localId: 'session:conflict-entry',
+                    content: { t: 'encrypted', c: encryptContent(session, {
+                        role: 'session',
+                        content: { ...conflicting, ev: { t: 'text', text: 'different persisted text' } },
+                        meta: { sentFrom: 'cli' },
+                    }) },
+                    createdAt: 1,
+                    updatedAt: 1,
+                }],
+                hasMore: false,
+            },
+        });
+
+        await (client as any).flushOutbox();
+
+        expect(mockAxiosPost).toHaveBeenCalledTimes(2);
+        expect(mockAxiosPost.mock.calls[1][1].messages.map((message: { localId: string }) => message.localId)).toEqual([
+            'session:later-entry',
+        ]);
+        expect((client as any).pendingOutbox).toHaveLength(0);
+        await expect(client.flushConfirmed(100)).rejects.toThrow('session:conflict-entry');
+    });
+
+    it('distinguishes matching and divergent canonical envelopes during restart inventory', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        const persisted = { id: 'inventory-entry', role: 'agent', time: 1, turn: 'turn-1', ev: { t: 'text', text: 'persisted text' } } as const;
+        mockAxiosGet.mockResolvedValueOnce({
+            data: {
+                messages: [{
+                    id: 'relay-message-1',
+                    seq: 1,
+                    localId: 'session:inventory-entry',
+                    content: { t: 'encrypted', c: encryptContent(session, {
+                        role: 'session',
+                        content: persisted,
+                        meta: { sentFrom: 'cli' },
+                    }) },
+                    createdAt: 1,
+                    updatedAt: 1,
+                }],
+                hasMore: false,
+            },
+        });
+
+        await client.syncExistingSessionProtocolEnvelopeIds();
+
+        expect(client.getSessionProtocolEnvelopeStatus(persisted)).toBe('matching');
+        expect(client.getSessionProtocolEnvelopeStatus({
+            ...persisted,
+            ev: { t: 'text', text: 'different text' },
+        })).toBe('conflict');
+        expect(client.getSessionProtocolEnvelopeStatus({
+            ...persisted,
+            id: 'missing-entry',
+        })).toBe('missing');
+    });
+
+    it('binds canonical envelope status to its deterministic Relay localId', async () => {
+        const client = new ApiSessionClient('fake-token', session);
+        const canonical = { id: 'bound-entry', role: 'agent', time: 1, turn: 'turn-1', ev: { t: 'text', text: 'canonical text' } } as const;
+        mockAxiosGet.mockResolvedValueOnce({
+            data: {
+                messages: [
+                    {
+                        id: 'relay-message-1',
+                        seq: 1,
+                        localId: 'session:bound-entry',
+                        content: { t: 'encrypted', c: encryptContent(session, {
+                            role: 'session',
+                            content: { ...canonical, ev: { t: 'text', text: 'divergent text' } },
+                        }) },
+                    },
+                    {
+                        id: 'relay-message-2',
+                        seq: 2,
+                        localId: 'unrelated-local-id',
+                        content: { t: 'encrypted', c: encryptContent(session, {
+                            role: 'session',
+                            content: canonical,
+                        }) },
+                    },
+                ],
+                hasMore: false,
+            },
+        });
+
+        await client.syncExistingSessionProtocolEnvelopeIds();
+
+        expect(client.getSessionProtocolEnvelopeStatus(canonical)).toBe('conflict');
+        expect(client.hasSessionProtocolEnvelope('bound-entry')).toBe(true);
     });
 
     it('never reconnects after close triggers a disconnect event', async () => {

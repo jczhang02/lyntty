@@ -1,0 +1,64 @@
+R121 merge-integration TDD transcript
+worktree=/home/jc/dev/lyntty/worktrees/session-sync-reliability
+branch=fix/session-sync-reliability
+origin_main=ab0f27fabcdc5e9d8b4b2c8da5e319d510505d3a
+pre_merge_tip=3c657f8197a89d0b84e9457593be2a96ee054275
+merge_commit=6ba0d592f2cd5ab9886a024bb3ec336a40667265
+
+[RED — deleted stable-tag discovery resurrected a synthetic row]
+$ cd packages/lyntty-app && bun test --preload ./sources/bunTestSetup.ts sources/sync/piSessionListSnapshot.test.ts
+Expected promoted identity:
+  relaySessionId: legacy-relay-delete
+  relaySessionTag: pi:stable-tag
+  machineId: machine-1
+  piSessionId: pi-tag-only
+Received: []
+13 pass
+1 fail
+
+[GREEN — hidden stable tags promote and survive restart]
+$ cd packages/lyntty-app && bun test --preload ./sources/bunTestSetup.ts sources/sync/piSessionListSnapshot.test.ts
+14 pass
+0 fail
+27 expect() calls
+
+[RED — persisted tombstones accepted malformed tags and did not deduplicate by tag]
+$ cd packages/lyntty-app && bun test --preload ./sources/bunTestSetup.ts sources/sync/piSessionTombstones.test.ts
+0 pass
+2 fail
+
+[GREEN — stable tags are validated and account-scoped]
+$ cd packages/lyntty-app && bun test --preload ./sources/bunTestSetup.ts sources/sync/piSessionTombstones.test.ts sources/sync/piSessionListSnapshot.test.ts
+16 pass
+0 fail
+29 expect() calls
+
+[RED — a delete update discarded the stable tag]
+$ cd packages/lyntty-app && bun test --preload ./sources/bunTestSetup.ts sources/sync/syncUpdateGeneration.test.ts
+Expected hideDeletedSession relaySessionTag: pi:stable-delete
+Received no relaySessionTag
+6 pass
+1 fail
+
+[GREEN — generation, coalescing, deletion, and delayed-page integration]
+$ cd packages/lyntty-app && bun test --preload ./sources/bunTestSetup.ts sources/sync/syncUpdateGeneration.test.ts
+10 pass
+0 fail
+17 expect() calls
+
+Covered integration assertions:
+- old-account canonical-name work stops before metadata submission;
+- later progressive discovery pages are coalesced instead of dropped;
+- tag-only Pi deletes persist before local identity is known;
+- delayed Pi history pages cannot resurrect a deleted session;
+- full refreshes requested during index retries remain authoritative.
+
+[INITIAL FULL GATE — i18n lint caught an internal object literal]
+$ bun run ci:fast
+lyntty-i18n/no-hardcoded-user-strings: 2 errors
+The stale-generation adapter now returns an internal error result without a user-visible hardcoded message.
+
+[FINAL]
+$ bun run ci:fast
+PASS
+Independent merge verifier: VERIFIED_NO_P0_P1_P2

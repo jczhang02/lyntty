@@ -172,6 +172,16 @@ describe('classifyPiSessionRecovery', () => {
     expect(record.firstMessage?.endsWith('…')).toBe(true);
   });
 
+  it('removes generic SessionManager title sentinels before machine RPC exposure', () => {
+    expect(classifyPiSessionRecovery({
+      local: sessionInfo({ name: '(no messages)', firstMessage: 'first prompt' }),
+      now,
+    })).toMatchObject({
+      name: undefined,
+      firstMessage: 'first prompt',
+    });
+  });
+
   it('marks import failures explicitly', () => {
     expect(classifyPiSessionRecovery({
       local: sessionInfo(),

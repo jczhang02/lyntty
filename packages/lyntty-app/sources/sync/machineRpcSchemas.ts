@@ -34,6 +34,7 @@ const piMachineSessionRecordSchema: z.ZodType<PiMachineSessionRecord> = z.object
     state: piRecoveryStateSchema,
     piSessionId: nonEmptyString,
     relaySessionId: nonEmptyString.optional(),
+    relaySessionTag: nonEmptyString.optional(),
     path: z.string().optional(),
     cwd: z.string().optional(),
     name: z.string().optional(),

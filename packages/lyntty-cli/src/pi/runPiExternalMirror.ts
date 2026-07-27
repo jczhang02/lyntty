@@ -2,9 +2,9 @@ import { closeSync, openSync, readFileSync, readSync, statSync } from 'node:fs';
 
 import type { SessionEntry } from '@earendil-works/pi-coding-agent';
 
-import type { ApiSessionClient } from '@/api/apiSession';
+import { SessionOutboxConflictError, type ApiSessionClient } from '@/api/apiSession';
 import { logger } from '@/ui/logger';
-import { mapPiSessionHistoryToEnvelopes } from './runPiHistory';
+import { mapPiSessionHistoryToEnvelopeGroups, mapPiSessionHistoryToEnvelopes } from './runPiHistory';
 
 const DEFAULT_QUIET_MS = 2_000;
 const DEFAULT_POLL_MS = 1_000;
@@ -97,6 +97,7 @@ const MAX_DELIVERED_TEXTS = 100;
 
 export class PiExternalMirror {
   private readonly knownEntryIds = new Set<string>();
+  private readonly relayConfirmedEntryIds = new Set<string>();
   private pendingEntries: SessionEntry[] = [];
   private deliveredUserTexts: DeliveredText[] = [];
   private deliveredAssistantTexts: DeliveredText[] = [];
@@ -108,12 +109,16 @@ export class PiExternalMirror {
   constructor(
     private readonly sessionFile: string,
     initialEntries: SessionEntry[],
-    private readonly sendEntries: (entries: SessionEntry[]) => void | Promise<void>,
+    private readonly sendEntries: (entries: SessionEntry[]) => boolean | void | Promise<boolean | void>,
     private readonly quietMs = DEFAULT_QUIET_MS,
   ) {
     for (const entry of initialEntries) {
       this.knownEntryIds.add(entry.id);
     }
+  }
+
+  isEntryRelayConfirmed(entryId: string): boolean {
+    return this.relayConfirmedEntryIds.has(entryId);
   }
 
   markCurrentEntriesKnown(): void {
@@ -130,6 +135,15 @@ export class PiExternalMirror {
 
   markCurrentEntriesDelivered(): void {
     this.markCurrentEntriesDeliveredSince(Number.NEGATIVE_INFINITY);
+  }
+
+  markEntryIdsDelivered(entryIds: Iterable<string>): void {
+    const deliveredIds = new Set(entryIds);
+    this.pendingEntries = this.pendingEntries.filter((entry) => !deliveredIds.has(entry.id));
+    for (const entryId of deliveredIds) {
+      this.knownEntryIds.add(entryId);
+      this.relayConfirmedEntryIds.add(entryId);
+    }
   }
 
   markCurrentEntriesDeliveredSince(cutoffTimeMs: number, options: { includeAssistantMessages?: boolean } = {}): void {
@@ -182,6 +196,7 @@ export class PiExternalMirror {
     this.pendingEntries = this.pendingEntries.filter((entry) => !deliveredIds.has(entry.id));
     for (const entry of entries.filter((entry) => deliveredIds.has(entry.id))) {
       this.knownEntryIds.add(entry.id);
+      this.relayConfirmedEntryIds.add(entry.id);
     }
   }
 
@@ -268,11 +283,14 @@ export class PiExternalMirror {
 
     if (this.pendingEntries.length > 0 && now - this.lastObservedChangeAt >= this.quietMs) {
       const pending = [...this.pendingEntries];
-      await this.sendEntries(pending);
+      const relayConfirmed = await this.sendEntries(pending);
       const sentIds = new Set(pending.map((entry) => entry.id));
       this.pendingEntries = this.pendingEntries.filter((entry) => !sentIds.has(entry.id));
       for (const entry of pending) {
         this.knownEntryIds.add(entry.id);
+        if (relayConfirmed !== false) {
+          this.relayConfirmedEntryIds.add(entry.id);
+        }
       }
     }
   }
@@ -284,21 +302,26 @@ export function startPiExternalMirror(options: {
   session: () => ApiSessionClient;
   metaForEnvelope?: (envelope: ReturnType<typeof mapPiSessionHistoryToEnvelopes>[number]) => Record<string, unknown> | undefined;
   isManagedRuntimeActive?: () => boolean;
+  onHistoryGap?: (reason: string) => void | Promise<void>;
   pollMs?: number;
-}): { stop: () => Promise<void>; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void; markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => void; capAssistantTextDeliveryWindow: (untilTimeMs: number) => void } | null {
+}): { stop: () => Promise<void>; isEntryRelayConfirmed: (entryId: string) => boolean; markCurrentEntriesKnown: () => void; markCurrentEntriesDelivered: () => void; markEntryIdsDelivered: (entryIds: Iterable<string>) => void; markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => void; markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => void; markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => void; capAssistantTextDeliveryWindow: (untilTimeMs: number) => void } | null {
   if (!options.sessionFile) {
     return null;
   }
+  const sessionFile = options.sessionFile;
 
   let stopped = false;
   let currentPoll: Promise<void> | null = null;
 
-  const mirror = new PiExternalMirror(options.sessionFile, options.initialEntries, async (entries) => {
+  const mirror = new PiExternalMirror(sessionFile, options.initialEntries, async (entries) => {
     if (stopped) return;
     if (options.isManagedRuntimeActive?.()) {
       throw new Error('External Pi mirror suppressed while live runtime is active');
     }
-    const envelopes = mapPiSessionHistoryToEnvelopes(entries);
+    const pendingEntryIds = new Set(entries.map((entry) => entry.id));
+    const envelopes = mapPiSessionHistoryToEnvelopeGroups(readPiSessionEntries(sessionFile))
+      .filter((group) => pendingEntryIds.has(group.entryId))
+      .flatMap((group) => group.envelopes);
     if (envelopes.length === 0) {
       return;
     }
@@ -309,7 +332,14 @@ export function startPiExternalMirror(options: {
       session.sendSessionProtocolMessage(envelope, options.metaForEnvelope?.(envelope));
     }
     if (stopped) return;
-    await session.flush();
+    try {
+      await session.flush();
+      return true;
+    } catch (error) {
+      if (!(error instanceof SessionOutboxConflictError)) throw error;
+      await options.onHistoryGap?.(error.message);
+      return false;
+    }
   });
 
   let polling = false;
@@ -349,8 +379,10 @@ export function startPiExternalMirror(options: {
       clearInterval(interval);
       await currentPoll;
     },
+    isEntryRelayConfirmed: (entryId: string) => mirror.isEntryRelayConfirmed(entryId),
     markCurrentEntriesKnown: () => mirror.markCurrentEntriesKnown(),
     markCurrentEntriesDelivered: () => mirror.markCurrentEntriesDelivered(),
+    markEntryIdsDelivered: (entryIds: Iterable<string>) => mirror.markEntryIdsDelivered(entryIds),
     markCurrentEntriesDeliveredSince: (cutoffTimeMs: number, options?: { includeAssistantMessages?: boolean }) => mirror.markCurrentEntriesDeliveredSince(cutoffTimeMs, options),
     markUserTextDeliveredSince: (text: string, cutoffTimeMs: number) => mirror.markUserTextDeliveredSince(text, cutoffTimeMs),
     markAssistantTextDeliveredSince: (text: string, cutoffTimeMs: number, untilTimeMs?: number) => mirror.markAssistantTextDeliveredSince(text, cutoffTimeMs, untilTimeMs),

@@ -22,6 +22,7 @@ export function sessionRoutes(app: Fastify) {
             take: 150,
             select: {
                 id: true,
+                tag: true,
                 seq: true,
                 createdAt: true,
                 updatedAt: true,
@@ -54,6 +55,7 @@ export function sessionRoutes(app: Fastify) {
 
                 return {
                     id: v.id,
+                    tag: v.tag,
                     seq: v.seq,
                     createdAt: v.createdAt.getTime(),
                     updatedAt: sessionUpdatedAt,

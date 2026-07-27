@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 
 import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
 
+import { normalizePiSessionDisplayNameCandidate } from './piSessionDisplayName';
+
 export type PiRecoveryState =
   | 'discovered_local'
   | 'registered'
@@ -24,6 +26,7 @@ export interface PiSessionRecoveryRecord {
   state: PiRecoveryState;
   piSessionId: string;
   relaySessionId?: string;
+  relaySessionTag?: string;
   path?: string;
   cwd?: string;
   name?: string;
@@ -116,11 +119,11 @@ export function classifyPiSessionRecovery(input: {
     relaySessionId: input.registered?.relaySessionId,
     path: input.local?.path,
     cwd: input.local?.cwd,
-    name: truncateRelayText(input.local?.name),
+    name: normalizePiSessionDisplayNameCandidate(truncateRelayText(input.local?.name)),
     createdAt: input.local?.created.getTime(),
     modifiedAt: input.local?.modified.getTime(),
     registeredUpdatedAt: input.registered?.updatedAt?.getTime(),
-    firstMessage: truncateRelayText(input.local?.firstMessage),
+    firstMessage: normalizePiSessionDisplayNameCandidate(truncateRelayText(input.local?.firstMessage)),
     messageCount: localMessageCount,
     summaryComplete,
   };

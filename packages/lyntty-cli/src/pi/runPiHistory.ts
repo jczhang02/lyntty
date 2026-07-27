@@ -5,8 +5,82 @@ const MAX_HISTORY_TEXT_LENGTH = 20_000;
 const MAX_HISTORY_TOOL_ARGS_LENGTH = 20_000;
 const DEFAULT_HISTORY_PAGE_BYTES = 256_000;
 const MAX_HISTORY_PAGE_BYTES = 512_000;
+const MIN_HISTORY_PAGE_BYTES = DEFAULT_HISTORY_PAGE_BYTES;
+const MAX_CANONICAL_HISTORY_ENTRY_BYTES = DEFAULT_HISTORY_PAGE_BYTES;
 const HISTORY_TRUNCATED_TEXT = '[Large historical Pi message truncated to fit Lyntty history page limits]';
 const HISTORY_TRUNCATION_MARKER = '\n\n[truncated by Lyntty history import]';
+
+export type PiHistoryEnvelopeStatus = 'missing' | 'matching' | 'conflict';
+
+export function partitionPiHistoryEnvelopes(
+  envelopes: readonly SessionEnvelope[],
+  getStatus: (envelope: SessionEnvelope) => PiHistoryEnvelopeStatus,
+): { missing: SessionEnvelope[]; matching: SessionEnvelope[]; conflicting: SessionEnvelope[] } {
+  const result: { missing: SessionEnvelope[]; matching: SessionEnvelope[]; conflicting: SessionEnvelope[] } = {
+    missing: [],
+    matching: [],
+    conflicting: [],
+  };
+  for (const envelope of envelopes) {
+    const status = getStatus(envelope);
+    if (status === 'matching') {
+      result.matching.push(envelope);
+    } else if (status === 'conflict') {
+      result.conflicting.push(envelope);
+    } else {
+      result.missing.push(envelope);
+    }
+  }
+  return result;
+}
+
+export type PiHistoryEnvelopeGroup = {
+  entryId: string;
+  envelopes: SessionEnvelope[];
+};
+
+export function analyzePiHistoryEnvelopeGroups(
+  groups: readonly PiHistoryEnvelopeGroup[],
+  getStatus: (envelope: SessionEnvelope) => PiHistoryEnvelopeStatus,
+): {
+  missing: SessionEnvelope[];
+  matching: SessionEnvelope[];
+  conflicting: SessionEnvelope[];
+  contiguousAppendCheckpointEntryId?: string;
+} {
+  const result: {
+    missing: SessionEnvelope[];
+    matching: SessionEnvelope[];
+    conflicting: SessionEnvelope[];
+    contiguousAppendCheckpointEntryId?: string;
+  } = {
+    missing: [],
+    matching: [],
+    conflicting: [],
+  };
+  let prefixIsMatching = true;
+  for (const group of groups) {
+    let groupIsMatching = true;
+    for (const envelope of group.envelopes) {
+      const status = getStatus(envelope);
+      if (status === 'matching') {
+        result.matching.push(envelope);
+      } else if (status === 'conflict') {
+        result.conflicting.push(envelope);
+        groupIsMatching = false;
+      } else {
+        result.missing.push(envelope);
+        groupIsMatching = false;
+      }
+    }
+    if (prefixIsMatching && groupIsMatching) {
+      result.contiguousAppendCheckpointEntryId = group.entryId;
+    } else {
+      prefixIsMatching = false;
+    }
+  }
+  return result;
+}
 
 function entryTime(entry: { timestamp?: string }): number {
   const parsed = entry.timestamp ? Date.parse(entry.timestamp) : NaN;
@@ -277,8 +351,9 @@ export function mapPiSessionEntryToHistoryEnvelopes(entry: SessionEntry): Sessio
   return [];
 }
 
-export function mapPiSessionHistoryToEnvelopes(entries: SessionEntry[]): SessionEnvelope[] {
-  const envelopes: SessionEnvelope[] = [];
+export function mapPiSessionHistoryToEnvelopeGroups(entries: SessionEntry[]): PiHistoryEnvelopeGroup[] {
+  const groups = entries.map((entry) => ({ entryId: entry.id, envelopes: [] as SessionEnvelope[] }));
+  const groupByEntry = new Map(entries.map((entry, index) => [entry, groups[index]]));
   const startedToolCalls = new Set<string>();
   const openToolTurns = new Map<string, string>();
   const pendingToolCallCountByTurn = new Map<string, number>();
@@ -295,9 +370,10 @@ export function mapPiSessionHistoryToEnvelopes(entries: SessionEntry[]): Session
       const call = toolCallId(messageEntry?.message) ?? `pi-history-tool-${entry.id}`;
       const turn = openToolTurns.get(call);
       if (turn) {
+        const group = groupByEntry.get(entry)!;
         const time = entryTime(entry);
         const text = collectText(messageContent(messageEntry?.message));
-        envelopes.push(createEnvelope('agent', {
+        group.envelopes.push(createEnvelope('agent', {
           t: 'tool-call-end',
           call,
           ...(text ? { result: text } : {}),
@@ -306,7 +382,7 @@ export function mapPiSessionHistoryToEnvelopes(entries: SessionEntry[]): Session
         const remaining = (pendingToolCallCountByTurn.get(turn) ?? 1) - 1;
         if (remaining <= 0) {
           pendingToolCallCountByTurn.delete(turn);
-          envelopes.push(createEnvelope('agent', { t: 'turn-end', status: 'completed' }, { id: `pi-history-${entry.id}-end`, turn, time: time + 3 }));
+          group.envelopes.push(createEnvelope('agent', { t: 'turn-end', status: 'completed' }, { id: `pi-history-${entry.id}-end`, turn, time: time + 3 }));
         } else {
           pendingToolCallCountByTurn.set(turn, remaining);
         }
@@ -342,13 +418,24 @@ export function mapPiSessionHistoryToEnvelopes(entries: SessionEntry[]): Session
     for (const [turn, count] of heldTurnCounts) {
       pendingToolCallCountByTurn.set(turn, (pendingToolCallCountByTurn.get(turn) ?? 0) + count);
     }
-    envelopes.push(...filtered);
+    groupByEntry.get(entry)!.envelopes.push(...filtered);
   }
-  return envelopes;
+  return groups.map((group) => ({
+    ...group,
+    // A JSONL entry is the durable idempotency unit. Cap it independently so
+    // full replay, post-checkpoint replay, and history pages always encrypt the
+    // same content under session:<envelope.id>.
+    envelopes: capHistoryEnvelopes(group.envelopes, MAX_CANONICAL_HISTORY_ENTRY_BYTES),
+  }));
+}
+
+export function mapPiSessionHistoryToEnvelopes(entries: SessionEntry[]): SessionEnvelope[] {
+  return mapPiSessionHistoryToEnvelopeGroups(entries).flatMap((group) => group.envelopes);
 }
 
 export type PiHistoryPage = {
   envelopes: SessionEnvelope[];
+  startEntryId?: string;
   nextCursor?: string;
   hasMore: boolean;
   totalMessages: number;
@@ -379,7 +466,7 @@ function clampHistoryBytes(maxBytes: number | undefined): number {
   if (!Number.isFinite(maxBytes ?? DEFAULT_HISTORY_PAGE_BYTES)) {
     return DEFAULT_HISTORY_PAGE_BYTES;
   }
-  return Math.min(Math.max(Math.floor(maxBytes ?? DEFAULT_HISTORY_PAGE_BYTES), 16_000), MAX_HISTORY_PAGE_BYTES);
+  return Math.min(Math.max(Math.floor(maxBytes ?? DEFAULT_HISTORY_PAGE_BYTES), MIN_HISTORY_PAGE_BYTES), MAX_HISTORY_PAGE_BYTES);
 }
 
 function isRenderableHistoryEntry(entry: SessionEntry): boolean {
@@ -400,6 +487,38 @@ function fallbackHistoryEnvelope(envelopes: SessionEnvelope[], maxBytes: number)
       time: first.time,
     })];
   }
+  let keptText = false;
+  const structural = envelopes.flatMap((envelope): SessionEnvelope[] => {
+    if (envelope.ev.t === 'text') {
+      if (keptText) return [];
+      keptText = true;
+      return [{
+        ...envelope,
+        ev: {
+          ...envelope.ev,
+          text: truncateTextToBytes(envelope.ev.text, Math.max(256, Math.floor(maxBytes / 4))),
+        },
+      }];
+    }
+    if (envelope.ev.t === 'tool-call-start') {
+      return [{
+        ...envelope,
+        ev: { ...envelope.ev, args: { truncated: true } },
+      }];
+    }
+    if (
+      envelope.ev.t === 'turn-start'
+      || envelope.ev.t === 'tool-call-end'
+      || envelope.ev.t === 'turn-end'
+    ) {
+      return [{ ...envelope, ev: { ...envelope.ev } }];
+    }
+    return [];
+  });
+  if (structural.length > 0 && byteLength(JSON.stringify(structural)) <= maxBytes) {
+    return structural;
+  }
+
   const turn = first.turn ?? `${first.id}-turn`;
   return [
     createEnvelope('agent', { t: 'turn-start' }, { id: `${first.id}-truncated-start`, turn, time: first.time }),
@@ -514,15 +633,47 @@ export function mapPiSessionHistoryPageToEnvelopes(
     }
   }
   let pageEntries = renderableEntries.slice(start, endExclusive);
-  let envelopes = capHistoryEnvelopes(mapPiSessionHistoryToEnvelopes(pageEntries), maxBytes);
+  const canonicalGroupsByEntryId = new Map(
+    mapPiSessionHistoryToEnvelopeGroups(entries).map((group) => [group.entryId, group]),
+  );
+  const pageEnvelopes = () => pageEntries.flatMap((entry) => (
+    canonicalGroupsByEntryId.get(entry.id)?.envelopes ?? []
+  ));
+  let envelopes = pageEnvelopes();
   while (pageEntries.length > 1 && byteLength(JSON.stringify(envelopes)) > maxBytes) {
-    pageEntries = pageEntries.slice(1);
-    start++;
-    envelopes = capHistoryEnvelopes(mapPiSessionHistoryToEnvelopes(pageEntries), maxBytes);
+    const firstEntry = pageEntries[0];
+    let removeCount = 1;
+    if (
+      firstEntry?.type === 'message'
+      && messageRole(firstEntry.message) === 'assistant'
+    ) {
+      while (removeCount < pageEntries.length) {
+        const candidate = pageEntries[removeCount];
+        if (
+          candidate.type !== 'message'
+          || messageRole(candidate.message) !== 'toolResult'
+          || candidate.parentId !== firstEntry.id
+        ) {
+          break;
+        }
+        removeCount++;
+      }
+    }
+    // A parent assistant entry and its tool results are one renderable turn
+    // boundary. If that atomic boundary is the whole remaining page, keep it
+    // together even when its independently canonical-capped entries exceed the
+    // page target; dropping either side would create an unreachable orphan.
+    if (removeCount === pageEntries.length) {
+      break;
+    }
+    pageEntries = pageEntries.slice(removeCount);
+    start += removeCount;
+    envelopes = pageEnvelopes();
   }
 
   return {
     envelopes,
+    startEntryId: pageEntries[0]?.id,
     nextCursor: start > 0 ? pageEntries[0]?.id : undefined,
     hasMore: start > 0,
     totalMessages: renderableEntries.length,

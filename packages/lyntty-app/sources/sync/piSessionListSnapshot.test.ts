@@ -320,6 +320,45 @@ describe('PiSessionListSnapshot', () => {
         expect(ids(restarted.getStored())).not.toContain('pi-deleted-late');
     });
 
+    it('promotes a deleted stable tag before tag-only discovery can resurrect it', () => {
+        const promoted: Array<{
+            relaySessionId: string;
+            relaySessionTag?: string;
+            machineId?: string;
+            piSessionId?: string;
+        }> = [];
+        const harness = createHarness([machine()], (identity) => promoted.push(identity));
+        const node = harness.nodes.get('machine-1')!;
+        harness.snapshot.hideDeletedSession({
+            relaySessionId: 'legacy-relay-delete',
+            relaySessionTag: 'pi:stable-tag',
+        });
+
+        const refreshId = harness.snapshot.beginMachineRefresh([node]);
+        harness.snapshot.applyMachinePage(refreshId, node.id, [{
+            ...piRecord('pi-tag-only', 200),
+            relaySessionTag: 'pi:stable-tag',
+        }], true);
+
+        expect(promoted).toEqual([{
+            relaySessionId: 'legacy-relay-delete',
+            relaySessionTag: 'pi:stable-tag',
+            machineId: 'machine-1',
+            piSessionId: 'pi-tag-only',
+        }]);
+        expect(ids(harness.getStored())).not.toContain('pi-tag-only');
+
+        const restarted = createHarness();
+        restarted.snapshot.setDeletedSessions(promoted);
+        const restartedNode = restarted.nodes.get('machine-1')!;
+        const restartedRefresh = restarted.snapshot.beginMachineRefresh([restartedNode]);
+        restarted.snapshot.applyMachinePage(restartedRefresh, restartedNode.id, [{
+            ...piRecord('pi-tag-only', 200),
+            relaySessionTag: 'pi:stable-tag',
+        }], true);
+        expect(ids(restarted.getStored())).not.toContain('pi-tag-only');
+    });
+
     it('restores account-scoped deletion tombstones before discovery after restart', () => {
         const harness = createHarness();
         const node = harness.nodes.get('machine-1')!;

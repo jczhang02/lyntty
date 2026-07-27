@@ -103,6 +103,7 @@ export class ApiMachineClient {
     private lastKnownResumeSupport: ResumeSupport | null = null;
     private rpcHandlerManager: RpcHandlerManager;
     private resumeSessionHandler: ((sessionId: string) => Promise<SpawnSessionResult>) | null = null;
+    private piSessionDiscoveryAvailable = false;
     private reconnectInterval: NodeJS.Timeout | null = null;
 
     constructor(
@@ -131,6 +132,7 @@ export class ApiMachineClient {
         requestShutdown
     }: MachineRpcHandlers) {
         this.resumeSessionHandler = resumeSession ?? null;
+        this.piSessionDiscoveryAvailable = !!listPiSessions;
 
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-lyntty-session', async (params: any) => {
@@ -457,6 +459,7 @@ export class ApiMachineClient {
                 this.updateMachineMetadata((metadata) => ({
                     ...(metadata || {} as any),
                     cliAvailability: newAvailability,
+                    piSessionDiscovery: { available: this.piSessionDiscoveryAvailable },
                     resumeSupport: { ...newResumeSupport, rpcAvailable: !!this.resumeSessionHandler },
                 })).catch((err) => {
                     logger.debug('[API MACHINE] Failed to update machine capabilities:', err);

@@ -2,8 +2,34 @@ import { describe, expect, it, vi } from 'bun:test';
 
 import { apiSocket } from './apiSocket';
 import { storage } from './storage';
-import type { Machine } from './storageTypes';
+import type { Machine, Session } from './storageTypes';
 import { sync } from './sync';
+
+function piSession(id: string, name: string): Session {
+    return {
+        id,
+        tag: `pi:${id}`,
+        seq: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        active: false,
+        activeAt: 1,
+        metadata: {
+            path: '/repo',
+            host: 'machine-1',
+            machineId: 'machine-1',
+            piSessionId: `pi-${id}`,
+            flavor: 'pi',
+            name,
+        },
+        metadataVersion: 1,
+        agentState: null,
+        agentStateVersion: 0,
+        thinking: false,
+        thinkingAt: 0,
+        presence: 1,
+    };
+}
 
 function machine(id: string): Machine {
     return {
@@ -98,6 +124,142 @@ describe('relay update generation isolation', () => {
         }
     });
 
+    it('drops canonical-name persistence after its runtime generation is replaced', async () => {
+        let releaseEncryption!: () => void;
+        let markEncryptionStarted!: () => void;
+        const encryptionStarted = new Promise<void>((resolve) => { markEncryptionStarted = resolve; });
+        const encryptionGate = new Promise<void>((resolve) => { releaseEncryption = resolve; });
+        const emitWithAck = vi.spyOn(apiSocket, 'emitWithAck').mockResolvedValue({
+            result: 'success',
+            version: 2,
+            metadata: 'saved',
+        });
+        const sessionEncryption = {
+            encryptMetadata: async (metadata: unknown) => {
+                markEncryptionStarted();
+                await encryptionGate;
+                return JSON.stringify(metadata);
+            },
+            decryptMetadata: async () => null,
+        };
+        const fakeEncryption = { getSessionEncryption: () => sessionEncryption };
+        const internals = sync as unknown as {
+            syncStarted: boolean;
+            sessionSnapshotGeneration: number;
+            encryption: unknown;
+            piSessionNameBackfillPending: unknown;
+            piSessionNameBackfillInFlight: Promise<void> | null;
+            queueCanonicalPiSessionNamePersistence: (relay: Session[], merged: Session[]) => void;
+        };
+        const previous = {
+            syncStarted: internals.syncStarted,
+            generation: internals.sessionSnapshotGeneration,
+            encryption: internals.encryption,
+            pending: internals.piSessionNameBackfillPending,
+            inFlight: internals.piSessionNameBackfillInFlight,
+        };
+
+        try {
+            internals.syncStarted = true;
+            internals.encryption = fakeEncryption;
+            internals.queueCanonicalPiSessionNamePersistence(
+                [piSession('old-generation', 'Pi session')],
+                [piSession('old-generation', 'Canonical old generation')],
+            );
+            const task = internals.piSessionNameBackfillInFlight;
+            expect(task).not.toBeNull();
+            await encryptionStarted;
+            internals.sessionSnapshotGeneration += 1;
+            internals.encryption = { getSessionEncryption: () => undefined };
+            releaseEncryption();
+            await task;
+
+            expect(emitWithAck).not.toHaveBeenCalled();
+        } finally {
+            emitWithAck.mockRestore();
+            internals.syncStarted = previous.syncStarted;
+            internals.sessionSnapshotGeneration = previous.generation;
+            internals.encryption = previous.encryption;
+            internals.piSessionNameBackfillPending = previous.pending;
+            internals.piSessionNameBackfillInFlight = previous.inFlight;
+        }
+    });
+
+    it('coalesces later discovery pages while canonical-name persistence is in flight', async () => {
+        let releaseFirstEncryption!: () => void;
+        let markFirstEncryptionStarted!: () => void;
+        const firstEncryptionStarted = new Promise<void>((resolve) => { markFirstEncryptionStarted = resolve; });
+        const firstEncryptionGate = new Promise<void>((resolve) => { releaseFirstEncryption = resolve; });
+        let encryptionCalls = 0;
+        const sessionEncryption = {
+            encryptMetadata: async (metadata: unknown) => {
+                encryptionCalls += 1;
+                if (encryptionCalls === 1) {
+                    markFirstEncryptionStarted();
+                    await firstEncryptionGate;
+                }
+                return JSON.stringify(metadata);
+            },
+            decryptMetadata: async (_version: number, ciphertext: string) => JSON.parse(ciphertext),
+        };
+        const fakeEncryption = { getSessionEncryption: () => sessionEncryption };
+        const emitWithAck = vi.spyOn(apiSocket, 'emitWithAck').mockImplementation(async (_event, payload) => ({
+            result: 'success',
+            version: 2,
+            metadata: (payload as { metadata: string }).metadata,
+        }) as never);
+        const internals = sync as unknown as {
+            syncStarted: boolean;
+            sessionSnapshotGeneration: number;
+            encryption: unknown;
+            piSessionNameBackfillPending: unknown;
+            piSessionNameBackfillInFlight: Promise<void> | null;
+            queueCanonicalPiSessionNamePersistence: (relay: Session[], merged: Session[]) => void;
+        };
+        const previous = {
+            syncStarted: internals.syncStarted,
+            generation: internals.sessionSnapshotGeneration,
+            encryption: internals.encryption,
+            pending: internals.piSessionNameBackfillPending,
+            inFlight: internals.piSessionNameBackfillInFlight,
+        };
+
+        try {
+            internals.syncStarted = true;
+            internals.encryption = fakeEncryption;
+            const firstRelay = piSession('first-page', 'Pi session');
+            const secondRelay = piSession('second-page', 'Pi session');
+            internals.queueCanonicalPiSessionNamePersistence(
+                [firstRelay],
+                [piSession('first-page', 'Canonical first page')],
+            );
+            const task = internals.piSessionNameBackfillInFlight;
+            expect(task).not.toBeNull();
+            await firstEncryptionStarted;
+            internals.queueCanonicalPiSessionNamePersistence(
+                [firstRelay, secondRelay],
+                [
+                    piSession('first-page', 'Canonical first page'),
+                    piSession('second-page', 'Canonical second page'),
+                ],
+            );
+            releaseFirstEncryption();
+            await task;
+
+            const submittedSessionIds = emitWithAck.mock.calls.map((call) => (
+                call[1] as { sid: string }
+            ).sid);
+            expect(submittedSessionIds).toContain('second-page');
+        } finally {
+            emitWithAck.mockRestore();
+            internals.syncStarted = previous.syncStarted;
+            internals.sessionSnapshotGeneration = previous.generation;
+            internals.encryption = previous.encryption;
+            internals.piSessionNameBackfillPending = previous.pending;
+            internals.piSessionNameBackfillInFlight = previous.inFlight;
+        }
+    });
+
     it('hides an unknown ordinary delete from in-flight relay snapshots without persisting a Pi tombstone', async () => {
         const hideDeletedSession = vi.fn();
         const fakeSnapshot = {
@@ -164,6 +326,91 @@ describe('relay update generation isolation', () => {
         }
     });
 
+    it('persists a deleted Pi stable tag before local discovery resolves its identity', async () => {
+        const hideDeletedSession = vi.fn();
+        const fakeSnapshot = {
+            findPiIdentityByRelaySessionId: () => undefined,
+            hideDeletedSession,
+        };
+        const fakeEncryption = { removeSessionEncryption: vi.fn() };
+        const fakeSessionsSync = {};
+        const internals = sync as unknown as {
+            syncStarted: boolean;
+            sessionSnapshotGeneration: number;
+            encryption: unknown;
+            sessionsSync: unknown;
+            serverID: string;
+            sessionListSnapshot: unknown;
+            piSessionTombstones: Array<{ relaySessionId: string; relaySessionTag?: string }>;
+            piSessionTombstoneScope: () => string;
+            processUpdate: (update: unknown, context: unknown) => Promise<void>;
+        };
+        const previous = {
+            syncStarted: internals.syncStarted,
+            encryption: internals.encryption,
+            sessionsSync: internals.sessionsSync,
+            serverID: internals.serverID,
+            snapshot: internals.sessionListSnapshot,
+            tombstones: internals.piSessionTombstones,
+        };
+
+        storage.getState().applySessions([{
+            id: 'legacy-pi-delete',
+            tag: 'pi:stable-delete',
+            seq: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            active: false,
+            activeAt: 1,
+            metadata: { path: '/repo', host: 'machine-1', name: 'Pi session' },
+            metadataVersion: 1,
+            agentState: null,
+            agentStateVersion: 0,
+            thinking: false,
+            thinkingAt: 0,
+        }]);
+        try {
+            internals.syncStarted = true;
+            internals.encryption = fakeEncryption;
+            internals.sessionsSync = fakeSessionsSync;
+            internals.serverID = 'tag-delete-account';
+            internals.sessionListSnapshot = fakeSnapshot;
+            internals.piSessionTombstones = [];
+            const generation = internals.sessionSnapshotGeneration;
+            await internals.processUpdate({
+                id: 'tag-delete-update',
+                seq: 1,
+                createdAt: 1,
+                body: { t: 'delete-session', sid: 'legacy-pi-delete' },
+            }, {
+                generation,
+                encryption: fakeEncryption,
+                sessionsSync: fakeSessionsSync,
+                tombstoneScope: internals.piSessionTombstoneScope(),
+            });
+
+            expect(hideDeletedSession).toHaveBeenCalledWith({
+                relaySessionId: 'legacy-pi-delete',
+                relaySessionTag: 'pi:stable-delete',
+                machineId: undefined,
+                piSessionId: undefined,
+            });
+            expect(internals.piSessionTombstones).toHaveLength(1);
+            expect(internals.piSessionTombstones[0]).toMatchObject({
+                relaySessionId: 'legacy-pi-delete',
+                relaySessionTag: 'pi:stable-delete',
+            });
+        } finally {
+            storage.getState().deleteSession('legacy-pi-delete');
+            internals.syncStarted = previous.syncStarted;
+            internals.encryption = previous.encryption;
+            internals.sessionsSync = previous.sessionsSync;
+            internals.serverID = previous.serverID;
+            internals.sessionListSnapshot = previous.snapshot;
+            internals.piSessionTombstones = previous.tombstones;
+        }
+    });
+
     it('drops a message page whose body completes after the runtime generation changes', async () => {
         let resolveBody!: (value: unknown) => void;
         let markBodyStarted!: () => void;
@@ -215,6 +462,72 @@ describe('relay update generation isolation', () => {
             internals.syncStarted = previous.syncStarted;
             internals.sessionSnapshotGeneration = previous.generation;
             internals.encryption = previous.encryption;
+        }
+    });
+
+    it('does not resurrect a session deleted while a Pi history page is in flight', async () => {
+        const sessionId = 'deleted-history-page';
+        storage.getState().applySessions([{
+            ...piSession(sessionId, 'Canonical history session'),
+            metadata: {
+                ...piSession(sessionId, 'Canonical history session').metadata!,
+                piHistoryCursor: 'cursor-1',
+                piHistoryHasMore: true,
+                controlState: 'ready',
+            },
+        }]);
+        storage.getState().applyMessagesLoaded(sessionId);
+        storage.getState().applyOlderMessagesPagination(sessionId, { hasMore: true });
+
+        const sessionEncryption = {};
+        const fakeEncryption = { getSessionEncryption: () => sessionEncryption };
+        const sessionRpc = vi.spyOn(apiSocket, 'sessionRPC').mockImplementation(async () => {
+            storage.getState().deleteSession(sessionId);
+            return {
+                type: 'success',
+                sent: 0,
+                nextCursor: undefined,
+                hasMore: false,
+                totalMessages: 1,
+            } as never;
+        });
+        const internals = sync as unknown as {
+            syncStarted: boolean;
+            sessionSnapshotGeneration: number;
+            encryption: unknown;
+            sessionOldestSeq: Map<string, number>;
+            sessionLastSeq: Map<string, number>;
+            sessionMessageLocks: Map<string, unknown>;
+            loadOlderMessages: (id: string) => Promise<void>;
+        };
+        const previous = {
+            syncStarted: internals.syncStarted,
+            generation: internals.sessionSnapshotGeneration,
+            encryption: internals.encryption,
+            oldest: internals.sessionOldestSeq,
+            last: internals.sessionLastSeq,
+            locks: internals.sessionMessageLocks,
+        };
+
+        try {
+            internals.syncStarted = true;
+            internals.encryption = fakeEncryption;
+            internals.sessionOldestSeq = new Map([[sessionId, 1]]);
+            internals.sessionLastSeq = new Map([[sessionId, 1]]);
+            internals.sessionMessageLocks = new Map();
+
+            await internals.loadOlderMessages(sessionId);
+
+            expect(storage.getState().sessions[sessionId]).toBeUndefined();
+        } finally {
+            sessionRpc.mockRestore();
+            storage.getState().deleteSession(sessionId);
+            internals.syncStarted = previous.syncStarted;
+            internals.sessionSnapshotGeneration = previous.generation;
+            internals.encryption = previous.encryption;
+            internals.sessionOldestSeq = previous.oldest;
+            internals.sessionLastSeq = previous.last;
+            internals.sessionMessageLocks = previous.locks;
         }
     });
 

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
-import { mapPiSessionHistoryPageToEnvelopes, mapPiSessionHistoryToEnvelopes } from './runPiHistory';
+import {
+  analyzePiHistoryEnvelopeGroups,
+  mapPiSessionHistoryPageToEnvelopes,
+  mapPiSessionHistoryToEnvelopeGroups,
+  mapPiSessionHistoryToEnvelopes,
+  partitionPiHistoryEnvelopes,
+} from './runPiHistory';
 import { PiSessionProtocolMapper } from './runPiSessionProtocol';
 
 describe('mapPiSessionHistoryToEnvelopes', () => {
@@ -150,6 +156,31 @@ describe('mapPiSessionHistoryToEnvelopes', () => {
     expect(turnIds.size).toBe(1);
   });
 
+  it('keeps paged envelope content identical to the canonical full-history mapping', () => {
+    const entries = [{
+      type: 'message',
+      id: 'a1',
+      parentId: 'u1',
+      timestamp: '2026-07-01T09:00:01.000Z',
+      message: {
+        role: 'assistant',
+        content: Array.from({ length: 80 }, (_, index) => ({
+          type: 'text',
+          text: `chunk ${index} ${'x'.repeat(20_000)}`,
+        })),
+      },
+    }] as any[];
+    const canonicalById = new Map(
+      mapPiSessionHistoryToEnvelopes(entries).map((envelope) => [envelope.id, envelope]),
+    );
+
+    const page = mapPiSessionHistoryPageToEnvelopes(entries, { limit: 1, maxBytes: 256_000 });
+
+    expect(page.envelopes.every((envelope) => (
+      JSON.stringify(envelope) === JSON.stringify(canonicalById.get(envelope.id))
+    ))).toBe(true);
+  });
+
   it('caps oversized single-entry history pages', () => {
     const page = mapPiSessionHistoryPageToEnvelopes([
       {
@@ -165,12 +196,70 @@ describe('mapPiSessionHistoryToEnvelopes', () => {
           })),
         },
       },
-    ] as any, { limit: 1, maxBytes: 16_000 });
+    ] as any, { limit: 1, maxBytes: 256_000 });
 
-    expect(Buffer.byteLength(JSON.stringify(page.envelopes), 'utf8')).toBeLessThanOrEqual(16_000);
+    expect(Buffer.byteLength(JSON.stringify(page.envelopes), 'utf8')).toBeLessThanOrEqual(256_000);
     expect(page.envelopes.some((envelope) => (
       envelope.ev.t === 'text' && envelope.ev.text.includes('truncated')
     ))).toBe(true);
+  });
+
+  it('keeps an oversized assistant and its tool result on the same page boundary', () => {
+    const entries = [
+      {
+        type: 'message',
+        id: 'a1',
+        parentId: 'u0',
+        timestamp: '2026-07-01T09:00:01.000Z',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'toolCall', id: 'call-1', name: 'read', arguments: { path: 'large.txt' } },
+            ...Array.from({ length: 200 }, (_, index) => ({
+              type: 'text',
+              text: `${'x'.repeat(20_000)}${index}`,
+            })),
+          ],
+        },
+      },
+      {
+        type: 'message',
+        id: 't1',
+        parentId: 'a1',
+        timestamp: '2026-07-01T09:00:02.000Z',
+        message: {
+          role: 'toolResult',
+          toolCallId: 'call-1',
+          toolName: 'read',
+          content: 'y'.repeat(20_000),
+          isError: false,
+        },
+      },
+      ...Array.from({ length: 49 }, (_, index) => ({
+        type: 'message',
+        id: `u${index + 1}`,
+        parentId: index === 0 ? 't1' : `u${index}`,
+        timestamp: `2026-07-01T10:${String(index).padStart(2, '0')}:00.000Z`,
+        message: { role: 'user', content: `later ${index + 1}` },
+      })),
+    ] as any[];
+
+    const tail = mapPiSessionHistoryPageToEnvelopes(entries, { limit: 50, maxBytes: 256_000 });
+    const tailStarts = new Set(tail.envelopes.flatMap((envelope) => (
+      envelope.ev.t === 'tool-call-start' ? [envelope.ev.call] : []
+    )));
+    const tailEnds = tail.envelopes.flatMap((envelope) => (
+      envelope.ev.t === 'tool-call-end' ? [envelope.ev.call] : []
+    ));
+    expect(tailEnds.every((call) => tailStarts.has(call))).toBe(true);
+
+    const older = mapPiSessionHistoryPageToEnvelopes(entries, {
+      beforeEntryId: tail.nextCursor,
+      limit: 50,
+      maxBytes: 256_000,
+    });
+    expect(older.envelopes.map((envelope) => envelope.ev.t)).toContain('tool-call-start');
+    expect(older.envelopes.map((envelope) => envelope.ev.t)).toContain('tool-call-end');
   });
 
   it('paginates historical Pi messages from the tail with an older cursor', () => {
@@ -209,5 +298,46 @@ describe('mapPiSessionHistoryToEnvelopes', () => {
     });
     expect(page.envelopes).toEqual([]);
     expect(page.hasMore).toBe(false);
+  });
+
+  it('partitions canonical replay into missing, matching, and conflicting envelopes', () => {
+    const envelopes = mapPiSessionHistoryToEnvelopes([
+      { type: 'message', id: 'u1', parentId: null, timestamp: '2026-07-01T09:00:00.000Z', message: { role: 'user', content: 'missing' } },
+      { type: 'message', id: 'u2', parentId: 'u1', timestamp: '2026-07-01T09:00:01.000Z', message: { role: 'user', content: 'matching' } },
+      { type: 'message', id: 'u3', parentId: 'u2', timestamp: '2026-07-01T09:00:02.000Z', message: { role: 'user', content: 'conflict' } },
+    ] as any[]);
+    const statuses = new Map([
+      [envelopes[0].id, 'missing'],
+      [envelopes[1].id, 'matching'],
+      [envelopes[2].id, 'conflict'],
+    ] as const);
+
+    const result = partitionPiHistoryEnvelopes(envelopes, (envelope) => statuses.get(envelope.id) ?? 'missing');
+
+    expect(result.missing.map((envelope) => envelope.id)).toEqual([envelopes[0].id]);
+    expect(result.matching.map((envelope) => envelope.id)).toEqual([envelopes[1].id]);
+    expect(result.conflicting.map((envelope) => envelope.id)).toEqual([envelopes[2].id]);
+  });
+
+  it('sends missing entries after a conflict but advances only through the matching prefix', () => {
+    const groups = mapPiSessionHistoryToEnvelopeGroups([
+      { type: 'message', id: 'u1', parentId: null, timestamp: '2026-07-01T09:00:00.000Z', message: { role: 'user', content: 'matching' } },
+      { type: 'message', id: 'u2', parentId: 'u1', timestamp: '2026-07-01T09:00:01.000Z', message: { role: 'user', content: 'conflict' } },
+      { type: 'message', id: 'u3', parentId: 'u2', timestamp: '2026-07-01T09:00:02.000Z', message: { role: 'user', content: 'missing after conflict' } },
+    ] as any[]);
+    const statuses = new Map([
+      [groups[0].envelopes[0].id, 'matching'],
+      [groups[1].envelopes[0].id, 'conflict'],
+      [groups[2].envelopes[0].id, 'missing'],
+    ] as const);
+
+    const result = analyzePiHistoryEnvelopeGroups(
+      groups,
+      (envelope) => statuses.get(envelope.id) ?? 'missing',
+    );
+
+    expect(result.missing.map((envelope) => envelope.id)).toEqual([groups[2].envelopes[0].id]);
+    expect(result.conflicting.map((envelope) => envelope.id)).toEqual([groups[1].envelopes[0].id]);
+    expect(result.contiguousAppendCheckpointEntryId).toBe('u1');
   });
 });

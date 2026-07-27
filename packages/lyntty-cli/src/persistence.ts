@@ -563,30 +563,30 @@ export function persistPiCommandBoundary(piSessionId: string, relaySeq: number):
   fsyncPath(configuration.piCommandBoundaryDir);
 }
 
-export function piHistoryWatermarkPath(piSessionId: string): string {
+export function piHistoryAppendCheckpointPath(piSessionId: string): string {
   const fileName = `${createHash('sha256').update(piSessionId).digest('hex')}.json`;
-  return join(configuration.piHistoryWatermarkDir, fileName);
+  return join(configuration.piHistoryAppendCheckpointDir, fileName);
 }
 
-export function readPersistedPiHistoryWatermark(piSessionId: string): string | null {
+export function readPersistedPiHistoryAppendCheckpoint(piSessionId: string): string | null {
   try {
-    const parsed = JSON.parse(readFileSync(piHistoryWatermarkPath(piSessionId), 'utf-8')) as { version?: unknown; entryId?: unknown };
+    const parsed = JSON.parse(readFileSync(piHistoryAppendCheckpointPath(piSessionId), 'utf-8')) as { version?: unknown; entryId?: unknown };
     return parsed.version === 1 && typeof parsed.entryId === 'string' ? parsed.entryId : null;
   } catch {
     return null;
   }
 }
 
-export function persistPiHistoryWatermark(piSessionId: string, entryId: string): void {
-  mkdirSync(configuration.piHistoryWatermarkDir, { recursive: true, mode: 0o700 });
-  const path = piHistoryWatermarkPath(piSessionId);
+export function persistPiHistoryAppendCheckpoint(piSessionId: string, entryId: string): void {
+  mkdirSync(configuration.piHistoryAppendCheckpointDir, { recursive: true, mode: 0o700 });
+  const path = piHistoryAppendCheckpointPath(piSessionId);
   const tmpFile = `${path}.${process.pid}.tmp`;
   writeFileSync(tmpFile, JSON.stringify({ version: 1, entryId }), { encoding: 'utf-8', mode: 0o600 });
   restrictFileToOwner(tmpFile);
   fsyncFile(tmpFile);
   renameSync(tmpFile, path);
   restrictFileToOwner(path);
-  fsyncPath(configuration.piHistoryWatermarkDir);
+  fsyncPath(configuration.piHistoryAppendCheckpointDir);
 }
 
 export function persistSession(sessionId: string, session: PersistedSession): void {

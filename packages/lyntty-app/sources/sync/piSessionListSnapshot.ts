@@ -5,6 +5,7 @@ type SessionSnapshot = Array<Omit<Session, 'presence'> & { presence?: Session['p
 
 export type DeletedPiSessionIdentity = {
     relaySessionId: string;
+    relaySessionTag?: string;
     machineId?: string;
     piSessionId?: string;
 };
@@ -24,6 +25,7 @@ export class PiSessionListSnapshot {
     private machineSnapshots = new Map<string, PiMachineSessionRecord[]>();
     private pendingMachineRefreshes = new Map<string, PendingMachineRefresh>();
     private hiddenRelaySessionIds = new Set<string>();
+    private hiddenRelaySessionIdByTag = new Map<string, string>();
     private hiddenPiSessionKeys = new Set<string>();
     private relaySeqAtDiscovery = new Map<string, number>();
     private nextRefreshId = 1;
@@ -48,6 +50,7 @@ export class PiSessionListSnapshot {
                 && session.metadata.piSessionId) {
                 this.promoteHiddenPiIdentity({
                     relaySessionId: session.id,
+                    relaySessionTag: session.tag,
                     machineId: session.metadata.machineId,
                     piSessionId: session.metadata.piSessionId,
                 });
@@ -115,9 +118,20 @@ export class PiSessionListSnapshot {
             if (session.relaySessionId && this.hiddenRelaySessionIds.has(session.relaySessionId)) {
                 this.promoteHiddenPiIdentity({
                     relaySessionId: session.relaySessionId,
+                    relaySessionTag: session.relaySessionTag,
                     machineId,
                     piSessionId: session.piSessionId,
                 });
+            } else if (session.relaySessionTag) {
+                const hiddenRelaySessionId = this.hiddenRelaySessionIdByTag.get(session.relaySessionTag);
+                if (hiddenRelaySessionId) {
+                    this.promoteHiddenPiIdentity({
+                        relaySessionId: hiddenRelaySessionId,
+                        relaySessionTag: session.relaySessionTag,
+                        machineId,
+                        piSessionId: session.piSessionId,
+                    });
+                }
             }
             if (!this.isHidden(machineId, session)) {
                 pending.freshById.set(session.piSessionId, session);
@@ -175,18 +189,21 @@ export class PiSessionListSnapshot {
     findPiIdentityByRelaySessionId(relaySessionId: string): Omit<DeletedPiSessionIdentity, 'relaySessionId'> | undefined {
         for (const [machineId, sessions] of this.machineSnapshots) {
             const match = sessions.find((session) => session.relaySessionId === relaySessionId);
-            if (match) return { machineId, piSessionId: match.piSessionId };
+            if (match) return { relaySessionTag: match.relaySessionTag, machineId, piSessionId: match.piSessionId };
         }
         for (const [machineId, pending] of this.pendingMachineRefreshes) {
             const candidates = [...pending.freshById.values(), ...pending.previous];
             const match = candidates.find((session) => session.relaySessionId === relaySessionId);
-            if (match) return { machineId, piSessionId: match.piSessionId };
+            if (match) return { relaySessionTag: match.relaySessionTag, machineId, piSessionId: match.piSessionId };
         }
         return undefined;
     }
 
     setDeletedSessions(identities: DeletedPiSessionIdentity[]): void {
         this.hiddenRelaySessionIds = new Set(identities.map((identity) => identity.relaySessionId));
+        this.hiddenRelaySessionIdByTag = new Map(identities.flatMap((identity) => (
+            identity.relaySessionTag ? [[identity.relaySessionTag, identity.relaySessionId]] : []
+        )));
         this.hiddenPiSessionKeys = new Set(identities.flatMap((identity) => (
             identity.machineId && identity.piSessionId
                 ? [`${identity.machineId}:${identity.piSessionId}`]
@@ -197,6 +214,9 @@ export class PiSessionListSnapshot {
 
     hideDeletedSession(identity: DeletedPiSessionIdentity): void {
         this.hiddenRelaySessionIds.add(identity.relaySessionId);
+        if (identity.relaySessionTag) {
+            this.hiddenRelaySessionIdByTag.set(identity.relaySessionTag, identity.relaySessionId);
+        }
         if (identity.machineId && identity.piSessionId) {
             this.hiddenPiSessionKeys.add(`${identity.machineId}:${identity.piSessionId}`);
         }
@@ -207,6 +227,7 @@ export class PiSessionListSnapshot {
         this.machineSnapshots.clear();
         this.pendingMachineRefreshes.clear();
         this.hiddenRelaySessionIds.clear();
+        this.hiddenRelaySessionIdByTag.clear();
         this.hiddenPiSessionKeys.clear();
         this.relaySeqAtDiscovery.clear();
     }
@@ -224,6 +245,7 @@ export class PiSessionListSnapshot {
         });
         this.onSnapshot(mergePiDiscoveredSessions(relaySessions, machineSessions, {
             hiddenRelaySessionIds: this.hiddenRelaySessionIds,
+            hiddenRelaySessionTags: new Set(this.hiddenRelaySessionIdByTag.keys()),
             hiddenPiSessionKeys: this.hiddenPiSessionKeys,
             relaySeqAtDiscovery: this.relaySeqAtDiscovery,
         }));
@@ -232,6 +254,7 @@ export class PiSessionListSnapshot {
     private isHidden(machineId: string, session: PiMachineSessionRecord): boolean {
         return Boolean(
             (session.relaySessionId && this.hiddenRelaySessionIds.has(session.relaySessionId))
+            || (session.relaySessionTag && this.hiddenRelaySessionIdByTag.has(session.relaySessionTag))
             || this.hiddenPiSessionKeys.has(`${machineId}:${session.piSessionId}`),
         );
     }

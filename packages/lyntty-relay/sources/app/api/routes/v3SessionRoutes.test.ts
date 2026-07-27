@@ -6,10 +6,17 @@ import { type Fastify } from "../types";
 type SessionRecord = {
     id: string;
     accountId: string;
+    tag: string;
     seq: number;
+    createdAt: Date;
     active: boolean;
     lastActiveAt: Date;
     updatedAt: Date;
+    metadata: string;
+    metadataVersion: number;
+    agentState: string | null;
+    agentStateVersion: number;
+    dataEncryptionKey: Uint8Array | null;
 };
 
 type MessageRecord = {
@@ -50,10 +57,17 @@ const {
         state.sessions.push({
             id: input.id,
             accountId: input.accountId,
+            tag: input.tag ?? `tag:${input.id}`,
             seq: input.seq ?? 0,
+            createdAt: input.createdAt ?? new Date(state.nowMs),
             active: input.active ?? false,
             lastActiveAt: input.lastActiveAt ?? new Date(state.nowMs),
-            updatedAt: input.updatedAt ?? new Date(state.nowMs)
+            updatedAt: input.updatedAt ?? new Date(state.nowMs),
+            metadata: input.metadata ?? "encrypted-metadata",
+            metadataVersion: input.metadataVersion ?? 1,
+            agentState: input.agentState ?? null,
+            agentStateVersion: input.agentStateVersion ?? 0,
+            dataEncryptionKey: input.dataEncryptionKey ?? null,
         });
         if (!state.accountSeqById.has(input.accountId)) {
             state.accountSeqById.set(input.accountId, 0);
@@ -103,6 +117,13 @@ const {
             return null;
         }
         return selectFields(row as unknown as Record<string, unknown>, args?.select) as SessionRecord;
+    });
+
+    const sessionFindMany = mock(async (args: any) => {
+        const rows = state.sessions
+            .filter((session) => session.accountId === args?.where?.accountId)
+            .slice(0, args?.take);
+        return rows.map((row) => selectFields(row as unknown as Record<string, unknown>, args?.select));
     });
 
     const sessionUpdate = mock(async (args: any) => {
@@ -198,6 +219,7 @@ const {
     const dbMock = {
         session: {
             findFirst: sessionFindFirst,
+            findMany: sessionFindMany,
             update: sessionUpdate
         },
         account: {
@@ -243,10 +265,17 @@ mock.module("@/app/events/eventRouter", () => ({
             message
         },
         createdAt: Date.now()
-    }))
+    })),
+    buildNewSessionUpdate: mock(),
+    buildSessionActivityEphemeral: mock(),
+}));
+
+mock.module("@/app/session/sessionDelete", () => ({
+    sessionDelete: mock(),
 }));
 
 import { v3SessionRoutes } from "./v3SessionRoutes";
+import { sessionRoutes } from "./sessionRoutes";
 
 async function createApp() {
     const app = fastify();
@@ -265,6 +294,7 @@ async function createApp() {
     });
 
     v3SessionRoutes(typed);
+    sessionRoutes(typed);
     await typed.ready();
     return typed;
 }
@@ -299,6 +329,23 @@ describe("v3SessionRoutes", () => {
         const body = response.json();
         expect(body.hasMore).toBe(false);
         expect(body.messages.map((message: any) => message.seq)).toEqual([1, 2]);
+    });
+
+    it("returns stable session tags for Pi discovery reconciliation", async () => {
+        seedSession({ id: "session-1", accountId: "user-1", tag: "pi:stable-tag" });
+
+        app = await createApp();
+        const response = await app.inject({
+            method: "GET",
+            url: "/v1/sessions",
+            headers: { "x-user-id": "user-1" }
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().sessions[0]).toMatchObject({
+            id: "session-1",
+            tag: "pi:stable-tag"
+        });
     });
 
     it("supports cursor pagination with hasMore", async () => {
@@ -534,6 +581,11 @@ describe("v3SessionRoutes", () => {
         });
 
         expect(response.statusCode).toBe(409);
+        expect(response.json() as unknown).toEqual({
+            error: "localId content conflict",
+            code: "LOCAL_ID_CONTENT_CONFLICT",
+            localId: "existing"
+        });
         expect(state.messages).toHaveLength(1);
         expect(emitUpdateMock).not.toHaveBeenCalled();
     });

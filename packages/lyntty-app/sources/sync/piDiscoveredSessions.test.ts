@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Machine, PiMachineSessionRecord, Session } from './storageTypes';
-import { mergePiDiscoveredSessions } from './piDiscoveredSessions';
+import { mergePiDiscoveredSessions, shouldFetchPiSessionDiscovery } from './piDiscoveredSessions';
 
 const machine: Machine = {
     id: 'machine-1',
@@ -74,6 +74,29 @@ function piRecord(overrides: Partial<PiMachineSessionRecord>): PiMachineSessionR
 }
 
 describe('mergePiDiscoveredSessions', () => {
+    it('discovers Pi JSONL sessions independently from executable availability', () => {
+        expect(shouldFetchPiSessionDiscovery({
+            ...machine,
+            metadata: {
+                ...machine.metadata!,
+                cliAvailability: { pi: false, detectedAt: 11 },
+                piSessionDiscovery: { available: true },
+            },
+        })).toBe(true);
+    });
+
+    it('tries discovery for old daemon metadata and skips only an explicit discovery disable', () => {
+        expect(shouldFetchPiSessionDiscovery(machine)).toBe(true);
+        expect(shouldFetchPiSessionDiscovery({ ...machine, active: false })).toBe(true);
+        expect(shouldFetchPiSessionDiscovery({
+            ...machine,
+            metadata: {
+                ...machine.metadata!,
+                piSessionDiscovery: { available: false },
+            },
+        })).toBe(false);
+    });
+
     it('adds node-local Pi sessions to Sessions Home data', () => {
         const sessions = mergePiDiscoveredSessions([], [{ machine, sessions: [piRecord({})] }]);
 
@@ -337,6 +360,65 @@ describe('mergePiDiscoveredSessions', () => {
             piDiscoveryState: 'registered',
             piMessageCount: 99,
             piSynthetic: false,
+        });
+    });
+
+    it('preserves a useful relay title when local discovery has no canonical title', () => {
+        const sessions = mergePiDiscoveredSessions([
+            relaySession({
+                metadata: {
+                    path: '/home/jc',
+                    host: 'thinkpad',
+                    machineId: 'machine-1',
+                    flavor: 'pi',
+                    piSessionId: 'pi-registered',
+                    name: 'Useful relay title',
+                },
+            }),
+        ], [{
+            machine,
+            sessions: [piRecord({
+                state: 'registered',
+                piSessionId: 'pi-registered',
+                relaySessionId: 'relay-1',
+                name: '(no messages)',
+                firstMessage: undefined,
+            })],
+        }]);
+
+        expect(sessions[0].metadata?.name).toBe('Useful relay title');
+    });
+
+    it('matches an older relay row by its stable Pi tag and restores the canonical title', () => {
+        const sessions = mergePiDiscoveredSessions([
+            relaySession({
+                tag: 'pi:stable-tag',
+                metadata: {
+                    path: '/home/jc',
+                    host: 'thinkpad',
+                    flavor: 'pi',
+                    name: 'Pi session',
+                },
+            }),
+        ], [{
+            machine,
+            sessions: [piRecord({
+                piSessionId: 'pi-stable',
+                relaySessionTag: 'pi:stable-tag',
+                name: 'Canonical session title',
+            })],
+        }]);
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0]).toMatchObject({
+            id: 'relay-1',
+            tag: 'pi:stable-tag',
+            metadata: {
+                machineId: 'machine-1',
+                piSessionId: 'pi-stable',
+                name: 'Canonical session title',
+                piSynthetic: false,
+            },
         });
     });
 });

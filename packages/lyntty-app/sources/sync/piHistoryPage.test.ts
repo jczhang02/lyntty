@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { applyPiHistoryPageResult } from './piHistoryPage';
 
 describe('applyPiHistoryPageResult', () => {
-    it('preserves current metadata while making history_gap explicit and terminal', () => {
+    it('makes history_gap explicit without losing the authoritative retry cursor', () => {
         expect(applyPiHistoryPageResult({
             path: '/repo',
             host: 'computer',
@@ -15,7 +15,8 @@ describe('applyPiHistoryPageResult', () => {
             code: 'history_gap',
             missingCursor: 'old-cursor',
             reason: 'cursor missing',
-            hasMore: false,
+            nextCursor: 'old-cursor',
+            hasMore: true,
             totalMessages: 10,
         })).toMatchObject({
             runtimeOwner: 'pi-extension',
@@ -23,10 +24,27 @@ describe('applyPiHistoryPageResult', () => {
             piHasHistoryGap: true,
             piHistoryGapSource: 'history_page',
             piRecoveryReason: 'cursor missing',
-            piHistoryCursor: undefined,
-            piHistoryHasMore: false,
+            piHistoryCursor: 'old-cursor',
+            piHistoryHasMore: true,
             piHistoryTotalMessages: 10,
         });
+    });
+
+    it('ignores a delayed page result after a newer cursor was applied', () => {
+        const metadata = {
+            path: '/repo',
+            host: 'computer',
+            piHistoryCursor: 'newer-cursor',
+            piHistoryHasMore: true,
+        };
+
+        expect(applyPiHistoryPageResult(metadata, {
+            type: 'success',
+            sent: 5,
+            nextCursor: 'older-response-cursor',
+            hasMore: true,
+            totalMessages: 20,
+        }, { expectedCursor: 'requested-cursor' })).toBe(metadata);
     });
 
     it('advances a successful Pi history page', () => {

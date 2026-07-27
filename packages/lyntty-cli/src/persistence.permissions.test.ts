@@ -52,11 +52,11 @@ describe.if(process.platform !== 'win32')('secret persistence permissions', () =
     expect(fileMode(persistence.piCommandBoundaryPath('pi-session-1'))).toBe(0o600);
   });
 
-  it('persists Pi history watermarks with owner-only permissions', () => {
-    persistence.persistPiHistoryWatermark('pi-session-1', 'entry-42');
+  it('persists Pi history append checkpoints with owner-only permissions', () => {
+    persistence.persistPiHistoryAppendCheckpoint('pi-session-1', 'entry-42');
 
-    expect(persistence.readPersistedPiHistoryWatermark('pi-session-1')).toBe('entry-42');
-    expect(fileMode(persistence.piHistoryWatermarkPath('pi-session-1'))).toBe(0o600);
+    expect(persistence.readPersistedPiHistoryAppendCheckpoint('pi-session-1')).toBe('entry-42');
+    expect(fileMode(persistence.piHistoryAppendCheckpointPath('pi-session-1'))).toBe(0o600);
   });
 
   it('durably records Pi command outcomes with owner-only permissions', () => {
