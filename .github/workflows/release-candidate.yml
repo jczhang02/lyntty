@@ -522,7 +522,8 @@ jobs:
           }
           predecessorEntries.sort((a, b) => b.sequence - a.sequence);
           const predecessors = predecessorEntries.map(entry => entry.reference);
-          await Bun.write(join(root, 'predecessor-paths.txt'), `${predecessorEntries.map(entry => entry.path).join('\n')}${predecessorEntries.length ? '\n' : ''}`);
+          const predecessorPaths = predecessorEntries.map(entry => relative(root, entry.path));
+          await Bun.write(join(root, 'predecessor-paths.txt'), `${predecessorPaths.join('\n')}${predecessorPaths.length ? '\n' : ''}`);
           const relayRepository = channel === 'stable' ? 'ghcr.io/jczhang02/lyntty-relay' : 'ghcr.io/jczhang02/lyntty-relay-preview';
           const relayDigest = (await Bun.file(join(root, 'relay/digest.txt')).text()).trim();
           const base = (version, component, componentWire) => ({ version, sourceCommit: process.env.GITHUB_SHA, wire: componentWire, requires, supplyChain: evidence(component) });
@@ -548,7 +549,16 @@ jobs:
           bun --no-install scripts/release.ts sign --bom "$CANDIDATE/compatibility-bom.json" --signature "$CANDIDATE/compatibility-bom.sig.json" --key-id "$LYNTTY_BOM_KEY_ID" --channel "$CHANNEL"
           bun --no-install scripts/release.ts verify --bom "$CANDIDATE/compatibility-bom.json" --signature "$CANDIDATE/compatibility-bom.sig.json" --trust-store "$RUNNER_TEMP/trust-roots.json" --channel "$CHANNEL" --minimum-sequence "$SEQUENCE" > "$CANDIDATE/bom-verification.json"
           predecessor_args=()
-          while IFS= read -r file; do [[ -z "$file" ]] || predecessor_args+=(--predecessor "$file"); done < "$CANDIDATE/predecessor-paths.txt"
+          while IFS= read -r file || [[ -n "$file" ]]; do
+            [[ -n "$file" ]] || { echo "candidate predecessor path contains a blank record" >&2; exit 1; }
+            [[ "$file" =~ ^predecessors/compat(-preview)?-v[0-9A-Za-z._-]+-s[0-9]+/compatibility-bom\.json$ ]] || {
+              echo "candidate predecessor path is not portable: $file" >&2
+              exit 1
+            }
+            predecessor="$CANDIDATE/$file"
+            [[ -f "$predecessor" ]] || { echo "candidate predecessor is missing: $file" >&2; exit 1; }
+            predecessor_args+=(--predecessor "$predecessor")
+          done < "$CANDIDATE/predecessor-paths.txt"
           bun --no-install scripts/release.ts verify-history --current "$CANDIDATE/compatibility-bom.json" "${predecessor_args[@]}" > "$CANDIDATE/compatibility-matrix.json"
 
       - name: Seal deterministic candidate bundle

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1402,6 +1402,88 @@ test('candidate builds once under channel isolation and never publishes', () => 
   assert.doesNotMatch(releaseCandidate, /packages: write/);
   assert.doesNotMatch(releaseCandidate, /gh release create/);
   assert.doesNotMatch(releaseCandidate, /docker\/login-action/);
+});
+
+test('candidate predecessor paths remain portable between workflow runners', async () => {
+  assert.match(releaseCandidate, /predecessorEntries\.map\(entry => relative\(root, entry\.path\)\)/);
+  assert.doesNotMatch(releaseCandidate, /predecessorEntries\.map\(entry => entry\.path\)/);
+
+  const extractBlock = (workflow, pattern) => workflow.match(pattern)?.[0]
+    .split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  const writer = extractBlock(
+    releaseCandidate,
+    /          const predecessorPaths = predecessorEntries\.map[\s\S]*?          await Bun\.write\(join\(root, 'predecessor-paths\.txt'\)[^\n]+/,
+  );
+  const resolvers = [releaseCandidate, releasePromote].map(workflow => extractBlock(
+    workflow,
+    /          predecessor_args=\(\)[\s\S]*?          done < "\$CANDIDATE\/predecessor-paths\.txt"/,
+  ));
+  assert.ok(writer);
+  assert.ok(resolvers.every(Boolean));
+
+  const root = await mkdtemp(join(tmpdir(), 'lyntty-portable-predecessor-'));
+  const runnerA = join(root, 'runner-a', 'candidate');
+  const runnerB = join(root, 'runner-b', 'candidate');
+  const relativePath = 'predecessors/compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1/compatibility-bom.json';
+  try {
+    await mkdir(join(runnerA, 'predecessors', 'compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1'), { recursive: true });
+    await writeFile(join(runnerA, relativePath), '{}\n');
+    const write = Bun.spawnSync({
+      cmd: ['bun', '-e', `
+        import { join, relative } from 'node:path';
+        const root = process.env.CANDIDATE;
+        const predecessorEntries = [{ path: join(root, process.env.RELATIVE_PATH) }];
+        ${writer}
+      `],
+      env: { ...process.env, CANDIDATE: runnerA, RELATIVE_PATH: relativePath },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    assert.equal(write.exitCode, 0, write.stderr.toString());
+    assert.equal(await readFile(join(runnerA, 'predecessor-paths.txt'), 'utf8'), `${relativePath}\n`);
+    await cp(runnerA, runnerB, { recursive: true });
+
+    const runResolver = async (resolver, contents, printArguments = false) => {
+      await writeFile(join(runnerB, 'predecessor-paths.txt'), contents);
+      return Bun.spawnSync({
+        cmd: ['bash', '-c', `set -euo pipefail\n${resolver}${printArguments ? '\nprintf \'%s\\n\' "${predecessor_args[@]}"' : ''}`],
+        env: { ...process.env, CANDIDATE: runnerB },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+    };
+
+    for (const resolver of resolvers) {
+      for (const contents of [`${relativePath}\n`, relativePath]) {
+        const run = await runResolver(resolver, contents, true);
+        assert.equal(run.exitCode, 0, run.stderr.toString());
+        assert.equal(run.stdout.toString(), `--predecessor\n${join(runnerB, relativePath)}\n`);
+        assert.doesNotMatch(run.stdout.toString(), /runner-a/);
+      }
+      assert.equal((await runResolver(resolver, '')).exitCode, 0);
+
+      for (const invalid of [
+        '/home/runner/work/_temp/candidate/predecessors/compat-v1.2.0-s1/compatibility-bom.json',
+        'predecessors/compat-v1.2.0-s1/../compatibility-bom.json\n',
+      ]) {
+        const run = await runResolver(resolver, invalid);
+        assert.notEqual(run.exitCode, 0);
+        assert.match(run.stderr.toString(), /not portable/);
+      }
+      const blank = await runResolver(resolver, '\n');
+      assert.notEqual(blank.exitCode, 0);
+      assert.match(blank.stderr.toString(), /blank record/);
+
+      const missing = await runResolver(
+        resolver,
+        'predecessors/compat-v9.9.9_9.9.9_9.9.9_0.2.0-s9/compatibility-bom.json\n',
+      );
+      assert.notEqual(missing.exitCode, 0);
+      assert.match(missing.stderr.toString(), /is missing/);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('promotion publishes exact candidate bytes with protected stable/preview separation', () => {
