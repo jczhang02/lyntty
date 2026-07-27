@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-07-27T15:07:07Z",
+  "policy": {
+    "pullRequest": 68,
+    "policyMergeCommit": "5b20b0b93bac95b8d74f59205aa78ef6ba5f0349",
+    "currentMainAtEdit": "73f15ff00f4e1c3368640d7cbf5c2f9e1f3d8f86"
+  },
+  "target": {
+    "repository": "jczhang02/lyntty",
+    "releaseId": 360246346,
+    "nodeId": "RE_kwDOTBWyxc4VeOxK",
+    "tag": "compat-v1.2.1_1.2.1_1.2.1_0.2.0-s2",
+    "targetCommit": "f9698f4930294ee38ff914dfa6d7d0705bebc485",
+    "directTagObjectType": "commit",
+    "directTagCommit": "f9698f4930294ee38ff914dfa6d7d0705bebc485",
+    "createdAt": "2026-07-27T05:55:38Z",
+    "publishedAt": "2026-07-27T06:51:15Z",
+    "updatedAtBefore": "2026-07-27T06:51:15Z",
+    "updatedAtAfter": "2026-07-27T15:07:07Z"
+  },
+  "inference": {
+    "version": "1.2.1",
+    "codeName": "Progressive Sessions",
+    "emoji": "⚡",
+    "rationale": "Progressive Sessions Home publication and the persistent incremental local Pi-session index are the dominant verified user-visible source changes; the emoji follows the speed/performance mapping."
+  },
+  "before": {
+    "title": "Lyntty stable compat-v1.2.1_1.2.1_1.2.1_0.2.0-s2",
+    "bodyBytes": 575,
+    "bodySha256": "0031007c0bb865edb7304bff6b1e6e3bb373ea987ef598e0cf25bec3e4dbc3a9"
+  },
+  "after": {
+    "title": "V1.2.1 Progressive Sessions ⚡",
+    "bodyBytes": 2429,
+    "bodySha256": "c5ff94120f4f98198a09dee5867849cc6e0b29fc93cfd90764c2495eeb8e839d",
+    "englishItems": 4,
+    "chineseItems": 4,
+    "mandatoryDisclosurePreserved": true,
+    "logoSourceCommit": "f9698f4930294ee38ff914dfa6d7d0705bebc485"
+  },
+  "mutation": {
+    "command": "gh release edit <exact-tag> --repo jczhang02/lyntty --title <exact-title> --notes-file <approved-draft>",
+    "releaseCreate": false,
+    "releaseDelete": false,
+    "assetMutation": false,
+    "tagMutation": false,
+    "reactionMutation": false
+  },
+  "preflight": {
+    "firstAttempt": "stopped-before-mutation: GitHub Latest API TLS handshake timeout",
+    "boundedImmediateRetry": "pass",
+    "approvedSnapshotMatched": true
+  },
+  "invariants": {
+    "draftBefore": false,
+    "draftAfter": false,
+    "prereleaseBefore": false,
+    "prereleaseAfter": false,
+    "immutableBefore": true,
+    "immutableAfter": true,
+    "latestReleaseIdBefore": 360359261,
+    "latestReleaseIdAfter": 360359261,
+    "latestTagBefore": "compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3",
+    "latestTagAfter": "compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3",
+    "assetCountBefore": 36,
+    "assetCountAfter": 36,
+    "assetTupleHashAlgorithm": "SHA256(compact JSON array(sorted by name, each {id,name,size,digest}) + LF)",
+    "assetTupleSha256Before": "e1a6cc5fc90d6e18a57f8fe55eccd24e5efe230b5dea84e42b9baa5d1edfa6b2",
+    "assetTupleSha256After": "e1a6cc5fc90d6e18a57f8fe55eccd24e5efe230b5dea84e42b9baa5d1edfa6b2"
+  },
+  "publicationGate": {
+    "candidateRun": 30241194899,
+    "candidateConclusion": "success",
+    "promotionRun": 30243779634,
+    "promotionConclusion": "success",
+    "activeCandidateOrPromotionRuns": 0,
+    "metadataBoundRetryCompatibilityRetained": false
+  },
+  "verification": {
+    "mechanicalDraftChecks": "pass",
+    "draftReview": "VERIFIED_NO_P0_P1_P2",
+    "postPublicationReview": "VERIFIED_NO_P0_P1_P2",
+    "evidenceReview": "VERIFIED_NO_P0_P1_P2"
+  }
+}
