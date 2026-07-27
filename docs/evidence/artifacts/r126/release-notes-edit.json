@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-07-27T14:30:14Z",
+  "policy": {
+    "pullRequest": 68,
+    "mergeCommit": "5b20b0b93bac95b8d74f59205aa78ef6ba5f0349",
+    "mergeCommitVerified": true,
+    "finalCheckContexts": 15,
+    "finalCheckContextsPassed": 15,
+    "initialMacosLifecycleAttempt": "timeout-failure",
+    "failedOnlyRerun": "success"
+  },
+  "target": {
+    "repository": "jczhang02/lyntty",
+    "releaseId": 360359261,
+    "nodeId": "RE_kwDOTBWyxc4VeqVd",
+    "tag": "compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3",
+    "targetCommit": "f2b22a4da144627aef485e984de9aa2324bbc08c",
+    "directTagObjectType": "commit",
+    "directTagCommit": "f2b22a4da144627aef485e984de9aa2324bbc08c",
+    "createdAt": "2026-07-27T09:55:05Z",
+    "publishedAt": "2026-07-27T10:47:50Z",
+    "updatedAtBefore": "2026-07-27T10:47:50Z",
+    "updatedAtAfter": "2026-07-27T14:30:14Z"
+  },
+  "inference": {
+    "version": "1.2.2",
+    "codeName": "Session Continuity",
+    "emoji": "🧭",
+    "rationale": "Canonical Pi history, session-name preservation, restart-safe forward sync, and local discovery form the dominant verified user-visible release theme; the emoji follows the history/sync/reliability/control mapping."
+  },
+  "before": {
+    "title": "Lyntty stable compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3",
+    "bodyBytes": 575,
+    "bodySha256": "4b47b03ede38f3efda424a4a8122ea259ec0e0d0af23ba0d79d4451bbcd86b0f"
+  },
+  "after": {
+    "title": "V1.2.2 Session Continuity 🧭",
+    "bodyBytes": 2300,
+    "bodySha256": "9dd29ee3a38d2401322e0d4d0b1a3cb181cc34afb2bc2a4dc028e2aa104de237",
+    "englishItems": 4,
+    "chineseItems": 4,
+    "mandatoryDisclosurePreserved": true,
+    "logoSourceCommit": "f2b22a4da144627aef485e984de9aa2324bbc08c"
+  },
+  "mutation": {
+    "command": "gh release edit <exact-tag> --repo jczhang02/lyntty --title <exact-title> --notes-file <approved-draft>",
+    "releaseCreate": false,
+    "releaseDelete": false,
+    "assetMutation": false,
+    "tagMutation": false,
+    "reactionMutation": false
+  },
+  "invariants": {
+    "draftBefore": false,
+    "draftAfter": false,
+    "prereleaseBefore": false,
+    "prereleaseAfter": false,
+    "immutableBefore": true,
+    "immutableAfter": true,
+    "latestReleaseIdBefore": 360359261,
+    "latestReleaseIdAfter": 360359261,
+    "latestTagBefore": "compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3",
+    "latestTagAfter": "compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3",
+    "assetCountBefore": 36,
+    "assetCountAfter": 36,
+    "assetTupleHashAlgorithm": "SHA256(compact JSON array(sorted by name, each {id,name,size,digest}) + LF)",
+    "assetTupleSha256Before": "df6325108590fe1076c31d47dcef276f9caa639fe985d75efc2cede8d30e36a3",
+    "assetTupleSha256After": "df6325108590fe1076c31d47dcef276f9caa639fe985d75efc2cede8d30e36a3"
+  },
+  "publicationGate": {
+    "candidateRun": 30256019450,
+    "candidateConclusion": "success",
+    "promotionRun": 30259067520,
+    "promotionConclusion": "success",
+    "activeCandidateOrPromotionRuns": 0,
+    "metadataBoundRetryCompatibilityRetained": false
+  },
+  "verification": {
+    "mechanicalDraftChecks": "pass",
+    "draftReview": "VERIFIED_NO_P0_P1_P2",
+    "postPublicationReview": "VERIFIED_NO_P0_P1_P2",
+    "evidenceReview": "VERIFIED_NO_P0_P1_P2"
+  }
+}
