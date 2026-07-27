@@ -1,0 +1,180 @@
+import { createHash } from 'node:crypto';
+
+import { ApiSessionClient } from '@/api/apiSession';
+import { decodeBase64, decrypt } from '@/api/encryption';
+import { readCredentials, readPersistedPiHistoryAppendCheckpoint, persistPiHistoryAppendCheckpoint } from '@/persistence';
+import { reconcilePiCanonicalHistory } from '@/pi/reconcilePiHistory';
+import { readPiSessionEntries } from '@/pi/runPiExternalMirror';
+
+const relayUrl = 'https://relay.jczhang.cc';
+const relaySessionId = 'cmrwsbw3x015n01mrbagof44g';
+const relayTag = 'pi:29312de55340242d328b5d01a91ea60a';
+const piSessionId = '019f8c6a-ab60-7ef6-8154-56d9f05751bd';
+const sessionFile = '/home/jc/dev/dotfiles/pi/.pi/agent/sessions/--home-jc-dev-lyntty--/2026-07-23T00-40-28-768Z_019f8c6a-ab60-7ef6-8154-56d9f05751bd.jsonl';
+const resultPath = '/tmp/lyntty-v1.2.2-local-update/repair-result.json';
+const inventoryTimeoutMs = 180_000;
+const flushTimeoutMs = 600_000;
+
+const credentials = await readCredentials();
+if (!credentials || credentials.encryption.type !== 'dataKey') {
+  throw new Error('Expected authenticated data-key credentials');
+}
+
+const listResponse = await fetch(`${relayUrl}/v1/sessions`, {
+  headers: {
+    Authorization: `Bearer ${credentials.token}`,
+    'X-Lyntty-Client': 'bounded-production-repair/1.2.2',
+  },
+  signal: AbortSignal.timeout(60_000),
+});
+const listBody = await listResponse.json() as { sessions?: Array<Record<string, any>> };
+if (!listResponse.ok) throw new Error(`Relay session list failed: HTTP ${listResponse.status}`);
+const raw = listBody.sessions?.find((session) => session.id === relaySessionId);
+if (!raw || raw.tag !== relayTag) throw new Error('Relay session identity mismatch');
+
+const encryptionKey = new Uint8Array(createHash('sha256')
+  .update('lyntty-session-data-key-v1')
+  .update(credentials.encryption.machineKey)
+  .update(relayTag)
+  .digest());
+const metadata = decrypt(encryptionKey, 'dataKey', decodeBase64(raw.metadata));
+if (!metadata || metadata.piSessionId !== piSessionId) {
+  throw new Error('Encrypted Relay metadata does not match the target Pi session');
+}
+
+const beforeCheckpoint = readPersistedPiHistoryAppendCheckpoint(piSessionId);
+if (beforeCheckpoint !== '3c3f1042') {
+  throw new Error(`Unexpected append checkpoint before repair: ${String(beforeCheckpoint)}`);
+}
+
+const client = new ApiSessionClient(credentials.token, {
+  id: raw.id,
+  seq: raw.seq,
+  metadata,
+  metadataVersion: raw.metadataVersion,
+  agentState: raw.agentState
+    ? decrypt(encryptionKey, 'dataKey', decodeBase64(raw.agentState))
+    : null,
+  agentStateVersion: raw.agentStateVersion,
+  encryptionKey,
+  encryptionVariant: 'dataKey',
+});
+
+// This repair client is the only Relay writer while lynttyd is stopped. Skip
+// replaying the already inventoried command stream over its short-lived socket.
+(client as any).receiveSeq = raw.seq;
+(client as any).lastSeq = raw.seq;
+client.skipMessagesThrough(raw.seq);
+
+const syncInventory = client.syncExistingSessionProtocolEnvelopeIds.bind(client);
+const flushOutbox = client.flushConfirmed.bind(client);
+(client as any).syncExistingSessionProtocolEnvelopeIds = () => syncInventory(inventoryTimeoutMs);
+(client as any).flushConfirmed = () => flushOutbox(flushTimeoutMs);
+
+const startedAt = Date.now();
+let checkpoint = beforeCheckpoint;
+let totalSent = 0;
+const passes: Array<Record<string, unknown>> = [];
+let metadataCleared = false;
+let metadataClearError: string | null = null;
+
+try {
+  for (let pass = 1; pass <= 3; pass += 1) {
+    const entries = readPiSessionEntries(sessionFile);
+    const latestEntryId = entries.at(-1)?.id;
+    if (!latestEntryId) throw new Error('Canonical Pi JSONL has no entries');
+
+    const passStartedAt = Date.now();
+    const result = await reconcilePiCanonicalHistory({
+      entries,
+      afterEntryId: checkpoint,
+      client,
+      isEntryRelayConfirmed: () => false,
+      allowRelayConfirmedEntries: false,
+    });
+    const passResult = {
+      pass,
+      canonicalEntryCount: entries.length,
+      requestedAfterEntryId: checkpoint,
+      latestEntryId,
+      sent: result.sent,
+      matching: result.matching.length,
+      missing: result.missing.length,
+      conflicting: result.conflicting.length,
+      outboxConflictLocalIds: result.outboxConflictLocalIds,
+      afterEntryMissing: result.afterEntryMissing,
+      startEntryMissing: result.startEntryMissing,
+      contiguousAppendCheckpointEntryId: result.contiguousAppendCheckpointEntryId,
+      elapsedMs: Date.now() - passStartedAt,
+    };
+    passes.push(passResult);
+    console.log(JSON.stringify(passResult));
+
+    if (
+      result.afterEntryMissing
+      || result.startEntryMissing
+      || result.missing.length > 0
+      || result.conflicting.length > 0
+      || result.outboxConflictLocalIds.length > 0
+      || !result.contiguousAppendCheckpointEntryId
+    ) {
+      throw new Error('Strict canonical reconciliation did not produce a contiguous, conflict-free checkpoint');
+    }
+
+    totalSent += result.sent;
+    checkpoint = result.contiguousAppendCheckpointEntryId;
+
+    const currentEntries = readPiSessionEntries(sessionFile);
+    if (currentEntries.at(-1)?.id === checkpoint) break;
+    if (pass === 3) throw new Error('Canonical JSONL kept advancing during the bounded repair window');
+  }
+
+  persistPiHistoryAppendCheckpoint(piSessionId, checkpoint);
+  if (readPersistedPiHistoryAppendCheckpoint(piSessionId) !== checkpoint) {
+    throw new Error('Persisted append checkpoint did not round-trip');
+  }
+
+  const socketDeadline = Date.now() + 30_000;
+  while (!(client as any).socket.connected && Date.now() < socketDeadline) {
+    await Bun.sleep(100);
+  }
+  if ((client as any).socket.connected) {
+    try {
+      await client.updateMetadataAndAwait((currentMetadata) => ({
+        ...currentMetadata,
+        version: '1.2.2',
+        lifecycleState: 'running',
+        lifecycleStateSince: Date.now(),
+        runtimeOwner: 'pi-extension',
+        controlState: 'ready',
+        piHasHistoryGap: false,
+        piRecoveryReason: undefined,
+      }), { timeoutMs: 30_000 });
+      metadataCleared = true;
+    } catch (error) {
+      metadataClearError = error instanceof Error ? error.message : String(error);
+    }
+  } else {
+    metadataClearError = 'repair client socket did not connect within 30 seconds';
+  }
+
+  const result = {
+    ok: true,
+    relaySessionId,
+    relayTag,
+    piSessionId,
+    beforeRelaySeq: raw.seq,
+    beforeMetadataVersion: raw.metadataVersion,
+    beforeCheckpoint,
+    afterCheckpoint: checkpoint,
+    totalSent,
+    metadataCleared,
+    metadataClearError,
+    passes,
+    elapsedMs: Date.now() - startedAt,
+  };
+  await Bun.write(resultPath, `${JSON.stringify(result, null, 2)}\n`);
+  console.log(JSON.stringify(result, null, 2));
+} finally {
+  await client.close();
+}
