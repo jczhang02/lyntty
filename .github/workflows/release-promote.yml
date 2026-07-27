@@ -152,7 +152,16 @@ jobs:
             --trust-store "$RUNNER_TEMP/trust-roots.json" \
             --channel "$CHANNEL" > "$RUNNER_TEMP/bom-verification.json"
           predecessor_args=()
-          while IFS= read -r file; do [[ -z "$file" ]] || predecessor_args+=(--predecessor "$file"); done < "$CANDIDATE/predecessor-paths.txt"
+          while IFS= read -r file || [[ -n "$file" ]]; do
+            [[ -n "$file" ]] || { echo "candidate predecessor path contains a blank record" >&2; exit 1; }
+            [[ "$file" =~ ^predecessors/compat(-preview)?-v[0-9A-Za-z._-]+-s[0-9]+/compatibility-bom\.json$ ]] || {
+              echo "candidate predecessor path is not portable: $file" >&2
+              exit 1
+            }
+            predecessor="$CANDIDATE/$file"
+            [[ -f "$predecessor" ]] || { echo "candidate predecessor is missing: $file" >&2; exit 1; }
+            predecessor_args+=(--predecessor "$predecessor")
+          done < "$CANDIDATE/predecessor-paths.txt"
           bun --no-install scripts/release.ts verify-history --current "$CANDIDATE/compatibility-bom.json" "${predecessor_args[@]}"
           CANDIDATE="$CANDIDATE" RUN_JSON="$(cat "$RUNNER_TEMP/candidate-run.json")" bun -e '
             const bom=await Bun.file(`${process.env.CANDIDATE}/compatibility-bom.json`).json();
