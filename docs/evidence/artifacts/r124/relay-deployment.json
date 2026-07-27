@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-07-27T12:08:36Z",
+  "repository": "jczhang02/lyntty",
+  "workflow": {
+    "name": "Deploy relay from Compatibility BOM",
+    "runId": 30261452266,
+    "url": "https://github.com/jczhang02/lyntty/actions/runs/30261452266",
+    "event": "workflow_dispatch",
+    "headSha": "5a64b6348c278c39d67528328e8de287159e0836",
+    "status": "completed",
+    "conclusion": "success",
+    "createdAt": "2026-07-27T11:18:44Z",
+    "updatedAt": "2026-07-27T11:22:05Z"
+  },
+  "deployment": {
+    "id": 5621505334,
+    "environment": "production-relay",
+    "statusId": 15985990386,
+    "state": "success",
+    "createdAt": "2026-07-27T11:18:46Z",
+    "updatedAt": "2026-07-27T11:22:05Z",
+    "statusCreatedAt": "2026-07-27T11:22:05Z"
+  },
+  "release": {
+    "tag": "compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3",
+    "sequence": 3,
+    "sourceCommit": "f2b22a4da144627aef485e984de9aa2324bbc08c",
+    "relayVersion": "1.2.2",
+    "relayImage": "ghcr.io/jczhang02/lyntty-relay@sha256:65d7823d1938f36867c2a798c7cb37a20b1e60cb9d93cb5bb4c40c100d546447",
+    "bomSha256": "9453da079bd9b5b181281c87f1780acfc499fd1f933d5120daba2b06f6e88b2b",
+    "apkSha256": "5ccb6336e31aa3b484b9df7fd02f6046eede656195e7528f64b2e645f7b3caae"
+  },
+  "predeployBackup": {
+    "provider": "pglite",
+    "path": "/backups/predeploy-compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3-20260727T112130Z.backup",
+    "sha256": "a7f3415fbad5417bdfc2764391665de7d88390f670388f700b2fefe692a0d56f",
+    "size": 162703305,
+    "sidecarVerified": true
+  },
+  "databaseDoctor": {
+    "provider": "pglite",
+    "appliedMigrations": 39,
+    "pendingMigrations": 0,
+    "schemaCompatibility": "ok"
+  },
+  "postchecks": {
+    "containerPinnedToExpectedDigest": true,
+    "localHealth": true,
+    "publicHealth": true,
+    "publicSignedBom": true,
+    "publicVersionName": "1.2.2",
+    "publicVersionCode": 8,
+    "publicBomSequence": 3
+  }
+}

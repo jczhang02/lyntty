@@ -1,0 +1,93 @@
+R124 verification summary (secrets and encrypted payloads omitted)
+Observed: 2026-07-27T12:08:36Z
+
+[PASS] Protected production Relay deployment
+  gh workflow run relay-deploy.yml --repo jczhang02/lyntty --ref main \
+    -f bom_tag=compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3
+  gh run watch 30261452266 --repo jczhang02/lyntty --exit-status --interval 10
+  Result: success at main@5a64b6348c278c39d67528328e8de287159e0836
+  Deployment: production-relay/5621505334, status 15985990386=success
+  OCI: ghcr.io/jczhang02/lyntty-relay@sha256:65d7823d1938f36867c2a798c7cb37a20b1e60cb9d93cb5bb4c40c100d546447
+  Backup: a7f3415fbad5417bdfc2764391665de7d88390f670388f700b2fefe692a0d56f, 162703305 bytes
+  Doctor: PGlite, applied=39, pending=0, schema=ok
+
+[PASS] Public Relay contract
+  curl -fsSL https://relay.jczhang.cc/health
+  curl -fsSL -X POST https://relay.jczhang.cc/v1/version \
+    -H 'Content-Type: application/json' \
+    --data '{"platform":"android","app_id":"dev.jczhang.lyntty","version":"1.2.1","version_code":7,"release_channel":"stable"}'
+  Result: health=ok; v1.2.2, versionCode=8, s3, BOM sequence=3,
+          BOM SHA-256=9453da079bd9b5b181281c87f1780acfc499fd1f933d5120daba2b06f6e88b2b
+
+[PASS] Signed Stable local update
+  lyntty update check --channel stable --json
+  gh release download compat-v1.2.2_1.2.2_1.2.2_0.2.0-s3 \
+    --repo jczhang02/lyntty --pattern lyntty-cli-1.2.2-linux-x64.tar.gz
+  sha256sum lyntty-cli-1.2.2-linux-x64.tar.gz
+  sha256sum lyntty-cli-1.2.2-linux-x64/artifact-manifest.json
+  ./lyntty-cli-1.2.2-linux-x64/lyntty --self-check --json
+  ./lyntty-cli-1.2.2-linux-x64/lyntty update apply \
+    --manifest-sha256 d5b3666941ffeb14c3f80f57b1aa603e55b0e2bdbfcca0b9d2a16cb311c04b84
+  Result: current=lyntty-cli-1.2.2-linux-x64; previous=lyntty-cli-1.2.0-linux-x64;
+          178 files verified; CLI/daemon source=f2b22a4da144627aef485e984de9aa2324bbc08c
+
+[PASS] Service and active Pi safety
+  lyntty daemon status
+  systemctl --user show lynttyd.service -p ActiveState -p SubState -p MainPID -p NRestarts
+  grep '^Environment="PATH=' ~/.config/systemd/user/lynttyd.service
+  head -c 22056176 <canonical-jsonl> | sha256sum
+  Result: daemon PID=1266556, active/running, NRestarts=0, PATH includes /opt/bin;
+          Pi PID=1078376 and startTicks=38315346 unchanged;
+          extension instance=23382957-400e-42bd-99d4-787fc74a68db unchanged;
+          JSONL inode=10357666 unchanged;
+          prefix SHA-256=d053f3b7be83c72780e9920d7bdcf9e7c9ffba64746bb9c25713f70eb1b807f1 unchanged;
+          root checkout HEAD/status digest unchanged.
+
+[PASS] Fail-closed diagnosis before repair
+  Authenticated GET /v3/sessions/cmrwsbw3x015n01mrbagof44g/messages?after_seq=<cursor>&limit=100
+  Exact-release ApiSessionClient inventory + planPiHistoryStartup + partitionPiHistoryEnvelopes
+  Result: cold inventory=1,034 rows / 11 pages / 51,362 ms;
+          strict plan=7,987 missing, 0 conflicting; automatic 10,000 ms deadline failed closed;
+          checkpoint remained 3c3f1042.
+  Authentication token and encrypted payloads were read only in process memory and never printed or stored in evidence.
+
+[PASS] Bounded exact-release reconciliation
+  systemctl --user stop lynttyd.service
+  cd packages/lyntty-cli
+  bun - < /tmp/lyntty-v1.2.2-local-update/repair-target-session.ts
+  systemctl --user start lynttyd.service
+  Historical source artifact: docs/evidence/artifacts/r124/repair-target-session.ts.txt
+  Temporary/exact artifact SHA-256: 3565da2e992c0e20fb8225dbcb6c0276d6e607ec5436046a819fe69705a13f81
+  This session-pinned evidence is not a supported or rerunnable operator command.
+  Result: sent=7,987; matching=7,987; missing=0; conflicting=0; outboxConflict=0;
+          checkpoint c2068e99 persisted only after exact per-localId ACKs;
+          history_gap metadata cleared; daemon restarted from signed v1.2.2 current pointer.
+
+[PASS] Independent Relay delta and tail audit
+  Authenticated forward paging after_seq=1034, limit=500 (content omitted)
+  Authenticated backward page before_seq=9022, limit=50; decrypt in memory; compare localId to envelope id
+  Result: Relay seq 1034 -> 9021; exactly 7,987 rows and 7,987 unique canonical localIds;
+          seq range 1035..9021; noncanonical delta localIds=0;
+          latest 50 bindings all satisfy localId=session:<envelope.id>;
+          highest row is session:pi-history-a5d093ae-end / turn-end.
+
+[PASS] Existing Relay session and canonical metadata
+  Authenticated GET /v1/sessions; derive stable data key; decrypt selected metadata in memory
+  Result: exactly one row for pi:29312de55340242d328b5d01a91ea60a;
+          same Relay session cmrwsbw3x015n01mrbagof44g;
+          name='lyntty notification upgrade session optimization';
+          version=1.2.2; runtimeOwner=pi-extension; controlState=ready;
+          piHasHistoryGap=false; piRecoveryReason absent.
+
+[PASS] Evidence-change checks
+  bun run test:repo-hardening — 85 pass, 0 fail
+  bun run ci:audit — no vulnerabilities
+  cd docs/.site && bun audit — no vulnerabilities
+  cd docs/.site && bun run docs:check — 42 pages, MDX and TypeScript pass
+  JSON parsing, local links, bilingual structure, selected sensitive-pattern scan, and whitespace checks — pass
+
+[NOT RUN] Physical Android phone / APK installation.
+[NOT RUN] Forced Pi extension reload or Pi process restart.
+[NOT RUN] Full repository gates after deployment; immutable candidate/promotion gates are recorded in R122/R123 and deployed source was unchanged.
+
+Residual: lyntty-ea7 tracks the production-scale full-inventory timeout. Three other active Pi sessions emitted the same fail-closed warning; they were outside this targeted repair.
