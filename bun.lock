@@ -10,7 +10,7 @@
     },
     "packages/lyntty-app": {
       "name": "lyntty-app",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "dependencies": {
         "@expo/ui": "~55.0.5",
         "@expo/vector-icons": "^15.0.2",
@@ -99,7 +99,7 @@
     },
     "packages/lyntty-cli": {
       "name": "lyntty-cli",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "bin": {
         "lyntty": "./bin/lyntty.mjs",
       },
@@ -135,7 +135,7 @@
     },
     "packages/lyntty-relay": {
       "name": "lyntty-relay",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "dependencies": {
         "@electric-sql/pglite": "0.3.15",
         "@fastify/cors": "^10.0.1",
