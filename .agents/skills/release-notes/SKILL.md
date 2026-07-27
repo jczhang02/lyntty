@@ -87,7 +87,6 @@ The source-pinned logo URL must use the Release's exact source commit rather tha
 
 Mandatory disclosure text is outside the curated sections. Preserve every workflow-mandated disclosure verbatim at the beginning of the body:
 
-- Stable owner-waiver physical-Android disclosure;
 - APK-only Preview owner-waiver physical-Android disclosure;
 - required Stable platform-unsigned disclosure for macOS and Windows archives.
 
