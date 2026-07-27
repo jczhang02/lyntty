@@ -31,8 +31,9 @@ describe('machine RPC response validation', () => {
             type: 'success',
             sessions: [completePiRecord],
             total: 1,
+            refreshing: true,
         });
-        expect(discovered).toMatchObject({ type: 'success', sessions: [completePiRecord] });
+        expect(discovered).toMatchObject({ type: 'success', sessions: [completePiRecord], refreshing: true });
         if (discovered.type === 'success') {
             expect(discovered.sessions[0]?.relaySessionTag).toBe('pi:stable-tag');
         }

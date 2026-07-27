@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'bun:test';
 
@@ -9,11 +10,15 @@ const SAFE_PAIRING_URL_PLACEHOLDERS = new Set([
   'lyntty://terminal?...',
   'lyntty://terminal?[REDACTED]',
 ]);
-const IMAGE_PATTERN = /\.(?:png|jpe?g|webp)$/i;
+const IMAGE_PATTERN = /\.(?:gif|png|jpe?g|webp)$/i;
 const SENSITIVE_IMAGE_PATH_PATTERN = /(?:auth|pair|terminal|manual-url|deeplink)/i;
 
+const APPROVED_PUBLIC_SCREENSHOTS = new Map([
+  ['docs/assets/readme/preview-onboarding-emulator.png', 'a4b9c068c988b69951f375e2eba0ddb1294d2e441209ca878d4515974a3e2725'],
+]);
+
 function trackedEvidenceFiles() {
-  return execFileSync('git', ['-c', 'core.quotepath=false', 'ls-files', '-z', 'docs/evidence'], { encoding: 'buffer' })
+  return execFileSync('git', ['-c', 'core.quotepath=false', 'ls-files', '-z', 'docs/evidence', 'docs/assets'], { encoding: 'buffer' })
     .toString('utf8')
     .split('\0')
     .filter(Boolean);
@@ -46,4 +51,15 @@ test('auth and pairing screenshots must be removed or explicitly redacted before
     && !/redacted/i.test(path)
   ));
   assert.deepEqual(unsafeImages, [], `sensitive screenshots must be redacted or removed: ${unsafeImages.join(', ')}`);
+});
+
+test('public screenshots require an explicit reviewed digest', () => {
+  const publicScreenshots = trackedEvidenceFiles().filter((path) => (
+    path.startsWith('docs/assets/') && IMAGE_PATTERN.test(path)
+  ));
+  assert.deepEqual(publicScreenshots, [...APPROVED_PUBLIC_SCREENSHOTS.keys()]);
+  for (const [path, expectedDigest] of APPROVED_PUBLIC_SCREENSHOTS) {
+    const actualDigest = createHash('sha256').update(readFileSync(path)).digest('hex');
+    assert.equal(actualDigest, expectedDigest, `${path} changed without reviewed redaction evidence`);
+  }
 });

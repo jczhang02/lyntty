@@ -11,25 +11,27 @@ import {
 
 import { getMDXComponents } from "@/mdx-components";
 import { baseOptions } from "@/lib/layout.shared";
+import { hasLocalizedRoute, staticParamsForLocale } from "@/lib/site-pages";
 import { source } from "@/lib/source";
 
 type PageProps = {
   params: Promise<{ slug?: string[] }>;
 };
 
-async function getChinesePage(props: PageProps) {
+async function getEnglishPage(props: PageProps) {
   const { slug = [] } = await props.params;
-  return source.getPage(slug, "zh");
+  return source.getPage(slug, "en");
 }
 
 export default async function Page(props: PageProps) {
-  const page = await getChinesePage(props);
+  const page = await getEnglishPage(props);
   if (!page) notFound();
 
   const MDX = page.data.body;
+  const route = page.slugs.join("/") || "index";
 
   return (
-    <DocsLayout {...baseOptions("zh")} tree={source.getPageTree("zh")}>
+    <DocsLayout {...baseOptions("en", route)} tree={source.getPageTree("en")}>
       <DocsPage toc={page.data.toc}>
         <DocsTitle>{page.data.title}</DocsTitle>
         <DocsDescription>{page.data.description}</DocsDescription>
@@ -42,24 +44,25 @@ export default async function Page(props: PageProps) {
 }
 
 export function generateStaticParams() {
-  return source.getPages("zh").map((page) => ({ slug: page.slugs }));
+  return staticParamsForLocale("en");
 }
 
 export async function generateMetadata(props: PageProps): Promise<Metadata> {
-  const page = await getChinesePage(props);
+  const page = await getEnglishPage(props);
   if (!page) notFound();
 
-  const englishUrl = page.url.startsWith("/zh") ? page.url.slice(3) || "/" : page.url;
+  const route = page.slugs.join("/") || "index";
+  const languages: Record<string, string> = { en: page.url };
+  if (hasLocalizedRoute(route, "zh")) {
+    languages["zh-CN"] = page.url === "/" ? "/zh" : `/zh${page.url}`;
+  }
 
   return {
     title: page.data.title,
     description: page.data.description,
     alternates: {
       canonical: page.url,
-      languages: {
-        en: englishUrl,
-        "zh-CN": page.url,
-      },
+      languages,
     },
   };
 }

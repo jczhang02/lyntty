@@ -43,6 +43,7 @@ const piMachineSessionRecordSchema: z.ZodType<PiMachineSessionRecord> = z.object
     registeredUpdatedAt: z.number().finite().optional(),
     firstMessage: z.string().optional(),
     messageCount: z.number().int().nonnegative(),
+    summaryComplete: z.boolean().optional(),
     needsRegistration: z.boolean(),
     needsBackfill: z.boolean(),
     hasHistoryGap: z.boolean(),
@@ -55,6 +56,7 @@ export const listPiSessionsResultSchema = z.discriminatedUnion('type', [
         sessions: z.array(piMachineSessionRecordSchema),
         nextCursor: nonEmptyString.optional(),
         total: z.number().int().nonnegative().optional(),
+        refreshing: z.boolean().optional(),
     }),
     rpcErrorSchema,
 ]);

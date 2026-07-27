@@ -10,6 +10,7 @@ const paths = {
   duplicateContext: new URL('../docs/contexts/product/CONTEXT.lyntty.md', import.meta.url),
   rootReadme: new URL('../README.md', import.meta.url),
   docsReadme: new URL('../docs/README.md', import.meta.url),
+  docsReadmeZh: new URL('../docs/README.zh.md', import.meta.url),
   prd: new URL('../docs/prds/lyntty-product.md', import.meta.url),
   prdZh: new URL('../docs/prds/lyntty-product.zh.md', import.meta.url),
   roadmap: new URL('../docs/roadmap.md', import.meta.url),
@@ -26,7 +27,7 @@ const paths = {
   relayDeploy: new URL('../docs/deploy/relay-vps.md', import.meta.url),
   relayDeployZh: new URL('../docs/deploy/relay-vps.zh.md', import.meta.url),
   importEvidence: new URL('../docs/evidence/h0-lyntty-import.md', import.meta.url),
-  siteGenerator: new URL('../docs/.site/scripts/prepare-fumadocs-pages.mjs', import.meta.url),
+  siteManifest: new URL('../docs/.site/lib/site-pages.ts', import.meta.url),
 };
 
 async function read(path) {
@@ -75,9 +76,10 @@ test('redundant imported copies and an unowned screenshot are removed with dispo
 });
 
 test('entry points separate current docs from historical migration records', async () => {
-  const [rootReadme, docsReadme, roadmap, roadmapZh, importedRoadmap, piResearch, discoveryResearch, forkPlan, mobileShell, siteGenerator] = await Promise.all([
+  const [rootReadme, docsReadme, docsReadmeZh, roadmap, roadmapZh, importedRoadmap, piResearch, discoveryResearch, forkPlan, mobileShell, siteManifest] = await Promise.all([
     read(paths.rootReadme),
     read(paths.docsReadme),
+    read(paths.docsReadmeZh),
     read(paths.roadmap),
     read(paths.roadmapZh),
     read(paths.importedRoadmap),
@@ -85,21 +87,23 @@ test('entry points separate current docs from historical migration records', asy
     read(paths.discoveryResearch),
     read(paths.forkPlan),
     read(paths.mobileShell),
-    read(paths.siteGenerator),
+    read(paths.siteManifest),
   ]);
 
   assert.match(rootReadme, /## Current documentation/);
   assert.match(rootReadme, /## Historical (migration )?(records|context)/i);
   assert.match(docsReadme, /## Current product and operations/);
   assert.match(docsReadme, /## Historical (migration )?(records|context)/i);
+  assert.match(docsReadmeZh, /## 当前产品与运行文档/);
+  assert.match(docsReadmeZh, /## 历史迁移记录/);
 
   for (const document of [roadmap, roadmapZh, importedRoadmap, piResearch, discoveryResearch, forkPlan, mobileShell]) {
     assert.match(document.slice(0, 900), /historical|历史|superseded|已完成/i);
     assert.match(document.slice(0, 1200), /AGENTS\.md|docs\/contexts\/product\/CONTEXT\.md|pi-shared-control\.md/);
   }
 
-  assert.match(siteGenerator, /Historical Migration Roadmap/);
-  assert.match(siteGenerator, /历史迁移路线图/);
+  assert.match(siteManifest, /Historical migration roadmap/);
+  assert.match(siteManifest, /历史迁移路线图/);
 });
 
 test('current PRD uses current product surfaces, topology, and package map', async () => {

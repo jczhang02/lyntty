@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   classifyPiSessionRecovery,
+  createPiDiscoverySnapshotGeneration,
   discoverLocalPiSessions,
   discoverLocalPiSessionsPage,
   piSessionDisplayName,
@@ -24,6 +25,19 @@ function sessionInfo(overrides: Partial<any> = {}) {
     ...overrides,
   };
 }
+
+describe('createPiDiscoverySnapshotGeneration', () => {
+  it('binds cursors to one daemon runtime even when index generations match', () => {
+    const input = {
+      indexGeneration: 1,
+      scope: 'machine' as const,
+      registered: [],
+      activePiSessionIds: [],
+    };
+    expect(createPiDiscoverySnapshotGeneration({ ...input, runtimeNonce: 'daemon-a' }))
+      .not.toBe(createPiDiscoverySnapshotGeneration({ ...input, runtimeNonce: 'daemon-b' }));
+  });
+});
 
 describe('classifyPiSessionRecovery', () => {
   it('marks unregistered local Pi JSONL as discovered_local and needing registration/import', () => {
@@ -51,6 +65,19 @@ describe('classifyPiSessionRecovery', () => {
     });
   });
 
+  it('never infers a discovery gap while the registered Pi runtime is active', () => {
+    expect(classifyPiSessionRecovery({
+      local: sessionInfo({ messageCount: 2 }),
+      registered: { piSessionId: 'pi-1', importedMessageCount: 5 },
+      active: true,
+      now,
+    })).toMatchObject({
+      state: 'active_runtime',
+      needsBackfill: false,
+      hasHistoryGap: false,
+    });
+  });
+
   it('marks missing local history when relay has registration but local JSONL is gone', () => {
     expect(classifyPiSessionRecovery({
       registered: { piSessionId: 'pi-1', relaySessionId: 'relay-1', importedMessageCount: 4 },
@@ -71,6 +98,37 @@ describe('classifyPiSessionRecovery', () => {
       state: 'history_gap',
       needsBackfill: false,
       hasHistoryGap: true,
+    });
+  });
+
+  it('does not infer history_gap from an incomplete bootstrap summary', () => {
+    expect(classifyPiSessionRecovery({
+      local: sessionInfo({ messageCount: 2 }),
+      localSummaryComplete: false,
+      registered: { piSessionId: 'pi-1', importedMessageCount: 5 },
+      now,
+    })).toMatchObject({
+      state: 'registered',
+      summaryComplete: false,
+      needsBackfill: false,
+      hasHistoryGap: false,
+      reason: 'Pi session summary is still indexing',
+    });
+  });
+
+  it('does not infer history_gap until a complete summary fingerprint is verified', () => {
+    expect(classifyPiSessionRecovery({
+      local: sessionInfo({ messageCount: 2 }),
+      localSummaryComplete: true,
+      localHistoryGapVerified: false,
+      registered: { piSessionId: 'pi-1', importedMessageCount: 5 },
+      now,
+    })).toMatchObject({
+      state: 'registered',
+      summaryComplete: true,
+      needsBackfill: false,
+      hasHistoryGap: false,
+      reason: 'Pi session history gap is awaiting current file verification',
     });
   });
 
@@ -147,6 +205,37 @@ describe('discoverLocalPiSessions', () => {
     })).resolves.toMatchObject([{ state: 'active_runtime', piSessionId: 'pi-1' }]);
   });
 
+  it('propagates an incomplete index summary without inferring a history gap', async () => {
+    await expect(discoverLocalPiSessions({
+      cwd: '/home/jc/dev/repo',
+      registeredSessions: [{ piSessionId: 'pi-1', importedMessageCount: 5 }],
+      now,
+      isSessionSummaryComplete: () => false,
+      isSessionHistoryGapVerified: () => false,
+      listSessions: async () => [sessionInfo({ messageCount: 2 })],
+    })).resolves.toMatchObject([{
+      state: 'registered',
+      summaryComplete: false,
+      needsBackfill: false,
+      hasHistoryGap: false,
+    }]);
+  });
+
+  it('rechecks active state at classification time after asynchronous index work', async () => {
+    await expect(discoverLocalPiSessions({
+      cwd: '/home/jc/dev/repo',
+      registeredSessions: [{ piSessionId: 'pi-1', importedMessageCount: 5 }],
+      activePiSessionIds: [],
+      isSessionHistoryGapVerified: () => true,
+      isSessionActive: () => true,
+      now,
+      listSessions: async () => [sessionInfo({ messageCount: 2 })],
+    })).resolves.toMatchObject([{
+      state: 'active_runtime',
+      hasHistoryGap: false,
+    }]);
+  });
+
   it('paginates machine-wide Pi discovery by opaque newest-first cursor', async () => {
     const sessions = [
       sessionInfo({ id: 'pi-old', cwd: '/repo/old', modified: new Date('2026-06-30T10:00:00Z') }),
@@ -158,6 +247,7 @@ describe('discoverLocalPiSessions', () => {
       scope: 'machine',
       limit: 1,
       now,
+      snapshotGeneration: 'generation-1',
       listSessions: async () => sessions,
     });
     expect(first.records).toMatchObject([{ piSessionId: 'pi-new' }]);
@@ -168,6 +258,7 @@ describe('discoverLocalPiSessions', () => {
       limit: 2,
       cursor: first.nextCursor,
       now,
+      snapshotGeneration: 'generation-1',
       listSessions: async () => sessions,
     })).resolves.toMatchObject({
       records: [
@@ -179,7 +270,30 @@ describe('discoverLocalPiSessions', () => {
     });
   });
 
-  it('keeps cursor stable when a newer Pi session appears before the next page', async () => {
+  it('rejects a later page from a different immutable discovery generation', async () => {
+    const sessions = [
+      sessionInfo({ id: 'pi-new', modified: new Date('2026-06-30T14:00:00Z') }),
+      sessionInfo({ id: 'pi-old', modified: new Date('2026-06-30T10:00:00Z') }),
+    ];
+    const first = await discoverLocalPiSessionsPage({
+      scope: 'machine',
+      limit: 1,
+      now,
+      snapshotGeneration: 'generation-1',
+      listSessions: async () => sessions,
+    });
+
+    await expect(discoverLocalPiSessionsPage({
+      scope: 'machine',
+      limit: 1,
+      cursor: first.nextCursor,
+      now,
+      snapshotGeneration: 'generation-2',
+      listSessions: async () => sessions,
+    })).rejects.toThrow('generation changed');
+  });
+
+  it('keeps a legacy keyset cursor stable when a newer Pi session appears before the next page', async () => {
     const first = await discoverLocalPiSessionsPage({
       scope: 'machine',
       limit: 1,

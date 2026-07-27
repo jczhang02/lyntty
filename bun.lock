@@ -10,7 +10,7 @@
     },
     "packages/lyntty-app": {
       "name": "lyntty-app",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "dependencies": {
         "@expo/ui": "~55.0.5",
         "@expo/vector-icons": "^15.0.2",
@@ -99,7 +99,7 @@
     },
     "packages/lyntty-cli": {
       "name": "lyntty-cli",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "bin": {
         "lyntty": "./bin/lyntty.mjs",
       },
@@ -135,7 +135,7 @@
     },
     "packages/lyntty-relay": {
       "name": "lyntty-relay",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "dependencies": {
         "@electric-sql/pglite": "0.3.15",
         "@fastify/cors": "^10.0.1",
@@ -200,8 +200,9 @@
     "expo-constants@55.0.16": "patches/expo-constants@55.0.16.patch",
     "@shopify/react-native-skia@2.5.5": "patches/@shopify%2Freact-native-skia@2.5.5.patch",
     "expo-modules-core@55.0.25": "patches/expo-modules-core@55.0.25.patch",
-    "expo-modules-autolinking@55.0.24": "patches/expo-modules-autolinking@55.0.24.patch",
+    "minimatch@3.1.5": "patches/minimatch@3.1.5.patch",
     "react-native-worklets@0.10.2": "patches/react-native-worklets@0.10.2.patch",
+    "expo-modules-autolinking@55.0.24": "patches/expo-modules-autolinking@55.0.24.patch",
     "@react-native/gradle-plugin@0.83.1": "patches/@react-native%2Fgradle-plugin@0.83.1.patch",
     "brace-expansion@5.0.8": "patches/brace-expansion@5.0.8.patch",
     "react-native-reanimated@4.5.1": "patches/react-native-reanimated@4.5.1.patch",

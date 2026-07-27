@@ -38,6 +38,24 @@ export interface SyncSocketState {
 
 export type SyncSocketListener = (state: SyncSocketState) => void;
 
+function createAbortError(): Error {
+    const error = new Error('The operation was aborted');
+    error.name = 'AbortError';
+    return error;
+}
+
+async function withAbortSignal<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (!signal) return promise;
+    if (signal.aborted) throw createAbortError();
+    return new Promise<T>((resolve, reject) => {
+        const onAbort = () => reject(createAbortError());
+        signal.addEventListener('abort', onAbort, { once: true });
+        promise.then(resolve, reject).finally(() => {
+            signal.removeEventListener('abort', onAbort);
+        });
+    });
+}
+
 //
 // Main Class
 //
@@ -53,6 +71,8 @@ class ApiSocket {
     private statusListeners: Set<(status: 'disconnected' | 'connecting' | 'connected' | 'error') => void> = new Set();
     private currentStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected';
     private visibleSessionId: string | null = null;
+    private hasConnected = false;
+    private pendingSessionRpcControllers = new Set<AbortController>();
 
     //
     // Initialization
@@ -104,10 +124,13 @@ class ApiSocket {
     }
 
     reset() {
+        for (const controller of this.pendingSessionRpcControllers) controller.abort();
+        this.pendingSessionRpcControllers.clear();
         this.disconnect();
         this.config = null;
         this.encryption = null;
         this.visibleSessionId = null;
+        this.hasConnected = false;
         this.messageHandlers.clear();
         this.reconnectedListeners.clear();
         this.statusListeners.clear();
@@ -146,21 +169,41 @@ class ApiSocket {
     /**
      * RPC call for sessions - uses session-specific encryption
      */
-    async sessionRPC<R, A>(sessionId: string, method: string, params: A): Promise<R> {
+    async sessionRPC<R, A>(
+        sessionId: string,
+        method: string,
+        params: A,
+        options: { timeoutMs?: number; signal?: AbortSignal } = {},
+    ): Promise<R> {
         const sessionEncryption = this.encryption!.getSessionEncryption(sessionId);
         if (!sessionEncryption) {
             throw new Error(`Session encryption not found for ${sessionId}`);
         }
 
-        const result = await this.socket!.emitWithAck('rpc-call', {
-            method: `${sessionId}:${method}`,
-            params: await sessionEncryption.encryptRaw(params)
-        });
+        const controller = new AbortController();
+        const abortFromCaller = () => controller.abort();
+        options.signal?.addEventListener('abort', abortFromCaller, { once: true });
+        if (options.signal?.aborted) controller.abort();
+        this.pendingSessionRpcControllers.add(controller);
+        try {
+            const encryptedParams = await sessionEncryption.encryptRaw(params);
+            if (controller.signal.aborted) throw createAbortError();
+            const socket = this.socket!.timeout(options.timeoutMs ?? 15_000);
+            const result = await withAbortSignal(socket.emitWithAck('rpc-call', {
+                method: `${sessionId}:${method}`,
+                params: encryptedParams,
+            }), controller.signal);
 
-        if (result.ok) {
-            return unwrapRpcHandlerResponse<R>(await sessionEncryption.decryptRaw(result.result));
+            if (result.ok) {
+                const decrypted = await sessionEncryption.decryptRaw(result.result);
+                if (controller.signal.aborted) throw createAbortError();
+                return unwrapRpcHandlerResponse<R>(decrypted);
+            }
+            throw new Error(formatSessionRpcFailure(method, result));
+        } finally {
+            options.signal?.removeEventListener('abort', abortFromCaller);
+            this.pendingSessionRpcControllers.delete(controller);
         }
-        throw new Error(formatSessionRpcFailure(method, result));
     }
 
     /**
@@ -171,13 +214,17 @@ class ApiSocket {
         method: string,
         params: A,
         parseResult: (value: unknown) => R,
+        options: { timeoutMs?: number } = {},
     ): Promise<R> {
         const machineEncryption = this.encryption!.getMachineEncryption(machineId);
         if (!machineEncryption) {
             throw new Error(`Machine encryption not found for ${machineId}`);
         }
 
-        const result = await this.socket!.emitWithAck('rpc-call', {
+        const socket = options.timeoutMs === undefined
+            ? this.socket!
+            : this.socket!.timeout(options.timeoutMs);
+        const result = await socket.emitWithAck('rpc-call', {
             method: `${machineId}:${method}`,
             params: await machineEncryption.encryptRaw(params)
         });
@@ -304,7 +351,9 @@ class ApiSocket {
                 console.log('🔌 SyncSocket: Socket ID:', this.socket?.id);
             }
             this.updateStatus('connected');
-            if (!this.socket?.recovered) {
+            const shouldRefreshAfterReconnect = this.hasConnected && !this.socket?.recovered;
+            this.hasConnected = true;
+            if (shouldRefreshAfterReconnect) {
                 this.reconnectedListeners.forEach(listener => listener());
             }
         });

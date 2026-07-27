@@ -51,6 +51,7 @@ export const MetadataSchema = z.object({
     piFirstMessage: z.string().optional(),
     piRecoveryReason: z.string().optional(),
     piHasHistoryGap: z.boolean().optional(),
+    piHistoryGapSource: z.enum(['discovery', 'history_page']).optional(),
     piSynthetic: z.boolean().optional(),
     tools: z.array(z.string()).optional(),
     slashCommands: z.array(z.string()).optional(),
@@ -217,6 +218,7 @@ export interface PiMachineSessionRecord {
     registeredUpdatedAt?: number;
     firstMessage?: string;
     messageCount: number;
+    summaryComplete?: boolean;
     needsRegistration: boolean;
     needsBackfill: boolean;
     hasHistoryGap: boolean;

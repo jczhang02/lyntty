@@ -1,0 +1,19 @@
+name: Request a private security contact
+description: Ask the maintainer to arrange a private channel without disclosing vulnerability details.
+title: "[Security contact] "
+labels:
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is public. Do not include vulnerability details or other technical information. If GitHub Private Vulnerability Reporting is available, close this form and use the private advisory form linked from SECURITY.md instead.
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Public-request safety check
+      options:
+        - label: I have not included technical details or sensitive information in this public request.
+          required: true
+        - label: I need the maintainer to arrange a private contact path.
+          required: true

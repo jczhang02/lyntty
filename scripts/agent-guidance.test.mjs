@@ -34,6 +34,9 @@ test('root guide defines instruction hierarchy and evidence authority', async ()
   assert.match(root, /research.*historical|historical.*research/is);
   assert.match(root, /evidence.*point in time|point in time.*evidence/is);
   assert.match(root, /must not override.*current product|current product.*must not override/is);
+  assert.match(root, /external fork.*(?:exempt|optional)/is);
+  assert.match(root, /Beads.*worktree.*(?:OpenPGP|GPG)/is);
+  assert.match(root, /product.*safety.*isolation.*verification/is);
 
   for (const [name, guide] of Object.entries({ app, cli, relay, wire, docs, docsSite })) {
     assert.match(guide, /root `AGENTS\.md` applies/i, `${name} must inherit the root contract explicitly`);

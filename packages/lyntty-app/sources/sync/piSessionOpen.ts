@@ -23,6 +23,7 @@ export function applyOptimisticPiSession(source: SessionRowData, sessionId: stri
             piFirstMessage: source.piFirstMessage ?? undefined,
             piRecoveryReason: source.piRecoveryReason ?? undefined,
             piHasHistoryGap: source.piHasHistoryGap,
+            piHistoryGapSource: source.piHasHistoryGap ? 'discovery' : undefined,
             name: source.name,
         },
         metadataVersion: 0,

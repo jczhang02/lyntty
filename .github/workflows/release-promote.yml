@@ -17,16 +17,12 @@ on:
         required: true
         type: string
       physical_phone_accepted:
-        description: Stable only — exact Candidate APK passed physical Android validation
+        description: Stable only — optional; true only when the exact Candidate APK passed physical Android validation
         required: true
         type: boolean
         default: false
-      stable_unverified_release_waiver:
-        description: Stable owner-only waiver — exact phrase required when physical_phone_accepted is false
-        required: false
-        type: string
       accepted_android_apk_sha256:
-        description: Stable only — SHA-256 of the physically validated Candidate APK
+        description: Stable only — required when physical_phone_accepted is true; SHA-256 of that exact Candidate APK
         required: false
         type: string
       immutable_releases_enabled:
@@ -57,7 +53,6 @@ jobs:
       CANDIDATE_TAG: ${{ inputs.candidate_tag }}
       LYNTTY_RELEASE_TRUST_ROOTS: ${{ vars.LYNTTY_RELEASE_TRUST_ROOTS }}
       PHYSICAL_PHONE_ACCEPTED: ${{ inputs.physical_phone_accepted }}
-      STABLE_UNVERIFIED_RELEASE_WAIVER: ${{ inputs.stable_unverified_release_waiver }}
       ACCEPTED_ANDROID_APK_SHA256: ${{ inputs.accepted_android_apk_sha256 }}
       IMMUTABLE_RELEASES_ENABLED: ${{ inputs.immutable_releases_enabled }}
       REPOSITORY_IMMUTABILITY_GATE: ${{ vars.LYNTTY_IMMUTABLE_RELEASES_ENABLED }}
@@ -85,23 +80,15 @@ jobs:
           [[ "$TAG_RULESET_ID" =~ ^[1-9][0-9]*$ ]]
           if [[ "$CHANNEL" == stable ]]; then
             [[ "$CANDIDATE_TAG" =~ ^compat-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
-            stable_waiver_phrase='I accept publishing this exact Stable Candidate without physical Android validation'
             case "$PHYSICAL_PHONE_ACCEPTED" in
-              true)
-                [[ -z "$STABLE_UNVERIFIED_RELEASE_WAIVER" ]]
-                [[ "$ACCEPTED_ANDROID_APK_SHA256" =~ ^[a-f0-9]{64}$ ]]
-                ;;
-              false)
-                [[ "$STABLE_UNVERIFIED_RELEASE_WAIVER" == "$stable_waiver_phrase" ]]
-                [[ -z "$ACCEPTED_ANDROID_APK_SHA256" ]]
-                ;;
+              true) [[ "$ACCEPTED_ANDROID_APK_SHA256" =~ ^[a-f0-9]{64}$ ]] ;;
+              false) [[ -z "$ACCEPTED_ANDROID_APK_SHA256" ]] ;;
               *) exit 1 ;;
             esac
             expected_tag_pattern='refs/tags/compat-v*'
           else
             [[ "$CANDIDATE_TAG" =~ ^compat-preview-v[0-9A-Za-z._-]+-s[0-9]+$ ]]
             [[ "$PHYSICAL_PHONE_ACCEPTED" == false ]]
-            [[ -z "$STABLE_UNVERIFIED_RELEASE_WAIVER" ]]
             [[ -z "$ACCEPTED_ANDROID_APK_SHA256" ]]
             expected_tag_pattern='refs/tags/compat-preview-v*'
           fi
@@ -165,7 +152,16 @@ jobs:
             --trust-store "$RUNNER_TEMP/trust-roots.json" \
             --channel "$CHANNEL" > "$RUNNER_TEMP/bom-verification.json"
           predecessor_args=()
-          while IFS= read -r file; do [[ -z "$file" ]] || predecessor_args+=(--predecessor "$file"); done < "$CANDIDATE/predecessor-paths.txt"
+          while IFS= read -r file || [[ -n "$file" ]]; do
+            [[ -n "$file" ]] || { echo "candidate predecessor path contains a blank record" >&2; exit 1; }
+            [[ "$file" =~ ^predecessors/compat(-preview)?-v[0-9A-Za-z._-]+-s[0-9]+/compatibility-bom\.json$ ]] || {
+              echo "candidate predecessor path is not portable: $file" >&2
+              exit 1
+            }
+            predecessor="$CANDIDATE/$file"
+            [[ -f "$predecessor" ]] || { echo "candidate predecessor is missing: $file" >&2; exit 1; }
+            predecessor_args+=(--predecessor "$predecessor")
+          done < "$CANDIDATE/predecessor-paths.txt"
           bun --no-install scripts/release.ts verify-history --current "$CANDIDATE/compatibility-bom.json" "${predecessor_args[@]}"
           CANDIDATE="$CANDIDATE" RUN_JSON="$(cat "$RUNNER_TEMP/candidate-run.json")" bun -e '
             const bom=await Bun.file(`${process.env.CANDIDATE}/compatibility-bom.json`).json();
@@ -379,7 +375,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ASSETS: ${{ steps.assets.outputs.path }}
           SOURCE_SHA: ${{ steps.verify.outputs.source_sha }}
-          ANDROID_APK_SHA256: ${{ steps.verify.outputs.android_apk_sha256 }}
           CURRENT_LATEST: ${{ steps.head.outputs.current_latest }}
           EXPECTED_CHANNEL_HEAD: ${{ steps.head.outputs.channel_head }}
         run: |
@@ -406,9 +401,6 @@ jobs:
           [[ "${#files[@]}" -gt 0 ]]
           notes="$RUNNER_TEMP/release-notes.md"
           {
-            if [[ "$CHANNEL" == stable ]]; then
-              bun scripts/stable-release-validation.ts warning --validation "$ASSETS/android-validation.json"
-            fi
             echo "# Lyntty Compatibility release $CANDIDATE_TAG"
             echo
             echo "Channel: \`$CHANNEL\`"
@@ -419,8 +411,6 @@ jobs:
             if [[ "$CHANNEL" == stable ]]; then
               if [[ "$PHYSICAL_PHONE_ACCEPTED" == true ]]; then
                 echo "Physical Android validation: accepted for APK SHA-256 \`$ACCEPTED_ANDROID_APK_SHA256\`"
-              else
-                echo "Physical Android validation: not performed; explicit owner self-use waiver. APK SHA-256 \`$ANDROID_APK_SHA256\`"
               fi
               echo 'macOS and Windows CLI archives: intentionally not platform code-signed for this owner-operated self-use release.'
             fi

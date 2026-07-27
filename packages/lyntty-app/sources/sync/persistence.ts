@@ -7,6 +7,7 @@ const NEW_SESSION_DRAFT_KEY = 'new-session-draft-v1';
 const REGISTERED_PUSH_TOKEN_KEY = 'registered-push-token-v1';
 const PENDING_OUTBOX_KEY = 'pending-message-outbox-v1';
 const PENDING_SYNTHETIC_OUTBOX_KEY = 'pending-synthetic-message-outbox-v1';
+const PI_SESSION_TOMBSTONES_KEY = 'pi-session-tombstones-v1';
 
 export type PersistedOutboxMessage = {
     localId: string;
@@ -95,6 +96,64 @@ export function loadPendingSyntheticOutbox(): Map<string, PersistedSyntheticOutb
 
 export function savePendingSyntheticOutbox(outbox: Map<string, PersistedSyntheticOutboxMessage[]>): void {
     mmkv.set(PENDING_SYNTHETIC_OUTBOX_KEY, JSON.stringify(Object.fromEntries(outbox)));
+}
+
+export type PersistedPiSessionTombstone = {
+    serverId: string;
+    relaySessionId: string;
+    relaySessionTag?: string;
+    machineId?: string;
+    piSessionId?: string;
+    deletedAt: number;
+};
+
+const MAX_PI_SESSION_TOMBSTONES = 1_000;
+
+export function parsePiSessionTombstones(raw: string | undefined): PersistedPiSessionTombstone[] {
+    if (!raw) return [];
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.flatMap((value): PersistedPiSessionTombstone[] => {
+            if (!value || typeof value !== 'object') return [];
+            const candidate = value as Partial<PersistedPiSessionTombstone>;
+            if (typeof candidate.serverId !== 'string'
+                || typeof candidate.relaySessionId !== 'string'
+                || typeof candidate.deletedAt !== 'number'
+                || !Number.isFinite(candidate.deletedAt)
+                || (candidate.relaySessionTag !== undefined && typeof candidate.relaySessionTag !== 'string')
+                || (candidate.machineId !== undefined && typeof candidate.machineId !== 'string')
+                || (candidate.piSessionId !== undefined && typeof candidate.piSessionId !== 'string')) return [];
+            return [candidate as PersistedPiSessionTombstone];
+        }).sort((a, b) => b.deletedAt - a.deletedAt).slice(0, MAX_PI_SESSION_TOMBSTONES);
+    } catch (error) {
+        console.error('Failed to parse Pi session tombstones', error);
+        return [];
+    }
+}
+
+export function addPiSessionTombstone(
+    current: PersistedPiSessionTombstone[],
+    tombstone: PersistedPiSessionTombstone,
+): PersistedPiSessionTombstone[] {
+    const deduplicated = current.filter((entry) => !(
+        entry.serverId === tombstone.serverId
+        && (entry.relaySessionId === tombstone.relaySessionId
+            || (Boolean(tombstone.relaySessionTag)
+                && entry.relaySessionTag === tombstone.relaySessionTag)
+            || (Boolean(tombstone.machineId && tombstone.piSessionId)
+                && entry.machineId === tombstone.machineId
+                && entry.piSessionId === tombstone.piSessionId))
+    ));
+    return [tombstone, ...deduplicated].slice(0, MAX_PI_SESSION_TOMBSTONES);
+}
+
+export function loadPiSessionTombstones(): PersistedPiSessionTombstone[] {
+    return parsePiSessionTombstones(mmkv.getString(PI_SESSION_TOMBSTONES_KEY));
+}
+
+export function savePiSessionTombstones(tombstones: PersistedPiSessionTombstone[]): void {
+    mmkv.set(PI_SESSION_TOMBSTONES_KEY, JSON.stringify(tombstones.slice(0, MAX_PI_SESSION_TOMBSTONES)));
 }
 
 export type NewSessionSessionType = 'simple' | 'worktree';

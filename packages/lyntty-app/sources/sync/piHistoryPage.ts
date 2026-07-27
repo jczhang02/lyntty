@@ -30,6 +30,7 @@ export function applyPiHistoryPageResult(
         ...metadata,
         controlState: result.type === 'history_gap' ? 'history_gap' : metadata.controlState,
         piHasHistoryGap: result.type === 'history_gap' ? true : metadata.piHasHistoryGap,
+        piHistoryGapSource: result.type === 'history_gap' ? 'history_page' : metadata.piHistoryGapSource,
         piRecoveryReason: result.type === 'history_gap' ? result.reason : metadata.piRecoveryReason,
         piHistoryCursor: result.nextCursor,
         piHistoryHasMore: result.hasMore,

@@ -87,6 +87,7 @@ describe('mergePiDiscoveredSessions', () => {
 
     it('tries discovery for old daemon metadata and skips only an explicit discovery disable', () => {
         expect(shouldFetchPiSessionDiscovery(machine)).toBe(true);
+        expect(shouldFetchPiSessionDiscovery({ ...machine, active: false })).toBe(true);
         expect(shouldFetchPiSessionDiscovery({
             ...machine,
             metadata: {
@@ -197,6 +198,7 @@ describe('mergePiDiscoveredSessions', () => {
                 flavor: 'pi',
                 piSessionId: 'pi-registered',
                 piHasHistoryGap: true,
+                piHistoryGapSource: 'history_page',
                 piRecoveryReason: 'cursor missing',
                 controlState: 'history_gap',
             },
@@ -211,9 +213,42 @@ describe('mergePiDiscoveredSessions', () => {
 
         expect(sessions[0].metadata).toMatchObject({
             piHasHistoryGap: true,
+            piHistoryGapSource: 'history_page',
             piRecoveryReason: 'cursor missing',
             controlState: 'history_gap',
         });
+    });
+
+    it('clears a provisional discovery gap after a verified complete refresh', () => {
+        const sessions = mergePiDiscoveredSessions([relaySession({
+            metadata: {
+                path: '/repo',
+                host: 'thinkpad',
+                machineId: 'machine-1',
+                flavor: 'pi',
+                piSessionId: 'pi-registered',
+                piDiscoveryState: 'history_gap',
+                piHasHistoryGap: true,
+                piHistoryGapSource: 'discovery',
+                piRecoveryReason: 'stale count',
+                controlState: 'history_gap',
+            },
+        })], [{
+            machine,
+            sessions: [piRecord({
+                state: 'registered',
+                relaySessionId: 'relay-1',
+                piSessionId: 'pi-registered',
+                hasHistoryGap: false,
+            })],
+        }]);
+
+        expect(sessions[0].metadata).toMatchObject({
+            piDiscoveryState: 'registered',
+            piHasHistoryGap: false,
+            controlState: 'queued',
+        });
+        expect(sessions[0].metadata?.piHistoryGapSource).toBeUndefined();
     });
 
     it('marks active runtime synthetic Pi rows as online active sessions', () => {

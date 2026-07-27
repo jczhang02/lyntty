@@ -24,7 +24,18 @@ import { Platform, AppState, type AppStateStatus } from 'react-native';
 import { isRunningOnMac } from '@/utils/platform';
 import { NormalizedMessage, normalizeRawMessage, RawRecord } from './typesRaw';
 import { applySettings, Settings, settingsDefaults, settingsParse, settingsToSyncPayload, SUPPORTED_SCHEMA_VERSION } from './settings';
-import { loadPendingOutbox, loadPendingSettings, loadPendingSyntheticOutbox, savePendingOutbox, savePendingSettings, savePendingSyntheticOutbox } from './persistence';
+import {
+    addPiSessionTombstone,
+    loadPendingOutbox,
+    loadPendingSettings,
+    loadPendingSyntheticOutbox,
+    loadPiSessionTombstones,
+    savePendingOutbox,
+    savePendingSettings,
+    savePendingSyntheticOutbox,
+    savePiSessionTombstones,
+    type PersistedPiSessionTombstone,
+} from './persistence';
 import { parseToken } from '@/utils/parseToken';
 import { expectsRemotePiEcho } from './remoteCommandEcho';
 import { getServerUrl } from './serverConfig';
@@ -39,12 +50,20 @@ import { encryptBlob } from '@/encryption/blob';
 import { readFileBytes } from '@/utils/readFileBytes';
 import { Modal } from '@/modal';
 import { t } from '@/text';
-import { mergePiDiscoveredSessions, shouldFetchPiSessionDiscovery } from './piDiscoveredSessions';
+import { shouldFetchPiSessionDiscovery } from './piDiscoveredSessions';
+import { fetchPiSessionPages, PiSessionIndexRefreshingError } from './piSessionDiscoveryFetch';
+import { PiSessionListSnapshot } from './piSessionListSnapshot';
 import { findPiSessionNameBackfills, persistPiSessionNameBackfills } from './piSessionNamePersistence';
+import {
+    resolvePiSessionRetryDelay,
+    shouldRefreshPiSessionsForMachineTransition,
+} from './piSessionRefreshPolicy';
 import { canControlSession } from './sessionControlPolicy';
 import { applyPiHistoryPageResult, type PiHistoryPageResult } from './piHistoryPage';
 import { listPiSessionsResultSchema, parseMachineRpcResult } from './machineRpcSchemas';
 import { resolveAndroidUpdateChannel } from './nativeUpdateChannel';
+import { fetchJsonWithTimeout } from './boundedJsonRequest';
+import { mergeAuthoritativeMachineSnapshot } from './machineSnapshotMerge';
 
 type V3GetSessionMessagesResponse = {
     messages: ApiMessage[];
@@ -57,6 +76,10 @@ type V3GetSessionMessagesResponse = {
 // 2_147_483_647. We use that exact upper bound to keep the request safely
 // within int4 while still being effectively "infinite" for any session.
 const SEQ_BACKWARD_INITIAL_SENTINEL = 2_147_483_647;
+const SESSION_LIST_REQUEST_TIMEOUT_MS = 5_000;
+const MACHINE_LIST_REQUEST_TIMEOUT_MS = 5_000;
+const SESSION_LIST_REQUEST_LABEL = 'Session list request';
+const MACHINE_LIST_REQUEST_LABEL = 'Machine list request';
 
 type V3PostSessionMessagesResponse = {
     messages: Array<{
@@ -73,6 +96,22 @@ type OutboxMessage = {
     content: string;
 };
 
+type RelayUpdateContext = {
+    generation: number;
+    encryption: Encryption;
+    sessionsSync: InvalidateSync;
+    tombstoneScope: string;
+};
+
+type SyncRuntimeContext = Pick<RelayUpdateContext, 'generation' | 'encryption'>;
+
+class ObsoletePiSessionRefreshError extends Error {
+    constructor() {
+        super('Pi session refresh was superseded');
+        this.name = 'ObsoletePiSessionRefreshError';
+    }
+}
+
 type SendMessageOptions = {
     /** Stable transport id used when migrating a persisted synthetic send. */
     localId?: string;
@@ -86,6 +125,8 @@ type SendMessageOptions = {
 
 class Sync {
     private static readonly BACKGROUND_SEND_TIMEOUT_MS = 30_000;
+    private static readonly PI_SESSION_TRANSPORT_MAX_RETRIES = 3;
+    private static readonly PI_SESSION_INDEX_MAX_RETRIES = 12;
     encryption!: Encryption;
     serverID!: string;
     private credentials!: AuthCredentials;
@@ -94,6 +135,8 @@ class Sync {
     private messagesSync = new Map<string, InvalidateSync>();
     private sendSync = new Map<string, InvalidateSync>();
     private sendAbortControllers = new Map<string, AbortController>();
+    private readAbortControllers = new Set<AbortController>();
+    private settingsAbortControllers = new Set<AbortController>();
     private sessionLastSeq = new Map<string, number>();
     // Lowest seq value we have already fetched and applied for a session.
     // Used as the cursor for backward pagination when the user scrolls up to
@@ -102,6 +145,7 @@ class Sync {
     private sessionOldestSeq = new Map<string, number>();
     private pendingOutbox: Map<string, OutboxMessage[]> = loadPendingOutbox();
     private pendingSyntheticOutbox = loadPendingSyntheticOutbox() as Map<string, Array<{ localId: string; machineId: string; piSessionId: string; text: string; options?: SendMessageOptions }>>;
+    private piSessionTombstones: PersistedPiSessionTombstone[] = loadPiSessionTombstones();
     private flushingSyntheticOutbox = new Set<string>();
     private sessionMessageQueue = new Map<string, NormalizedMessage[]>();
     private sessionQueueProcessing = new Set<string>();
@@ -111,13 +155,33 @@ class Sync {
     private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
     private settingsSync: InvalidateSync;
     private machinesSync: InvalidateSync;
+    private piSessionsSync: InvalidateSync;
     private pushTokenSync: InvalidateSync;
     private nativeUpdateSync: InvalidateSync;
-    private piSessionsFetchInFlight: Promise<Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }>> | null = null;
+    private sessionListSnapshot: PiSessionListSnapshot;
+    private piSessionNameBackfillRelaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }> = [];
+    private piSessionNameBackfillPending: {
+        context: SyncRuntimeContext;
+        relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>;
+        mergedSessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>;
+    } | null = null;
     private piSessionNameBackfillInFlight: Promise<void> | null = null;
     private activityAccumulator: ActivityUpdateAccumulator;
     private pendingSettings: Partial<Settings> = loadPendingSettings();
     private appState: AppStateStatus = AppState.currentState;
+    private syncStarted = false;
+    private sessionSnapshotGeneration = 0;
+    private relayInitialAttempt: Promise<void> = Promise.resolve();
+    private resolveRelayInitialAttempt: (() => void) | null = null;
+    private piSessionRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+    private piSessionRefreshGenerationInFlight: number | null = null;
+    private piSessionRefreshPending = false;
+    private piSessionFullRefreshEpoch = 0;
+    private piSessionHandledFullRefreshEpoch = 0;
+    private piSessionTransportRetryAttempt = 0;
+    private piSessionIndexRetryAttempt = 0;
+    private piSessionTransportRetryMachineIds = new Set<string>();
+    private piSessionIndexRetryMachineIds = new Set<string>();
     private backgroundSendTimeout: ReturnType<typeof setTimeout> | null = null;
     private backgroundSendNotificationId: string | null = null;
     private backgroundSendStartedAt: number | null = null;
@@ -126,18 +190,33 @@ class Sync {
     private lastRecalculationTime = 0;
 
     constructor() {
-        this.sessionsSync = new InvalidateSync(this.fetchSessions);
-        this.settingsSync = new InvalidateSync(this.syncSettings);
+        this.sessionListSnapshot = new PiSessionListSnapshot(
+            () => Object.values(storage.getState().sessions),
+            (machineId) => storage.getState().machines[machineId],
+            (sessions) => {
+                this.applySessions(sessions, { replace: true });
+                this.queueCanonicalPiSessionNamePersistence(
+                    this.piSessionNameBackfillRelaySessions,
+                    sessions,
+                );
+                if (sessions.length > 0) storage.getState().applyReady();
+            },
+            (identity) => this.persistPiSessionTombstone(identity),
+        );
+        this.sessionsSync = new InvalidateSync(this.refreshSessionSnapshot);
+        this.settingsSync = this.createSettingsSync();
         this.machinesSync = new InvalidateSync(this.fetchMachines);
+        this.piSessionsSync = new InvalidateSync(this.fetchMachinePiSessions);
         this.nativeUpdateSync = new InvalidateSync(this.fetchNativeUpdate);
 
         const registerPushToken = async () => {
             await this.registerPushToken();
         }
         this.pushTokenSync = new InvalidateSync(registerPushToken);
-        this.activityAccumulator = new ActivityUpdateAccumulator(this.flushActivityUpdates.bind(this), 2000);
+        this.activityAccumulator = this.createActivityAccumulator();
 
         AppState.addEventListener('change', (nextAppState) => {
+            const previousAppState = this.appState;
             this.appState = nextAppState;
 
             // Notify server of focus state for push notification routing.
@@ -154,11 +233,17 @@ class Sync {
                     void this.notifyMessageSendFailed();
                     this.failPendingOutboxMessages('Message failed to send in background after 30s. Please retry.');
                 }
-                log.log('📱 App became active');
-                this.machinesSync.invalidate();
-                this.pushTokenSync.invalidate();
-                this.sessionsSync.invalidate();
-                this.nativeUpdateSync.invalidate();
+                if (previousAppState !== 'active') {
+                    log.log('📱 App became active');
+                    if (this.syncStarted) {
+                        this.requestPiSessionFullRefresh();
+                        this.schedulePiSessionRefresh();
+                        this.machinesSync.invalidate();
+                        this.pushTokenSync.invalidate();
+                        this.sessionsSync.invalidate();
+                        this.nativeUpdateSync.invalidate();
+                    }
+                }
             } else {
                 log.log(`📱 App state changed to: ${nextAppState}`);
                 this.maybeStartBackgroundSendWatchdog();
@@ -167,10 +252,12 @@ class Sync {
     }
 
     resetRuntimeState() {
+        this.activityAccumulator.cancel();
         for (const sync of [
             this.sessionsSync,
             this.settingsSync,
             this.machinesSync,
+            this.piSessionsSync,
             this.pushTokenSync,
             this.nativeUpdateSync,
             ...this.messagesSync.values(),
@@ -181,9 +268,17 @@ class Sync {
         for (const controller of this.sendAbortControllers.values()) {
             controller.abort();
         }
+        for (const controller of this.readAbortControllers) {
+            controller.abort();
+        }
+        for (const controller of this.settingsAbortControllers) {
+            controller.abort();
+        }
         this.messagesSync.clear();
         this.sendSync.clear();
         this.sendAbortControllers.clear();
+        this.readAbortControllers.clear();
+        this.settingsAbortControllers.clear();
         this.sessionLastSeq.clear();
         this.sessionOldestSeq.clear();
         this.pendingOutbox.clear();
@@ -199,25 +294,45 @@ class Sync {
         this.encryptionCache = new EncryptionCache();
         this.pendingSettings = {};
         savePendingSettings(this.pendingSettings);
-        this.piSessionsFetchInFlight = null;
+        this.sessionListSnapshot.reset();
+        this.piSessionNameBackfillRelaySessions = [];
+        this.piSessionNameBackfillPending = null;
         this.piSessionNameBackfillInFlight = null;
+        this.sessionSnapshotGeneration += 1;
+        this.updateProcessingChain = Promise.resolve();
+        this.resolveRelayInitialAttempt?.();
+        this.resolveRelayInitialAttempt = null;
+        this.relayInitialAttempt = Promise.resolve();
+        this.syncStarted = false;
+        if (this.piSessionRefreshTimer) clearTimeout(this.piSessionRefreshTimer);
+        this.piSessionRefreshTimer = null;
+        this.piSessionRefreshGenerationInFlight = null;
+        this.piSessionRefreshPending = false;
+        this.piSessionFullRefreshEpoch = 0;
+        this.piSessionHandledFullRefreshEpoch = 0;
+        this.piSessionTransportRetryAttempt = 0;
+        this.piSessionIndexRetryAttempt = 0;
+        this.piSessionTransportRetryMachineIds.clear();
+        this.piSessionIndexRetryMachineIds.clear();
         this.clearBackgroundSendWatchdog();
         void this.cancelBackgroundSendTimeoutNotification();
         this.backgroundSendStartedAt = null;
-        this.sessionsSync = new InvalidateSync(this.fetchSessions);
-        this.settingsSync = new InvalidateSync(this.syncSettings);
+        this.sessionsSync = new InvalidateSync(this.refreshSessionSnapshot);
+        this.settingsSync = this.createSettingsSync();
         this.machinesSync = new InvalidateSync(this.fetchMachines);
+        this.piSessionsSync = new InvalidateSync(this.fetchMachinePiSessions);
         this.nativeUpdateSync = new InvalidateSync(this.fetchNativeUpdate);
         this.pushTokenSync = new InvalidateSync(async () => {
             await this.registerPushToken();
         });
-        this.activityAccumulator = new ActivityUpdateAccumulator(this.flushActivityUpdates.bind(this), 2000);
+        this.activityAccumulator = this.createActivityAccumulator();
     }
 
     async create(credentials: AuthCredentials, encryption: Encryption) {
         this.credentials = credentials;
         this.encryption = encryption;
         this.serverID = parseToken(credentials.token);
+        this.restorePiSessionTombstonesForAccount();
         await this.#init();
 
         // Await settings sync to have fresh settings
@@ -230,15 +345,22 @@ class Sync {
         this.credentials = credentials;
         this.encryption = encryption;
         this.serverID = parseToken(credentials.token);
+        this.restorePiSessionTombstonesForAccount();
         await this.#init();
     }
 
     async #init() {
+        this.relayInitialAttempt = new Promise<void>((resolve) => {
+            this.resolveRelayInitialAttempt = resolve;
+        });
 
         // Subscribe to updates
         this.subscribeToUpdates();
 
-        // Invalidate sync
+        // Invalidate sync. Re-read the native state here because this singleton
+        // is constructed before auth/bootstrap and its initial value may be stale.
+        this.appState = AppState.currentState;
+        this.syncStarted = true;
         log.log('🔄 #init: Invalidating all syncs');
         this.sessionsSync.invalidate();
         this.settingsSync.invalidate();
@@ -247,10 +369,9 @@ class Sync {
         this.nativeUpdateSync.invalidate();
         log.log('🔄 #init: All syncs invalidated');
 
-        // Mark UI ready as soon as sessions load. Machines sync may hang
-        // when encryption keys are unavailable (e.g. V1 auth fallback) —
-        // let it resolve in the background instead of blocking the UI.
-        this.sessionsSync.awaitQueue().then(() => {
+        // The first relay attempt is bounded. Commit it before Pi discovery, but
+        // never keep Sessions Home waiting for a successful network response.
+        void this.relayInitialAttempt.then(() => {
             storage.getState().applyReady();
             for (const sessionId of this.pendingOutbox.keys()) {
                 this.getSendSync(sessionId).invalidate();
@@ -258,10 +379,6 @@ class Sync {
             if (this.hasPendingOutboxMessages()) {
                 this.maybeStartBackgroundSendWatchdog();
             }
-        }).catch((error) => {
-            console.error('Failed to load sessions:', error);
-            // Still mark ready so the UI doesn't stay on a blank screen forever
-            storage.getState().applyReady();
         });
     }
 
@@ -275,10 +392,34 @@ class Sync {
         }
     }
 
+    private captureRuntimeContext = (): SyncRuntimeContext => ({
+        generation: this.sessionSnapshotGeneration,
+        encryption: this.encryption,
+    });
+
+    private isRuntimeContextCurrent = (context: SyncRuntimeContext): boolean => (
+        this.syncStarted
+        && context.generation === this.sessionSnapshotGeneration
+        && context.encryption === this.encryption
+    );
+
+    private isSettingsContextCurrent = (
+        context: SyncRuntimeContext,
+        credentials: AuthCredentials,
+    ): boolean => this.isRuntimeContextCurrent(context) && credentials === this.credentials;
+
+    private createSettingsSync = (): InvalidateSync => new InvalidateSync(async () => {
+        const credentials = this.credentials;
+        const context = this.captureRuntimeContext();
+        if (!credentials || !this.isSettingsContextCurrent(context, credentials)) return;
+        await this.syncSettings(context, credentials);
+    });
+
     private getMessagesSync(sessionId: string): InvalidateSync {
         let sync = this.messagesSync.get(sessionId);
         if (!sync) {
-            sync = new InvalidateSync(() => this.fetchMessages(sessionId));
+            const context = this.captureRuntimeContext();
+            sync = new InvalidateSync(() => this.fetchMessages(sessionId, context));
             this.messagesSync.set(sessionId, sync);
         }
         return sync;
@@ -287,7 +428,8 @@ class Sync {
     private getSendSync(sessionId: string): InvalidateSync {
         let sync = this.sendSync.get(sessionId);
         if (!sync) {
-            sync = new InvalidateSync(() => this.flushOutbox(sessionId));
+            const context = this.captureRuntimeContext();
+            sync = new InvalidateSync(() => this.flushOutbox(sessionId, context));
             this.sendSync.set(sessionId, sync);
         }
         return sync;
@@ -305,7 +447,7 @@ class Sync {
         }
         queue.push(...messages);
 
-        this.scheduleQueuedMessagesProcessing(sessionId);
+        this.scheduleQueuedMessagesProcessing(sessionId, this.sessionSnapshotGeneration);
     }
 
     private getSessionMessageLock(sessionId: string): AsyncLock {
@@ -317,15 +459,15 @@ class Sync {
         return lock;
     }
 
-    private scheduleQueuedMessagesProcessing(sessionId: string) {
-        if (this.sessionQueueProcessing.has(sessionId)) {
+    private scheduleQueuedMessagesProcessing(sessionId: string, generation: number) {
+        if (generation !== this.sessionSnapshotGeneration || this.sessionQueueProcessing.has(sessionId)) {
             return;
         }
 
         this.sessionQueueProcessing.add(sessionId);
         const lock = this.getSessionMessageLock(sessionId);
         void lock.inLock(() => {
-            while (true) {
+            while (generation === this.sessionSnapshotGeneration) {
                 const pending = this.sessionMessageQueue.get(sessionId);
                 if (!pending || pending.length === 0) {
                     break;
@@ -334,10 +476,11 @@ class Sync {
                 this.applyMessages(sessionId, batch);
             }
         }).finally(() => {
+            if (generation !== this.sessionSnapshotGeneration) return;
             this.sessionQueueProcessing.delete(sessionId);
             const pending = this.sessionMessageQueue.get(sessionId);
             if (pending && pending.length > 0) {
-                this.scheduleQueuedMessagesProcessing(sessionId);
+                this.scheduleQueuedMessagesProcessing(sessionId, generation);
             }
         });
     }
@@ -364,9 +507,10 @@ class Sync {
 
         log.log('📨 Pending messages detected in background. Starting 30s send watchdog.');
         this.backgroundSendStartedAt = Date.now();
+        const context = this.captureRuntimeContext();
         this.backgroundSendTimeout = setTimeout(() => {
             this.backgroundSendTimeout = null;
-            void this.handleBackgroundSendTimeout();
+            void this.handleBackgroundSendTimeout(context);
         }, Sync.BACKGROUND_SEND_TIMEOUT_MS);
         void this.scheduleBackgroundSendTimeoutNotification();
     }
@@ -462,15 +606,19 @@ class Sync {
         }
     }
 
-    private async handleBackgroundSendTimeout() {
+    private async handleBackgroundSendTimeout(context: SyncRuntimeContext) {
+        if (!this.isRuntimeContextCurrent(context)) return;
         if (!this.hasPendingOutboxMessages()) {
             await this.cancelBackgroundSendTimeoutNotification();
+            if (!this.isRuntimeContextCurrent(context)) return;
             this.backgroundSendStartedAt = null;
             return;
         }
 
         await this.cancelBackgroundSendTimeoutNotification();
+        if (!this.isRuntimeContextCurrent(context)) return;
         await this.notifyMessageSendFailed();
+        if (!this.isRuntimeContextCurrent(context)) return;
         this.failPendingOutboxMessages('Message failed to send in background after 30s. Please retry.');
         this.backgroundSendStartedAt = null;
     }
@@ -483,10 +631,14 @@ class Sync {
     private async uploadAttachmentsForSession(
         sessionId: string,
         attachments: AttachmentPreview[],
+        context: SyncRuntimeContext,
     ): Promise<{ uploaded: UploadedAttachment[]; failed: number }> {
-        if (!this.credentials) return { uploaded: [], failed: attachments.length };
+        const credentials = this.credentials;
+        if (!credentials || !this.isRuntimeContextCurrent(context)) {
+            return { uploaded: [], failed: attachments.length };
+        }
 
-        const blobKey = this.encryption.getSessionBlobKey(sessionId);
+        const blobKey = context.encryption.getSessionBlobKey(sessionId);
         if (!blobKey) {
             console.error(`[attachments] No blob key for session ${sessionId}`);
             return { uploaded: [], failed: attachments.length };
@@ -498,16 +650,19 @@ class Sync {
         for (const attachment of attachments) {
             try {
                 const bytes = await readFileBytes(attachment.uri);
+                if (!this.isRuntimeContextCurrent(context)) return { uploaded: [], failed: attachments.length };
                 const encrypted = encryptBlob(bytes, blobKey);
 
                 const upload = await requestAttachmentUpload(
-                    this.credentials,
+                    credentials,
                     sessionId,
                     attachment.name,
                     encrypted.length,
                 );
+                if (!this.isRuntimeContextCurrent(context)) return { uploaded: [], failed: attachments.length };
 
-                await uploadEncryptedBlob(upload, encrypted, this.credentials);
+                await uploadEncryptedBlob(upload, encrypted, credentials);
+                if (!this.isRuntimeContextCurrent(context)) return { uploaded: [], failed: attachments.length };
                 const { ref } = upload;
 
                 uploaded.push({
@@ -520,6 +675,9 @@ class Sync {
                     thumbhash: attachment.thumbhash,
                 });
             } catch (err) {
+                if (!this.isRuntimeContextCurrent(context)) {
+                    return { uploaded: [], failed: attachments.length };
+                }
                 const diagnostic = getAttachmentDiagnostic(err);
                 if (diagnostic) {
                     console.error('[attachments] Failed to upload image attachment:', formatAttachmentDiagnosticForLog(diagnostic, {
@@ -607,6 +765,8 @@ class Sync {
     }
 
     async flushSyntheticMessages(syntheticSessionId: string, relaySessionId: string) {
+        const context = this.captureRuntimeContext();
+        if (!this.isRuntimeContextCurrent(context)) return;
         if (this.flushingSyntheticOutbox.has(syntheticSessionId)) {
             return;
         }
@@ -617,10 +777,12 @@ class Sync {
                 return;
             }
             await this.sessionsSync.awaitQueue();
-            if (!this.encryption.getSessionEncryption(relaySessionId)) {
+            if (!this.isRuntimeContextCurrent(context)
+                || !context.encryption.getSessionEncryption(relaySessionId)) {
                 return;
             }
             while (true) {
+                if (!this.isRuntimeContextCurrent(context)) return;
                 const current = this.pendingSyntheticOutbox.get(syntheticSessionId);
                 if (!current || current.length === 0) {
                     this.pendingSyntheticOutbox.delete(syntheticSessionId);
@@ -635,7 +797,7 @@ class Sync {
                     localId: item.localId,
                     deferSend: true,
                 });
-                if (!queued) return;
+                if (!queued || !this.isRuntimeContextCurrent(context)) return;
                 const afterSend = this.pendingSyntheticOutbox.get(syntheticSessionId) ?? [];
                 const remaining = afterSend.filter((entry) => entry !== item);
                 if (remaining.length > 0) {
@@ -650,16 +812,21 @@ class Sync {
                 this.maybeStartBackgroundSendWatchdog();
             }
         } finally {
-            this.flushingSyntheticOutbox.delete(syntheticSessionId);
+            if (this.isRuntimeContextCurrent(context)) {
+                this.flushingSyntheticOutbox.delete(syntheticSessionId);
+            }
         }
     }
 
     async sendMessage(sessionId: string, text: string, options?: SendMessageOptions): Promise<boolean> {
+        const context = this.captureRuntimeContext();
+        if (!this.isRuntimeContextCurrent(context)) return false;
 
         // Get session data from storage
         let session = storage.getState().sessions[sessionId];
         if (!session) {
             await this.sessionsSync.awaitQueue();
+            if (!this.isRuntimeContextCurrent(context)) return false;
             session = storage.getState().sessions[sessionId];
             if (!session) {
                 console.error(`Session ${sessionId} not found in storage after sync`);
@@ -677,10 +844,11 @@ class Sync {
         // Synthetic Pi rows intentionally have no relay encryption yet; queue
         // their sends locally until the background open call resolves a real
         // relay session id.
-        let encryption = this.encryption.getSessionEncryption(sessionId);
+        let encryption = context.encryption.getSessionEncryption(sessionId);
         if (!encryption) {
             await this.sessionsSync.awaitQueue();
-            encryption = this.encryption.getSessionEncryption(sessionId);
+            if (!this.isRuntimeContextCurrent(context)) return false;
+            encryption = context.encryption.getSessionEncryption(sessionId);
             if (!encryption && session.metadata?.piSynthetic) {
                 return this.queueSyntheticMessage(sessionId, text, options);
             }
@@ -720,7 +888,8 @@ class Sync {
         const localMessageBatch: NormalizedMessage[] = [];
 
         if (effectiveAttachments && effectiveAttachments.length > 0) {
-            const { uploaded, failed } = await this.uploadAttachmentsForSession(sessionId, effectiveAttachments);
+            const { uploaded, failed } = await this.uploadAttachmentsForSession(sessionId, effectiveAttachments, context);
+            if (!this.isRuntimeContextCurrent(context)) return false;
 
             if (!isCompleteImageAttachmentUpload({
                 requested: effectiveAttachments.length,
@@ -771,6 +940,7 @@ class Sync {
                         },
                     };
                     const encryptedFileRecord = await encryption.encryptRawRecord(fileRecord);
+                    if (!this.isRuntimeContextCurrent(context)) return false;
                     const fileLocalId = randomUUID();
                     const fileNormalized = normalizeRawMessage(fileLocalId, fileLocalId, Date.now(), fileRecord);
                     if (fileNormalized) {
@@ -805,6 +975,7 @@ class Sync {
             }
         };
         const encryptedRawRecord = await encryption.encryptRawRecord(content);
+        if (!this.isRuntimeContextCurrent(context)) return false;
 
         // Add to messages - normalize the raw record
         const createdAt = Date.now();
@@ -814,6 +985,7 @@ class Sync {
         }
         outboxBatch.push({ localId, content: encryptedRawRecord });
 
+        if (!this.isRuntimeContextCurrent(context)) return false;
         let pending = this.pendingOutbox.get(sessionId);
         if (!pending) {
             pending = [];
@@ -853,23 +1025,37 @@ class Sync {
     //
 
     private persistCanonicalPiSessionNames = async (
+        context: SyncRuntimeContext,
         relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
         mergedSessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
     ): Promise<void> => {
+        if (!this.isRuntimeContextCurrent(context)) return;
         const candidates = findPiSessionNameBackfills(relaySessions, mergedSessions);
         if (candidates.length === 0) return;
         const result = await persistPiSessionNameBackfills(candidates, {
             encryptMetadata: async (sessionId, metadata) => {
-                const sessionEncryption = this.encryption.getSessionEncryption(sessionId);
+                if (!this.isRuntimeContextCurrent(context)) {
+                    throw new Error('Pi session name persistence was superseded');
+                }
+                const sessionEncryption = context.encryption.getSessionEncryption(sessionId);
                 if (!sessionEncryption) throw new Error('Session encryption is unavailable');
-                return sessionEncryption.encryptMetadata(metadata);
+                const encrypted = await sessionEncryption.encryptMetadata(metadata);
+                if (!this.isRuntimeContextCurrent(context)) {
+                    throw new Error('Pi session name persistence was superseded');
+                }
+                return encrypted;
             },
             decryptMetadata: async (sessionId, version, ciphertext) => {
-                const sessionEncryption = this.encryption.getSessionEncryption(sessionId);
+                if (!this.isRuntimeContextCurrent(context)) return null;
+                const sessionEncryption = context.encryption.getSessionEncryption(sessionId);
                 if (!sessionEncryption) return null;
-                return sessionEncryption.decryptMetadata(version, ciphertext);
+                const metadata = await sessionEncryption.decryptMetadata(version, ciphertext);
+                return this.isRuntimeContextCurrent(context) ? metadata : null;
             },
             updateMetadata: async ({ sessionId, metadata, expectedVersion }) => {
+                if (!this.isRuntimeContextCurrent(context)) {
+                    return { result: 'error' };
+                }
                 const response = await apiSocket.emitWithAck<{
                     result: 'success' | 'version-mismatch' | 'error';
                     version?: number;
@@ -880,6 +1066,9 @@ class Sync {
                     metadata,
                     expectedVersion,
                 }, 10_000);
+                if (!this.isRuntimeContextCurrent(context)) {
+                    return { result: 'error' };
+                }
                 if (
                     (response.result === 'success' || response.result === 'version-mismatch')
                     && typeof response.version === 'number'
@@ -894,111 +1083,276 @@ class Sync {
                 return { result: 'error', message: response.message };
             },
         });
-        if (result.failed > 0) {
+        if (result.failed > 0 && this.isRuntimeContextCurrent(context)) {
             console.warn(`Failed to persist ${result.failed}/${candidates.length} canonical Pi session name(s)`);
         }
+    };
+
+    private startCanonicalPiSessionNamePersistence = (): void => {
+        if (this.piSessionNameBackfillInFlight || !this.piSessionNameBackfillPending) return;
+        const task = (async () => {
+            while (this.piSessionNameBackfillPending) {
+                const job = this.piSessionNameBackfillPending;
+                this.piSessionNameBackfillPending = null;
+                if (!this.isRuntimeContextCurrent(job.context)) continue;
+                await this.persistCanonicalPiSessionNames(
+                    job.context,
+                    job.relaySessions,
+                    job.mergedSessions,
+                );
+            }
+        })().catch((error) => {
+            console.warn('Failed to persist canonical Pi session names', error);
+        });
+        this.piSessionNameBackfillInFlight = task;
+        void task.finally(() => {
+            if (this.piSessionNameBackfillInFlight === task) {
+                this.piSessionNameBackfillInFlight = null;
+            }
+            if (this.piSessionNameBackfillPending) {
+                this.startCanonicalPiSessionNamePersistence();
+            }
+        });
     };
 
     private queueCanonicalPiSessionNamePersistence = (
         relaySessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
         mergedSessions: Array<Omit<Session, 'presence'> & { presence?: Session['presence'] }>,
     ): void => {
-        if (this.piSessionNameBackfillInFlight) return;
-        const pending = this.persistCanonicalPiSessionNames(relaySessions, mergedSessions)
-            .catch((error) => {
-                console.warn('Failed to persist canonical Pi session names', error);
-            })
-            .finally(() => {
-                if (this.piSessionNameBackfillInFlight === pending) {
-                    this.piSessionNameBackfillInFlight = null;
-                }
-            });
-        this.piSessionNameBackfillInFlight = pending;
+        const context = this.captureRuntimeContext();
+        if (!this.isRuntimeContextCurrent(context)
+            || findPiSessionNameBackfills(relaySessions, mergedSessions).length === 0) return;
+        this.piSessionNameBackfillPending = { context, relaySessions, mergedSessions };
+        this.startCanonicalPiSessionNamePersistence();
     };
 
-    private fetchMachinePiSessions = async (): Promise<Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }>> => {
-        if (this.piSessionsFetchInFlight) {
-            return this.piSessionsFetchInFlight;
+    private piSessionTombstoneScope = (): string => `${getServerUrl()}#${this.serverID}`;
+
+    private restorePiSessionTombstonesForAccount = (): void => {
+        const scope = this.piSessionTombstoneScope();
+        this.sessionListSnapshot.setDeletedSessions(
+            this.piSessionTombstones.filter((tombstone) => tombstone.serverId === scope),
+        );
+    }
+
+    private persistPiSessionTombstone = (
+        identity: {
+            relaySessionId: string;
+            relaySessionTag?: string;
+            machineId?: string;
+            piSessionId?: string;
+        },
+        serverId = this.piSessionTombstoneScope(),
+    ): void => {
+        if (!identity.relaySessionTag && (!identity.machineId || !identity.piSessionId)) return;
+        this.piSessionTombstones = addPiSessionTombstone(this.piSessionTombstones, {
+            serverId,
+            relaySessionId: identity.relaySessionId,
+            relaySessionTag: identity.relaySessionTag,
+            machineId: identity.machineId,
+            piSessionId: identity.piSessionId,
+            deletedAt: Date.now(),
+        });
+        savePiSessionTombstones(this.piSessionTombstones);
+    };
+
+    private resetPiSessionRetryBudget = (): void => {
+        if (this.piSessionRefreshTimer) clearTimeout(this.piSessionRefreshTimer);
+        this.piSessionRefreshTimer = null;
+        this.piSessionTransportRetryAttempt = 0;
+        this.piSessionIndexRetryAttempt = 0;
+        this.piSessionTransportRetryMachineIds.clear();
+        this.piSessionIndexRetryMachineIds.clear();
+    }
+
+    private requestPiSessionFullRefresh = (): void => {
+        this.resetPiSessionRetryBudget();
+        this.sessionListSnapshot.cancelPendingMachineRefreshes();
+        this.piSessionFullRefreshEpoch += 1;
+        if (this.piSessionRefreshGenerationInFlight === this.sessionSnapshotGeneration) {
+            this.piSessionRefreshPending = true;
         }
+    };
 
-        const request = (async () => {
-            const machines = Object.values(storage.getState().machines)
-                .filter(shouldFetchPiSessionDiscovery);
+    private schedulePiSessionRefresh = (delayMs = 150): void => {
+        if (!this.syncStarted) return;
+        if (this.piSessionRefreshGenerationInFlight === this.sessionSnapshotGeneration) {
+            this.piSessionRefreshPending = true;
+            return;
+        }
+        if (this.piSessionRefreshTimer) return;
+        this.piSessionRefreshTimer = setTimeout(() => {
+            this.piSessionRefreshTimer = null;
+            if (this.syncStarted) this.piSessionsSync.invalidate();
+        }, delayMs);
+    }
 
-            const pageSize = 100;
-            const maxRecordsPerMachine = 5000;
-            const results = await Promise.allSettled(machines.map(async (machine) => {
-                const sessions: PiMachineSessionRecord[] = [];
-                let cursor: string | undefined;
-                let total: number | undefined;
+    private fetchMachinePiSessions = async (): Promise<void> => {
+        const generation = this.sessionSnapshotGeneration;
+        await this.relayInitialAttempt;
+        if (generation !== this.sessionSnapshotGeneration || !this.syncStarted) return;
+        if (this.piSessionRefreshTimer) clearTimeout(this.piSessionRefreshTimer);
+        this.piSessionRefreshTimer = null;
+        this.piSessionRefreshPending = false;
 
-                do {
+        const refreshEpoch = this.piSessionFullRefreshEpoch;
+        const hasRequestedFullRefresh = this.piSessionHandledFullRefreshEpoch < refreshEpoch;
+        const retryMachineIds = new Set([
+            ...this.piSessionTransportRetryMachineIds,
+            ...this.piSessionIndexRetryMachineIds,
+        ]);
+        const retryOnly = !hasRequestedFullRefresh && retryMachineIds.size > 0;
+        const machines = Object.values(storage.getState().machines)
+            .filter(shouldFetchPiSessionDiscovery)
+            .filter(machine => !retryOnly || retryMachineIds.has(machine.id));
+        const refreshId = this.sessionListSnapshot.beginMachineRefresh(machines, !retryOnly);
+        const failures: string[] = [];
+        const failedMachineIds = new Set<string>();
+        const refreshingMachineIds = new Set<string>();
+        const isRefreshCurrent = () => (
+            generation === this.sessionSnapshotGeneration
+            && refreshEpoch === this.piSessionFullRefreshEpoch
+            && this.syncStarted
+        );
+
+        this.piSessionRefreshGenerationInFlight = generation;
+        try {
+            await fetchPiSessionPages({
+                machines,
+                requestPage: async ({ machine, limit, cursor }) => {
+                    if (!isRefreshCurrent()) throw new ObsoletePiSessionRefreshError();
                     const response = await apiSocket.machineRPC<
-                        { type: 'success'; sessions: PiMachineSessionRecord[]; nextCursor?: string; total?: number } | { type: 'error'; errorMessage: string },
+                        { type: 'success'; sessions: PiMachineSessionRecord[]; nextCursor?: string; total?: number; refreshing?: boolean } | { type: 'error'; errorMessage: string },
                         { scope: 'machine'; limit: number; cursor?: string }
                     >(
                         machine.id,
                         'list-pi-sessions',
-                        { scope: 'machine', limit: pageSize, cursor },
+                        { scope: 'machine', limit, cursor },
                         parseMachineRpcResult('list-pi-sessions', listPiSessionsResultSchema),
+                        { timeoutMs: 15_000 },
                     );
-
-                    if (response.type !== 'success') {
-                        throw new Error(response.errorMessage);
+                    if (!isRefreshCurrent()) throw new ObsoletePiSessionRefreshError();
+                    if (response.type !== 'success') throw new Error(response.errorMessage);
+                    return response;
+                },
+                onPage: ({ machine, sessions, complete, truncated, total }) => {
+                    if (!isRefreshCurrent()) return;
+                    this.sessionListSnapshot.applyMachinePage(refreshId, machine.id, sessions, complete);
+                    if (truncated) {
+                        this.sessionListSnapshot.failMachineRefresh(refreshId, machine.id);
+                        console.warn(`Pi session discovery for machine ${machine.id} truncated at 5000/${total ?? 'unknown'} records`);
                     }
-
-                    sessions.push(...response.sessions);
-                    cursor = response.nextCursor;
-                    total = response.total;
-                } while (cursor && sessions.length < maxRecordsPerMachine);
-
-                if (cursor) {
-                    console.warn(`Pi session discovery for machine ${machine.id} truncated at ${sessions.length}/${total ?? 'unknown'} records`);
-                }
-
-                return { machine, sessions };
-            }));
-
-            const discovered: Array<{ machine: Machine; sessions: PiMachineSessionRecord[] }> = [];
-            results.forEach((result, index) => {
-                if (result.status === 'fulfilled') {
-                    discovered.push(result.value);
-                } else {
-                    console.warn(`Failed to list Pi sessions for machine ${machines[index]?.id}: ${String(result.reason)}`);
-                }
+                },
+                onError: ({ machine, error }) => {
+                    this.sessionListSnapshot.failMachineRefresh(refreshId, machine.id);
+                    if (error instanceof ObsoletePiSessionRefreshError || !isRefreshCurrent()) return;
+                    if (error instanceof PiSessionIndexRefreshingError) {
+                        refreshingMachineIds.add(machine.id);
+                        return;
+                    }
+                    failedMachineIds.add(machine.id);
+                    failures.push(`${machine.id}: ${error.message}`);
+                    console.warn(`Failed to list Pi sessions for machine ${machine.id}: ${error.message}`);
+                },
             });
-
-            return discovered;
-        })();
-
-        this.piSessionsFetchInFlight = request;
-        try {
-            return await request;
         } finally {
-            if (this.piSessionsFetchInFlight === request) {
-                this.piSessionsFetchInFlight = null;
+            if (this.piSessionRefreshGenerationInFlight === generation) {
+                this.piSessionRefreshGenerationInFlight = null;
             }
+        }
+        if (generation !== this.sessionSnapshotGeneration || !this.syncStarted) return;
+        if (refreshEpoch !== this.piSessionFullRefreshEpoch) {
+            this.piSessionRefreshPending = false;
+            this.schedulePiSessionRefresh();
+            return;
+        }
+        if (hasRequestedFullRefresh) {
+            this.piSessionHandledFullRefreshEpoch = refreshEpoch;
+        }
+        const retryDelays: number[] = [];
+        this.piSessionTransportRetryMachineIds = failedMachineIds;
+        if (failedMachineIds.size > 0) {
+            const delay = resolvePiSessionRetryDelay(
+                this.piSessionTransportRetryAttempt,
+                Sync.PI_SESSION_TRANSPORT_MAX_RETRIES,
+            );
+            this.piSessionTransportRetryAttempt += 1;
+            if (delay === undefined) {
+                this.piSessionTransportRetryMachineIds.clear();
+                console.warn(`Pi session discovery paused after ${failures.length} machine failure(s); waiting for a lifecycle refresh`);
+            } else {
+                retryDelays.push(delay);
+            }
+        } else {
+            this.piSessionTransportRetryAttempt = 0;
+        }
+
+        // Warming nodes retain their independent, longer retry budget even if
+        // another node exhausts transport retries in the same refresh cycle.
+        this.piSessionIndexRetryMachineIds = refreshingMachineIds;
+        if (refreshingMachineIds.size > 0) {
+            const delay = resolvePiSessionRetryDelay(
+                this.piSessionIndexRetryAttempt,
+                Sync.PI_SESSION_INDEX_MAX_RETRIES,
+            );
+            this.piSessionIndexRetryAttempt += 1;
+            if (delay === undefined) {
+                this.piSessionIndexRetryMachineIds.clear();
+                console.warn('Pi session index refresh polling paused; waiting for a lifecycle refresh');
+            } else {
+                retryDelays.push(delay);
+            }
+        } else {
+            this.piSessionIndexRetryAttempt = 0;
+        }
+
+        if (this.piSessionRefreshPending) {
+            this.piSessionRefreshPending = false;
+            this.schedulePiSessionRefresh();
+        } else if (retryDelays.length > 0) {
+            this.schedulePiSessionRefresh(Math.min(...retryDelays));
+        }
+    }
+
+    private refreshSessionSnapshot = async (): Promise<void> => {
+        const generation = this.sessionSnapshotGeneration;
+        const resolveInitialAttempt = this.resolveRelayInitialAttempt;
+        try {
+            await this.fetchSessions();
+        } finally {
+            if (generation === this.sessionSnapshotGeneration
+                && this.resolveRelayInitialAttempt === resolveInitialAttempt) {
+                this.resolveRelayInitialAttempt = null;
+            }
+            resolveInitialAttempt?.();
         }
     }
 
     private fetchSessions = async () => {
         if (!this.credentials) return;
+        const credentials = this.credentials;
+        const encryption = this.encryption;
+        const generation = this.sessionSnapshotGeneration;
+        const requestStartIds = this.sessionListSnapshot.captureRelaySessionIds();
 
         const API_ENDPOINT = getServerUrl();
-        const response = await fetch(`${API_ENDPOINT}/v1/sessions`, {
-            headers: {
-                'Authorization': `Bearer ${this.credentials.token}`,
-                'Content-Type': 'application/json',
-                'X-Lyntty-Client': getLynttyClientId(),
-            }
+        const data = await fetchJsonWithTimeout({
+            url: `${API_ENDPOINT}/v1/sessions`,
+            timeoutMs: SESSION_LIST_REQUEST_TIMEOUT_MS,
+            label: SESSION_LIST_REQUEST_LABEL,
+            init: {
+                headers: {
+                    'Authorization': `Bearer ${credentials.token}`,
+                    'Content-Type': 'application/json',
+                    'X-Lyntty-Client': getLynttyClientId(),
+                },
+            },
         });
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch sessions: ${response.status}`);
+        if (generation !== this.sessionSnapshotGeneration || encryption !== this.encryption) return;
+        if (!data || typeof data !== 'object' || !Array.isArray((data as { sessions?: unknown }).sessions)) {
+            throw new Error('Session list request returned an invalid response');
         }
-
-        const data = await response.json();
-        const sessions = data.sessions as Array<{
+        const sessions = (data as { sessions: Array<{
             id: string;
             tag: string;
             seq: number;
@@ -1012,13 +1366,13 @@ class Sync {
             createdAt: number;
             updatedAt: number;
             lastMessage: ApiMessage | null;
-        }>;
+        }> }).sessions;
 
         // Initialize all session encryptions first
         const sessionKeys = new Map<string, Uint8Array | null>();
         for (const session of sessions) {
             if (session.dataEncryptionKey) {
-                let decrypted = await this.encryption.decryptEncryptionKey(session.dataEncryptionKey);
+                let decrypted = await encryption.decryptEncryptionKey(session.dataEncryptionKey);
                 if (!decrypted) {
                     console.error(`Failed to decrypt data encryption key for session ${session.id}`);
                     continue;
@@ -1028,13 +1382,13 @@ class Sync {
                 sessionKeys.set(session.id, null);
             }
         }
-        await this.encryption.initializeSessions(sessionKeys);
+        await encryption.initializeSessions(sessionKeys);
 
         // Decrypt sessions
         let decryptedSessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[] = [];
         for (const session of sessions) {
             // Get session encryption (should always exist after initialization)
-            const sessionEncryption = this.encryption.getSessionEncryption(session.id);
+            const sessionEncryption = encryption.getSessionEncryption(session.id);
             if (!sessionEncryption) {
                 console.error(`Session encryption not found for ${session.id} - this should never happen`);
                 continue;
@@ -1057,29 +1411,32 @@ class Sync {
             decryptedSessions.push(processedSession);
         }
 
-        const machinePiSessions = await this.fetchMachinePiSessions();
-        const sessionsWithPiHistory = mergePiDiscoveredSessions(
-            decryptedSessions,
-            machinePiSessions,
-        );
-
-        // Apply to storage. This is a full server/discovery snapshot, so remove
-        // stale rows from a previous account, server, or deleted relay state.
-        this.applySessions(sessionsWithPiHistory, { replace: true });
-        this.queueCanonicalPiSessionNamePersistence(decryptedSessions, sessionsWithPiHistory);
+        // A logout/server reset can finish while decryption is in flight. Never
+        // let that obsolete account snapshot write into the new sync generation.
+        if (generation !== this.sessionSnapshotGeneration || encryption !== this.encryption) return;
+        // Keep the raw Relay view as the optimistic-concurrency baseline for
+        // canonical Pi title persistence. Progressive discovery snapshots merge
+        // synchronously and queue only the newest resulting backfill work.
+        this.piSessionNameBackfillRelaySessions = decryptedSessions;
+        // Publish the relay snapshot immediately. Existing Pi discovery rows stay
+        // present until their own progressive refresh finishes.
+        this.sessionListSnapshot.commitRelaySnapshot(decryptedSessions, requestStartIds);
         // Canonical relay sessions may appear after startup. Reconcile after
-        // every full snapshot so their synthetic sends cannot be stranded.
+        // every relay snapshot so their synthetic sends cannot be stranded.
         this.reconcileSyntheticOutbox();
-        log.log(`📥 fetchSessions completed - processed ${decryptedSessions.length} relay sessions + ${sessionsWithPiHistory.length - decryptedSessions.length} local Pi sessions`);
+        log.log(`📥 fetchSessions completed - processed ${decryptedSessions.length} relay sessions`);
 
     }
 
     public refreshMachines = async () => {
-        return this.fetchMachines();
+        this.requestPiSessionFullRefresh();
+        return this.machinesSync.invalidateAndAwait();
     }
 
     public refreshSessions = async () => {
-        return this.sessionsSync.invalidateAndAwait();
+        this.requestPiSessionFullRefresh();
+        await this.sessionsSync.invalidateAndAwait();
+        return this.piSessionsSync.invalidateAndAwait();
     }
 
     public getCredentials() {
@@ -1088,24 +1445,32 @@ class Sync {
 
     private fetchMachines = async () => {
         if (!this.credentials) return;
+        const credentials = this.credentials;
+        const encryption = this.encryption;
+        const generation = this.sessionSnapshotGeneration;
+        const requestStartMachines = new Map(
+            Object.values(storage.getState().machines).map((machine) => [machine.id, machine]),
+        );
 
         console.log('📊 Sync: Fetching machines...');
         const API_ENDPOINT = getServerUrl();
-        const response = await fetch(`${API_ENDPOINT}/v1/machines`, {
-            headers: {
-                'Authorization': `Bearer ${this.credentials.token}`,
-                'Content-Type': 'application/json',
-                'X-Lyntty-Client': getLynttyClientId(),
-            }
+        const data = await fetchJsonWithTimeout({
+            url: `${API_ENDPOINT}/v1/machines`,
+            timeoutMs: MACHINE_LIST_REQUEST_TIMEOUT_MS,
+            label: MACHINE_LIST_REQUEST_LABEL,
+            init: {
+                headers: {
+                    'Authorization': `Bearer ${credentials.token}`,
+                    'Content-Type': 'application/json',
+                    'X-Lyntty-Client': getLynttyClientId(),
+                },
+            },
         });
-
-        if (!response.ok) {
-            console.error(`Failed to fetch machines: ${response.status}`);
-            return;
-        }
-
-        const data = await response.json();
-        console.log(`📊 Sync: Fetched ${Array.isArray(data) ? data.length : 0} machines from server`);
+        if (generation !== this.sessionSnapshotGeneration
+            || credentials !== this.credentials
+            || encryption !== this.encryption) return;
+        if (!Array.isArray(data)) throw new Error('Machine list request returned an invalid response');
+        console.log(`📊 Sync: Fetched ${data.length} machines from server`);
         const machines = data as Array<{
             id: string;
             metadata: string;
@@ -1136,13 +1501,12 @@ class Sync {
             if (machine.dataEncryptionKey) {
                 let decryptedKey: Uint8Array | null = null;
                 try {
-                    decryptedKey = await this.encryption.decryptEncryptionKey(machine.dataEncryptionKey);
+                    decryptedKey = await encryption.decryptEncryptionKey(machine.dataEncryptionKey);
                 } catch (error) {
                     console.error(`Failed to decrypt data encryption key for machine ${machine.id}:`, error);
                 }
                 if (decryptedKey) {
                     machineKeysMap.set(machine.id, decryptedKey);
-                    this.machineDataKeys.set(machine.id, decryptedKey);
                 } else {
                     console.error(`Failed to decrypt data encryption key for machine ${machine.id} - keeping machine with undecryptable metadata`);
                     machineKeysMap.set(machine.id, null);
@@ -1155,7 +1519,7 @@ class Sync {
         // Initialize machine encryptions. Guard so an init failure cannot
         // reject the whole sync and wipe the machine list.
         try {
-            await this.encryption.initializeMachines(machineKeysMap);
+            await encryption.initializeMachines(machineKeysMap);
         } catch (error) {
             console.error('Failed to initialize machine encryptions:', error);
         }
@@ -1168,7 +1532,7 @@ class Sync {
 
         for (const machine of machines) {
             try {
-                const machineEncryption = this.encryption.getMachineEncryption(machine.id);
+                const machineEncryption = encryption.getMachineEncryption(machine.id);
 
                 // Use machine-specific encryption (which handles fallback internally)
                 const metadata = machineEncryption && machine.metadata
@@ -1209,132 +1573,148 @@ class Sync {
             }
         }
 
-        // Replace entire machine state with fetched machines — but never wipe
-        // a populated store with an empty result. An empty list here almost
-        // always means a transient fetch/decrypt problem, not "user has no
-        // machines"; destroying good state would blank /new until restart.
-        const existingMachineCount = Object.keys(storage.getState().machines).length;
-        if (decryptedMachines.length === 0 && existingMachineCount > 0) {
-            log.log(`🖥️ fetchMachines: empty result, keeping ${existingMachineCount} existing machine(s)`);
-            return;
+        // A logout/server switch or a newer account generation can complete
+        // while keys/metadata are being decrypted. Never commit that late work.
+        if (generation !== this.sessionSnapshotGeneration
+            || credentials !== this.credentials
+            || encryption !== this.encryption) return;
+        const mergedMachines = mergeAuthoritativeMachineSnapshot(
+            decryptedMachines,
+            Object.values(storage.getState().machines),
+            requestStartMachines,
+        );
+        const retainedMachineIds = new Set(mergedMachines.map((machine) => machine.id));
+        for (const machineId of this.machineDataKeys.keys()) {
+            if (!retainedMachineIds.has(machineId)) this.machineDataKeys.delete(machineId);
         }
-        storage.getState().applyMachines(decryptedMachines, true);
-        this.sessionsSync.invalidate();
-        log.log(`🖥️ fetchMachines completed - processed ${decryptedMachines.length} machines`);
+        for (const [machineId, key] of machineKeysMap) {
+            if (key) this.machineDataKeys.set(machineId, key);
+        }
+        // A validated HTTP 200 empty list is authoritative (for example after
+        // the account's last node is deleted) and must clear stale node rows.
+        storage.getState().applyMachines(mergedMachines, true);
+        this.sessionListSnapshot.retainMachines(retainedMachineIds);
+        this.requestPiSessionFullRefresh();
+        this.piSessionsSync.invalidate();
+        log.log(`🖥️ fetchMachines completed - processed ${mergedMachines.length} machines`);
     }
 
-    private syncSettings = async () => {
-        if (!this.credentials) return;
+    private requestSettingsJson = async <T>(
+        url: string,
+        init: RequestInit,
+        context: SyncRuntimeContext,
+        credentials: AuthCredentials,
+    ): Promise<{ ok: boolean; status: number; data: T } | undefined> => {
+        if (!this.isSettingsContextCurrent(context, credentials)) return undefined;
+        const controller = new AbortController();
+        this.settingsAbortControllers.add(controller);
+        try {
+            const response = await fetch(url, { ...init, signal: controller.signal });
+            if (!this.isSettingsContextCurrent(context, credentials)) return undefined;
+            const data = await response.json() as T;
+            if (!this.isSettingsContextCurrent(context, credentials)) return undefined;
+            return { ok: response.ok, status: response.status, data };
+        } catch (error) {
+            if (!this.isSettingsContextCurrent(context, credentials)) return undefined;
+            throw error;
+        } finally {
+            this.settingsAbortControllers.delete(controller);
+        }
+    };
+
+    private syncSettings = async (
+        context: SyncRuntimeContext,
+        credentials: AuthCredentials,
+    ) => {
+        if (!this.isSettingsContextCurrent(context, credentials)) return;
 
         const API_ENDPOINT = getServerUrl();
+        const headers = {
+            'Authorization': `Bearer ${credentials.token}`,
+            'Content-Type': 'application/json',
+            'X-Lyntty-Client': getLynttyClientId(),
+        };
         const maxRetries = 3;
         let retryCount = 0;
 
-        // Apply pending settings
         if (Object.keys(this.pendingSettings).length > 0) {
-
             while (retryCount < maxRetries) {
-                // Snapshot what we're about to send so we can detect concurrent changes
+                if (!this.isSettingsContextCurrent(context, credentials)) return;
                 const sentPending = { ...this.pendingSettings };
-                let version = storage.getState().settingsVersion;
-                let settings = applySettings(storage.getState().settings, this.pendingSettings);
-                const response = await fetch(`${API_ENDPOINT}/v1/account/settings`, {
+                const version = storage.getState().settingsVersion;
+                const settings = applySettings(storage.getState().settings, this.pendingSettings);
+                const encryptedSettings = await context.encryption.encryptRaw(settingsToSyncPayload(settings));
+                if (!this.isSettingsContextCurrent(context, credentials)) return;
+                const response = await this.requestSettingsJson<{
+                    success: false;
+                    error: string;
+                    currentVersion: number;
+                    currentSettings: string | null;
+                } | {
+                    success: true;
+                }>(`${API_ENDPOINT}/v1/account/settings`, {
                     method: 'POST',
                     body: JSON.stringify({
-                        settings: await this.encryption.encryptRaw(settingsToSyncPayload(settings)),
-                        expectedVersion: version ?? 0
+                        settings: encryptedSettings,
+                        expectedVersion: version ?? 0,
                     }),
-                    headers: {
-                        'Authorization': `Bearer ${this.credentials.token}`,
-                        'Content-Type': 'application/json',
-                        'X-Lyntty-Client': getLynttyClientId(),
-                    }
-                });
-                const data = await response.json() as {
-                    success: false,
-                    error: string,
-                    currentVersion: number,
-                    currentSettings: string | null
-                } | {
-                    success: true
-                };
+                    headers,
+                }, context, credentials);
+                if (!response) return;
+                const data = response.data;
                 if (data.success) {
-                    // Only clear keys we actually sent — preserve any settings
-                    // added by applySettings() calls during the POST roundtrip
                     const newPending: Partial<Settings> = {};
                     for (const key of Object.keys(this.pendingSettings) as (keyof Settings)[]) {
                         if (!(key in sentPending) || this.pendingSettings[key] !== sentPending[key]) {
                             (newPending as any)[key] = this.pendingSettings[key];
                         }
                     }
+                    if (!this.isSettingsContextCurrent(context, credentials)) return;
                     this.pendingSettings = newPending;
                     savePendingSettings(this.pendingSettings);
                     break;
                 }
-                if (data.error === 'version-mismatch') {
-                    // Parse server settings
-                    const serverSettings = data.currentSettings
-                        ? settingsParse(await this.encryption.decryptRaw(data.currentSettings))
-                        : { ...settingsDefaults };
-
-                    // Merge: server base + our pending changes (our changes win)
-                    const mergedSettings = applySettings(serverSettings, this.pendingSettings);
-
-                    // Update local storage with merged result at server's version
-                    this.applyServerSettings(mergedSettings, data.currentVersion);
-
-                    // Log and retry
-                    console.log('settings version-mismatch, retrying', {
-                        serverVersion: data.currentVersion,
-                        retry: retryCount + 1,
-                        pendingKeys: Object.keys(this.pendingSettings)
-                    });
-                    retryCount++;
-                    continue;
-                } else {
+                if (data.error !== 'version-mismatch') {
                     throw new Error(`Failed to sync settings: ${data.error}`);
                 }
+                const decryptedSettings = data.currentSettings
+                    ? await context.encryption.decryptRaw(data.currentSettings)
+                    : null;
+                if (!this.isSettingsContextCurrent(context, credentials)) return;
+                const serverSettings = decryptedSettings
+                    ? settingsParse(decryptedSettings)
+                    : { ...settingsDefaults };
+                const mergedSettings = applySettings(serverSettings, this.pendingSettings);
+                this.applyServerSettings(mergedSettings, data.currentVersion);
+                console.log('settings version-mismatch, retrying', {
+                    serverVersion: data.currentVersion,
+                    retry: retryCount + 1,
+                    pendingKeys: Object.keys(this.pendingSettings),
+                });
+                retryCount++;
             }
         }
 
-        // If exhausted retries, throw to trigger outer backoff delay
         if (retryCount >= maxRetries) {
             throw new Error(`Settings sync failed after ${maxRetries} retries due to version conflicts`);
         }
 
-        // Run request
-        const response = await fetch(`${API_ENDPOINT}/v1/account/settings`, {
-            headers: {
-                'Authorization': `Bearer ${this.credentials.token}`,
-                'Content-Type': 'application/json',
-                'X-Lyntty-Client': getLynttyClientId(),
-            }
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to fetch settings: ${response.status}`);
-        }
-        const data = await response.json() as {
-            settings: string | null,
-            settingsVersion: number
-        };
+        const response = await this.requestSettingsJson<{
+            settings: string | null;
+            settingsVersion: number;
+        }>(`${API_ENDPOINT}/v1/account/settings`, { headers }, context, credentials);
+        if (!response) return;
+        if (!response.ok) throw new Error(`Failed to fetch settings: ${response.status}`);
+        const parsedSettings = response.data.settings
+            ? settingsParse(await context.encryption.decryptRaw(response.data.settings))
+            : { ...settingsDefaults };
+        if (!this.isSettingsContextCurrent(context, credentials)) return;
 
-        // Parse response
-        let parsedSettings: Settings;
-        if (data.settings) {
-            parsedSettings = settingsParse(await this.encryption.decryptRaw(data.settings));
-        } else {
-            parsedSettings = { ...settingsDefaults };
-        }
-
-        // Log
         console.log('settings', JSON.stringify({
             settings: parsedSettings,
-            version: data.settingsVersion
+            version: response.data.settingsVersion,
         }));
-
-        // Apply settings to storage, re-layering any pending local changes on top
-        this.applyServerSettings(parsedSettings, data.settingsVersion);
-
+        this.applyServerSettings(parsedSettings, response.data.settingsVersion);
     }
 
     private fetchNativeUpdate = async () => {
@@ -1400,12 +1780,14 @@ class Sync {
         }
     }
 
-    private flushOutbox = async (sessionId: string) => {
+    private flushOutbox = async (sessionId: string, context: SyncRuntimeContext) => {
+        if (!this.isRuntimeContextCurrent(context)) return;
         const pending = this.pendingOutbox.get(sessionId);
         if (!pending || pending.length === 0) {
             if (!this.hasPendingOutboxMessages()) {
                 this.clearBackgroundSendWatchdog();
                 await this.cancelBackgroundSendTimeoutNotification();
+                if (!this.isRuntimeContextCurrent(context)) return;
                 this.backgroundSendStartedAt = null;
             }
             return;
@@ -1433,6 +1815,7 @@ class Sync {
             }
 
             const data = await response.json() as V3PostSessionMessagesResponse;
+            if (!this.isRuntimeContextCurrent(context)) return;
             pending.splice(0, batch.length);
             if (pending.length === 0) this.pendingOutbox.delete(sessionId);
             savePendingOutbox(this.pendingOutbox);
@@ -1447,30 +1830,60 @@ class Sync {
                 this.sessionLastSeq.set(sessionId, maxSeq);
             }
         } catch (error) {
+            if (!this.isRuntimeContextCurrent(context)) return;
             this.maybeStartBackgroundSendWatchdog();
             throw error;
         } finally {
-            this.sendAbortControllers.delete(sessionId);
+            if (this.sendAbortControllers.get(sessionId) === controller) {
+                this.sendAbortControllers.delete(sessionId);
+            }
         }
 
+        if (!this.isRuntimeContextCurrent(context)) return;
         if (pending.length === 0) {
             this.pendingOutbox.delete(sessionId);
         }
         if (!this.hasPendingOutboxMessages()) {
             this.clearBackgroundSendWatchdog();
             await this.cancelBackgroundSendTimeoutNotification();
+            if (!this.isRuntimeContextCurrent(context)) return;
             this.backgroundSendStartedAt = null;
         } else if (this.appState !== 'active') {
             this.maybeStartBackgroundSendWatchdog();
         }
     }
 
-    private fetchMessages = async (sessionId: string) => {
+    private requestRuntimeJson = async <T>(
+        path: string,
+        context: SyncRuntimeContext,
+        failureMessage: (status: number) => string,
+    ): Promise<T | undefined> => {
+        if (!this.isRuntimeContextCurrent(context)) return undefined;
+        const controller = new AbortController();
+        this.readAbortControllers.add(controller);
+        try {
+            const response = await apiSocket.request(path, { signal: controller.signal });
+            if (!this.isRuntimeContextCurrent(context)) return undefined;
+            if (!response.ok) throw new Error(failureMessage(response.status));
+            const data = await response.json() as T;
+            if (!this.isRuntimeContextCurrent(context)) return undefined;
+            return data;
+        } catch (error) {
+            if (!this.isRuntimeContextCurrent(context)) return undefined;
+            throw error;
+        } finally {
+            this.readAbortControllers.delete(controller);
+        }
+    };
+
+    private fetchMessages = async (sessionId: string, context: SyncRuntimeContext) => {
+        if (!this.isRuntimeContextCurrent(context)) return;
         log.log(`💬 fetchMessages starting for session ${sessionId} - acquiring lock`);
         const lock = this.getSessionMessageLock(sessionId);
         let shouldLoadInitialPiHistory = false;
         await lock.inLock(async () => {
-            const encryption = this.encryption.getSessionEncryption(sessionId);
+            if (!this.isRuntimeContextCurrent(context)) return;
+            const encryption = context.encryption.getSessionEncryption(sessionId);
             if (!encryption) {
                 log.log(`💬 fetchMessages: Session encryption not ready for ${sessionId}, will retry`);
                 throw new Error(`Session encryption not ready for ${sessionId}`);
@@ -1489,14 +1902,15 @@ class Sync {
                 // from displaying anything for sessions with thousands of
                 // messages. The user's reported pain point was "opening a long
                 // session feels frozen" — this is the fix.
-                await this.fetchInitialLatestPage(sessionId, encryption);
+                await this.fetchInitialLatestPage(sessionId, encryption, context);
             } else {
                 // Forward incremental sync. Used after reconnect, invalidate,
                 // or any subsequent visit. Only pulls messages newer than what
                 // we already have, so it's bounded and fast in normal use.
-                await this.fetchForwardSince(sessionId, encryption, knownLastSeq);
+                await this.fetchForwardSince(sessionId, encryption, knownLastSeq, context);
             }
 
+            if (!this.isRuntimeContextCurrent(context)) return;
             storage.getState().applyMessagesLoaded(sessionId);
             log.log(`💬 fetchMessages completed for session ${sessionId}`);
 
@@ -1510,25 +1924,26 @@ class Sync {
             // background-drain long Pi/relay histories; that keeps session open
             // fast and avoids APK freezes on large timelines.
         });
-        if (shouldLoadInitialPiHistory) {
+        if (shouldLoadInitialPiHistory && this.isRuntimeContextCurrent(context)) {
             void this.loadOlderMessages(sessionId).catch(() => undefined);
         }
     }
 
     private fetchInitialLatestPage = async (
         sessionId: string,
-        encryption: ReturnType<Encryption['getSessionEncryption']> & {}
+        encryption: ReturnType<Encryption['getSessionEncryption']> & {},
+        context: SyncRuntimeContext,
     ) => {
-        const response = await apiSocket.request(
-            `/v3/sessions/${sessionId}/messages?before_seq=${SEQ_BACKWARD_INITIAL_SENTINEL}&limit=100`
+        const data = await this.requestRuntimeJson<V3GetSessionMessagesResponse>(
+            `/v3/sessions/${sessionId}/messages?before_seq=${SEQ_BACKWARD_INITIAL_SENTINEL}&limit=100`,
+            context,
+            (status) => `Failed to fetch initial page for ${sessionId}: ${status}`,
         );
-        if (!response.ok) {
-            throw new Error(`Failed to fetch initial page for ${sessionId}: ${response.status}`);
-        }
-        const data = await response.json() as V3GetSessionMessagesResponse;
+        if (!data || !this.isRuntimeContextCurrent(context)) return;
         const messages = Array.isArray(data.messages) ? data.messages : [];
 
-        await this.applyFetchedMessages(sessionId, encryption, messages);
+        await this.applyFetchedMessages(sessionId, encryption, messages, context);
+        if (!this.isRuntimeContextCurrent(context)) return;
 
         // Anchor both ends so future incremental forward sync resumes from
         // maxSeq, and loadOlderMessages can page backward from minSeq.
@@ -1551,18 +1966,21 @@ class Sync {
     private fetchForwardSince = async (
         sessionId: string,
         encryption: ReturnType<Encryption['getSessionEncryption']> & {},
-        fromSeq: number
+        fromSeq: number,
+        context: SyncRuntimeContext,
     ) => {
         let afterSeq = fromSeq;
         while (true) {
-            const response = await apiSocket.request(`/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=100`);
-            if (!response.ok) {
-                throw new Error(`Failed to forward-sync ${sessionId}: ${response.status}`);
-            }
-            const data = await response.json() as V3GetSessionMessagesResponse;
+            const data = await this.requestRuntimeJson<V3GetSessionMessagesResponse>(
+                `/v3/sessions/${sessionId}/messages?after_seq=${afterSeq}&limit=100`,
+                context,
+                (status) => `Failed to forward-sync ${sessionId}: ${status}`,
+            );
+            if (!data || !this.isRuntimeContextCurrent(context)) return;
             const messages = Array.isArray(data.messages) ? data.messages : [];
 
-            await this.applyFetchedMessages(sessionId, encryption, messages);
+            await this.applyFetchedMessages(sessionId, encryption, messages, context);
+            if (!this.isRuntimeContextCurrent(context)) return;
 
             let maxSeq = afterSeq;
             for (const message of messages) {
@@ -1582,13 +2000,15 @@ class Sync {
     private applyFetchedMessages = async (
         sessionId: string,
         encryption: ReturnType<Encryption['getSessionEncryption']> & {},
-        messages: ApiMessage[]
+        messages: ApiMessage[],
+        context: SyncRuntimeContext,
     ) => {
-        if (messages.length === 0) return;
+        if (messages.length === 0 || !this.isRuntimeContextCurrent(context)) return;
         // Backward pages arrive newest-first from the relay, but session
         // protocol turn-start/text/turn-end events are stateful and must be
         // reduced in ascending sequence order.
         const decryptedMessages = await encryption.decryptMessages(orderApiMessagesForReducer(messages));
+        if (!this.isRuntimeContextCurrent(context)) return;
         const normalizedMessages: NormalizedMessage[] = [];
         for (let i = 0; i < decryptedMessages.length; i++) {
             const decrypted = decryptedMessages[i];
@@ -1598,7 +2018,7 @@ class Sync {
                 normalizedMessages.push(normalized);
             }
         }
-        if (normalizedMessages.length > 0) {
+        if (normalizedMessages.length > 0 && this.isRuntimeContextCurrent(context)) {
             this.applyMessages(sessionId, normalizedMessages);
         }
     }
@@ -1611,6 +2031,8 @@ class Sync {
      * older-fetch is already in flight for this session.
      */
     loadOlderMessages = async (sessionId: string) => {
+        const context = this.captureRuntimeContext();
+        if (!this.isRuntimeContextCurrent(context)) return;
         const oldestSeq = this.sessionOldestSeq.get(sessionId);
         const session = storage.getState().sessions[sessionId];
         const hasMorePiHistory = session?.metadata?.piHistoryHasMore === true;
@@ -1627,7 +2049,8 @@ class Sync {
         let historyGapReason: string | null = null;
         try {
             await lock.inLock(async () => {
-                const encryption = this.encryption.getSessionEncryption(sessionId);
+                if (!this.isRuntimeContextCurrent(context)) return;
+                const encryption = context.encryption.getSessionEncryption(sessionId);
                 if (!encryption) {
                     log.log(`💬 loadOlderMessages: encryption not ready for ${sessionId}`);
                     return;
@@ -1640,13 +2063,26 @@ class Sync {
                     const fromSeq = this.sessionLastSeq.get(sessionId) ?? 0;
                     const requestedCursor = currentSession.metadata.piHistoryCursor;
                     const requestedMetadataVersion = currentSession.metadataVersion;
-                    const result = await apiSocket.sessionRPC<PiHistoryPageResult, { beforeEntryId?: string }>(
-                        sessionId,
-                        'pi-history-page',
-                        requestedCursor ? { beforeEntryId: requestedCursor } : {},
-                    );
-                    const latestSession = storage.getState().sessions[sessionId] ?? currentSession;
-                    const latestMetadata = latestSession.metadata ?? currentSession.metadata!;
+                    const controller = new AbortController();
+                    this.readAbortControllers.add(controller);
+                    let result: PiHistoryPageResult;
+                    try {
+                        result = await apiSocket.sessionRPC<PiHistoryPageResult, { beforeEntryId?: string }>(
+                            sessionId,
+                            'pi-history-page',
+                            requestedCursor ? { beforeEntryId: requestedCursor } : {},
+                            { timeoutMs: 15_000, signal: controller.signal },
+                        );
+                    } finally {
+                        this.readAbortControllers.delete(controller);
+                    }
+                    if (!this.isRuntimeContextCurrent(context)) return;
+                    // A delete received while the RPC was in flight is
+                    // authoritative. Never use the request-time row as a
+                    // fallback or recreate it through a delayed response.
+                    const latestSession = storage.getState().sessions[sessionId];
+                    const latestMetadata = latestSession?.metadata;
+                    if (!latestSession || !latestMetadata) return;
                     if (
                         latestSession.metadataVersion !== requestedMetadataVersion
                         || latestMetadata.piHistoryCursor !== requestedCursor
@@ -1655,7 +2091,8 @@ class Sync {
                         // this RPC was in flight. Fetch any newly confirmed
                         // messages, but never let the delayed response regress
                         // the newer cursor or pagination state.
-                        await this.fetchForwardSince(sessionId, encryption, fromSeq);
+                        await this.fetchForwardSince(sessionId, encryption, fromSeq, context);
+                        if (!this.isRuntimeContextCurrent(context)) return;
                         storage.getState().applyOlderMessagesPagination(sessionId, {
                             hasMore: latestMetadata.piHistoryHasMore === true
                                 || (this.sessionOldestSeq.get(sessionId) ?? 0) > 1,
@@ -1677,7 +2114,8 @@ class Sync {
                         });
                         return;
                     }
-                    await this.fetchForwardSince(sessionId, encryption, fromSeq);
+                    await this.fetchForwardSince(sessionId, encryption, fromSeq, context);
+                    if (!this.isRuntimeContextCurrent(context)) return;
                     storage.getState().applyOlderMessagesPagination(sessionId, {
                         hasMore: result.hasMore || (this.sessionOldestSeq.get(sessionId) ?? 0) > 1,
                     });
@@ -1689,16 +2127,16 @@ class Sync {
                 if (beforeSeq === undefined || beforeSeq <= 1) {
                     return;
                 }
-                const response = await apiSocket.request(
-                    `/v3/sessions/${sessionId}/messages?before_seq=${beforeSeq}&limit=100`
+                const data = await this.requestRuntimeJson<V3GetSessionMessagesResponse>(
+                    `/v3/sessions/${sessionId}/messages?before_seq=${beforeSeq}&limit=100`,
+                    context,
+                    (status) => `Failed to load older messages for ${sessionId}: ${status}`,
                 );
-                if (!response.ok) {
-                    throw new Error(`Failed to load older messages for ${sessionId}: ${response.status}`);
-                }
-                const data = await response.json() as V3GetSessionMessagesResponse;
+                if (!data || !this.isRuntimeContextCurrent(context)) return;
                 const messages = Array.isArray(data.messages) ? data.messages : [];
 
-                await this.applyFetchedMessages(sessionId, encryption, messages);
+                await this.applyFetchedMessages(sessionId, encryption, messages, context);
+                if (!this.isRuntimeContextCurrent(context)) return;
 
                 let minSeq = beforeSeq;
                 for (const message of messages) {
@@ -1711,15 +2149,20 @@ class Sync {
                     hasMore: !!data.hasMore && messages.length > 0
                 });
             });
-            storage.getState().applyOlderMessagesError(sessionId, historyGapReason);
+            if (this.isRuntimeContextCurrent(context)) {
+                storage.getState().applyOlderMessagesError(sessionId, historyGapReason);
+            }
         } catch (error) {
+            if (!this.isRuntimeContextCurrent(context)) return;
             storage.getState().applyOlderMessagesError(
                 sessionId,
                 error instanceof Error ? error.message : String(error),
             );
             throw error;
         } finally {
-            storage.getState().applyOlderMessagesLoading(sessionId, false);
+            if (this.isRuntimeContextCurrent(context)) {
+                storage.getState().applyOlderMessagesLoading(sessionId, false);
+            }
         }
     }
 
@@ -1740,6 +2183,13 @@ class Sync {
         }
     }
 
+    private createActivityAccumulator = (): ActivityUpdateAccumulator => {
+        const generation = this.sessionSnapshotGeneration;
+        return new ActivityUpdateAccumulator((updates) => {
+            if (generation === this.sessionSnapshotGeneration) this.flushActivityUpdates(updates);
+        }, 2000);
+    }
+
     private subscribeToUpdates = () => {
         // Subscribe to message updates
         apiSocket.onMessage('update', this.handleUpdate.bind(this));
@@ -1754,6 +2204,8 @@ class Sync {
             // covers the very first connect; this covers reconnects).
             apiSocket.sendAppState(getCurrentAppState());
 
+            this.requestPiSessionFullRefresh();
+            this.schedulePiSessionRefresh();
             this.sessionsSync.invalidate();
             this.machinesSync.invalidate();
             // Messages are fetched lazily per-session via onSessionVisible (called by SessionView
@@ -1766,14 +2218,29 @@ class Sync {
     }
 
     private handleUpdate = (update: unknown) => {
+        const context: RelayUpdateContext = {
+            generation: this.sessionSnapshotGeneration,
+            encryption: this.encryption,
+            sessionsSync: this.sessionsSync,
+            tombstoneScope: this.piSessionTombstoneScope(),
+        };
         this.updateProcessingChain = this.updateProcessingChain
-            .then(() => this.processUpdate(update))
+            .then(() => this.processUpdate(update, context))
             .catch((error) => {
                 console.error('Failed to process relay update in order', error);
             });
     }
 
-    private processUpdate = async (update: unknown) => {
+    private isRelayUpdateContextCurrent = (context: RelayUpdateContext): boolean => (
+        this.syncStarted
+        && context.generation === this.sessionSnapshotGeneration
+        && context.encryption === this.encryption
+        && context.sessionsSync === this.sessionsSync
+        && context.tombstoneScope === this.piSessionTombstoneScope()
+    );
+
+    private processUpdate = async (update: unknown, context: RelayUpdateContext) => {
+        if (!this.isRelayUpdateContextCurrent(context)) return;
         const validatedUpdate = ApiUpdateContainerSchema.safeParse(update);
         if (!validatedUpdate.success) {
             console.log('❌ Sync: Invalid update received:', validatedUpdate.error);
@@ -1786,13 +2253,14 @@ class Sync {
         if (updateData.body.t === 'new-message') {
 
             // Get encryption — may not be ready if sessions are still syncing
-            let encryption = this.encryption.getSessionEncryption(updateData.body.sid);
+            let encryption = context.encryption.getSessionEncryption(updateData.body.sid);
             if (!encryption) {
-                await this.sessionsSync.awaitQueue();
-                encryption = this.encryption.getSessionEncryption(updateData.body.sid);
+                await context.sessionsSync.awaitQueue();
+                if (!this.isRelayUpdateContextCurrent(context)) return;
+                encryption = context.encryption.getSessionEncryption(updateData.body.sid);
                 if (!encryption) {
                     console.error(`Session ${updateData.body.sid} not found after sync`);
-                    this.fetchSessions();
+                    this.sessionsSync.invalidate();
                     return;
                 }
             }
@@ -1801,6 +2269,7 @@ class Sync {
             let lastMessage: NormalizedMessage | null = null;
             if (updateData.body.message) {
                 const decrypted = await encryption.decryptMessage(updateData.body.message);
+                if (!this.isRelayUpdateContextCurrent(context)) return;
                 if (decrypted) {
                     lastMessage = normalizeRawMessage(decrypted.id, decrypted.localId, decrypted.createdAt, decrypted.content, decrypted.seq);
 
@@ -1844,7 +2313,7 @@ class Sync {
                         }])
                     } else {
                         // Fetch sessions again if we don't have this session
-                        this.fetchSessions();
+                        this.sessionsSync.invalidate();
                     }
 
                     // Fast-path only on consecutive seq values, otherwise fetch from server.
@@ -1875,12 +2344,30 @@ class Sync {
         } else if (updateData.body.t === 'delete-session') {
             log.log('🗑️ Delete session update received');
             const sessionId = updateData.body.sid;
+            const deletedSession = storage.getState().sessions[sessionId];
+            const discoveredIdentity = this.sessionListSnapshot.findPiIdentityByRelaySessionId(sessionId);
+            const relaySessionTag = deletedSession?.tag ?? discoveredIdentity?.relaySessionTag;
+            const machineId = deletedSession?.metadata?.machineId ?? discoveredIdentity?.machineId;
+            const piSessionId = deletedSession?.metadata?.piSessionId ?? discoveredIdentity?.piSessionId;
+            const isPiSession = deletedSession?.metadata?.flavor === 'pi'
+                || relaySessionTag?.startsWith('pi:') === true
+                || Boolean(machineId && piSessionId);
+            const deletedIdentity = {
+                relaySessionId: sessionId,
+                ...(relaySessionTag ? { relaySessionTag } : {}),
+                machineId,
+                piSessionId,
+            };
+            this.sessionListSnapshot.hideDeletedSession(deletedIdentity);
+            if (isPiSession) {
+                this.persistPiSessionTombstone(deletedIdentity, context.tombstoneScope);
+            }
 
             // Remove session from storage
             storage.getState().deleteSession(sessionId);
 
             // Remove encryption keys from memory
-            this.encryption.removeSessionEncryption(sessionId);
+            context.encryption.removeSessionEncryption(sessionId);
 
             // Clear any cached git status
             gitStatusSync.clearForSession(sessionId);
@@ -1902,16 +2389,17 @@ class Sync {
             // silently loses the metadata update that carries the chat title
             // (#1251: every chat stuck on "New chat" after the lazy-load change).
             let session = storage.getState().sessions[updateData.body.id];
-            let sessionEncryption = this.encryption.getSessionEncryption(updateData.body.id);
+            let sessionEncryption = context.encryption.getSessionEncryption(updateData.body.id);
             if (!session || !sessionEncryption) {
-                await this.sessionsSync.awaitQueue();
+                await context.sessionsSync.awaitQueue();
+                if (!this.isRelayUpdateContextCurrent(context)) return;
                 session = storage.getState().sessions[updateData.body.id];
-                sessionEncryption = this.encryption.getSessionEncryption(updateData.body.id);
+                sessionEncryption = context.encryption.getSessionEncryption(updateData.body.id);
             }
             if (session) {
                 if (!sessionEncryption) {
                     console.error(`Session encryption not found for ${updateData.body.id} after sync`);
-                    this.fetchSessions();
+                    this.sessionsSync.invalidate();
                     return;
                 }
 
@@ -1921,6 +2409,7 @@ class Sync {
                 const metadata = updateData.body.metadata && sessionEncryption
                     ? await sessionEncryption.decryptMetadata(updateData.body.metadata.version, updateData.body.metadata.value)
                     : session.metadata;
+                if (!this.isRelayUpdateContextCurrent(context)) return;
 
                 this.applySessions([{
                     ...session,
@@ -1955,7 +2444,8 @@ class Sync {
             // Account updates carry encrypted settings changes.
             if (accountUpdate.settings?.value) {
                 try {
-                    const decryptedSettings = await this.encryption.decryptRaw(accountUpdate.settings.value);
+                    const decryptedSettings = await context.encryption.decryptRaw(accountUpdate.settings.value);
+                    if (!this.isRelayUpdateContextCurrent(context)) return;
                     const parsedSettings = settingsParse(decryptedSettings);
 
                     // Version compatibility check
@@ -1987,7 +2477,8 @@ class Sync {
             // restart / socket reconnect triggers a full machine refetch.
             const machineKeysMap = new Map<string, Uint8Array | null>();
             if (machineUpdate.dataEncryptionKey) {
-                const decryptedKey = await this.encryption.decryptEncryptionKey(machineUpdate.dataEncryptionKey);
+                const decryptedKey = await context.encryption.decryptEncryptionKey(machineUpdate.dataEncryptionKey);
+                if (!this.isRelayUpdateContextCurrent(context)) return;
                 if (decryptedKey) {
                     machineKeysMap.set(machineId, decryptedKey);
                     this.machineDataKeys.set(machineId, decryptedKey);
@@ -1998,9 +2489,10 @@ class Sync {
             } else {
                 machineKeysMap.set(machineId, null);
             }
-            await this.encryption.initializeMachines(machineKeysMap);
+            await context.encryption.initializeMachines(machineKeysMap);
+            if (!this.isRelayUpdateContextCurrent(context)) return;
 
-            const machineEncryption = this.encryption.getMachineEncryption(machineId);
+            const machineEncryption = context.encryption.getMachineEncryption(machineId);
             if (!machineEncryption) {
                 console.error(`Machine encryption not found for ${machineId} after init - cannot apply new-machine`);
                 return;
@@ -2033,8 +2525,13 @@ class Sync {
             } catch (error) {
                 console.error(`Failed to decrypt new machine ${machineId}:`, error);
             }
+            if (!this.isRelayUpdateContextCurrent(context)) return;
 
             storage.getState().applyMachines([newMachine]);
+            if (shouldRefreshPiSessionsForMachineTransition(existing?.active, newMachine.active)) {
+                this.requestPiSessionFullRefresh();
+                this.schedulePiSessionRefresh();
+            }
         } else if (updateData.body.t === 'update-machine') {
             const machineUpdate = updateData.body;
             const machineId = machineUpdate.machineId;  // Changed from .id to .machineId
@@ -2055,7 +2552,7 @@ class Sync {
             };
 
             // Get machine-specific encryption (might not exist if machine wasn't initialized)
-            const machineEncryption = this.encryption.getMachineEncryption(machineId);
+            const machineEncryption = context.encryption.getMachineEncryption(machineId);
             if (!machineEncryption) {
                 console.error(`Machine encryption not found for ${machineId} - cannot decrypt updates`);
                 return;
@@ -2066,6 +2563,7 @@ class Sync {
             if (metadataUpdate) {
                 try {
                     const metadata = await machineEncryption.decryptMetadata(metadataUpdate.version, metadataUpdate.value);
+                    if (!this.isRelayUpdateContextCurrent(context)) return;
                     updatedMachine.metadata = metadata;
                     updatedMachine.metadataVersion = metadataUpdate.version;
                 } catch (error) {
@@ -2078,6 +2576,7 @@ class Sync {
             if (daemonStateUpdate) {
                 try {
                     const daemonState = await machineEncryption.decryptDaemonState(daemonStateUpdate.version, daemonStateUpdate.value);
+                    if (!this.isRelayUpdateContextCurrent(context)) return;
                     updatedMachine.daemonState = daemonState;
                     updatedMachine.daemonStateVersion = daemonStateUpdate.version;
                 } catch (error) {
@@ -2086,7 +2585,12 @@ class Sync {
             }
 
             // Update storage using applyMachines which rebuilds sessionListViewData
+            if (!this.isRelayUpdateContextCurrent(context)) return;
             storage.getState().applyMachines([updatedMachine]);
+            if (shouldRefreshPiSessionsForMachineTransition(machine?.active, updatedMachine.active)) {
+                this.requestPiSessionFullRefresh();
+                this.schedulePiSessionRefresh();
+            }
         } else if (updateData.body.t === 'delete-machine') {
             const machineId = updateData.body.machineId;
             log.log(`🗑️ Delete machine update received for ${machineId}`);
@@ -2094,7 +2598,8 @@ class Sync {
                 log.log(`Machine ${machineId} not in storage, skipping delete`);
             } else {
                 storage.getState().deleteMachine(machineId);
-                this.encryption.removeMachineEncryption(machineId);
+                this.sessionListSnapshot.removeMachine(machineId);
+                context.encryption.removeMachineEncryption(machineId);
                 this.machineDataKeys.delete(machineId);
             }
         }
@@ -2154,6 +2659,10 @@ class Sync {
                     activeAt: updateData.activeAt
                 };
                 storage.getState().applyMachines([updatedMachine]);
+                if (shouldRefreshPiSessionsForMachineTransition(machine.active, updatedMachine.active)) {
+                    this.requestPiSessionFullRefresh();
+                    this.schedulePiSessionRefresh();
+                }
             }
         }
 

@@ -1,4 +1,5 @@
 import { basename } from 'node:path';
+import { createHash } from 'node:crypto';
 
 import { SessionManager, type SessionInfo } from '@earendil-works/pi-coding-agent';
 
@@ -34,6 +35,7 @@ export interface PiSessionRecoveryRecord {
   registeredUpdatedAt?: number;
   firstMessage?: string;
   messageCount: number;
+  summaryComplete?: boolean;
   needsRegistration: boolean;
   needsBackfill: boolean;
   hasHistoryGap: boolean;
@@ -56,10 +58,31 @@ export interface DiscoverPiSessionsOptions {
   now?: Date;
   limit?: number;
   cursor?: string;
+  snapshotGeneration?: string;
   listSessions?: () => Promise<SessionInfo[]>;
+  isSessionSummaryComplete?: (sessionId: string) => boolean;
+  isSessionHistoryGapVerified?: (sessionId: string) => boolean;
+  isSessionActive?: (sessionId: string) => boolean;
 }
 
 const DEFAULT_STALE_AFTER_MS = 1000 * 60 * 60 * 24 * 14;
+
+export function createPiDiscoverySnapshotGeneration(input: {
+  runtimeNonce: string;
+  indexGeneration: number;
+  scope: 'cwd' | 'machine';
+  cwd?: string;
+  registered: Array<{
+    piSessionId: string;
+    relaySessionId?: string;
+    importedMessageCount: number;
+    relayAvailable?: boolean;
+    updatedAt?: number;
+  }>;
+  activePiSessionIds: string[];
+}): string {
+  return createHash('sha256').update(JSON.stringify(input)).digest('base64url');
+}
 const MAX_RELAY_TEXT_FIELD_LENGTH = 240;
 
 function truncateRelayText(value: string | undefined, maxLength = MAX_RELAY_TEXT_FIELD_LENGTH): string | undefined {
@@ -80,12 +103,17 @@ export function classifyPiSessionRecovery(input: {
   importError?: string;
   staleAfterMs?: number;
   now?: Date;
+  localSummaryComplete?: boolean;
+  localHistoryGapVerified?: boolean;
 }): PiSessionRecoveryRecord {
   const now = input.now ?? new Date();
   const staleAfterMs = input.staleAfterMs ?? DEFAULT_STALE_AFTER_MS;
   const piSessionId = input.local?.id ?? input.registered?.piSessionId ?? 'unknown';
   const importedMessageCount = input.registered?.importedMessageCount ?? 0;
   const localMessageCount = input.local?.messageCount ?? 0;
+  const summaryComplete = input.localSummaryComplete !== false;
+  const historyGapVerified = input.localHistoryGapVerified !== false;
+  const hasNewLocalHistory = summaryComplete && localMessageCount > importedMessageCount;
   const base = {
     piSessionId,
     relaySessionId: input.registered?.relaySessionId,
@@ -97,6 +125,7 @@ export function classifyPiSessionRecovery(input: {
     registeredUpdatedAt: input.registered?.updatedAt?.getTime(),
     firstMessage: normalizePiSessionDisplayNameCandidate(truncateRelayText(input.local?.firstMessage)),
     messageCount: localMessageCount,
+    summaryComplete,
   };
 
   if (input.importError) {
@@ -132,7 +161,18 @@ export function classifyPiSessionRecovery(input: {
     };
   }
 
-  if (localMessageCount < importedMessageCount) {
+  if (input.active) {
+    return {
+      ...base,
+      state: 'active_runtime',
+      needsRegistration: false,
+      needsBackfill: hasNewLocalHistory || input.registered.relayAvailable === false,
+      hasHistoryGap: false,
+      reason: 'Pi runtime is active for this session',
+    };
+  }
+
+  if (summaryComplete && historyGapVerified && localMessageCount < importedMessageCount) {
     return {
       ...base,
       state: 'history_gap',
@@ -140,17 +180,6 @@ export function classifyPiSessionRecovery(input: {
       needsBackfill: false,
       hasHistoryGap: true,
       reason: `local Pi history has ${localMessageCount} messages but relay import ledger expects ${importedMessageCount}`,
-    };
-  }
-
-  if (input.active) {
-    return {
-      ...base,
-      state: 'active_runtime',
-      needsRegistration: false,
-      needsBackfill: localMessageCount > importedMessageCount || input.registered.relayAvailable === false,
-      hasHistoryGap: false,
-      reason: 'Pi runtime is active for this session',
     };
   }
 
@@ -170,7 +199,7 @@ export function classifyPiSessionRecovery(input: {
       ...base,
       state: 'stale_local',
       needsRegistration: false,
-      needsBackfill: localMessageCount > importedMessageCount,
+      needsBackfill: hasNewLocalHistory,
       hasHistoryGap: false,
       reason: 'local Pi session is registered but stale',
     };
@@ -180,9 +209,13 @@ export function classifyPiSessionRecovery(input: {
     ...base,
     state: 'registered',
     needsRegistration: false,
-    needsBackfill: localMessageCount > importedMessageCount,
+    needsBackfill: hasNewLocalHistory,
     hasHistoryGap: false,
-    reason: localMessageCount > importedMessageCount
+    reason: !summaryComplete
+      ? 'Pi session summary is still indexing'
+      : !historyGapVerified && localMessageCount < importedMessageCount
+      ? 'Pi session history gap is awaiting current file verification'
+      : hasNewLocalHistory
       ? 'local Pi history has new messages to backfill'
       : 'local Pi session is registered and in sync',
   };
@@ -199,6 +232,7 @@ interface PiDiscoveryCursorV1 {
   active: boolean;
   modified: number;
   id: string;
+  generation?: string;
 }
 
 function sessionDiscoveryKey(session: SessionInfo, activePiIds: Set<string>): Omit<PiDiscoveryCursorV1, 'v'> {
@@ -226,10 +260,14 @@ function recoveryRecordDiscoveryKey(record: PiSessionRecoveryRecord, activePiIds
   };
 }
 
-function encodeDiscoveryKey(key: Omit<PiDiscoveryCursorV1, 'v'>): string {
+function encodeDiscoveryKey(
+  key: Omit<PiDiscoveryCursorV1, 'v' | 'generation'>,
+  generation?: string,
+): string {
   return Buffer.from(JSON.stringify({
     v: 1,
     ...key,
+    ...(generation ? { generation } : {}),
   } satisfies PiDiscoveryCursorV1), 'utf8').toString('base64url');
 }
 
@@ -239,7 +277,11 @@ function decodeDiscoveryCursor(cursor: string | undefined): PiDiscoveryCursorV1 
   }
   try {
     const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as Partial<PiDiscoveryCursorV1>;
-    if (decoded.v === 1 && typeof decoded.active === 'boolean' && typeof decoded.modified === 'number' && typeof decoded.id === 'string') {
+    if (decoded.v === 1
+      && typeof decoded.active === 'boolean'
+      && typeof decoded.modified === 'number'
+      && typeof decoded.id === 'string'
+      && (decoded.generation === undefined || typeof decoded.generation === 'string')) {
       return decoded as PiDiscoveryCursorV1;
     }
   } catch {
@@ -275,8 +317,12 @@ async function listPiSessionsForScope(options: DiscoverPiSessionsOptions): Promi
 export async function discoverLocalPiSessionsPage(options: DiscoverPiSessionsOptions): Promise<PiSessionDiscoveryPage> {
   const registeredByPiId = new Map((options.registeredSessions ?? []).map((entry) => [entry.piSessionId, entry]));
   const activePiIds = new Set(options.activePiSessionIds ?? []);
-  const sessions = (await listPiSessionsForScope(options)).sort(compareSessionInfoByDiscoveryOrder(activePiIds));
   const decodedCursor = decodeDiscoveryCursor(options.cursor);
+  if (decodedCursor && options.snapshotGeneration
+    && decodedCursor.generation !== options.snapshotGeneration) {
+    throw new Error('Pi discovery snapshot generation changed during pagination');
+  }
+  const sessions = (await listPiSessionsForScope(options)).sort(compareSessionInfoByDiscoveryOrder(activePiIds));
   const limit = resolvePageLimit(options.limit);
   // Product-visible discovery only exposes real local/live Pi sessions. Relay-only
   // registrations without a local Pi JSONL/session record are diagnostic noise,
@@ -284,7 +330,9 @@ export async function discoverLocalPiSessionsPage(options: DiscoverPiSessionsOpt
   const records = sessions.map((local) => classifyPiSessionRecovery({
     local,
     registered: registeredByPiId.get(local.id),
-    active: activePiIds.has(local.id),
+    active: activePiIds.has(local.id) || options.isSessionActive?.(local.id) === true,
+    localSummaryComplete: options.isSessionSummaryComplete?.(local.id) ?? true,
+    localHistoryGapVerified: options.isSessionHistoryGapVerified?.(local.id) ?? true,
     staleAfterMs: options.staleAfterMs,
     now: options.now,
   })).sort((a, b) => compareSessionDiscoveryKeys(recoveryRecordDiscoveryKey(a, activePiIds), recoveryRecordDiscoveryKey(b, activePiIds)));
@@ -299,7 +347,7 @@ export async function discoverLocalPiSessionsPage(options: DiscoverPiSessionsOpt
   return {
     records: pageRecords,
     nextCursor: hasMore && lastRecord
-      ? encodeDiscoveryKey(recoveryRecordDiscoveryKey(lastRecord, activePiIds))
+      ? encodeDiscoveryKey(recoveryRecordDiscoveryKey(lastRecord, activePiIds), options.snapshotGeneration)
       : undefined,
     total,
   };

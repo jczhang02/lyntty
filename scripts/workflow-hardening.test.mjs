@@ -1,15 +1,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'bun:test';
-import {
-  createStableAndroidValidation,
-  renderStableAndroidValidationWarning,
-  STABLE_ANDROID_WAIVER_PHRASE,
-} from './stable-release-validation.ts';
+import { createStableAndroidValidation } from './stable-release-validation.ts';
 
 const relayDeployPath = new URL('../.github/workflows/relay-deploy.yml', import.meta.url);
 const relayImagePath = new URL('../.github/workflows/relay-image.yml', import.meta.url);
@@ -28,6 +24,7 @@ const androidGradlePath = new URL('../packages/lyntty-app/android/app/build.grad
 const maestroRunnerPath = new URL('./e2e/run-maestro.sh', import.meta.url);
 const codeownersPath = new URL('../.github/CODEOWNERS', import.meta.url);
 const typecheckWorkflowPath = new URL('../.github/workflows/typecheck.yml', import.meta.url);
+const docsWorkflowPath = new URL('../.github/workflows/docs.yml', import.meta.url);
 const cliSmokeWorkflowPath = new URL('../.github/workflows/cli-smoke-test.yml', import.meta.url);
 const cliArtifactBuilderPath = new URL('../packages/lyntty-cli/scripts/build-artifact.ts', import.meta.url);
 const rootPackagePath = new URL('../package.json', import.meta.url);
@@ -62,6 +59,9 @@ const [relayDeploy, relayImage, androidRelease, androidExpoDev, androidPreviewCa
   readFile(previewBundleSmokePath, 'utf8'),
 ]);
 const rootPackage = JSON.parse(rootPackageText);
+const docsWorkflow = await readFile(docsWorkflowPath, 'utf8');
+const typecheckWorkflowConfig = Bun.YAML.parse(typecheckWorkflow);
+const docsWorkflowConfig = Bun.YAML.parse(docsWorkflow);
 const previewReleaseNotes = await readFile(previewReleaseNotesPath, 'utf8');
 const resolvedPreviewReleaseNotes = previewReleaseNotes
   .replaceAll('{{VERSION_NAME}}', '1.2.0')
@@ -1404,10 +1404,92 @@ test('candidate builds once under channel isolation and never publishes', () => 
   assert.doesNotMatch(releaseCandidate, /docker\/login-action/);
 });
 
+test('candidate predecessor paths remain portable between workflow runners', async () => {
+  assert.match(releaseCandidate, /predecessorEntries\.map\(entry => relative\(root, entry\.path\)\)/);
+  assert.doesNotMatch(releaseCandidate, /predecessorEntries\.map\(entry => entry\.path\)/);
+
+  const extractBlock = (workflow, pattern) => workflow.match(pattern)?.[0]
+    .split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  const writer = extractBlock(
+    releaseCandidate,
+    /          const predecessorPaths = predecessorEntries\.map[\s\S]*?          await Bun\.write\(join\(root, 'predecessor-paths\.txt'\)[^\n]+/,
+  );
+  const resolvers = [releaseCandidate, releasePromote].map(workflow => extractBlock(
+    workflow,
+    /          predecessor_args=\(\)[\s\S]*?          done < "\$CANDIDATE\/predecessor-paths\.txt"/,
+  ));
+  assert.ok(writer);
+  assert.ok(resolvers.every(Boolean));
+
+  const root = await mkdtemp(join(tmpdir(), 'lyntty-portable-predecessor-'));
+  const runnerA = join(root, 'runner-a', 'candidate');
+  const runnerB = join(root, 'runner-b', 'candidate');
+  const relativePath = 'predecessors/compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1/compatibility-bom.json';
+  try {
+    await mkdir(join(runnerA, 'predecessors', 'compat-v1.2.0_1.2.0_1.2.0_0.2.0-s1'), { recursive: true });
+    await writeFile(join(runnerA, relativePath), '{}\n');
+    const write = Bun.spawnSync({
+      cmd: ['bun', '-e', `
+        import { join, relative } from 'node:path';
+        const root = process.env.CANDIDATE;
+        const predecessorEntries = [{ path: join(root, process.env.RELATIVE_PATH) }];
+        ${writer}
+      `],
+      env: { ...process.env, CANDIDATE: runnerA, RELATIVE_PATH: relativePath },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    assert.equal(write.exitCode, 0, write.stderr.toString());
+    assert.equal(await readFile(join(runnerA, 'predecessor-paths.txt'), 'utf8'), `${relativePath}\n`);
+    await cp(runnerA, runnerB, { recursive: true });
+
+    const runResolver = async (resolver, contents, printArguments = false) => {
+      await writeFile(join(runnerB, 'predecessor-paths.txt'), contents);
+      return Bun.spawnSync({
+        cmd: ['bash', '-c', `set -euo pipefail\n${resolver}${printArguments ? '\nprintf \'%s\\n\' "${predecessor_args[@]}"' : ''}`],
+        env: { ...process.env, CANDIDATE: runnerB },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+    };
+
+    for (const resolver of resolvers) {
+      for (const contents of [`${relativePath}\n`, relativePath]) {
+        const run = await runResolver(resolver, contents, true);
+        assert.equal(run.exitCode, 0, run.stderr.toString());
+        assert.equal(run.stdout.toString(), `--predecessor\n${join(runnerB, relativePath)}\n`);
+        assert.doesNotMatch(run.stdout.toString(), /runner-a/);
+      }
+      assert.equal((await runResolver(resolver, '')).exitCode, 0);
+
+      for (const invalid of [
+        '/home/runner/work/_temp/candidate/predecessors/compat-v1.2.0-s1/compatibility-bom.json',
+        'predecessors/compat-v1.2.0-s1/../compatibility-bom.json\n',
+      ]) {
+        const run = await runResolver(resolver, invalid);
+        assert.notEqual(run.exitCode, 0);
+        assert.match(run.stderr.toString(), /not portable/);
+      }
+      const blank = await runResolver(resolver, '\n');
+      assert.notEqual(blank.exitCode, 0);
+      assert.match(blank.stderr.toString(), /blank record/);
+
+      const missing = await runResolver(
+        resolver,
+        'predecessors/compat-v9.9.9_9.9.9_9.9.9_0.2.0-s9/compatibility-bom.json\n',
+      );
+      assert.notEqual(missing.exitCode, 0);
+      assert.match(missing.stderr.toString(), /is missing/);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('promotion publishes exact candidate bytes with protected stable/preview separation', () => {
   assert.match(releasePromote, /workflow_dispatch/);
   assert.match(releasePromote, /physical_phone_accepted/);
-  assert.match(releasePromote, /stable_unverified_release_waiver/);
+  assert.doesNotMatch(releasePromote, /stable_unverified_release_waiver/);
   assert.match(releasePromote, /accepted_android_apk_sha256/);
   assert.match(releasePromote, /immutable_releases_enabled/);
   assert.match(releasePromote, /LYNTTY_STABLE_TAG_RULESET_ID/);
@@ -1441,30 +1523,27 @@ test('promotion publishes exact candidate bytes with protected stable/preview se
   assert.match(releasePromote, /read -r repository digest[\s\S]*?console\.log\(`/);
   assert.doesNotMatch(releasePromote, /read -r repository digest[\s\S]*?process\.stdout\.write/);
   assert.match(releasePromote, /android-validation\.json/);
-  assert.match(releasePromote, /Physical Android validation: not performed; explicit owner self-use waiver/);
+  assert.doesNotMatch(releasePromote, /not performed; explicit owner self-use waiver/);
+  assert.doesNotMatch(releasePromote, /stable-release-validation\.ts warning/);
   const auditIndex = releasePromote.indexOf('stable-release-validation.ts audit');
   const checksumsIndex = releasePromote.indexOf('sha256sum * | sort -k2 > release-checksums.txt');
-  const warningIndex = releasePromote.indexOf('stable-release-validation.ts warning');
-  const headerIndex = releasePromote.indexOf('echo "# Lyntty Compatibility release');
   assert.ok(auditIndex > 0 && auditIndex < checksumsIndex);
-  assert.ok(warningIndex > 0 && warningIndex < headerIndex);
   assert.match(releasePromote, /bun install --frozen-lockfile/);
   assert.doesNotMatch(releasePromote, /gradlew|build-artifact\.ts|docker buildx|build-push-action/);
 });
 
-test('Stable physical acceptance and owner waiver are explicit and mutually exclusive', () => {
+test('Stable physical acceptance is optional and exact when supplied', () => {
   const authorizationBlock = releasePromote.match(
-    /stable_waiver_phrase='I accept publishing this exact Stable Candidate without physical Android validation'[\s\S]*?\n\s+esac/,
+    /case "\$PHYSICAL_PHONE_ACCEPTED" in[\s\S]*?\n\s+esac/,
   )?.[0];
   assert.ok(authorizationBlock);
 
-  const authorize = (physicalPhoneAccepted, waiver, acceptedSha256) => {
+  const authorize = (physicalPhoneAccepted, acceptedSha256) => {
     const result = Bun.spawnSync({
       cmd: ['bash', '-c', `set -euo pipefail\n${authorizationBlock}`],
       env: {
         ...process.env,
         PHYSICAL_PHONE_ACCEPTED: physicalPhoneAccepted,
-        STABLE_UNVERIFIED_RELEASE_WAIVER: waiver,
         ACCEPTED_ANDROID_APK_SHA256: acceptedSha256,
       },
       stdout: 'pipe',
@@ -1474,56 +1553,74 @@ test('Stable physical acceptance and owner waiver are explicit and mutually excl
   };
 
   const digest = 'a'.repeat(64);
-  const phrase = 'I accept publishing this exact Stable Candidate without physical Android validation';
-  assert.equal(authorize('true', '', digest), 0);
-  assert.equal(authorize('false', phrase, ''), 0);
-  assert.notEqual(authorize('false', '', ''), 0);
-  assert.notEqual(authorize('false', phrase, digest), 0);
-  assert.notEqual(authorize('true', phrase, digest), 0);
-  assert.notEqual(authorize('true', '', ''), 0);
-  assert.notEqual(authorize('unknown', '', ''), 0);
+  assert.equal(authorize('true', digest), 0);
+  assert.equal(authorize('false', ''), 0);
+  assert.notEqual(authorize('false', digest), 0);
+  assert.notEqual(authorize('true', ''), 0);
+  assert.notEqual(authorize('unknown', ''), 0);
+
+  const disclosureBlock = releasePromote.match(
+    /if \[\[ "\$CHANNEL" == stable \]\]; then\n\s+if \[\[ "\$PHYSICAL_PHONE_ACCEPTED" == true \]\]; then[\s\S]*?macOS and Windows CLI archives[^\n]*\n\s+fi/,
+  )?.[0];
+  assert.ok(disclosureBlock);
+  const renderDisclosure = (physicalPhoneAccepted) => {
+    const result = Bun.spawnSync({
+      cmd: ['bash', '-c', `set -euo pipefail\n${disclosureBlock}`],
+      env: {
+        ...process.env,
+        CHANNEL: 'stable',
+        PHYSICAL_PHONE_ACCEPTED: physicalPhoneAccepted,
+        ACCEPTED_ANDROID_APK_SHA256: digest,
+      },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    assert.equal(result.exitCode, 0, result.stderr.toString());
+    return result.stdout.toString();
+  };
+  const optionalDisclosure = renderDisclosure('false');
+  assert.doesNotMatch(optionalDisclosure, /Physical Android validation|not performed|waiver/);
+  assert.match(optionalDisclosure, /^macOS and Windows CLI archives:/);
+  assert.match(renderDisclosure('true'), new RegExp(`Physical Android validation: accepted for APK SHA-256 .${digest}.`));
 });
 
-test('Stable validation audit and public warning stay truthful and deterministic', () => {
+test('Stable validation audit records optional physical acceptance deterministically', () => {
   const digest = 'b'.repeat(64);
-  const waiver = createStableAndroidValidation({
+  const notPerformed = createStableAndroidValidation({
     physicalPhoneAccepted: 'false',
     acceptedApkSha256: '',
     actualApkSha256: digest,
-    ownerWaiverAcknowledgement: STABLE_ANDROID_WAIVER_PHRASE,
   });
-  assert.deepEqual(waiver, {
-    schemaVersion: 1,
+  assert.deepEqual(notPerformed, {
+    schemaVersion: 2,
     mode: false,
-    authorizationMode: 'owner-waiver-unverified',
+    authorizationMode: 'optional-not-performed',
     physicalPhoneAccepted: false,
     apkSha256: digest,
-    ownerWaiverAcknowledgement: STABLE_ANDROID_WAIVER_PHRASE,
   });
-  const warning = renderStableAndroidValidationWarning(waiver);
-  assert.match(warning, /^> \[!WARNING\]\n/);
-  assert.match(warning, /was not physically validated/);
-  assert.match(warning, /未完成实体机验收/);
-  assert.doesNotMatch(warning, /Physical Android validation: accepted|实体机验收已通过/);
-  assert.match(warning, /\n\n$/);
 
   const physical = createStableAndroidValidation({
     physicalPhoneAccepted: 'true',
     acceptedApkSha256: digest,
     actualApkSha256: digest,
-    ownerWaiverAcknowledgement: '',
   });
-  assert.equal(physical.mode, true);
-  assert.equal(physical.authorizationMode, 'physical-phone');
-  assert.equal(physical.physicalPhoneAccepted, true);
-  assert.equal(physical.ownerWaiverAcknowledgement, null);
-  assert.equal(renderStableAndroidValidationWarning(physical), '');
+  assert.deepEqual(physical, {
+    schemaVersion: 2,
+    mode: true,
+    authorizationMode: 'physical-phone',
+    physicalPhoneAccepted: true,
+    apkSha256: digest,
+  });
 
   assert.throws(() => createStableAndroidValidation({
     physicalPhoneAccepted: 'false', acceptedApkSha256: digest, actualApkSha256: digest,
-    ownerWaiverAcknowledgement: STABLE_ANDROID_WAIVER_PHRASE,
-  }), /empty physically accepted/);
-  assert.throws(() => renderStableAndroidValidationWarning({ ...waiver, mode: true }), /inconsistent/);
+  }), /requires an empty accepted APK SHA-256/);
+  assert.throws(() => createStableAndroidValidation({
+    physicalPhoneAccepted: 'true', acceptedApkSha256: '', actualApkSha256: digest,
+  }), /does not bind the exact Stable APK/);
+  assert.throws(() => createStableAndroidValidation({
+    physicalPhoneAccepted: 'true', acceptedApkSha256: 'a'.repeat(64), actualApkSha256: digest,
+  }), /does not bind the exact Stable APK/);
 });
 
 test('stable rollback creates a higher signed BOM and reuses retained bytes', () => {
@@ -1601,19 +1698,34 @@ test('native signature verification pins platform identities and attests exact a
   assert.match(nativeSigning, /bun install --frozen-lockfile/);
 });
 
-test('dependency audit pins patched transitive releases', () => {
+test('dependency audit pins patched transitive releases', async () => {
   const patchedVersions = {
     '@hono/node-server': '2.0.11',
+    'brace-expansion': '5.0.8',
     'fast-uri': '3.1.4',
     'find-my-way': '9.7.0',
     'fast-xml-parser': '5.10.1',
     'hono': '4.12.27',
     'shell-quote': '1.9.0',
+    'valibot': '1.4.2',
   };
   for (const [name, version] of Object.entries(patchedVersions)) {
     assert.equal(rootPackage.overrides[name], version);
     assert.match(bunLockText, new RegExp(`"${name.replace('/', '\\/')}": \\["${name.replace('/', '\\/')}@${version.replaceAll('.', '\\.')}"`));
   }
+  assert.equal(rootPackage.patchedDependencies['minimatch@3.1.5'], 'patches/minimatch@3.1.5.patch');
+  const minimatchPatch = await readFile(new URL('../patches/minimatch@3.1.5.patch', import.meta.url), 'utf8');
+  assert.match(minimatchPatch, /var \{ expand \} = require\('brace-expansion'\)/);
+  const braceExpansionVersions = [...bunLockText.matchAll(/brace-expansion@(\d+\.\d+\.\d+)/g)].map((match) => match[1]);
+  const valibotVersions = [...bunLockText.matchAll(/valibot@(\d+\.\d+\.\d+)/g)].map((match) => match[1]);
+  assert.deepEqual([...new Set(braceExpansionVersions)].sort(), ['5.0.8']);
+  assert.deepEqual([...new Set(valibotVersions)].sort(), ['1.4.2']);
+  const [legacyMinimatch, modernMinimatch] = await Promise.all([
+    import(new URL('../node_modules/.bun/minimatch@3.1.5/node_modules/minimatch/minimatch.js', import.meta.url)),
+    import(new URL('../node_modules/.bun/minimatch@10.2.5/node_modules/minimatch/dist/commonjs/index.js', import.meta.url)),
+  ]);
+  assert.equal(legacyMinimatch.default('file.ts', '*.{js,ts}'), true);
+  assert.equal(modernMinimatch.minimatch('file.ts', '*.{js,ts}'), true);
   assert.doesNotMatch(bunLockText, /shell-quote@1\.8\.4/);
   assert.doesNotMatch(bunLockText, /find-my-way@9\.6\.0/);
 });
@@ -1622,6 +1734,73 @@ test('required PR hygiene verifies lifecycle trust and release contracts', () =>
   assert.match(typecheckWorkflow, /bun pm untrusted/);
   assert.match(typecheckWorkflow, /Found 0 untrusted dependencies with scripts/);
   assert.match(typecheckWorkflow, /bun test scripts\/release\.test\.ts scripts\/github-release\.test\.ts scripts\/relay-oci-sbom\.test\.ts packages\/lyntty-cli\/scripts\/build-artifact\.test\.ts/);
+});
+
+test('required PR hygiene builds the complete docs site and watches every root source', () => {
+  assert.equal(typecheckWorkflowConfig.name, 'Lyntty CI');
+  assert.deepEqual(typecheckWorkflowConfig.on.pull_request, { branches: ['main'] });
+
+  const repoHygieneJob = typecheckWorkflowConfig.jobs['repo-hygiene'];
+  assert.ok(repoHygieneJob, 'repo-hygiene job must exist');
+  assert.equal(repoHygieneJob.name, 'Repo hygiene');
+  assert.equal(repoHygieneJob.if, undefined);
+
+  const docsInstall = repoHygieneJob.steps.find((step) => step.name === 'Install docs toolchain');
+  const docsTrust = repoHygieneJob.steps.find((step) => step.name === 'Verify docs lifecycle-script trust');
+  const docsBuild = repoHygieneJob.steps.find((step) => step.name === 'Check and build complete docs site');
+  assert.deepEqual(docsInstall, {
+    name: 'Install docs toolchain',
+    'working-directory': 'docs/.site',
+    run: 'bun install --frozen-lockfile --ignore-scripts',
+  });
+  assert.equal(docsTrust['working-directory'], 'docs/.site');
+  assert.match(docsTrust.run, /bun pm untrusted/);
+  assert.deepEqual(docsBuild, {
+    name: 'Check and build complete docs site',
+    'working-directory': 'docs/.site',
+    run: 'bun run docs:audit\nbun run docs:check\nbun run docs:build\n',
+  });
+  assert.equal(repoHygieneJob.steps.indexOf(docsInstall) < repoHygieneJob.steps.indexOf(docsTrust), true);
+  assert.equal(repoHygieneJob.steps.indexOf(docsTrust) < repoHygieneJob.steps.indexOf(docsBuild), true);
+  assert.equal(repoHygieneJob['continue-on-error'], undefined);
+
+  assert.deepEqual(docsWorkflowConfig.on.push.branches, ['main']);
+  assert.equal(docsWorkflowConfig.on.workflow_dispatch, null);
+  const deploymentPaths = docsWorkflowConfig.on.push.paths;
+  for (const sourceGlob of ['docs/**', 'CONTRIBUTING*.md', 'PRIVACY*.md', 'SECURITY*.md']) {
+    assert.equal(deploymentPaths.includes(sourceGlob), true, `${sourceGlob} must trigger Pages deployment`);
+  }
+  assert.deepEqual(docsWorkflowConfig.permissions, {});
+  assert.deepEqual(docsWorkflowConfig.jobs.build.permissions, { contents: 'read' });
+  assert.deepEqual(docsWorkflowConfig.jobs.deploy.permissions, {
+    pages: 'write',
+    'id-token': 'write',
+  });
+
+  for (const [jobName, job] of Object.entries(docsWorkflowConfig.jobs)) {
+    if (jobName === 'deploy') continue;
+    assert.notEqual(job.permissions?.pages, 'write');
+    assert.notEqual(job.permissions?.['id-token'], 'write');
+  }
+
+  const deployBuildSteps = docsWorkflowConfig.jobs.build.steps;
+  const docsInstallSteps = deployBuildSteps.filter((step) => /^bun install(?:\s|$)/.test(step.run ?? ''));
+  assert.equal(docsInstallSteps.length, 1);
+  assert.equal(docsInstallSteps.every((step) => step.run.includes('--ignore-scripts')), true);
+  assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:audit'), true);
+  assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:check'), true);
+  assert.equal(deployBuildSteps.some((step) => step.run === 'bun run docs:build'), true);
+  assert.equal(deployBuildSteps.some((step) => `${step.uses ?? ''}`.startsWith('actions/configure-pages@')), false);
+
+  const deployJob = docsWorkflowConfig.jobs.deploy;
+  assert.equal(deployJob.needs, 'build');
+  assert.deepEqual(deployJob.steps, [
+    { uses: 'actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b' },
+    {
+      id: 'deployment',
+      uses: 'actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e',
+    },
+  ]);
 });
 
 test('supported CLI artifacts run on every release architecture in PR CI', () => {

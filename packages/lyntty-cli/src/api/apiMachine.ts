@@ -83,7 +83,7 @@ interface DaemonToServerEvents {
 type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
     resumeSession?: (sessionId: string) => Promise<SpawnSessionResult>;
-    listPiSessions?: (options?: { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }) => Promise<{ sessions: PiSessionRecoveryRecord[]; nextCursor?: string; total: number }>;
+    listPiSessions?: (options?: { cwd?: string; scope?: 'cwd' | 'machine'; limit?: number; cursor?: string }) => Promise<{ sessions: PiSessionRecoveryRecord[]; nextCursor?: string; total: number; refreshing?: boolean }>;
     ensurePiSessionMirror?: (options: { piSessionId: string; directory?: string; machineId?: string }) => Promise<{ type: 'success'; sessionId: string; sent: number } | { type: 'error'; errorMessage: string }>;
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
