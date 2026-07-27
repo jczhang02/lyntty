@@ -1,0 +1,64 @@
+R125 autonomous Release Notes metadata
+Date: 2026-07-27
+Worktree: /home/jc/dev/lyntty/worktrees/stable-1.2.2-publication
+Branch: feat/autonomous-release-notes
+Base: origin/main@3022a9eec0ea5be44ce37803ce03302ca477de2f
+Implementation commit: 2911948bb0c4c6e02e9714de109b38135dc1bbac (GPG verified)
+Bead: lyntty-b0u
+
+RED 1
+Command: bun test scripts/release-agent-rules.test.mjs
+Result: 1 pass, 3 fail
+Observed contracts missing from the old policy:
+- AGENTS.md did not permit proactive release-notes invocation.
+- release-flow required explicit user invocation and prohibited inference.
+- release-notes still contained disable-model-invocation: true.
+
+GREEN 1
+Command: bun test scripts/release-agent-rules.test.mjs
+Result: 4 pass, 0 fail
+
+INDEPENDENT REVIEW
+Result: two P2 findings, no P0/P1.
+- Creative fallbacks could imply unsupported product guarantees.
+- Tests did not directly bind proactive invocation to read-only drafting and exact-draft/target publication authority.
+
+RED 2
+Command: bun test scripts/release-agent-rules.test.mjs
+Result: 3 pass, 1 fail
+Observed contract missing before the review fix:
+- neutral, descriptive, non-promissory CodeName and fallback policy.
+
+GREEN 2
+Command: bun test scripts/release-agent-rules.test.mjs
+Result: 4 pass, 0 fail
+
+BROAD GATES
+Command: bun run test:repo-hardening
+Result: 85 pass, 0 fail
+
+Command: bun pm untrusted
+Result: Found 0 untrusted dependencies with scripts.
+
+Command: bun run ci:audit
+Result: No vulnerabilities found
+
+Command: cd docs/.site && bun audit --audit-level=moderate
+Result: No vulnerabilities found
+
+Command: cd docs/.site && bun run docs:check
+Result: Prepared 42 Fumadocs pages; MDX generation and TypeScript checks passed
+
+Command: R125 local-link and paired-heading check
+Result: 1 local link and 7 section headings per language; all targets exist
+
+Command: git diff --check
+Result: PASS
+
+FINAL INDEPENDENT REVIEW
+Result: VERIFIED_NO_P0_P1_P2
+
+LIVE MUTATIONS
+- No GitHub Release edit/create/delete operation was run.
+- No workflow was dispatched.
+- No tag, asset, Latest state, package, or runtime was changed.
