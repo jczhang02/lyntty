@@ -12,7 +12,7 @@
       "name": "lyntty-app",
       "version": "1.2.2",
       "dependencies": {
-        "@expo/ui": "~55.0.5",
+        "@expo/ui": "~57.0.10",
         "@expo/vector-icons": "^15.0.2",
         "@more-tech/react-native-libsodium": "^1.5.5",
         "@paralleldrive/cuid2": "^2.3.1",
@@ -642,7 +642,7 @@
 
     "@expo/sudo-prompt": ["@expo/sudo-prompt@9.3.2", "", {}, "sha512-HHQigo3rQWKMDzYDLkubN5WQOYXJJE2eNqIQC2axC2iO3mHdwnIR7FgZVvHWtBwAdzBgAP0ECp8KqS8TiMKvgw=="],
 
-    "@expo/ui": ["@expo/ui@55.0.17", "", { "dependencies": { "sf-symbols-typescript": "^2.1.0" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-NW/wFs+mhQeA/5W0yUNn6qKRNJBGiuF7NjCLZDFvg5Tyd+hDUEDEhBsLvI9MJ8B2aYuGcbuH9XZBIPF22LMrfQ=="],
+    "@expo/ui": ["@expo/ui@57.0.10", "", { "dependencies": { "sf-symbols-typescript": "^2.1.0", "vaul": "^1.1.2" }, "peerDependencies": { "@babel/core": "*", "expo": "*", "react": "*", "react-dom": "*", "react-native": "*", "react-native-worklets": "*" }, "optionalPeers": ["@babel/core", "react-dom", "react-native-worklets"] }, "sha512-cYVo6R6JmJgza2p1jyE1lGfNPWncHJGWRxhTyOi+pLRAAdiwo8Z2LcdaArewEXVUwJTQhczLRxeXGL0i99NUwQ=="],
 
     "@expo/vector-icons": ["@expo/vector-icons@15.1.1", "", { "peerDependencies": { "expo-font": ">=14.0.4", "react": "*", "react-native": "*" } }, "sha512-Iu2VkcoI5vygbtYngm7jb4ifxElNVXQYdDrYkT7UCEIiKLeWnQY0wf2ZhHZ+Wro6Sc5TaumpKUOqDRpLi5rkvw=="],
 
